@@ -1,8 +1,10 @@
 # Traceability — Cannon Academy engine + content core
 
 Requirement → ticket(s), for everything in this swarm's scope (`src/engine/**`, `src/content/**`).
-Written at Phase 1 planning, 2026-07-27. **Revision 2** after two independent adversarial plan
-reviews. Four sections:
+Written at Phase 1 planning, 2026-07-27. **Revision 3** — two independent adversarial plan reviews
+(rev 2) followed by the owner's rulings D-1…D-5 at the Phase 1 checkpoint (rev 3). Resolved items
+are struck through and kept in place with their ruling and date, so the reasoning survives and
+nobody reopens them. Four sections:
 
 1. **Coverage** — every engine-relevant requirement in `PLAN.md` / `ARCHITECTURE.md` and the
    ticket that serves it.
@@ -50,7 +52,7 @@ reviews. Four sections:
 | Bot delays PRNG-drawn or presentational, **never wall-clock** | T-018 (AC-8, AC-9), T-021 (AC-14, AC-18) |
 | Banded bot accuracy tracking player accuracy minus a margin (mercy) | T-021 (AC-4, AC-6, AC-19) |
 | Scripted onboarding rival on the same interface | T-018 (AC-2, AC-3) |
-| **Seed + ordered per-volley action log `{actor, cannonId, correct, elapsedMs}` = exactly reconstructable duel** | T-013 (AC-11), T-023 (AC-1, AC-2, AC-7, AC-13) |
+| **Seed + ordered per-volley action log `{actor, cannonId, correct, elapsedMs}` = exactly reconstructable duel** | T-013 (AC-11), **T-024 (AC-19 reconstruction, AC-20 negative control, AC-21 branch coverage, AC-22 soundness premise)**. Proven as a property over the fuzz corpus, not packaged as a module — `duel/replay.ts` cut by owner ruling D-5 |
 | Turn-token discard of stale promises; teardown cancellation | **OUT OF SCOPE** — `src/stores/**`. T-013/T-020 supply the `turnToken` the driver compares. |
 
 ### ARCHITECTURE.md §4.3 — Damage model
@@ -84,13 +86,13 @@ reviews. Four sections:
 |---|---|
 | `rng.ts` | T-001 |
 | `questions/` — types, generator, distractors, safe constraint eval | T-002, T-003, T-005, T-007 |
-| `duel/` — DuelState, events, reducer, damage | T-008, T-013, T-020, T-022, T-023, T-024 |
+| `duel/` — DuelState, events, reducer, damage | T-008, T-013, T-020, T-022, T-024 |
 | `opponents/` — Opponent interface, bots, mercy, scripted rival | T-018, T-021 |
 | `economy.ts` | T-009 |
 | `mastery.ts` | T-010 |
 | `tuning.ts` | T-004 |
 | `src/content/` — JSON catalogs + zod schemas | T-003, T-006, T-014, T-015, T-016, T-019 |
-| *(added)* `placement.ts`, `ranks.ts`, `drill.ts`, `duel/replay.ts`, `duel/invariants.ts` | T-011, T-012, T-017, T-023, T-024 — five modules not named in §8; each is tagged `proposed` in its ticket with the PLAN/ARCHITECTURE line it serves |
+| *(added)* `placement.ts`, `ranks.ts`, `drill.ts`, `duel/invariants.ts` | T-011, T-012, T-017, T-024 — four modules not named in §8; each is tagged `proposed` in its ticket with the PLAN/ARCHITECTURE line it serves. A fifth, `duel/replay.ts`, was planned and then **cut** (owner ruling D-5) |
 
 ### ARCHITECTURE.md §9 — Testing strategy
 
@@ -110,9 +112,9 @@ reviews. Four sections:
 |---|---|
 | `rankTier` is **numeric** (string ranks sort alphabetically and break the ladder) | T-012 (DoD) |
 | `mastery: {skillId: 0-100}` persisted shape | T-010 (AC-8, `MASTERY_METER_MAX`) |
-| `duels/{id}: { seed, actions[] }` replayable | T-013 (AC-11), T-023 (AC-12) |
+| `duels/{id}: { seed, actions[] }` replayable | T-013 (AC-11), T-024 (AC-19 — the log is JSON round-tripped before reconstruction, proving it is a valid wire format) |
 | Firestore, Auth, sync, leaderboard mirror, TTL | **OUT OF SCOPE** (`.tdd-swarm/posture.md`) |
-| §13 ghost-captain async PvP | `deferred` — T-023 delivers the reconstruction primitive; the `Opponent` adapter is documented, not built |
+| §13 ghost-captain async PvP | `deferred` — the engine is **proven** replayable (T-024 AC-19–AC-22); neither the reconstruction module nor the `Opponent` adapter is built |
 | §11 captain-name **wordlist filter** | **GAP — see §3.9** |
 
 ### PLAN.md — design requirements
@@ -176,25 +178,22 @@ handled one of two ways:
 
 | when it must be answered | items |
 |---|---|
-| **Before wave 1 dispatch** | none. 2.10's blast radius was neutralised by adding `difficulty?: 1 \| 2 \| 3` to `templateSchema` as insurance (T-003 AC-17), and 2.5's three-tier `ChestRarity` is now stated as a `(R)` assumption rather than an implicit one. |
-| **Before wave 3 dispatch** | **2.2** (Reliable vs Standard on a miss). If `reliable` grants a re-answer, that is a new reducer transition and possibly a new phase — a T-020 supersede, and T-008 changes too. |
-| **Before wave 5 dispatch** | **2.9** (templates per skill: 15–25 vs ≥8). Determines the size of three tickets. |
-| **Before wave 6 dispatch** | **2.10** (Double-Shot semantics). With the insurance field in place this is now a T-022-local patch plus content authoring, not a cross-wave supersede. |
-| **Any time** | 2.1, 2.14, 2.16 (one-line data edits or gap-only). All **(B)** items — never blocking. |
-| **Scoping calls, answer before wave 5 / wave 7 respectively** | **2.18** (T-020 / T-021 sizing), **2.19** (whether T-023 is built at all). |
+| **Nothing blocks any wave.** The four questions that carried a dispatch deadline were closed by owner rulings D-1…D-4 on 2026-07-27. | — |
+| **Any time** | **2.5** (chest rarity tier count — the planner assumed three, and that assumption is already baked into a wave-1 id union plus two frozen suites, so it is the most expensive of the three to change later), **2.14** (fog lifts on any one mastered range skill), **2.16** (captain-name wordlist, gap 3.9). |
+| **Accepted disposition, no answer required** | **2.18** (ticket sizing — the planner's recommendation stands by default). |
 
 | # | question | source ambiguity | handling |
 |---|---|---|---|
-| 2.1 | **Culverin recoil.** PLAN.md's armory writes `Volatile (5/8/10)` for three guns but `Volatile (crit)` for the Culverin. §Risks says the starter guns "can't punish" K players. | PLAN.md §The armory vs §Risks | **(R)** T-006 sets `culverin.recoilDamage = 0` and reads "crit" as its wide 4–16 spread; the three documented values are pinned exactly (T-006 AC-4). One-line data edit if wrong. |
-| 2.2 | **Reliable vs Standard on a miss.** "Reliable guns never punish a miss" vs "Standard guns waste the turn" — at the damage layer these are identical. | PLAN.md §The duel loop | **(R) — answer before wave 3.** T-008 and T-020 treat them identically. If `reliable` should grant a re-answer, that is a **new reducer transition** and possibly a new `DuelState` phase: a T-020 supersede, not a patch, and T-013's phase list would reopen too. This is the highest-blast-radius unanswered question in the set. |
+| ~~2.1~~ | **RESOLVED — owner ruling D-3, 2026-07-27: `culverin.recoilDamage = 0`.** PLAN.md's armory writes `Volatile (5/8/10)` for three guns but `Volatile (crit)` for the Culverin, while §Risks says the starter gun "can't punish". The planner read "crit" as the wide 4–16 spread rather than a recoil; the owner accepted that reading. `temperament: 'volatile'` is retained with `recoilDamage: 0`. Recorded in T-006 as `locked-decision`. |
+| ~~2.2~~ | **RESOLVED — owner ruling D-4, 2026-07-27: identical at the damage layer, flavour only.** Neither deals recoil, both lose the turn, there is no re-answer mechanic, **no new reducer transition and no new phase**. T-008 and T-020 were correct as written and are re-tagged `locked-decision`. The owner's accompanying note, verbatim: *"identical but i think there should be some very powerful weapons that do cause recoil if answered incorrectly"* — already satisfied by the Volatile tier (`double_broadside` 5, `powder_keg` 8, `long_nine` 10), pinned exactly by T-006 AC-4 and asserted by T-008 AC-9, so **no change follows from it**. This was the only remaining question that could have forced a T-020 supersede; closed before wave 3. |
 | 2.3 | **Enemy hull for islands 2–5.** Only "40–50 at the start" and "scale by island" are given. | PLAN.md §The duel loop, ARCHITECTURE.md §4.3 | **(B)** T-004 AC-2: first island in `[40,50]`, strictly increasing by island order. |
 | 2.4 | **Coin payout coefficients.** Inputs are named (win, accuracy, perfects); no numbers, only "a small purse" on a loss. | PLAN.md §Treasure chests | **(B)** T-004 AC-6 + T-009 AC-1…AC-4: loss < win, loss > 0, monotone in accuracy and in perfects. |
 | 2.5 | **Chest rarity tiers, weights, and coin ranges.** PLAN.md names no tiers and no weights. | PLAN.md §Treasure chests | **(R) for the tier count, (B) for the values.** `ChestRarity` is a **wave-1 id union** in T-003, and T-004 AC-7 plus T-009 AC-8/AC-10 are all written against exactly three tiers — so changing the count later is a wave-1 schema edit plus two frozen suites. Three is the planner's assumption, not a sourced fact. Weights/ranges are behaviour-pinned (positive, summing to 1, strictly decreasing, with strictly increasing coin ranges). |
 | 2.6 | **Bot mercy margin, accuracy window, per-band accuracy clamps.** | PLAN.md §Opponents | **(B)** T-004 AC-8 + T-021 AC-4…AC-6: within band, below player accuracy where the clamp allows, monotone in player accuracy, bands non-decreasing across grade. |
 | 2.7 | **Rank `minWins` thresholds.** Five ranks named; advancement "by duel wins"; no numbers. | PLAN.md §Sea chart | **(B)** T-006 AC-7: `cadet.minWins === 0`, strictly increasing across tiers. |
 | 2.8 | **Recent-template exclusion window size.** | ARCHITECTURE.md §4.1 | **(B)** T-004 AC-4: integer in `[1, 8]`, below the per-skill template floor. |
-| 2.9 | **Templates per skill — the documents conflict.** ARCHITECTURE.md §4.1 says "15–25 golden parameterized shapes per skill"; PLAN.md day 3 says "≥8 templates/skill floor". | direct contradiction | **(R)** T-014/15/16/19 enforce **≥8** (the explicitly written floor) with no cap. If 15–25 is the real target, three tickets grow rather than change shape. |
-| 2.10 | **What "a harder variant of the same skill" means for Double-Shot**, plus the timer factor and volley count. | PLAN.md §The duel loop | **(R) — answer before wave 6.** T-022 models it as the same question under a shortened timer, which composes with the existing quality curve and needs no content change. If harder *templates* are intended instead, T-022 is superseded rather than patched. **Blast radius reduced in rev 2:** `difficulty?: 1 \| 2 \| 3` is now carried on `templateSchema` (T-003 AC-17) as unused insurance, so the alternative answer no longer reopens a frozen wave-1 schema — it becomes a T-022 rewrite plus content authoring. |
+| ~~2.9~~ | **RESOLVED — owner ruling D-1, 2026-07-27: a floor of 8 per skill, no cap.** Resolved *in the source document*: `PLAN.md:73` now reads "a floor of 8 golden parameterized shapes per skill (the build target; 15–25 per skill is the post-MVP content goal, not a day-3 requirement)", which removes the conflict with PLAN.md's own day-3 row. **ARCHITECTURE.md §4.1 never stated a count** — the planner's T-014 `traces_to` had misattributed the "15–25" figure to it, and that citation is corrected. T-014/15/16/19 keep `>= 8` unchanged and are re-tagged `locked-decision`. |
+| ~~2.10~~ | **RESOLVED — owner ruling D-2, 2026-07-27: a shortened timer on the same question pool.** The alternative reading (draw from harder templates) would have required a difficulty rating for ~72 authored templates. The owner ruled for the planner's modelling; T-022's mechanic is re-tagged `locked-decision`. `templateSchema`'s `difficulty?: 1 \| 2 \| 3` (T-003 AC-17) **stays** as declared insurance and remains unread by T-007 and every content ticket — cheap protection that is now dormant rather than load-bearing. `DOUBLE_SHOT_TIMER_FACTOR` and `DOUBLE_SHOT_VOLLEY_COUNT` remain behaviour-pinned by T-004 AC-11. |
 | 2.11 | **Perfect Shot bonus ball damage** and the base ball count per volley. | ARCHITECTURE.md §4.3 says "+1 bonus ball" with no value | **(B)** T-004 AC-3: both integers `>= 1`; T-008 AC-7 pins that a perfect shot strictly exceeds a non-perfect one at equal inputs. |
 | 2.12 | **`QUALITY_WEIGHT`** — how strongly answer speed biases the roll, and the **effect-size floor** that keeps it honest. ARCHITECTURE.md says "biased by" and gives no curve. | ARCHITECTURE.md §4.3 | **(B)** T-004 AC-3 (`0 < w <= 1`), T-008 AC-4/AC-5 (in range, monotone), **and new in rev 2** T-008 AC-16: the mean roll at full quality must exceed the mean at the floor by `>= 0.10 * range`. Without AC-16 an implementation could set `w = 0.001` — passing everything while making "answer speed aims the shot" statistically undetectable. **The `0.10` threshold is itself unsourced**; it implies roughly `QUALITY_WEIGHT >= 0.62` and is deliberately a floor, not a target. Raise or lower it if the felt effect is wrong on-device. |
 | 2.13 | **Distractor plausibility thresholds** — "plausibly typed (same magnitude/sign)" is prose. | ARCHITECTURE.md §4.1 | **(B)** T-005 operationalises it as a four-clause rule over `DISTRACTOR_MAX_RATIO` / `DISTRACTOR_ABS_FLOOR`; T-004 AC-5 pins their bounds. |
@@ -207,8 +206,8 @@ handled one of two ways:
 
 | # | decision | what it costs either way | recommendation |
 |---|---|---|---|
-| 2.18 | **Do T-020 (24 ACs, one file) and T-021 (19 ACs, two files) get split?** Both exceed the ticket-format guidance of "~half a day / ≤8 DoD items". T-020 additionally sits on the critical path in the run's peak-load wave (5). | **Keep whole:** one agent holds the entire transition table, which is where reducer bugs actually live — a split along phases would give two agents overlapping `file_scopes` in the same wave, which the parallel model forbids, so a split necessarily means an extra wave. **Split:** T-020 could shed its rival-turn half (AC-13–AC-15, AC-18) into a wave-6 follow-up; T-021 could separate `mercy.ts` (pure policy, ~10 ACs) from `bot.ts` (~9 ACs) — those two files have no circular dependency, so this one costs nothing but a wave. | **Keep T-020 whole; split T-021 only if wave 6 is running light.** T-020's ACs are numerous because the transition table is exhaustively enumerated, not because it spans two concerns; splitting a state machine mid-table is how soft-locks get in. T-021's split is genuinely cheap — but its two files are coupled by design and the coordination cost is real. Both are flagged, not defaulted. |
-| 2.19 | **Is `duel/replay.ts` (T-023) built at all?** It is the plan's strongest cut-line candidate. | **Build it (current plan):** one `capable` ticket, 13 ACs, in wave 7. It makes ARCHITECTURE.md §4.2's claim — "seed + action log = an exactly reconstructable duel" — falsifiable while the machine is small, and it is the primitive both §13 futures (ghost-captain PvP, server-validated payouts) need. **Cut it:** the MVP-facing half of that claim is *already* covered without it — mid-duel kill/relaunch is T-013 AC-6 and T-020 AC-20, and determinism is T-020 AC-19. What `replay.ts` adds beyond those serves only features ARCHITECTURE.md §13 explicitly declines to build. | **Cut-line candidate, owner's call.** Against a 5-day timebox with an explicit cut list, this is the one shipped module in the plan whose only beneficiaries are documented-not-built features. If it is cut, keep the property as one AC inside T-024's fuzz ("re-dispatching a recorded event stream reproduces the final state") and drop the module — that retains the architectural check for roughly a tenth of the cost. Wave 7 would then hold T-024 alone. |
+| 2.18 | **ACCEPTED DISPOSITION, 2026-07-27 — owner did not overrule, so the planner's recommendation stands: keep T-020 whole; split T-021's `mercy.ts` / `bot.ts` only if wave 6 runs light.** T-020's 24 ACs are numerous because the transition table is exhaustively enumerated, not because it spans two concerns, and a split along phases would put two agents on the same file in the same wave — which the parallel model forbids, so it would cost an extra wave. T-021's two files have no circular dependency, so that split is cheap but buys little. **Re-flagged by rev 3:** T-024 has grown to 22 ACs across three suites after absorbing the cut T-023, and now sits alone in wave 7. It is not on anyone's critical path and has no same-wave sibling to contend with, so the planner does not recommend splitting it either — but the owner should know its size changed. |
+| ~~2.19~~ | **RESOLVED — owner ruling D-5, 2026-07-27: CUT.** `tickets/T-023.md` is deleted and no `src/engine/duel/replay.ts` module is built. The module served only ARCHITECTURE.md §13 features the architecture explicitly declines to build, and the MVP-facing half of its claim was already covered by T-013 AC-6 and T-020 AC-19/AC-20. **The property is not cut** — it moved into T-024 as AC-19 (reconstruct every terminal duel in a 200-duel fuzz corpus from `seed` + a JSON-round-tripped action log, final *and* intermediate states deeply equal), AC-20 (negative control: a wrong seed must fail to reproduce), AC-21 (the corpus must contain a volatile misfire, a Perfect Shot, a Double-Shot turn and a timeout, or the test fails on an unrepresentative sample), and AC-22 (which wrong choice was tapped provably does not affect state — the premise that lets the driver reconstruct an index the log never records). The planner confirms this is an **honest** proof: reconstruction dispatches through the real `duelReducer`, so no rule is reimplemented, and the corpus is larger than the module's own suite would have been. What is genuinely lost is the module's error surface (typed failures for a truncated / out-of-order / bad-`cannonId` log) — properties of a wrapper, not of the engine, with no consumer while §13 is unbuilt. |
 
 ---
 
@@ -228,8 +227,9 @@ Listed so the absence is a decision, not an oversight.
 | 3.8 | **Faction taxonomy** — rival cadets vs pirate crews vs bosses | PLAN.md day 3 calls it "faction opponent variety". T-018/T-021 carry an opaque `id` string, which is the whole mechanical surface; anything more is art and copy. | `scope-cut` |
 | 3.9 | **Captain-name wordlist filter** (ARCHITECTURE.md §11) | This *is* pure-TS, in-scope-shaped work, and it is the only user-generated text in the product — the one place a child-safety promise is made and not tested. No ticket exists because the wordlist itself is content nobody has specified (source, language coverage, match strategy). **Recommend a T-025 once the human answers 2.16.** | `research-required` |
 | 3.10 | **"Tap-the-picture" fraction choices** (PLAN.md §The armory) | Needs an image asset pipeline and a non-numeric `Choice` shape, both out of this swarm's scope. T-016 ships integer-answerable fractions, which PLAN.md offers as the primary option. | `scope-cut` |
-| 3.11 | **Ghost-captain `Opponent` adapter** (ARCHITECTURE.md §13) | Explicitly "documented, not built" in the source. T-023 delivers the seed+log reconstruction primitive it would need, and tests ARCHITECTURE.md's claim that the primitive works. **Recorded as an accepted deviation, not as ordinary coverage:** T-023 ships a module whose only beneficiaries are §13 futures. See owner decision 2.19. | `deferred` (adapter) · **accepted deviation** (the primitive) |
-| 3.12 | **Server-validated economy** (ARCHITECTURE.md §13) | Cloud Functions — out of this swarm's scope. T-023 and T-009 keep it possible by making payouts a pure function of a replayable log. | `deferred` |
+| 3.11 | **Ghost-captain `Opponent` adapter** (ARCHITECTURE.md §13) | Explicitly "documented, not built" in the source, and nothing here changes that. The engine it would sit on is **proven** replayable by T-024 AC-19–AC-22, so the adapter is thin work whenever a real consumer appears. | `deferred` |
+| 3.13 | **`src/engine/duel/replay.ts`** — a shipped module wrapping seed + action log reconstruction | **Cut by owner ruling D-5, 2026-07-27.** It was planned (T-023, 13 ACs, its own wave) and deleted at the Phase 1 checkpoint. Its only beneficiaries were the two ARCHITECTURE.md §13 features the architecture explicitly declines to build; the MVP-facing half of its claim was already covered by T-013 AC-6 and T-020 AC-19/AC-20. **The architectural property it existed to prove is still proven** — T-024 AC-19–AC-22 reconstruct every terminal duel in a 200-duel fuzz corpus through the real `duelReducer`, with a negative control and a corpus-representativeness guard. What is gone is the wrapper's own error surface (typed failures for a truncated, out-of-order, or bad-`cannonId` log), which has no consumer today. Writing the wrapper later is thin work over an engine already proven replayable. | `scope-cut` |
+| 3.12 | **Server-validated economy** (ARCHITECTURE.md §13) | Cloud Functions — out of this swarm's scope. T-009 and T-024's replay proof keep it possible by making payouts a pure function of a log that is proven to reconstruct the duel exactly. | `deferred` |
 
 ### Requirements deliberately excluded as out of scope
 
@@ -255,9 +255,10 @@ through `createScriptedOpponent` and `createBotOpponent`, which both de-orphans 
 provides the only in-scope exercise of ARCHITECTURE.md §4.2's async↔sync seam.
 
 Still consumed only by out-of-scope callers, which is expected and covered by the waiver:
-`economy.ts` (store), `placement.ts` (onboarding screen), `ranks.ts` (store), `drill.ts`
-(`app/range.tsx`), `duel/invariants.ts` (`app/dev.tsx` — though T-024's own fuzz drives it), and
-`duel/replay.ts` (§13 futures — see owner decision 2.19).
+`economy.ts` (store), `placement.ts` (onboarding screen), `ranks.ts` (store), and `drill.ts`
+(`app/range.tsx`). `duel/invariants.ts` is exercised by T-024's own fuzz after every dispatch, so
+it is not an orphan even though its eventual UI consumer (`app/dev.tsx`) is out of scope.
+`duel/invariants.ts` is now driven by T-024's own fuzz, so it is no longer in this list. `duel/replay.ts` was cut (owner ruling D-5) and no longer exists.
 
 ---
 
@@ -266,6 +267,10 @@ Still consumed only by out-of-scope callers, which is expected and covered by th
 Both reviewers were right about every Critical and Important finding, and all of them are fixed.
 Three recommendations were **not** followed as written. Evidence for each, so the coordinator can
 overrule me if I have this wrong.
+
+*Sections 4.1–4.3 are a historical record of the rev-2 review round and refer to the plan as it
+stood then, including the since-cut T-023. Section 4.4 records the one place rev 3 asked for a
+judgment rather than compliance.*
 
 ### 4.1 The "8 waves → 7" arithmetic in the coupling review is inconsistent with its own F3 recommendation
 
@@ -331,3 +336,28 @@ ticket's `file_scopes`). It is written into T-002 AC-1 as an explicit **orchestr
 required before T-002 is dispatched**, including the lesson L-001 requirement to prove the rules
 firing on a synthetic violation. The scans stay in all four tickets as secondary defence, per the
 coordinator's instruction.
+
+### 4.4 D-5 asked whether the replay property can be honestly proven without the module — it can
+
+The coordinator's instruction was explicit: if the seed-plus-log claim cannot be honestly proven
+inside T-024 without shipping `duel/replay.ts`, say so rather than comply. **It can be, and the
+proof is stronger than the module's would have been.** The reasoning, so this is auditable:
+
+- **No rule is reimplemented.** The reconstruction driver dispatches through the real
+  `duelReducer`. That was already true of the cut T-023 — the driver was always ~15 lines of
+  event-sequencing over the reducer, never a second implementation of the rules. Whether those 15
+  lines live in `replay.test.ts` or in a shipped module has no bearing on what the test proves.
+- **The corpus is larger.** T-023 planned 50 hand-built duels plus one scripted example per
+  branch. T-024 already generates thousands of seeded duels and now reconstructs a 200-duel
+  terminal subset, with AC-21 *failing* the suite if that subset lacks a volatile misfire, a
+  Perfect Shot, a Double-Shot turn, or a timeout.
+- **The one genuine soundness gap is closed explicitly.** The action log records `correct`, not
+  `choiceIndex`, so any reconstruction must invent an index. T-023 relied on that being harmless;
+  AC-22 now *proves* it — two different wrong indices produce deeply equal states and identical
+  log entries.
+- **The negative control survived the cut.** AC-20 keeps the assertion that a wrong seed fails to
+  reproduce, which is what stops AC-19 passing vacuously against a driver that ignores the seed.
+
+What genuinely does not survive: typed errors for a truncated, out-of-order, or bad-`cannonId`
+log. Those are properties of a wrapper's input validation, not of the engine, and they have no
+consumer while ARCHITECTURE.md §13 remains unbuilt. Recorded as gap 3.13.

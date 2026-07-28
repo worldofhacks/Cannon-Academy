@@ -81,6 +81,48 @@ before wave 3 — it is the only open question that could still force a reducer 
 `js.configs.recommended`, so nothing currently catches aliased dynamic code in the expression
 evaluator.
 
+**Status: Phase 1 rev 2 complete.** Superseded by rev 3 below.
+
+---
+
+## Phase 1 rev 3 — owner rulings applied (2026-07-27)
+
+Owner ruled on the open questions at the Phase 1 checkpoint. All five decisions applied and
+recorded **in the tickets themselves**, dated, tagged `locked-decision`, so they cannot be
+silently reopened.
+
+- **D-1 template count** — floor of 8 per skill, no cap. The owner amended `PLAN.md:73`, so the
+  source documents no longer conflict. Also corrected a **planner citation error**: T-014's
+  `traces_to` had attributed the "15–25" figure to ARCHITECTURE.md §4.1, which never stated a
+  count — it was PLAN.md §Questions all along.
+- **D-2 Double-Shot** — shortened timer on the same question pool. `difficulty?: 1 | 2 | 3` stays
+  in T-003 as dormant insurance.
+- **D-3 Culverin** — `recoilDamage = 0`; "crit" reads as the wide 4–16 spread.
+- **D-4 Reliable vs Standard** — identical at the damage layer, flavour only. **No new reducer
+  transition, no new phase.** The owner's note that powerful weapons should recoil is already
+  satisfied by the Volatile tier (5 / 8 / 10, T-006 AC-4), so nothing follows from it. This was
+  the last question that could have forced a T-020 supersede — closed before wave 3.
+- **D-5 replay** — `tickets/T-023.md` **deleted**; no `src/engine/duel/replay.ts`. The property it
+  proved moved into T-024 as AC-19 (reconstruction over a 200-duel corpus with the log JSON
+  round-tripped), AC-20 (negative control), AC-21 (corpus branch coverage), AC-22 (soundness of
+  reconstructing an unrecorded choice index). The planner confirms this is an honest proof —
+  reasoning in `.tdd-swarm/traceability.md` §4.4. What is lost is the wrapper's own input-validation
+  error surface, recorded as gap 3.13 `scope-cut`.
+- **2.18 sizing** — owner did not overrule; the planner's disposition is now the accepted one.
+
+**Measured after the changes: 23 tickets, 7 waves, 338 acceptance criteria.** Re-verified
+mechanically — no unknown or cyclic dependencies, no back-edges, every ticket at the earliest wave
+its dependencies allow, no same-wave `file_scopes` or `test_scopes` collision, AC ids contiguous in
+every ticket, every self- and cross-ticket AC citation resolves, every ticket has a non-empty
+`traces_to`, prettier clean, all 23 parse under spec-lint.
+
+Still open, none blocking any wave: **2.5** (chest rarity tier count — three was a planner
+assumption baked into a wave-1 id union), **2.14** (fog lifts on any one mastered range skill),
+**2.16** (captain-name wordlist, gap 3.9, would become T-025).
+
+**Orchestrator action still outstanding, before dispatching T-002:** add `no-eval` /
+`no-implied-eval` / `no-new-func` to the engine+content ESLint block and prove them firing (L-001).
+
 **Status: Phase 1 COMPLETE — tickets frozen, awaiting Wave 1 dispatch.**
 
 ## Phase 1 — Plan (2026-07-27)
@@ -128,3 +170,29 @@ Still open, none blocking waves 1–3: 2.5 (chest tier count), 2.14 (fog-lift ru
 2.16 / gap 3.9 (captain-name wordlist — the one child-safety promise with no test).
 
 **Status: Phase 1 COMPLETE, owner-approved.** Next: Phase 2 — write and freeze wave 1 tests.
+
+## Phase 2 — Wave 1 tests (RED), dispatched 2026-07-27
+
+Plan re-verified by orchestrator after owner decisions: **23 tickets · 7 waves · 338 ACs**
+(T-023 cut per D-5). No cycles, no back-edges, every ticket at earliest wave, no same-wave
+file or test-scope collisions. Matches the Planner's reported numbers exactly.
+
+Planner's residual claim that `no-eval` was missing from eslint.config.js was **stale** —
+verified present (lines 62-64) and firing by live probe. No action taken.
+
+Guard hook installed and verified by exit code in all four directions
+(`.claude/hooks/guard-writes.cjs`, phase file `.tdd-swarm/phase`). See L-007 — the first
+version failed OPEN silently because the repo is `"type": "module"`.
+
+Worktrees created off `swarm/engine-core`, each with a symlinked `node_modules`
+(verified vitest runs inside a worktree):
+
+| ticket | branch | worktree | test agent model |
+|---|---|---|---|
+| T-001 | `ticket/T-001-seeded-prng` | `../cannon-wt/wt-T-001` | sonnet |
+| T-002 | `ticket/T-002-safe-expr-eval` | `../cannon-wt/wt-T-002` | opus |
+| T-003 | `ticket/T-003-schemas-and-types` | `../cannon-wt/wt-T-003` | opus |
+
+`phase=tests` written into each worktree, so the guard blocks any write to `src/`.
+Three Test Agents dispatched in parallel. Next: verify RED for the right reason, then
+independent test-design review before freezing.

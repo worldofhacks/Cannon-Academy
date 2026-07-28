@@ -4,10 +4,17 @@
 `app/**`, `src/components/**`, `src/stores/**`, `src/services/**`, EAS, art, and audio are out of
 this swarm's scope per `.tdd-swarm/posture.md` and cannot be gated in this environment.
 
-**24 tickets · 7 waves · 347 acceptance criteria.** Every ticket cites a PRD / ARCHITECTURE
+**23 tickets · 7 waves · 338 acceptance criteria.** Every ticket cites a PRD / ARCHITECTURE
 section in `traces_to`. Requirement coverage, open questions, and planning gaps:
 `.tdd-swarm/traceability.md`.
 
+> **Revision 3** — owner rulings D-1…D-5 applied at the Phase 1 checkpoint, 2026-07-27.
+> `T-023` (`duel/replay.ts`) is **cut**; its replay proof moved into T-024 as AC-19–AC-22,
+> including the negative control. Four open questions are now **closed decisions**, recorded and
+> dated in each ticket's Planning Decisions so they are not reopened: template floor of 8 (D-1),
+> Double-Shot as a shortened timer (D-2), `culverin.recoilDamage = 0` (D-3), and Reliable ≡
+> Standard at the damage layer (D-4). 24 → 23 tickets; wave count unchanged at 7.
+>
 > **Revision 2** (post adversarial plan review). Two Critical and eight Important findings fixed;
 > the wave count went 8 → 7. The material changes: `T-005` now declares its real `T-004`
 > dependency (it was a dispatch-time compile failure), `T-008`'s damage curve was **corrected**
@@ -78,8 +85,7 @@ source of truth.
 
 | id | title | status | deps | branch | model | issue |
 |----|-------|--------|------|--------|-------|-------|
-| T-023 | Duel replay — reconstruct a duel from seed plus the ordered action log | backlog | T-013, T-020, T-022 | `ticket/T-023-duel-replay` | capable | — |
-| T-024 | Duel invariants, opponent-driven fuzz, and the reachability proof | backlog | T-013, T-018, T-020, T-021, T-022 | `ticket/T-024-duel-invariants` | capable | — |
+| T-024 | Duel invariants, opponent-driven fuzz, and the seed-plus-log replay proof | backlog | T-013, T-018, T-020, T-021, T-022 | `ticket/T-024-duel-invariants` | capable | — |
 
 ## Blocked
 
@@ -127,7 +133,6 @@ graph TD
     T021[T-021 bot + mercy]
     T022[T-022 double-shot]
   end
-  T023[T-023 replay]
   T024[T-024 invariants + fuzz]
 
   T003 --> T004
@@ -178,9 +183,6 @@ graph TD
   T004 --> T022
   T013 --> T022
   T020 --> T022
-  T013 --> T023
-  T020 --> T023
-  T022 --> T023
   T018 --> T024
   T020 --> T024
   T021 --> T024
@@ -199,11 +201,11 @@ graph TD
 | 4 | T-007, T-013 | 2 | Both gate wave 5 entirely. The narrowest point on the critical path — nothing else can be pulled forward into it. |
 | 5 | T-014, T-015, T-016, T-017, T-018, T-020 | 6 | **Peak load.** Three heavy template tickets (1,000-sample sweeps each) alongside `T-020`, the largest ticket in the run at 24 ACs. If capacity is constrained anywhere, it is here. |
 | 6 | T-019, T-021, T-022 | 3 | `T-019` is the project's highest-value gate (`.tdd-swarm/posture.md`) but sits off the critical path. |
-| 7 | T-023, T-024 | 2 | Both prove properties of the finished machine; neither may edit it. |
+| 7 | T-024 | 1 | Proves properties of the finished machine and may not edit it. Absorbed the cut T-023's replay proof (owner ruling D-5), so it now carries 22 ACs across three suites. |
 
 **Critical path — 7 waves deep.** Two chains tie for longest:
-`T-003 → T-004 → T-005 → T-007 → T-020 → T-022 → T-023/T-024` and
-`T-003 → T-004 → T-008 → T-013 → T-020 → T-022 → T-023/T-024`.
+`T-003 → T-004 → T-005 → T-007 → T-020 → T-022 → T-024` and
+`T-003 → T-004 → T-008 → T-013 → T-020 → T-022 → T-024`.
 
 ### File-scope exclusivity
 
@@ -232,12 +234,23 @@ waves and both deliberate:
   This needs a conscious go/no-go from the owner, not a default — see `.tdd-swarm/traceability.md`
   §2 item 2.18 for the split options and the recommendation.
 - T-014/T-015/T-016 each run ~1,000 seeded samples per template; T-019 repeats the sweep over the
-  whole registry; T-024 runs 3,000 fuzz duels. Each is capped at 60 s in its own DoD.
+  whole registry; T-024 runs ~3,700 seeded duels across its fuzz, opponent, and replay suites. Each is capped at 60 s in its own DoD.
 - No ticket has an `Eval` row in its Test Plan. There is no LLM anywhere in this codebase.
 
 ---
 
 ## Revision log
+
+**Rev 3 — owner rulings at the Phase 1 checkpoint, 2026-07-27.** 24 → 23 tickets; 7 waves.
+
+| ruling | change |
+|---|---|
+| **D-1** template count | Floor of 8 per skill, no cap. The owner amended `PLAN.md:73` itself, so the docs no longer conflict. T-014/15/16/19 unchanged in substance; their `open-question` tags became `locked-decision` with the ruling recorded. Also corrected a **planner citation error**: T-014's `traces_to` had attributed the "15–25" figure to ARCHITECTURE.md §4.1, which never stated a count — it was PLAN.md §Questions. |
+| **D-2** Double-Shot | Shortened timer on the same question pool. T-022's mechanic re-tagged `proposed` → `locked-decision`. `difficulty?: 1 \| 2 \| 3` stays in T-003 as declared insurance, still unread by T-007 and every content ticket. |
+| **D-3** Culverin | `culverin.recoilDamage = 0`; "crit" reads as the wide 4–16 spread. T-006 re-tagged `locked-decision`. |
+| **D-4** Reliable vs Standard | Identical at the damage layer, flavour only. T-008 and T-020 re-tagged `locked-decision`; **no new reducer transition, no new phase.** The owner's note that powerful weapons should recoil is already satisfied by the Volatile tier (5 / 8 / 10, pinned by T-006 AC-4). This was the last question that could have forced a T-020 supersede — closed before wave 3, as flagged. |
+| **D-5** replay | `tickets/T-023.md` **deleted**; no `src/engine/duel/replay.ts` module. T-024 absorbs the proof as AC-19 (reconstruction over a 200-duel corpus, log JSON round-tripped), AC-20 (negative control — a wrong seed must fail to reproduce), AC-21 (corpus must exhibit misfire / Perfect Shot / Double-Shot / timeout), AC-22 (which wrong choice was tapped provably does not affect state — the premise that lets the driver reconstruct an index the log never recorded). Wave 7 now holds T-024 alone. |
+| **2.18** sizing | Owner did not overrule, so the planner's disposition stands and is now **accepted**: keep T-020 whole; split T-021's `mercy.ts` / `bot.ts` only if wave 6 runs light. |
 
 **Rev 2 — post adversarial plan review (two independent reviewers).** Wave count 8 → 7.
 
