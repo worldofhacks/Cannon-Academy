@@ -1,6 +1,6 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { evaluateNumber, evaluatePredicate, ExprError } from '@engine/questions/expr';
 import type { ExprErrorCode } from '@engine/questions/expr';
@@ -74,6 +74,165 @@ describe('AC-1 — no dynamic code construction in the evaluator source', () => 
       expect(source).not.toContain(banned);
     });
   }
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-21 — the AUTHORITATIVE anti-codegen guard: a behavioural trap
+//
+// The AC-1 scan above and the `no-eval` / `no-implied-eval` / `no-new-func` lint rules are both
+// secondary defence. Measured, they miss aliasing, computed access and reflection: a complete
+// evaluator built on `Reflect.construct(Function, ...)` passed 229/229 with tsc and eslint clean
+// (`.tdd-swarm/reports/T-002-test-design-review.md`). Obtaining the `Function` constructor
+// requires the global binding, `<anyFunction>.constructor`, `Reflect` over one of those, or
+// `eval` — all four are poisoned below, BEFORE the module is imported, so a reference cached at
+// module-init time is caught too.
+// --------------------------------------------------------------------------------------------
+
+const realFunction = globalThis.Function;
+const realEval = globalThis.eval;
+const realConstruct = Reflect.construct;
+const realCtorDescriptor = Object.getOwnPropertyDescriptor(realFunction.prototype, 'constructor');
+
+type EvaluatorModule = {
+  evaluateNumber: (expr: string, env: Env) => number;
+  evaluatePredicate: (expr: string, env: Env) => boolean;
+};
+
+/**
+ * Freshly imports the evaluator with every dynamic-compilation route poisoned, runs `body`
+ * while they are still poisoned, then restores the globals. Returns the routes that were
+ * touched. All assertions are deliberately made by the caller AFTER restoration, so a poisoned
+ * global can never leak into the assertion machinery or into another test.
+ */
+async function underDynamicCodeTraps<T>(body: (mod: EvaluatorModule) => T): Promise<{
+  tripped: string[];
+  value: T;
+}> {
+  const tripped: string[] = [];
+  const traps = new Set<unknown>();
+  /**
+   * A trap must be *constructible* and must return something *callable*, so that a module
+   * reaching for codegen keeps running and fails on the assertion below rather than on an
+   * incidental TypeError. The point is to report the route, not to break the caller.
+   */
+  const trap = (what: string): unknown => {
+    const stub = function stubbedDynamicCode(): number {
+      return 0;
+    };
+    const trapped = function trappedDynamicCodeRoute(...args: unknown[]) {
+      tripped.push(what);
+      void args;
+      return stub;
+    };
+    traps.add(trapped);
+    return trapped;
+  };
+  const g = globalThis as unknown as { Function: unknown; eval: unknown };
+
+  try {
+    g.Function = trap('globalThis.Function');
+    g.eval = trap('globalThis.eval');
+    Reflect.construct = ((target: unknown, ...rest: unknown[]) => {
+      if (target === realFunction) tripped.push('Reflect.construct(Function)');
+      if (traps.has(target)) return (target as () => unknown)();
+      return (realConstruct as (...a: unknown[]) => unknown)(target, ...rest);
+    }) as typeof Reflect.construct;
+    Object.defineProperty(realFunction.prototype, 'constructor', {
+      configurable: true,
+      get() {
+        tripped.push('Function.prototype.constructor');
+        return trap('fn.constructor');
+      },
+    });
+
+    vi.resetModules();
+    const mod = (await import('@engine/questions/expr')) as unknown as EvaluatorModule;
+    return { tripped, value: body(mod) };
+  } finally {
+    g.Function = realFunction;
+    g.eval = realEval;
+    Reflect.construct = realConstruct;
+    if (realCtorDescriptor) {
+      Object.defineProperty(realFunction.prototype, 'constructor', realCtorDescriptor);
+    }
+  }
+}
+
+describe('AC-21 — no dynamic-compilation route is reached, at import time or at call time', () => {
+  it('spec(T-002:AC-21) evaluating arithmetic touches no dynamic-compilation route', async () => {
+    const { tripped, value } = await underDynamicCodeTraps((mod) =>
+      mod.evaluateNumber('a + b * c', { a: 2, b: 3, c: 4 }),
+    );
+
+    expect(tripped).toEqual([]);
+    expect(value).toBe(14);
+  });
+
+  it('spec(T-002:AC-21) evaluating a predicate touches no dynamic-compilation route', async () => {
+    const { tripped, value } = await underDynamicCodeTraps((mod) =>
+      mod.evaluatePredicate('a > 0 && b > 0 || a == 0', { a: 0, b: 0 }),
+    );
+
+    expect(tripped).toEqual([]);
+    expect(value).toBe(true);
+  });
+
+  it('spec(T-002:AC-21) importing the module touches no dynamic-compilation route', async () => {
+    const { tripped } = await underDynamicCodeTraps(() => undefined);
+
+    expect(tripped).toEqual([]);
+  });
+
+  it('spec(T-002:AC-21) function calls and error paths touch no dynamic-compilation route', async () => {
+    const { tripped, value } = await underDynamicCodeTraps((mod) => {
+      const results: unknown[] = [
+        mod.evaluateNumber('gcd(a, b)', { a: 12, b: 18 }),
+        mod.evaluateNumber('floor(a / b)', { a: 7, b: 2 }),
+        mod.evaluatePredicate('a + b <= 20', { a: 9, b: 9 }),
+      ];
+      for (const bad of ['a +', 'a + z', 'foo(a)', 'min(a)', 'a / 0', 'a > b']) {
+        try {
+          mod.evaluateNumber(bad, { a: 1, b: 2 });
+        } catch (e) {
+          results.push((e as ExprError).code);
+        }
+      }
+      return results;
+    });
+
+    expect(tripped).toEqual([]);
+    expect(value).toEqual([
+      6,
+      3,
+      true,
+      'PARSE_ERROR',
+      'UNKNOWN_IDENTIFIER',
+      'UNKNOWN_FUNCTION',
+      'ARITY_MISMATCH',
+      'DIVISION_BY_ZERO',
+      'TYPE_MISMATCH',
+    ]);
+  });
+
+  it('spec(T-002:AC-21) the trap harness itself detects a dynamic-compilation route', async () => {
+    const { tripped } = await underDynamicCodeTraps(() => {
+      // A deliberate synthetic violation, exercising all four poisoned routes. This proves the
+      // harness reports rather than silently passing — L-001: a guard never observed firing is
+      // an assumption, not a gate.
+      void (globalThis as unknown as { Function: (s: string) => unknown }).Function('return 1');
+      void (globalThis as unknown as { eval: (s: string) => unknown }).eval('1');
+      void Reflect.construct(realFunction, ['return 1']);
+      void function () {}.constructor;
+      return undefined;
+    });
+
+    expect(tripped).toEqual([
+      'globalThis.Function',
+      'globalThis.eval',
+      'Reflect.construct(Function)',
+      'Function.prototype.constructor',
+    ]);
+  });
 });
 
 // --------------------------------------------------------------------------------------------
@@ -379,6 +538,22 @@ describe('AC-7 — comparison operators', () => {
     expect(evaluatePredicate('a / b == 3.5', { a: 7, b: 2 })).toBe(true);
   });
 
+  it('spec(T-002:AC-7) == is exact, not tolerance-based, at a distance of 0.5', () => {
+    expect(evaluatePredicate('a / b == 3', { a: 7, b: 2 })).toBe(false);
+  });
+
+  it('spec(T-002:AC-7) == is exact, not tolerance-based, at a distance of 0.1', () => {
+    expect(evaluatePredicate('a / b == 3.4', { a: 7, b: 2 })).toBe(false);
+  });
+
+  it('spec(T-002:AC-7) != is exact, not tolerance-based, at a distance of 0.5', () => {
+    expect(evaluatePredicate('a / b != 3', { a: 7, b: 2 })).toBe(true);
+  });
+
+  it('spec(T-002:AC-7) != is exact, not tolerance-based, at a distance of 0.1', () => {
+    expect(evaluatePredicate('a / b != 3.4', { a: 7, b: 2 })).toBe(true);
+  });
+
   it('spec(T-002:AC-7) comparison operands may be negative', () => {
     expect(evaluatePredicate('-a < b', { a: 1, b: 0 })).toBe(true);
   });
@@ -598,6 +773,14 @@ describe('AC-11 — malformed input rejected with PARSE_ERROR', () => {
     '"a"',
     '`a`',
     'a?b:b',
+    // `NUMBER := digits ( "." digits )?` excludes exponents, radix prefixes and separators, not
+    // only misplaced decimal points. A `Number()`-friendly greedy tokenizer accepts all of these.
+    '1e3',
+    '1E3',
+    '0x10',
+    '1_000',
+    '0b11',
+    '0o17',
   ];
 
   for (const expr of OUT_OF_GRAMMAR) {
@@ -1026,5 +1209,129 @@ describe('AC-20 — 16 nested levels must still evaluate', () => {
   it('spec(T-002:AC-20) a 16-level nested predicate evaluates successfully', () => {
     const expr = `${'('.repeat(16)}a + b <= 20${')'.repeat(16)}`;
     expect(evaluatePredicate(expr, { a: 9, b: 9 })).toBe(true);
+  });
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-22 — the function whitelist is CLOSED, not "whatever Math exposes"
+//
+// Every AC-10 negative uses a name that is not an own property of `Math`, so an evaluator
+// resolving calls as `hasOwnProperty.call(Math, name) ? Math[name] : ...` satisfies all of them.
+// These names are real `Math` own-properties and are NOT on the declared whitelist.
+// --------------------------------------------------------------------------------------------
+
+/** `Math` own-properties that are deliberately absent from the whitelist. */
+const MATH_OWN_NON_WHITELISTED = [
+  'sqrt',
+  'round',
+  'pow',
+  'sign',
+  'trunc',
+  'log',
+  'hypot',
+  'cbrt',
+  'random',
+  'atan2',
+  'imul',
+];
+
+/** The whitelist, verbatim from the ticket. Five of these six are also `Math` own-properties. */
+const WHITELISTED_FUNCTIONS = ['abs', 'min', 'max', 'floor', 'ceil', 'gcd'];
+
+describe('AC-22 — Math own-properties outside the whitelist are rejected', () => {
+  it('spec(T-002:AC-22) every name in this block really is an own-property of Math', () => {
+    for (const name of MATH_OWN_NON_WHITELISTED) {
+      expect(
+        Object.prototype.hasOwnProperty.call(Math, name),
+        `${name} is not an own property of Math — this block would be testing nothing`,
+      ).toBe(true);
+    }
+  });
+
+  it('spec(T-002:AC-22) no whitelisted name is accidentally in the rejection list', () => {
+    for (const name of WHITELISTED_FUNCTIONS) {
+      expect(MATH_OWN_NON_WHITELISTED).not.toContain(name);
+    }
+  });
+
+  for (const name of MATH_OWN_NON_WHITELISTED) {
+    it(`spec(T-002:AC-22) ${name}(a) is UNKNOWN_FUNCTION, not silently resolved from Math`, () => {
+      expectNumberError(`${name}(a)`, { a: 4, b: 2 }, 'UNKNOWN_FUNCTION');
+    });
+
+    it(`spec(T-002:AC-22) ${name}(a, b) is UNKNOWN_FUNCTION at two-argument arity too`, () => {
+      expectNumberError(`${name}(a, b)`, { a: 4, b: 2 }, 'UNKNOWN_FUNCTION');
+    });
+  }
+
+  it('spec(T-002:AC-22) a non-function Math own-property is not a callable function', () => {
+    expectNumberError('PI(a)', { a: 1 }, 'UNKNOWN_FUNCTION');
+  });
+
+  it('spec(T-002:AC-22) a non-function Math own-property is not a resolvable identifier', () => {
+    expectNumberError('PI', {}, 'UNKNOWN_IDENTIFIER');
+  });
+
+  it('spec(T-002:AC-22) Math.E is not a resolvable identifier', () => {
+    expectNumberError('E', {}, 'UNKNOWN_IDENTIFIER');
+  });
+
+  it('spec(T-002:AC-22) all six whitelisted names remain callable', () => {
+    expect(evaluateNumber('abs(0 - 5)', {})).toBe(5);
+    expect(evaluateNumber('min(a, b)', { a: 3, b: 9 })).toBe(3);
+    expect(evaluateNumber('max(a, b)', { a: 3, b: 9 })).toBe(9);
+    expect(evaluateNumber('floor(a / b)', { a: 7, b: 2 })).toBe(3);
+    expect(evaluateNumber('ceil(a / b)', { a: 7, b: 2 })).toBe(4);
+    expect(evaluateNumber('gcd(a, b)', { a: 12, b: 18 })).toBe(6);
+  });
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-23 — `&&` and `||` short-circuit (host-language semantics, per the AC-16 ruling)
+//
+// T-007 rejection-samples params and calls evaluatePredicate per candidate. Under eager
+// evaluation a guarded constraint THROWS on a candidate it was written to reject, turning an
+// ordinary rejection into a generator crash.
+// --------------------------------------------------------------------------------------------
+
+describe('AC-23 — short-circuit evaluation of logical operators', () => {
+  it('spec(T-002:AC-23) || does not evaluate its right operand when the left is true', () => {
+    expect(evaluatePredicate('b == 0 || a % b == 0', { a: 5, b: 0 })).toBe(true);
+  });
+
+  it('spec(T-002:AC-23) && does not evaluate its right operand when the left is false', () => {
+    expect(evaluatePredicate('b != 0 && a % b == 0', { a: 5, b: 0 })).toBe(false);
+  });
+
+  it('spec(T-002:AC-23) a short-circuited operand is still type-checked', () => {
+    expectPredicateError('b == 0 || a', { a: 5, b: 0 }, 'TYPE_MISMATCH');
+  });
+
+  it('spec(T-002:AC-23) a short-circuited && operand is still type-checked', () => {
+    expectPredicateError('b != 0 && a', { a: 5, b: 0 }, 'TYPE_MISMATCH');
+  });
+
+  it('spec(T-002:AC-23) || still evaluates its right operand when the left is false', () => {
+    expectPredicateError('b == 1 || a % b == 0', { a: 5, b: 0 }, 'DIVISION_BY_ZERO');
+  });
+
+  it('spec(T-002:AC-23) && still evaluates its right operand when the left is true', () => {
+    expectPredicateError('b == 0 && a % b == 0', { a: 5, b: 0 }, 'DIVISION_BY_ZERO');
+  });
+
+  it('spec(T-002:AC-23) a division guard short-circuits the same way', () => {
+    expect(evaluatePredicate('b == 0 || a / b > 1', { a: 5, b: 0 })).toBe(true);
+  });
+
+  it('spec(T-002:AC-23) a guarded constraint still evaluates normally for a valid candidate', () => {
+    expect(evaluatePredicate('b == 0 || a % b == 0', { a: 12, b: 4 })).toBe(true);
+  });
+
+  it('spec(T-002:AC-23) a guarded constraint still rejects an invalid candidate', () => {
+    expect(evaluatePredicate('b == 0 || a % b == 0', { a: 13, b: 4 })).toBe(false);
+  });
+
+  it('spec(T-002:AC-23) short-circuiting composes left to right across a chain', () => {
+    expect(evaluatePredicate('b == 0 || a % b == 0 || a / b > 1', { a: 5, b: 0 })).toBe(true);
   });
 });
