@@ -138,3 +138,25 @@ detect it: the tests will be internally consistent, pass review, and encode the 
 (`git status --porcelain` empty) or commit first. After creating worktrees, diff each
 dispatched ticket file against the integration branch and confirm it is identical.
 Verify, then dispatch — never dispatch and then verify.
+
+---
+
+## L-009 — Default-permissive validation silently loses data (Phase 2)
+
+**Pattern:** Content schemas were specified without saying whether unknown keys are
+rejected. zod strips them by default, so a typo'd **optional** field in a JSON catalog
+(`recoilDmg` for `recoilDamage`, `requiresIsand` for `requiresIsland`) would parse
+successfully and vanish. The catalog would look valid, the tests would pass, and the
+field would simply not be there at runtime. Required fields are safe — their absence
+throws — so the hole is invisible exactly where it is hardest to notice.
+
+**Why:** "Validated" is not a binary. A schema that accepts a superset of the intended
+shape provides type safety for what it names and zero protection for what it does not.
+The catalogs are authored by a different ticket than the one owning the schema, so the
+author cannot fix the schema when a typo slips through — they just get quiet data loss.
+
+**What to do instead:** For any schema validating data authored elsewhere, specify the
+unknown-key policy explicitly and test it. Default to strict for hand-authored content.
+More generally: when a ticket specifies a validator, require the spec to state what it
+**rejects**, not only what it accepts — a criterion listing only accept cases is passed
+by a validator that accepts everything.
