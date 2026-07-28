@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
+import { Worker } from 'node:worker_threads';
 import { describe, expect, it, vi } from 'vitest';
 
 import { evaluateNumber, evaluatePredicate, ExprError } from '@engine/questions/expr';
@@ -1127,7 +1128,7 @@ describe('AC-18 — zero-argument calls are PARSE_ERROR', () => {
 // --------------------------------------------------------------------------------------------
 
 describe('AC-19 — the exported error contract', () => {
-  it('spec(T-002:AC-19) ExprErrorCode is exactly the six documented codes', () => {
+  it('spec(T-002:AC-19) ExprErrorCode is exactly the seven documented codes', () => {
     const codeUnionIsExact: Exact<
       ExprErrorCode,
       | 'PARSE_ERROR'
@@ -1136,6 +1137,7 @@ describe('AC-19 — the exported error contract', () => {
       | 'ARITY_MISMATCH'
       | 'DIVISION_BY_ZERO'
       | 'TYPE_MISMATCH'
+      | 'NON_FINITE_VALUE'
     > = true;
 
     expect(codeUnionIsExact).toBe(true);
@@ -1173,11 +1175,13 @@ describe('AC-19 — the exported error contract', () => {
       catchExprError(() => evaluateNumber('min(a)', { a: 1 })).code,
       catchExprError(() => evaluateNumber('a / b', { a: 1, b: 0 })).code,
       catchExprError(() => evaluateNumber('a > b', { a: 2, b: 1 })).code,
+      catchExprError(() => evaluateNumber(OVERSIZED_LITERAL, {})).code,
     ]);
 
     expect([...observed].sort()).toEqual([
       'ARITY_MISMATCH',
       'DIVISION_BY_ZERO',
+      'NON_FINITE_VALUE',
       'PARSE_ERROR',
       'TYPE_MISMATCH',
       'UNKNOWN_FUNCTION',
@@ -1413,4 +1417,271 @@ describe('AC-24 — every identifier must resolve, evaluated branch or not', () 
   // type — is deliberately NOT pinned. `UNKNOWN_IDENTIFIER` and `TYPE_MISMATCH` are each
   // defensible depending on the order of the static passes, and no criterion rules on it
   // (this is review finding M3, still open). Inventing an answer here would freeze a guess.
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-25 — non-finite values are rejected at every boundary
+//
+// `gcd` loops forever on a non-finite argument: `(NaN, NaN)` is a fixed point of the Euclid
+// loop. That failure mode CANNOT be bounded by vitest's own timeout — a synchronous infinite
+// loop never yields the event loop — so the three routes that can reach `gcd` are evaluated
+// inside a worker thread that is force-terminated. `Worker.terminate()` interrupts a running
+// V8 isolate, so a non-terminating implementation produces a FAILING test rather than a
+// wedged gate suite. Every other AC-25 route returns promptly and is called directly.
+// --------------------------------------------------------------------------------------------
+
+/** `1e309` — the smallest power of ten JavaScript cannot represent. */
+const OVERSIZED_LITERAL = '9'.repeat(309);
+/** Large enough that subtracting it from itself yields `NaN`, not `0`. */
+const HUGE_LITERAL = '9'.repeat(400);
+
+const EVALUATOR_URL = pathToFileURL(SOURCE_PATH).href;
+
+/**
+ * Runs one evaluation in a worker thread, reporting `nontermination` instead of hanging.
+ * Deliberately reports rather than throws, so every outcome — including a module that cannot
+ * be loaded — becomes a readable assertion failure rather than a stalled run.
+ */
+const ISOLATED_WORKER_SOURCE = `
+const { parentPort, workerData } = require('node:worker_threads');
+import(workerData.url).then((mod) => {
+  const call = workerData.kind === 'number' ? mod.evaluateNumber : mod.evaluatePredicate;
+  let outcome;
+  try {
+    outcome = { kind: 'value', value: String(call(workerData.expr, workerData.env)) };
+  } catch (e) {
+    outcome =
+      e && typeof e.code === 'string'
+        ? { kind: 'error', code: e.code }
+        : { kind: 'other', name: (e && e.constructor && e.constructor.name) || String(e) };
+  }
+  parentPort.postMessage(outcome);
+}).catch((e) => parentPort.postMessage({ kind: 'loadfail', message: String(e && e.message) }));
+`;
+
+type IsolatedOutcome =
+  | { kind: 'value'; value: string }
+  | { kind: 'error'; code: string }
+  | { kind: 'other'; name: string }
+  | { kind: 'loadfail'; message: string }
+  | { kind: 'nontermination' };
+
+function evaluateIsolated(
+  expr: string,
+  env: Env,
+  kind: 'number' | 'predicate' = 'number',
+  budgetMs = 3000,
+): Promise<IsolatedOutcome> {
+  return new Promise((resolve) => {
+    const worker = new Worker(ISOLATED_WORKER_SOURCE, {
+      eval: true,
+      workerData: { url: EVALUATOR_URL, expr, env, kind },
+    });
+    const settle = (outcome: IsolatedOutcome): void => {
+      clearTimeout(timer);
+      void worker.terminate();
+      resolve(outcome);
+    };
+    const timer = setTimeout(() => settle({ kind: 'nontermination' }), budgetMs);
+    worker.on('message', (m: IsolatedOutcome) => settle(m));
+    worker.on('error', (e: Error) => settle({ kind: 'other', name: e.constructor.name }));
+  });
+}
+
+/** Asserts an isolated evaluation terminated and threw the expected `ExprError` code. */
+async function expectIsolatedError(expr: string, env: Env, code: string): Promise<void> {
+  const outcome = await evaluateIsolated(expr, env);
+  expect(outcome, `expected ExprError ${code}, got ${JSON.stringify(outcome)}`).toEqual({
+    kind: 'error',
+    code,
+  });
+}
+
+describe('AC-25 — non-finite values are rejected, never returned and never passed to a function', () => {
+  it('spec(T-002:AC-25) a numeric literal too large to represent throws NON_FINITE_VALUE', () => {
+    expectNumberError(OVERSIZED_LITERAL, {}, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) an arithmetic result that overflows to Infinity throws NON_FINITE_VALUE', () => {
+    expectNumberError('a * a', { a: 1e200 }, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) an arithmetic result that becomes NaN throws NON_FINITE_VALUE', () => {
+    expectNumberError(`${HUGE_LITERAL} - ${HUGE_LITERAL}`, {}, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) an Infinity supplied in the environment throws NON_FINITE_VALUE', () => {
+    expectNumberError('a', { a: Infinity }, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) a -Infinity supplied in the environment throws NON_FINITE_VALUE', () => {
+    expectNumberError('a', { a: -Infinity }, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) a NaN supplied in the environment throws NON_FINITE_VALUE', () => {
+    expectNumberError('a', { a: NaN }, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) a non-finite environment value is rejected inside a larger expression', () => {
+    expectNumberError('a + b', { a: Infinity, b: 1 }, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) evaluatePredicate rejects a non-finite environment value', () => {
+    expectPredicateError('a > 0', { a: NaN }, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) a non-finite value never reaches abs', () => {
+    expectNumberError('abs(a)', { a: NaN }, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) a non-finite value never reaches min', () => {
+    expectNumberError('min(a, b)', { a: Infinity, b: 1 }, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) a non-finite value never reaches floor', () => {
+    expectNumberError('floor(a)', { a: Infinity }, 'NON_FINITE_VALUE');
+  });
+
+  it('spec(T-002:AC-25) evaluateNumber never returns a non-finite number by any route', () => {
+    for (const [expr, env] of [
+      [OVERSIZED_LITERAL, {}],
+      [`${HUGE_LITERAL} - ${HUGE_LITERAL}`, {}],
+      ['a * a', { a: 1e200 }],
+      ['a', { a: Infinity }],
+      ['a', { a: NaN }],
+      ['0 - a', { a: Infinity }],
+    ] as ReadonlyArray<[string, Env]>) {
+      const err = catchExprError(() => evaluateNumber(expr, env));
+      expect(err.code, `${expr.slice(0, 24)} did not throw NON_FINITE_VALUE`).toBe('NON_FINITE_VALUE');
+    }
+  });
+
+  // The three routes that can reach `gcd`'s Euclid loop — isolated so a non-terminating
+  // implementation fails the test instead of freezing the run.
+
+  it('spec(T-002:AC-25) gcd of an oversized literal terminates and throws, with an empty environment', async () => {
+    await expectIsolatedError(`gcd(${HUGE_LITERAL}, 2)`, {}, 'NON_FINITE_VALUE');
+  }, 20000);
+
+  it('spec(T-002:AC-25) gcd of a non-finite environment value terminates and throws', async () => {
+    await expectIsolatedError('gcd(a, b)', { a: Infinity, b: 2 }, 'NON_FINITE_VALUE');
+  }, 20000);
+
+  it('spec(T-002:AC-25) gcd of an argument that overflows during evaluation terminates and throws', async () => {
+    await expectIsolatedError('gcd(a * a, 2)', { a: 1e200 }, 'NON_FINITE_VALUE');
+  }, 20000);
+
+  it('spec(T-002:AC-25) gcd of a NaN environment value terminates and throws', async () => {
+    await expectIsolatedError('gcd(a, b)', { a: NaN, b: 2 }, 'NON_FINITE_VALUE');
+  }, 20000);
+
+  // Positive controls — large but representable values must still work.
+
+  it('spec(T-002:AC-25) a large but representable literal still evaluates', () => {
+    expect(evaluateNumber('9'.repeat(308), {})).toBe(Number('9'.repeat(308)));
+  });
+
+  it('spec(T-002:AC-25) a large but representable product still evaluates', () => {
+    const result = evaluateNumber('a * b', { a: 1e150, b: 1e150 });
+
+    expect(Number.isFinite(result)).toBe(true);
+    expect(result).toBeGreaterThan(1e299);
+  });
+
+  it('spec(T-002:AC-25) ordinary gcd still evaluates inside the isolation harness', async () => {
+    const outcome = await evaluateIsolated('gcd(a, b)', { a: 12, b: 18 });
+    expect(outcome).toEqual({ kind: 'value', value: '6' });
+  }, 20000);
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-26 — no RangeError escapes; the work bound covers operator chains, not only nesting
+//
+// AC-15's nesting tests all use `"(".repeat(n)` or `"abs(".repeat(n)`. A flat operator chain
+// folds iteratively during parsing, so it never trips a nesting counter — but it builds a
+// left-deep AST that is later walked with native recursion.
+// --------------------------------------------------------------------------------------------
+
+/** Classifies a synchronous call without letting a non-ExprError escape the assertion. */
+function classifyThrow(
+  fn: () => unknown,
+): { kind: 'value'; value: unknown } | { kind: 'expr'; code: string } | { kind: 'other'; name: string } {
+  try {
+    return { kind: 'value', value: fn() };
+  } catch (e) {
+    if (e instanceof ExprError) return { kind: 'expr', code: e.code };
+    return { kind: 'other', name: (e as Error)?.constructor?.name ?? String(e) };
+  }
+}
+
+const numericChain = (terms: number): string => `1${'+1'.repeat(terms - 1)}`;
+const productChain = (terms: number): string => `1${'*1'.repeat(terms - 1)}`;
+const conjunctionChain = (terms: number): string => `a > 0${' && a > 0'.repeat(terms - 1)}`;
+const disjunctionChain = (terms: number): string => `a > 0${' || a > 0'.repeat(terms - 1)}`;
+
+describe('AC-26 — an unbounded operator chain fails as an ExprError, never a RangeError', () => {
+  const CHAINS: ReadonlyArray<[string, (terms: number) => string, 'number' | 'predicate']> = [
+    ['additive', numericChain, 'number'],
+    ['multiplicative', productChain, 'number'],
+    ['conjunction', conjunctionChain, 'predicate'],
+    ['disjunction', disjunctionChain, 'predicate'],
+  ];
+
+  // The invariant AC-26 states: whatever the length, the outcome is a value or an ExprError.
+  for (const [name, build, kind] of CHAINS) {
+    for (const terms of [5_000, 20_000]) {
+      it(`spec(T-002:AC-26) a ${name} chain of ${terms} terms never escapes a RangeError`, () => {
+        const expr = build(terms);
+        const outcome = classifyThrow(() =>
+          kind === 'number' ? evaluateNumber(expr, { a: 1 }) : evaluatePredicate(expr, { a: 1 }),
+        );
+
+        expect(outcome.kind, `a ${name} chain leaked ${JSON.stringify(outcome)}`).not.toBe('other');
+      });
+    }
+  }
+
+  // Far above any plausible deterministic bound, the answer must be PARSE_ERROR specifically.
+  for (const [name, build, kind] of CHAINS) {
+    it(`spec(T-002:AC-26) a ${name} chain of 100000 terms throws PARSE_ERROR`, () => {
+      const expr = build(100_000);
+      const outcome = classifyThrow(() =>
+        kind === 'number' ? evaluateNumber(expr, { a: 1 }) : evaluatePredicate(expr, { a: 1 }),
+      );
+
+      expect(outcome).toEqual({ kind: 'expr', code: 'PARSE_ERROR' });
+    });
+  }
+
+  it('spec(T-002:AC-26) the failure for an over-long chain is an ExprError, not a RangeError', () => {
+    const err = catchExprError(() => evaluateNumber(numericChain(100_000), {}));
+    expect(err).not.toBeInstanceOf(RangeError);
+    expect(err.code).toBe('PARSE_ERROR');
+  });
+
+  // Realistic lengths must still evaluate — the bound cannot be set absurdly low.
+
+  it('spec(T-002:AC-26) a 200-term additive chain still evaluates', () => {
+    expect(evaluateNumber(numericChain(200), {})).toBe(200);
+  });
+
+  it('spec(T-002:AC-26) a 500-term additive chain still evaluates', () => {
+    expect(evaluateNumber(numericChain(500), {})).toBe(500);
+  });
+
+  it('spec(T-002:AC-26) a 200-term multiplicative chain still evaluates', () => {
+    expect(evaluateNumber(productChain(200), {})).toBe(1);
+  });
+
+  it('spec(T-002:AC-26) a 200-term conjunction still evaluates', () => {
+    expect(evaluatePredicate(conjunctionChain(200), { a: 1 })).toBe(true);
+  });
+
+  it('spec(T-002:AC-26) a 200-term disjunction still evaluates', () => {
+    expect(evaluatePredicate(disjunctionChain(200), { a: 1 })).toBe(true);
+  });
+
+  it('spec(T-002:AC-26) a 200-term chain mixing operators and parentheses still evaluates', () => {
+    expect(evaluateNumber(`(${numericChain(200)}) * 2`, {})).toBe(400);
+  });
 });
