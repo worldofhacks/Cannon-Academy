@@ -26,7 +26,7 @@ blocks:
 - **Every ticket sits at exactly the earliest wave its declared dependencies allow.** The
   Planner's claim is arithmetically true.
 
-The catch: that last statement is only true *because several `depends_on` sets are incomplete*.
+The catch: that last statement is only true _because several `depends_on` sets are incomplete_.
 The mechanical check validates the graph the Planner declared, not the graph the code implies.
 Findings F1 and F3 are what the mechanical check cannot see.
 
@@ -45,7 +45,7 @@ Findings F1 and F3 are what the mechanical check cannot see.
 - `TICKETS.md:130-148` — the mermaid graph contains **no** `T004 --> T005` edge
 
 This is the exact failure mode the parallel-worktree model cannot survive: two same-wave tickets
-sharing an *interface* without sharing a file. T-005's agent gets a worktree in which
+sharing an _interface_ without sharing a file. T-005's agent gets a worktree in which
 `src/engine/tuning.ts` does not exist. It cannot typecheck, cannot lint, cannot run. Worse, the
 **frozen tests** for T-005 are written before implementation and must import `@engine/tuning`
 too — so the test-writing agent is blocked as well, one phase earlier.
@@ -80,6 +80,7 @@ T-022's additive field breaks it and T-022 AC-1 becomes unachievable. The ticket
 scheduled a guaranteed wave-7 blocker.
 
 Related, same root cause:
+
 - `tickets/T-013.md:194` — DoD: "Exactly the five ARCHITECTURE.md §4.2 event types; no invented
   events" vs T-022 adding a sixth (`DOUBLE_SHOT_SELECTED`).
 - `tickets/T-020.md:129-131` — AC-16's "`8 × 5` exhaustive matrix". If the frozen test derives
@@ -99,7 +100,7 @@ exported union, precisely so T-022 can extend them.
 - `tickets/T-020.md:31-53` — the complete transition table. Nothing in it touches `Opponent`.
 - `tickets/T-020.md:92, 120-125` — `RIVAL_ACTION` carries `RivalVolley`, which
   `tickets/T-013.md:73-75` places in `duel/types.ts`, **not** in `opponents/`.
-- `tickets/T-020.md:186-190` — `Opponent` appears only in *Out of Scope*: "awaiting `Opponent`
+- `tickets/T-020.md:186-190` — `Opponent` appears only in _Out of Scope_: "awaiting `Opponent`
   promises … out of this swarm's scope".
 
 The reducer is synchronous and consumes events, not opponents. The `Opponent` interface is
@@ -113,6 +114,7 @@ imports `src/engine/opponents/**` at all.** `Opponent`, `createScriptedOpponent`
 never compile-checked against a real caller anywhere in this swarm.
 
 **Fix — choose deliberately, do not leave it ambiguous:**
+
 - (a) **Drop the edge.** T-020 moves a wave earlier. Accept that `opponents/**` is a library
   layer with no in-scope consumer (see F8).
 - (b) **Make the edge real.** Rewrite T-020 AC-18 (`tickets/T-020.md:134-137`) to drive its
@@ -130,12 +132,12 @@ never compile-checked against a real caller anywhere in this swarm.
 
 But downstream tickets assert on fields T-003 is never required to create:
 
-| field asserted | where |
-|---|---|
-| `question.templateId` | `tickets/T-007.md:92` (AC-3), `tickets/T-020.md:86-87` (AC-2), `tickets/T-017.md:44` |
-| `question.params` | `tickets/T-007.md:115` (AC-12), `tickets/T-019.md:88` (AC-8) |
-| `question.isWordProblem` / `readAloud` | `tickets/T-007.md:123-126` (AC-15) |
-| `Choice = { value, label }` | `tickets/T-007.md:57-59`, `tickets/T-016.md:107` (AC-7 checks the *label*) |
+| field asserted                         | where                                                                                |
+| -------------------------------------- | ------------------------------------------------------------------------------------ |
+| `question.templateId`                  | `tickets/T-007.md:92` (AC-3), `tickets/T-020.md:86-87` (AC-2), `tickets/T-017.md:44` |
+| `question.params`                      | `tickets/T-007.md:115` (AC-12), `tickets/T-019.md:88` (AC-8)                         |
+| `question.isWordProblem` / `readAloud` | `tickets/T-007.md:123-126` (AC-15)                                                   |
+| `Choice = { value, label }`            | `tickets/T-007.md:57-59`, `tickets/T-016.md:107` (AC-7 checks the _label_)           |
 
 A T-003 implementer can ship `Question = { text, choices: number[], correctIndex }`, pass every
 one of its 14 ACs, and freeze it. T-007 then cannot proceed — `questions/types.ts` is **not** in
@@ -144,6 +146,7 @@ blocked ticket in wave 3 requiring a new amendment ticket against a frozen file.
 
 **Fix:** add an AC to T-003 enumerating the exact `Question` and `Choice` field sets, in the same
 style as its catalog-shape block:
+
 ```ts
 Question { templateId: string; skill: SkillId; text: string;
            params: Readonly<Record<string, number>>;
@@ -158,7 +161,7 @@ Choice   { value: number; label: string }
 **wave-1 blockers**:
 
 - **2.10 — Double-Shot semantics** (`traceability.md:180`). The alternative reading (draw from
-  *harder templates*) requires a `difficulty` field on `Template`, which lives in
+  _harder templates_) requires a `difficulty` field on `Template`, which lives in
   `src/content/schemas.ts` — **T-003, wave 1, frozen**. T-022 itself says the wrong guess means
   it is "**superseded, not patched**" (`tickets/T-022.md:64`). But the supersede does not stop at
   T-022: it cascades back to T-003's frozen schema, to ~72 authored templates across
@@ -188,7 +191,7 @@ Genuinely deferrable (all handled as behaviour-pinned constants, correctly): 2.3
 
 Under the linear blend, `u` is a fresh uniform draw in `[0,1)`. With `u → 0`, a slow-but-correct
 answer produces `biased → 0.35 * W`, i.e. a roll barely above `damageMin`. The 0.35 floor floors
-the *quality input*, not the *roll*. The architecture's guarantee is about the roll. The two are
+the _quality input_, not the _roll_. The architecture's guarantee is about the roll. The two are
 not the same thing and the plan quietly substitutes one for the other.
 
 T-008's ACs will not catch this: AC-6 (`tickets/T-008.md:109-112`) asserts only
@@ -196,13 +199,13 @@ T-008's ACs will not catch this: AC-6 (`tickets/T-008.md:109-112`) asserts only
 the blend. The frozen test will lock in a formula that contradicts the design intent.
 
 **Fix (cheap, patch not supersede):** either (a) change the formula so quality raises the roll's
-*lower bound* — e.g. `lo = damageMin + quality * QUALITY_WEIGHT * range; roll = uniform(lo, max)`,
+_lower bound_ — e.g. `lo = damageMin + quality * QUALITY_WEIGHT * range; roll = uniform(lo, max)`,
 which preserves spread, stays monotone, and makes the floor mean what §4.3 says it means; or
-(b) keep the blend and add an AC pinning the *minimum* observed roll for a floored correct answer
+(b) keep the blend and add an AC pinning the _minimum_ observed roll for a floored correct answer
 over N seeds, then get the human to confirm that number is "respectable". Do not ship the current
 AC set — it is weak in exactly the place the pedagogy lives.
 
-Note this is the *only* one of the four flagged judgment calls I'd overturn. The other three are
+Note this is the _only_ one of the four flagged judgment calls I'd overturn. The other three are
 audited below.
 
 ### F7. `src/content/**` is in scope but is not covered by the purity or determinism lint
@@ -211,7 +214,7 @@ audited below.
 and `no-restricted-globals` (Date) to `files: ['src/engine/**/*.ts']` only.
 
 `.tdd-swarm/posture.md:42` puts **`src/content/**` in scope**. And engine modules import
-`src/content/index.ts` at *runtime*, not type-only — `getCannon`/`cannons` are consumed by T-008,
+`src/content/index.ts` at _runtime_, not type-only — `getCannon`/`cannons` are consumed by T-008,
 T-010, T-011, T-012, T-013, T-018, T-021. So `src/content/index.ts` is on the engine's runtime
 path with no determinism guard. T-006's DoD (`tickets/T-006.md:163`) asserts "no `Math.random()`,
 no `Date`" as a checkbox with nothing enforcing it, and `gates.md:20-21` claims the guards are
@@ -229,27 +232,27 @@ wave 1.
 
 Modules this swarm ships that **nothing in scope imports**:
 
-| module | ticket | only consumer |
-|---|---|---|
-| `engine/economy.ts` | T-009 | store (out of scope) — `tickets/T-020.md:191` |
-| `engine/placement.ts` | T-011 | onboarding screen (out of scope) |
-| `engine/ranks.ts` | T-012 | store (out of scope) |
-| `engine/drill.ts` | T-017 | `app/range.tsx` (out of scope) |
-| `engine/opponents/types.ts`, `scripted.ts` | T-018 | duel-store driver (out of scope) |
-| `engine/opponents/bot.ts`, `mercy.ts` | T-021 | duel-store driver (out of scope) |
-| `engine/duel/replay.ts` | T-023 | §13 future work (not built) |
-| `engine/duel/invariants.ts` | T-024 | `app/dev.tsx` (out of scope) |
+| module                                     | ticket | only consumer                                 |
+| ------------------------------------------ | ------ | --------------------------------------------- |
+| `engine/economy.ts`                        | T-009  | store (out of scope) — `tickets/T-020.md:191` |
+| `engine/placement.ts`                      | T-011  | onboarding screen (out of scope)              |
+| `engine/ranks.ts`                          | T-012  | store (out of scope)                          |
+| `engine/drill.ts`                          | T-017  | `app/range.tsx` (out of scope)                |
+| `engine/opponents/types.ts`, `scripted.ts` | T-018  | duel-store driver (out of scope)              |
+| `engine/opponents/bot.ts`, `mercy.ts`      | T-021  | duel-store driver (out of scope)              |
+| `engine/duel/replay.ts`                    | T-023  | §13 future work (not built)                   |
+| `engine/duel/invariants.ts`                | T-024  | `app/dev.tsx` (out of scope)                  |
 
-This is **acceptable in principle** — the swarm's declared scope *is* a library layer the app
+This is **acceptable in principle** — the swarm's declared scope _is_ a library layer the app
 wires later, and `traceability.md:214-216` says as much. But `posture.md`'s deferred-gates table
 has **no row for reachability**, unlike every other waived gate. Wave gating will therefore
 either fail this check or skip it silently — the exact thing the posture file exists to prevent.
 
-**Fix:** add an explicit row to `posture.md`'s deferred table: *"Reachability / entrypoint wiring
+**Fix:** add an explicit row to `posture.md`'s deferred table: _"Reachability / entrypoint wiring
 — **SUBSTITUTED**. This swarm's scope is a pure library layer by design (posture §Scope). The
 substituted proof of reachability is: every exported symbol has at least one frozen test that
 executes it, and `tsc --noEmit` proves the whole graph compiles. Re-enable when `src/stores/**`
-enters scope."* Then F3(b) becomes even more valuable — it converts `opponents/**` from
+enters scope."_ Then F3(b) becomes even more valuable — it converts `opponents/**` from
 "tested but never called" to "called by the reducer's own test".
 
 ### F9. `duel/replay.ts` (T-023) is the plan's strongest scope-creep candidate
@@ -268,7 +271,7 @@ relaunch" is T-013 AC-6 (`tickets/T-013.md:152-154`) and T-020 AC-20
 Against a 5-day timebox with an explicit cut list, this is the one ticket I would put on the cut
 line.
 
-**Fix:** either (a) demote it — keep the *property* as a test inside T-024's fuzz suite
+**Fix:** either (a) demote it — keep the _property_ as a test inside T-024's fuzz suite
 ("re-dispatching a recorded event stream reproduces the final state") and drop the shipped
 module; or (b) keep it, but record it in `traceability.md` §3 as an accepted deviation from
 §13's "documented, not built", not as ordinary coverage. Do not leave it looking like a
@@ -279,9 +282,9 @@ requirement.
 - `tickets/T-010.md:110-112` — AC-12 asserts that mastering `add_within_20` lifts the fog to
   `isla_products`, which requires `add_within_20 ∈ port_sumwich.rangeSkills`.
 - `tickets/T-011.md:80` — AC-7 asserts `k_1 → unlockedIslands === [port_sumwich]`, which depends
-  on the *minimum* grade across every island's `rangeSkills`.
+  on the _minimum_ grade across every island's `rangeSkills`.
 - `tickets/T-006.md:125-128` — AC-9 checks only referential integrity ("every referenced SkillId
-  exists"). Nothing pins *which* skills each island carries.
+  exists"). Nothing pins _which_ skills each island carries.
 
 T-006 (wave 2) has real latitude here; T-010/T-011 (wave 3) have frozen tests that assume one
 particular assignment. Cross-wave, so it will surface as a wave-3 red rather than a dispatch
@@ -294,23 +297,23 @@ in the same table-driven style as its AC-3 cannon transcription.
 
 ## Audit of the four flagged judgment calls
 
-| call | verdict |
-|---|---|
-| **(a) linear damage blend** | **Overturn.** Fails ARCHITECTURE §4.3's stated guarantee; T-008's ACs are too weak to notice. Correctly tagged `proposed` (`tickets/T-008.md:76-79`) and correctly escalated as 2.12, but the escalation understates it — this is a design *defect*, not just an unspecified number. Cost to fix: one formula line + one AC. **Patch, not supersede.** See F6. |
-| **(b) Double-Shot = shortened timer** | **Accept the modelling, reject the deferral.** The mechanic composes cleanly with the existing quality curve, adds no phase (`tickets/T-022.md:73-74` — good call, keeps §4.2's eight-phase list and T-024's fuzz coverage intact), and is honestly tagged `open-question` with the alternative spelled out. But the ticket's own "superseded, not patched" cost lands in **wave 1**, not wave 7. See F5. |
-| **(c) `RivalAction` / `RivalVolley` split** | **Endorse, no change.** ARCHITECTURE §4.2's `Opponent` return types genuinely do not reconcile with the `RIVAL_ACTION` payload and the four-field action log; the split is the minimal honest reconciliation. Siting all three (`RivalAction`, `RivalVolley`, `RivalView`) in `duel/types.ts` rather than `opponents/` correctly avoids an import cycle (`tickets/T-013.md:109-111`) and is the reason wave 5/6 stays parallelisable at all. `RivalView`'s deliberate information hiding (`tickets/T-013.md:126-128` — no `rng`, no `question`) is a genuinely good call for the future-network-player path. Clearly tagged `proposed`. |
-| **(d) optional `doubleShot` on the action log** | **Necessary and correctly flagged** (`tickets/T-022.md:70-72` names it as a deviation from §4.2's four-field log). But it collides head-on with T-013 AC-11's "exactly four fields and no others". See F2 — this is the finding that turns a good judgment call into a scheduled wave-7 blocker. |
+| call                                            | verdict                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **(a) linear damage blend**                     | **Overturn.** Fails ARCHITECTURE §4.3's stated guarantee; T-008's ACs are too weak to notice. Correctly tagged `proposed` (`tickets/T-008.md:76-79`) and correctly escalated as 2.12, but the escalation understates it — this is a design _defect_, not just an unspecified number. Cost to fix: one formula line + one AC. **Patch, not supersede.** See F6.                                                                                                                                                                                                                                                                          |
+| **(b) Double-Shot = shortened timer**           | **Accept the modelling, reject the deferral.** The mechanic composes cleanly with the existing quality curve, adds no phase (`tickets/T-022.md:73-74` — good call, keeps §4.2's eight-phase list and T-024's fuzz coverage intact), and is honestly tagged `open-question` with the alternative spelled out. But the ticket's own "superseded, not patched" cost lands in **wave 1**, not wave 7. See F5.                                                                                                                                                                                                                               |
+| **(c) `RivalAction` / `RivalVolley` split**     | **Endorse, no change.** ARCHITECTURE §4.2's `Opponent` return types genuinely do not reconcile with the `RIVAL_ACTION` payload and the four-field action log; the split is the minimal honest reconciliation. Siting all three (`RivalAction`, `RivalVolley`, `RivalView`) in `duel/types.ts` rather than `opponents/` correctly avoids an import cycle (`tickets/T-013.md:109-111`) and is the reason wave 5/6 stays parallelisable at all. `RivalView`'s deliberate information hiding (`tickets/T-013.md:126-128` — no `rng`, no `question`) is a genuinely good call for the future-network-player path. Clearly tagged `proposed`. |
+| **(d) optional `doubleShot` on the action log** | **Necessary and correctly flagged** (`tickets/T-022.md:70-72` names it as a deviation from §4.2's four-field log). But it collides head-on with T-013 AC-11's "exactly four fields and no others". See F2 — this is the finding that turns a good judgment call into a scheduled wave-7 blocker.                                                                                                                                                                                                                                                                                                                                        |
 
 ---
 
 ## Architectural drift — the five modules not in ARCHITECTURE.md §8
 
-| module | verdict |
-|---|---|
-| `placement.ts` (T-011) | **Justified.** PLAN.md's grade picker is an MVP-checklist item; the logic has to live somewhere and folding it into `mastery.ts` would mix onboarding with progression. §8's engine list reads as illustrative, not exhaustive. `cheap` ticket. |
-| `ranks.ts` (T-012) | **Justified but deferrable.** ARCHITECTURE §5 requires numeric `rankTier`; the ratchet is a stated child-safety guarantee. But PLAN.md dates the rank ladder **day 4**, and the module has no in-scope consumer. Keep if wave width allows; first thing I'd cut if wave 3 runs long. |
-| `drill.ts` (T-017) | **Justified.** §8 names `app/range.tsx` but no engine module; putting the pure loop in the engine is exactly right under §3.2's "all game logic outside React". Serves an MVP-checklist line. |
-| `duel/replay.ts` (T-023) | **Scope creep.** See F9. |
+| module                       | verdict                                                                                                                                                                                                                                                                                                                                                                              |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `placement.ts` (T-011)       | **Justified.** PLAN.md's grade picker is an MVP-checklist item; the logic has to live somewhere and folding it into `mastery.ts` would mix onboarding with progression. §8's engine list reads as illustrative, not exhaustive. `cheap` ticket.                                                                                                                                      |
+| `ranks.ts` (T-012)           | **Justified but deferrable.** ARCHITECTURE §5 requires numeric `rankTier`; the ratchet is a stated child-safety guarantee. But PLAN.md dates the rank ladder **day 4**, and the module has no in-scope consumer. Keep if wave width allows; first thing I'd cut if wave 3 runs long.                                                                                                 |
+| `drill.ts` (T-017)           | **Justified.** §8 names `app/range.tsx` but no engine module; putting the pure loop in the engine is exactly right under §3.2's "all game logic outside React". Serves an MVP-checklist line.                                                                                                                                                                                        |
+| `duel/replay.ts` (T-023)     | **Scope creep.** See F9.                                                                                                                                                                                                                                                                                                                                                             |
 | `duel/invariants.ts` (T-024) | **Justified for the fuzz; thin as shipped code.** ARCHITECTURE §9.2 explicitly asks for the invariant fuzz, so the ticket earns its place. But the argument for exporting the predicate from `src/engine/` rather than keeping it test-local (`tickets/T-024.md:65-68`) rests on `app/dev.tsx` and a future server validator — both out of scope. Minor; the cost is one small file. |
 
 **Engine purity: clean.** No ticket requires `src/engine/**` to import React/RN/Expo/Firebase.
@@ -346,7 +349,7 @@ T-019 → T-020 dependency. Credit where due.
   at runtime, which imports zod and validates at module load (`tickets/T-006.md:91-93`). Harmless
   (zod is not lint-banned and §2 endorses it) but the DoD line as written is misleading — reword
   to "`questions/types.ts` imports **types only** from `@content/schemas`".
-- **M7.** `TICKETS.md:199` declares the critical path as 8 hops. It is 8 hops *as declared*, but
+- **M7.** `TICKETS.md:199` declares the critical path as 8 hops. It is 8 hops _as declared_, but
   one of its edges is phantom (F3) and one required edge is missing (F1). Regenerate after fixing.
 - **M8.** `traceability.md:88` tags all five added modules as "each is tagged `proposed` in its
   ticket". T-017's `drill.ts` and T-011's `placement.ts` carry no module-level `proposed` tag —
@@ -359,15 +362,15 @@ T-019 → T-020 dependency. Credit where due.
 Applying only the two dependency corrections — add `T-004 → T-005`; keep `T-018 → T-020` but make
 it real per F3(b) — and recomputing earliest-possible waves:
 
-| wave | tickets | width | file-scope check |
-|---|---|---|---|
-| 1 | T-001, T-002, T-003 | 3 | disjoint |
-| 2 | T-004, T-006 | 2 | disjoint |
-| 3 | T-005, T-008, T-009, T-010, T-011, T-012 | 6 | disjoint |
-| 4 | T-007, T-013 | 2 | disjoint |
-| 5 | T-014, T-015, T-016, T-017, T-018, T-020 | 6 | disjoint (3 template files, `drill.ts`, `opponents/{types,scripted}.ts`, `duel/reducer.ts`) |
-| 6 | T-019, T-021, T-022 | 3 | disjoint (`templates/index.ts`, `opponents/{bot,mercy}.ts`, `duel/{types,reducer}.ts`) |
-| 7 | T-023, T-024 | 2 | disjoint |
+| wave | tickets                                  | width | file-scope check                                                                            |
+| ---- | ---------------------------------------- | ----- | ------------------------------------------------------------------------------------------- |
+| 1    | T-001, T-002, T-003                      | 3     | disjoint                                                                                    |
+| 2    | T-004, T-006                             | 2     | disjoint                                                                                    |
+| 3    | T-005, T-008, T-009, T-010, T-011, T-012 | 6     | disjoint                                                                                    |
+| 4    | T-007, T-013                             | 2     | disjoint                                                                                    |
+| 5    | T-014, T-015, T-016, T-017, T-018, T-020 | 6     | disjoint (3 template files, `drill.ts`, `opponents/{types,scripted}.ts`, `duel/reducer.ts`) |
+| 6    | T-019, T-021, T-022                      | 3     | disjoint (`templates/index.ts`, `opponents/{bot,mercy}.ts`, `duel/{types,reducer}.ts`)      |
+| 7    | T-023, T-024                             | 2     | disjoint                                                                                    |
 
 New critical path (7 hops): `T-003 → T-004 → T-005 → T-007 → T-013 → T-020 → T-022 → T-023/T-024`
 — note T-013 gates on T-008 (wave 3) and T-020 gates on both T-007 and T-013.
@@ -394,7 +397,7 @@ in the original plan (its wave 4).
      without this, T-007 is a blocked ticket in wave 3 against a frozen file.
   2. Add `difficulty?: 1 | 2 | 3` to `templateSchema` (**F5**) — one line of cheap insurance that
      converts a possible cross-wave Double-Shot supersede into a T-022-local patch.
-  Then dispatch.
+     Then dispatch.
 
 Additionally, before wave 2 opens: fix **F1** (T-005's missing `T-004` edge — this is a hard
 blocker, not a nice-to-have), **F2** (T-013 AC-11 wording, so wave 7 is not pre-broken), and

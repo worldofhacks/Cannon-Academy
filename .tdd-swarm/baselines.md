@@ -2,15 +2,15 @@
 
 Every later gate result is compared against these numbers.
 
-| Metric | Baseline | Command |
-|---|---|---|
-| Test files | 1 (`__tests__/scaffold.test.ts`) | `npx vitest run` |
-| Tests passing | 1 | `npx vitest run` |
-| Tests failing | 0 | — |
-| Coverage (src/) | 0/0 — no source yet | `npx vitest run --coverage` |
-| Typecheck errors | 0 | `npx tsc --noEmit` |
-| Lint errors | 0 | `npx eslint . --max-warnings 0` |
-| npm audit (high+) | 0 | `npm audit --audit-level=high` |
+| Metric            | Baseline                         | Command                         |
+| ----------------- | -------------------------------- | ------------------------------- |
+| Test files        | 1 (`__tests__/scaffold.test.ts`) | `npx vitest run`                |
+| Tests passing     | 1                                | `npx vitest run`                |
+| Tests failing     | 0                                | —                               |
+| Coverage (src/)   | 0/0 — no source yet              | `npx vitest run --coverage`     |
+| Typecheck errors  | 0                                | `npx tsc --noEmit`              |
+| Lint errors       | 0                                | `npx eslint . --max-warnings 0` |
+| npm audit (high+) | 0                                | `npm audit --audit-level=high`  |
 
 **Regression rule:** passing test count may never fall below the recorded baseline,
 and coverage may never fall below the previous wave's recorded percentage.

@@ -12,34 +12,34 @@ Solo build, 5-day timebox. **Day 1 is Tuesday July 28, 2026. Submission is Satur
 
 Planning is complete and adversarially reviewed. Nothing is open; the next action is code.
 
-| Artifact | State |
-| --- | --- |
-| Concept, name, differentiation | Locked (`PLAN.md`) |
-| Game design + 5-day schedule | Locked (`PLAN.md`) |
-| Technical architecture | Locked (`ARCHITECTURE.md`) |
-| UI approach + art pipeline | Locked (`ARCHITECTURE.md` §3.6, §7) |
-| Adversarial review (schedule / technical / design) | Complete — findings folded in |
-| Repo scaffold | **Not started ← you are here** |
+| Artifact                                           | State                               |
+| -------------------------------------------------- | ----------------------------------- |
+| Concept, name, differentiation                     | Locked (`PLAN.md`)                  |
+| Game design + 5-day schedule                       | Locked (`PLAN.md`)                  |
+| Technical architecture                             | Locked (`ARCHITECTURE.md`)          |
+| UI approach + art pipeline                         | Locked (`ARCHITECTURE.md` §3.6, §7) |
+| Adversarial review (schedule / technical / design) | Complete — findings folded in       |
+| Repo scaffold                                      | **Not started ← you are here**      |
 
 ## Documents
 
-- **`PLAN.md`** — the pitch, game design (duel loop, armory, mastery, economy, encounters), the 2-day MVP milestone with its definition of done, the day-by-day schedule, risks, and the competitive/similarity audit. Read this for *what* we're building.
-- **`ARCHITECTURE.md`** — every stack layer with options considered, the decision, and revisit conditions; UI structure and design tokens; the art pipeline; the engine design (question templates, duel state machine, damage model); backend schema and known React Native gotchas; testing, builds, project structure. Read this for *how*.
+- **`PLAN.md`** — the pitch, game design (duel loop, armory, mastery, economy, encounters), the 2-day MVP milestone with its definition of done, the day-by-day schedule, risks, and the competitive/similarity audit. Read this for _what_ we're building.
+- **`ARCHITECTURE.md`** — every stack layer with options considered, the decision, and revisit conditions; UI structure and design tokens; the art pipeline; the engine design (question templates, duel state machine, damage model); backend schema and known React Native gotchas; testing, builds, project structure. Read this for _how_.
 
 ## The decisions, at a glance
 
-| | |
-| --- | --- |
-| **Genre** | Turn-based naval duel, question-gated volleys |
-| **Platform** | Expo SDK 57 / RN 0.86 / TypeScript strict, portrait-locked |
-| **Dev loop** | **Development build, not Expo Go** (App Store Expo Go is SDK 54) — Android dev client first |
-| **Rendering** | Plain RN Views + Reanimated 4.5 + pre-rendered sprites + Lottie — no game engine, no 3D runtime |
-| **Art** | Free CC0 low-poly packs rendered to 2D sprites in Blender from one locked camera |
-| **State** | Zustand + pure reducers; `src/engine/` has zero React imports |
-| **Answer input** | Four-choice taps, universally (mobile smoothness, K-friendly, one input for every skill) |
-| **Backend** | Firebase JS SDK v12+ — anonymous auth + Firestore, local-first sync |
-| **Placement** | Grade picker at onboarding (K-1 / 2-3 / 4-5) pre-unlocks content to band |
-| **Opponents** | Bots behind one `Opponent` interface — the seam a remote player fills later |
+|                  |                                                                                                           |
+| ---------------- | --------------------------------------------------------------------------------------------------------- |
+| **Genre**        | Turn-based naval duel, question-gated volleys                                                             |
+| **Platform**     | Expo SDK 57 / RN 0.86 / TypeScript strict, portrait-locked                                                |
+| **Dev loop**     | **Development build, not Expo Go** (App Store Expo Go is SDK 54) — Android dev client first               |
+| **Rendering**    | Plain RN Views + Reanimated 4.5 + pre-rendered sprites + Lottie — no game engine, no 3D runtime           |
+| **Art**          | Free CC0 low-poly packs rendered to 2D sprites in Blender from one locked camera                          |
+| **State**        | Zustand + pure reducers; `src/engine/` has zero React imports                                             |
+| **Answer input** | Four-choice taps, universally (mobile smoothness, K-friendly, one input for every skill)                  |
+| **Backend**      | Firebase JS SDK v12+ — anonymous auth + Firestore, local-first sync                                       |
+| **Placement**    | Grade picker at onboarding (K-1 / 2-3 / 4-5) pre-unlocks content to band                                  |
+| **Opponents**    | Bots behind one `Opponent` interface — the seam a remote player fills later                               |
 | **Distribution** | Android APK via Firebase App Distribution + web build (committed); TestFlight if Apple activates (upside) |
 
 ## MVP definition of done (end of day 2)
@@ -62,7 +62,7 @@ Everything here must be green. Nothing here may slip. Grey-box art passes; sound
 ## Pre-flight (before writing code)
 
 1. **Pay the Apple Developer $99** — enrollment is created but unpaid; activation takes 24–48h and TestFlight is blocked until it clears. Android + web remain the committed path either way.
-2. **Kick off the EAS dev-client build for Android** — 90-minute timebox. Expo Go is *not* the dev loop for this project (see below). Simulator/emulator is the fallback and blocks no JS work.
+2. **Kick off the EAS dev-client build for Android** — 90-minute timebox. Expo Go is _not_ the dev loop for this project (see below). Simulator/emulator is the fallback and blocks no JS work.
 3. **Create the Firebase project** — anonymous auth enabled; grab the web config.
 4. **Download the art packs** (free, CC0, no account needed): [Quaternius Pirate Kit](https://quaternius.com/packs/piratekit.html), [Kenney Pirate Kit](https://kenney.nl/assets/pirate-kit), [Kenney Pirate Pack 2D](https://kenney.nl/assets/pirate-pack) (the parachute).
 5. Confirm `npm`, Node LTS, Blender 5.1, and an EAS account are ready.

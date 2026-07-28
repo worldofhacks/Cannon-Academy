@@ -60,6 +60,6 @@ through AC-14) maps to at least one passing `spec(T-001:AC-n)` test. `tsc --noEm
   `engine-purity` all show PASS.
   - Recommended fix (out of my scope to apply): add `.claude/hooks/guard-writes.cjs`
     to a CommonJS-aware eslint override (e.g. `env: { node: true }`, `sourceType:
-    'commonjs'`, or move it into the existing `ignores` list alongside
+'commonjs'`, or move it into the existing `ignores` list alongside
     `.tdd-swarm/**`), or convert it to ESM. This should be handled by whoever owns
     repo-wide tooling config, not by a ticket scoped to `src/engine/rng.ts`.

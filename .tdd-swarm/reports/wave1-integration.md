@@ -10,14 +10,14 @@
 
 ## Verdict
 
-| Dimension | Result |
-| --- | --- |
-| **Merges** | 3/3 clean — zero conflicts, textual or semantic |
-| **Repo gate suite** | ALL GREEN |
-| **Test suite** | **492 passed / 492**, 5 files, 1.00s |
-| **Cross-ticket compatibility** | VERIFIED — first-ever co-compilation and co-execution, clean |
-| **Architecture drift** | **1 Minor finding**, escalated (not absorbed). 2 noted non-drift. |
-| **Overall** | **PASS** |
+| Dimension                      | Result                                                            |
+| ------------------------------ | ----------------------------------------------------------------- |
+| **Merges**                     | 3/3 clean — zero conflicts, textual or semantic                   |
+| **Repo gate suite**            | ALL GREEN                                                         |
+| **Test suite**                 | **492 passed / 492**, 5 files, 1.00s                              |
+| **Cross-ticket compatibility** | VERIFIED — first-ever co-compilation and co-execution, clean      |
+| **Architecture drift**         | **1 Minor finding**, escalated (not absorbed). 2 noted non-drift. |
+| **Overall**                    | **PASS**                                                          |
 
 ---
 
@@ -27,11 +27,11 @@ All three branches merged with `--no-ff` in ticket-id order. Every merge reporte
 "Merge made by the 'ort' strategy" with exit 0. **No conflict at any point**, so no
 semantic conflict resolution was performed or required.
 
-| Merge commit | Branch | Files added |
-| --- | --- | --- |
-| `6694fc8` | `ticket/T-001-seeded-prng` | `src/engine/rng.ts`, `__tests__/engine/rng.test.ts`, `.tdd-swarm/reports/T-001-implementation.md` |
-| `e76ca9d` | `ticket/T-002-safe-expr-eval` | `src/engine/questions/expr.ts`, `__tests__/engine/questions/expr.test.ts` |
-| `ac34693` | `ticket/T-003-schemas-and-types` | `src/content/schemas.ts`, `src/engine/questions/types.ts`, `__tests__/content/schemas.test.ts`, `__tests__/engine/questions/types.test.ts` |
+| Merge commit | Branch                           | Files added                                                                                                                                |
+| ------------ | -------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `6694fc8`    | `ticket/T-001-seeded-prng`       | `src/engine/rng.ts`, `__tests__/engine/rng.test.ts`, `.tdd-swarm/reports/T-001-implementation.md`                                          |
+| `e76ca9d`    | `ticket/T-002-safe-expr-eval`    | `src/engine/questions/expr.ts`, `__tests__/engine/questions/expr.test.ts`                                                                  |
+| `ac34693`    | `ticket/T-003-schemas-and-types` | `src/content/schemas.ts`, `src/engine/questions/types.ts`, `__tests__/content/schemas.test.ts`, `__tests__/engine/questions/types.test.ts` |
 
 The three branches touched **strictly disjoint file sets**, which is why the merges were
 trivial. The `.tdd-swarm/` and `tickets/` ledger edits carried by each branch were already
@@ -70,11 +70,11 @@ unchanged. Confirmed against both the pre-merge tip and `main`.
 
 ### `.tdd-swarm/spec-lint.sh` — exit 0 for all three
 
-| Ticket | Result | ACs mapped to tests |
-| --- | --- | --- |
-| `tickets/T-001.md` | `== SPEC-LINT PASS ==` | 16 |
-| `tickets/T-002.md` | `== SPEC-LINT PASS ==` | 26 |
-| `tickets/T-003.md` | `== SPEC-LINT PASS ==` | 20 |
+| Ticket             | Result                 | ACs mapped to tests |
+| ------------------ | ---------------------- | ------------------- |
+| `tickets/T-001.md` | `== SPEC-LINT PASS ==` | 16                  |
+| `tickets/T-002.md` | `== SPEC-LINT PASS ==` | 26                  |
+| `tickets/T-003.md` | `== SPEC-LINT PASS ==` | 20                  |
 
 Bidirectional: every AC has ≥1 tagged test, and every test file cites ≥1 criterion.
 
@@ -110,7 +110,7 @@ positive control running and passing:
 
 The 3s figure is a **timeout ceiling, not a fixed cost** — it is only reached by a
 non-terminating implementation. Each worker spawns, resolves in 41–76ms, and settles.
-The suite is fast *because* T-002's implementation correctly rejects non-finite values
+The suite is fast _because_ T-002's implementation correctly rejects non-finite values
 before they ever reach the Euclid loop. This is the intended behavior, and the suite
 completes well within any reasonable budget.
 
@@ -134,11 +134,11 @@ executed in one process** before this merge. Findings below are all empirical.
 The four modules' export surfaces are fully disjoint. Nothing in `expr.ts` or `rng.ts`
 shadows or conflicts with any `schemas.ts` export:
 
-| Module | Exports |
-| --- | --- |
-| `rng.ts` | `Rng`, `createRng`, `nextFloat`, `nextInt`, `shuffle`, `pick`, `weightedPick` |
-| `expr.ts` | `ExprErrorCode`, `ExprError`, `evaluateNumber`, `evaluatePredicate` |
-| `types.ts` | `Choice`, `Question`, `QuestionGenerationCode`, `QuestionGenerationError`, `assertQuestion` |
+| Module       | Exports                                                                                                                                                                                                                                                                                                                               |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rng.ts`     | `Rng`, `createRng`, `nextFloat`, `nextInt`, `shuffle`, `pick`, `weightedPick`                                                                                                                                                                                                                                                         |
+| `expr.ts`    | `ExprErrorCode`, `ExprError`, `evaluateNumber`, `evaluatePredicate`                                                                                                                                                                                                                                                                   |
+| `types.ts`   | `Choice`, `Question`, `QuestionGenerationCode`, `QuestionGenerationError`, `assertQuestion`                                                                                                                                                                                                                                           |
 | `schemas.ts` | `SKILL_IDS`/`SkillId`, `CANNON_IDS`/`CannonId`, `ISLAND_IDS`/`IslandId`, `RANK_IDS`/`RankId`, `GRADE_BANDS`/`GradeBand`, `TEMPERAMENTS`/`Temperament`, `CHEST_RARITIES`/`ChestRarity`, `templateSchema`/`Template`, `skillSchema`/`Skill`, `cannonSchema`/`Cannon`, `islandSchema`/`Island`, `rankSchema`/`Rank`, `crewSchema`/`Crew` |
 
 ### 3.2 `types.ts` → `@content/schemas` resolves — VERIFIED
@@ -215,11 +215,11 @@ module graph, satisfying T-003's Definition of Done.
 
 ### 4.1 Declared paths (§8) — NO DRIFT
 
-| §8 declares | Wave 1 built | Verdict |
-| --- | --- | --- |
-| `src/engine/rng.ts` — "seeded mulberry32" | `src/engine/rng.ts`, mulberry32 | Exact match |
+| §8 declares                                                                              | Wave 1 built                                                                      | Verdict                                                                                                                                            |
+| ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `src/engine/rng.ts` — "seeded mulberry32"                                                | `src/engine/rng.ts`, mulberry32                                                   | Exact match                                                                                                                                        |
 | `src/engine/questions/` — "template types, generator, distractors, safe constraint eval" | `questions/types.ts` (template types), `questions/expr.ts` (safe constraint eval) | Match — §8 declares the directory and its roles, not filenames; both files fill declared roles. Generator and distractors remain for a later wave. |
-| `src/content/` — "JSON catalogs + zod schemas" | `src/content/schemas.ts` | Match — schemas landed; JSON catalogs are a later wave. |
+| `src/content/` — "JSON catalogs + zod schemas"                                           | `src/content/schemas.ts`                                                          | Match — schemas landed; JSON catalogs are a later wave.                                                                                            |
 
 ### 4.2 Boundary crossings — NONE UNDECLARED
 
@@ -236,7 +236,7 @@ import exists. No app/store/service layer is touched.
 ARCHITECTURE.md describes T-002's subject only as "constraints?: string[] — tiny safe
 evaluator over params" (§4.1). It never enumerates an error taxonomy, never names a single
 error code, and never states how many there are. There is no documented contract to drift
-*from*. Adding a code is a refinement strictly below the architecture's altitude — the
+_from_. Adding a code is a refinement strictly below the architecture's altitude — the
 architecture's actual commitment ("a tiny safe evaluator") is more fully honored by a
 sharper failure taxonomy, not violated by it. **No doc amendment needed.** The code is
 specified where it belongs: T-002's ACs and frozen tests.
@@ -246,7 +246,7 @@ and correctly propagated.**
 
 §4.1 commits only to "a seeded PRNG (mulberry32), seed carried in state" and §4.2 to the
 seed surviving persistence. Both still hold — `Rng` remains a plain JSON-serialisable
-`{state: number}`. The seed *domain* is not specified at architecture altitude, so
+`{state: number}`. The seed _domain_ is not specified at architecture altitude, so
 rejecting a 40-bit seed rather than silently truncating it is an input-validation detail,
 not a contract change against the document.
 
@@ -259,8 +259,8 @@ the affected tickets. That is the correct handling. Flagged here only for the re
 
 **Escalated, not absorbed. Not fixed by me — it is a semantic decision with an owner.**
 
-ARCHITECTURE.md §4.1 is unambiguous: *"Answers are four-choice taps, universally. Every
-question renders one correct answer plus three engineered distractors."* Exactly three.
+ARCHITECTURE.md §4.1 is unambiguous: _"Answers are four-choice taps, universally. Every
+question renders one correct answer plus three engineered distractors."_ Exactly three.
 
 `src/content/schemas.ts:81` implements `distractors: z.array(z.string()).min(3)` — **at
 least** three. A four-distractor template validates successfully. Confirmed empirically:
@@ -282,6 +282,7 @@ validation time, which is precisely where the architecture put the catch. Two wa
 modules disagree about the same invariant.
 
 **Owner decision required — one of:**
+
 1. Tighten to `.length(3)` and amend AC-4 (needs a repair ticket; frozen tests pin `>=3`, so the suite would need re-freezing), or
 2. Amend ARCHITECTURE.md §4.1 if variable choice counts are genuinely wanted later, or
 3. Accept as deliberate headroom and record the rationale — consistent with the

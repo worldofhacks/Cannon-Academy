@@ -1,6 +1,7 @@
 # Wave-1 Security Review — T-001 (rng.ts) + T-003 (schemas.ts, questions/types.ts)
 
 Scope reviewed via `git diff swarm/engine-core..HEAD -- src/` in each worktree:
+
 - `wt-T-001/src/engine/rng.ts` (122 lines, new file)
 - `wt-T-003/src/content/schemas.ts` (200 lines, new file)
 - `wt-T-003/src/engine/questions/types.ts` (64 lines, new file)
@@ -22,8 +23,8 @@ None present in either diff. The only match for the string `constructor` is the 
 Verified against the installed zod version (3.25.76, from `node_modules/zod/package.json`) rather than assuming: both `ZodObject` and `ZodRecord` route through the shared `ParseStatus.mergeObjectSync` (`node_modules/zod/v3/helpers/parseUtil.js:82-96`), which explicitly guards:
 
 ```js
-if (key.value !== "__proto__" && (typeof value.value !== "undefined" || pair.alwaysSet)) {
-    finalObject[key.value] = value.value;
+if (key.value !== '__proto__' && (typeof value.value !== 'undefined' || pair.alwaysSet)) {
+  finalObject[key.value] = value.value;
 }
 ```
 

@@ -60,7 +60,7 @@ Important findings were fixed:
   ARCHITECTURE.md:206. **Formula corrected**, T-008 AC-15 added. Side effect: the 4–6 volley
   tolerance tightened to match PLAN.md exactly.
 - **I-2** — T-008 AC-16 adds an effect-size floor so a near-zero `QUALITY_WEIGHT` cannot pass.
-- **F2/F4/F5** — T-013's action-log AC restated over *required* fields; T-003 gained exact
+- **F2/F4/F5** — T-013's action-log AC restated over _required_ fields; T-003 gained exact
   `Question`/`Choice` shapes and a `difficulty?` insurance field.
 - **F3** — the `T-018 → T-020` edge was phantom. Dropped; T-024 now drives 1,000 fuzz duels
   through the real scripted and bot opponents, de-orphaning all of `src/engine/opponents/**`.
@@ -135,7 +135,7 @@ assumption baked into a wave-1 id union), **2.14** (fog lifts on any one mastere
   correct, and **no fabricated numbers anywhere**.
 - Criticals fixed:
   - T-005 imported `tuning.ts` while in the same wave as its owner T-004 — could not have
-    compiled in its worktree. (Exclusive file scopes govern *writes*, not *reads*.)
+    compiled in its worktree. (Exclusive file scopes govern _writes_, not _reads_.)
   - `DISTRACTOR_ABS_FLOOR >= 1` made T-005's three-distinct-distractors requirement
     unsatisfiable for a zero answer, which `sub_within_20` legally produces.
 - Design corrections (both would have passed their own tests):
@@ -158,13 +158,13 @@ assumption baked into a wave-1 id union), **2.14** (fog lifts on any one mastere
 
 Owner decisions, now locked (recorded in traceability.md §2):
 
-| id | question | ruling |
-|---|---|---|
-| D-1 | Template count (docs contradicted: 15–25 vs ≥8) | **Floor of 8/skill, no cap.** `PLAN.md:73` edited to remove the contradiction. |
-| D-2 | Double-Shot "harder variant" | **Shortened timer**, same question pool. `difficulty?: 1\|2\|3` kept as schema insurance. |
-| D-3 | Culverin recoil ("Volatile (crit)", no number) | **recoilDamage = 0.** Keeps the K-band starter unable to punish. |
-| D-4 | Reliable vs Standard on a miss | **Identical** — flavour only, no recoil, no re-answer. Volatile tier (5/8/10) already provides the "powerful guns that punish" the owner wanted. Closed before wave 3, so T-020 cannot be superseded by it. |
-| D-5 | Build `duel/replay.ts` (T-023)? | **CUT.** Replaced by replay-proof ACs inside T-024's fuzz suite, including a wrong-seed negative control. Engine stays provably replayable; only the wrapper is deferred. |
+| id  | question                                        | ruling                                                                                                                                                                                                      |
+| --- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D-1 | Template count (docs contradicted: 15–25 vs ≥8) | **Floor of 8/skill, no cap.** `PLAN.md:73` edited to remove the contradiction.                                                                                                                              |
+| D-2 | Double-Shot "harder variant"                    | **Shortened timer**, same question pool. `difficulty?: 1\|2\|3` kept as schema insurance.                                                                                                                   |
+| D-3 | Culverin recoil ("Volatile (crit)", no number)  | **recoilDamage = 0.** Keeps the K-band starter unable to punish.                                                                                                                                            |
+| D-4 | Reliable vs Standard on a miss                  | **Identical** — flavour only, no recoil, no re-answer. Volatile tier (5/8/10) already provides the "powerful guns that punish" the owner wanted. Closed before wave 3, so T-020 cannot be superseded by it. |
+| D-5 | Build `duel/replay.ts` (T-023)?                 | **CUT.** Replaced by replay-proof ACs inside T-024's fuzz suite, including a wrong-seed negative control. Engine stays provably replayable; only the wrapper is deferred.                                   |
 
 Still open, none blocking waves 1–3: 2.5 (chest tier count), 2.14 (fog-lift rule),
 2.16 / gap 3.9 (captain-name wordlist — the one child-safety promise with no test).
@@ -187,11 +187,11 @@ version failed OPEN silently because the repo is `"type": "module"`.
 Worktrees created off `swarm/engine-core`, each with a symlinked `node_modules`
 (verified vitest runs inside a worktree):
 
-| ticket | branch | worktree | test agent model |
-|---|---|---|---|
-| T-001 | `ticket/T-001-seeded-prng` | `../cannon-wt/wt-T-001` | sonnet |
-| T-002 | `ticket/T-002-safe-expr-eval` | `../cannon-wt/wt-T-002` | opus |
-| T-003 | `ticket/T-003-schemas-and-types` | `../cannon-wt/wt-T-003` | opus |
+| ticket | branch                           | worktree                | test agent model |
+| ------ | -------------------------------- | ----------------------- | ---------------- |
+| T-001  | `ticket/T-001-seeded-prng`       | `../cannon-wt/wt-T-001` | sonnet           |
+| T-002  | `ticket/T-002-safe-expr-eval`    | `../cannon-wt/wt-T-002` | opus             |
+| T-003  | `ticket/T-003-schemas-and-types` | `../cannon-wt/wt-T-003` | opus             |
 
 `phase=tests` written into each worktree, so the guard blocks any write to `src/`.
 Three Test Agents dispatched in parallel. Next: verify RED for the right reason, then
@@ -199,10 +199,10 @@ independent test-design review before freezing.
 
 ### Wave 1 test authoring — results
 
-| ticket | tests | ACs | RED verified by orchestrator | pre-freeze defects caught |
-|---|---|---|---|---|
-| T-001 | 19 | 12 | ✅ fails only on `Cannot find module '@engine/rng'` | `weightedPick` entry field named `value`, colliding with T-009's `{item, weight}` — would have hit a frozen file in wave 3 (L-004 class) |
-| T-003 | 85 | 20 | ✅ fails only on the two absent modules | zod stripped unknown keys by default (silent data loss on a typo'd optional field in a hand-authored catalog); `crewSchema` had no criterion at all; id-array export names unnamed; nested `unlock` strictness missing |
+| ticket | tests | ACs | RED verified by orchestrator                        | pre-freeze defects caught                                                                                                                                                                                              |
+| ------ | ----- | --- | --------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| T-001  | 19    | 12  | ✅ fails only on `Cannot find module '@engine/rng'` | `weightedPick` entry field named `value`, colliding with T-009's `{item, weight}` — would have hit a frozen file in wave 3 (L-004 class)                                                                               |
+| T-003  | 85    | 20  | ✅ fails only on the two absent modules             | zod stripped unknown keys by default (silent data loss on a typo'd optional field in a hand-authored catalog); `crewSchema` had no criterion at all; id-array export names unnamed; nested `unlock` strictness missing |
 
 Both Test Agents flagged ambiguities instead of guessing silently. The T-003 agent built a
 throwaway probe implementation in the scratchpad (never in `src/`) to prove its criteria were
@@ -211,6 +211,7 @@ provably cannot, and M10 proved that covering all three `unlock` variants catche
 implementation that strictens only the `range` branch.
 
 Ticket amendments made before freeze (orchestrator):
+
 - T-001: `weightedPick` entries locked to `{ item, weight }`; two `proposed` API decisions
   promoted to `locked-decision` because five tickets couple to them.
 - T-003: AC-18 (crew schema), AC-19 (reject unknown keys), AC-20 (nested strictness);
@@ -230,6 +231,7 @@ plausible implementation** and measured which cheats survived. Both completed re
 **DO NOT FREEZE**, and neither defect would have failed a test.
 
 **T-001 — 3 Critical.** The reviewer's cheats, measured against the frozen bands:
+
 - A `shuffle` swapping index 0 with one random position and leaving positions 1–9 in input order
   scored **946–1050 at index 0** — inside the required [700,1300] — while producing only **4 of
   24 permutations**. It also passed the new-array, no-mutation, and is-a-permutation assertions.
@@ -240,11 +242,11 @@ plausible implementation** and measured which cheats survived. Both completed re
   scored a perfect [10000×6] and passed **every test in the file**, while making draws a
   function of process history rather than the serialised seed — destroying replay after relaunch.
 - `pick = items[0]` passed, as did returning a bare value instead of a `[value, nextRng]` tuple.
-Verified CLEAN: the mulberry32 oracle, checked character-by-character against the ticket
-pseudocode and executed against canonical mulberry32 over 11 seeds × 200 draws — **0 mismatches**,
-including the `4294967295` edge case. The expensive thing to get wrong was right.
-→ AC-8, AC-9, AC-11 extended; AC-13 (purity of all five draw functions) and AC-14 (readonly
-array params) added.
+  Verified CLEAN: the mulberry32 oracle, checked character-by-character against the ticket
+  pseudocode and executed against canonical mulberry32 over 11 seeds × 200 draws — **0 mismatches**,
+  including the `4294967295` edge case. The expensive thing to get wrong was right.
+  → AC-8, AC-9, AC-11 extended; AC-13 (purity of all five draw functions) and AC-14 (readonly
+  array params) added.
 
 **T-003 — 3 Critical.** The lazy implementation passed **85/85 with clean typecheck**:
 `maxGrade > minGrade` (rejecting legal single-grade skills T-006 authors), ten id-union fields
@@ -256,11 +258,11 @@ Over-constraint checked in both directions — valid alternative implementations
 
 ### Status
 
-| ticket | tests | design review | state |
-|---|---|---|---|
-| T-001 | 19 → hardening | 3 Critical | Test Agent fixing |
-| T-002 | 229 | review running | — |
-| T-003 | **116** | 3 Critical, **all closed** | **tests FROZEN**, implementer dispatched (sonnet) |
+| ticket | tests          | design review              | state                                             |
+| ------ | -------------- | -------------------------- | ------------------------------------------------- |
+| T-001  | 19 → hardening | 3 Critical                 | Test Agent fixing                                 |
+| T-002  | 229            | review running             | —                                                 |
+| T-003  | **116**        | 3 Critical, **all closed** | **tests FROZEN**, implementer dispatched (sonnet) |
 
 Worktrees rebased onto the integration branch, closing the L-008 staleness (I5 in the T-003
 review). `phase=implement` set in wt-T-003 and the guard verified flipping: edits to frozen
@@ -271,18 +273,18 @@ tests now blocked (exit 2), writes to `src/` allowed.
 Suite grown 19 → 27 tests (14 ACs). Cheat-mutation verified by the Test Agent against a
 correct implementation in a sandbox:
 
-| cheat | outcome |
-|---|---|
-| correct implementation | 31/31 pass, tsc clean |
-| `oneSwap` shuffle | caught — index-5 count 0, only 4/24 permutations |
-| `naiveSwap` shuffle | caught — passes BOTH index bands, fails permutation count at 827 < 850 |
-| counter-based `nextInt` | caught — scores a perfect [10000×6] on AC-5, fails AC-13 purity and cascades |
-| `pick = items[0]` | caught — 0/10000 for 9 of 10 elements |
-| `pick` returning a bare value | caught at compile time by the tuple destructuring |
+| cheat                         | outcome                                                                      |
+| ----------------------------- | ---------------------------------------------------------------------------- |
+| correct implementation        | 31/31 pass, tsc clean                                                        |
+| `oneSwap` shuffle             | caught — index-5 count 0, only 4/24 permutations                             |
+| `naiveSwap` shuffle           | caught — passes BOTH index bands, fails permutation count at 827 < 850       |
+| counter-based `nextInt`       | caught — scores a perfect [10000×6] on AC-5, fails AC-13 purity and cascades |
+| `pick = items[0]`             | caught — 0/10000 for 9 of 10 elements                                        |
+| `pick` returning a bare value | caught at compile time by the tuple destructuring                            |
 
 Also took M-4: bulk loops converted to collect-then-assert-once; suite runs ~35ms (was 2.8s).
 
-Worktree rebased a second time — the ticket had been amended (AC-13, AC-14) *after* the first
+Worktree rebased a second time — the ticket had been amended (AC-13, AC-14) _after_ the first
 rebase, so it went stale again. Verified current at 14 ACs before freezing.
 
 `phase=implement` set, guard verified flipping. Implementer dispatched (sonnet, per model_hint).
@@ -296,15 +298,17 @@ format, lint, typecheck, unit, no-TODOs, no-skipped-tests, engine-purity, spec-l
 and **zero test files modified by implementer commits** (verified at commit level).
 
 **Ticket T-003: review-passed** (commits ..fb5f78d, gates pass, wave 1)
+
 - Code review: **APPROVED** — 20/20 ACs, 8/8 DoD, no Critical/Important. Reviewer verified the
   derived types with its own `Exact<>` probes rather than trusting the frozen tests, confirmed
   `.strict()` on all six schemas AND all three `unlock` variants, and confirmed the id unions are
-  *consumed* by schema fields rather than merely declared (the L-012 failure mode). Zero `!`,
+  _consumed_ by schema fields rather than merely declared (the L-012 failure mode). Zero `!`,
   `as`, `any`, or ts-suppressions. Four Minor findings recorded, none blocking.
 - Security review: **PASS**. Prototype pollution checked by reading the installed zod source
   (`parseUtil.js` guards `__proto__` for `ZodRecord`), not by assumption.
 
 **Ticket T-001: CHANGES REQUIRED** (attempt 1)
+
 - Code review verified the mulberry32 transcription token-by-token against the ticket pseudocode
   — **exact**, ruling out the "test and implementation agree with each other but both drift from
   the spec" failure. `shuffle` read as an algorithm and confirmed textbook Fisher-Yates with the
@@ -325,11 +329,11 @@ hardening. See L-013 — the anti-eval guard did not guard.
 
 ### Wave 1 test suites — final frozen state
 
-| ticket | tests | ACs | growth | every addition driven by |
-|---|---|---|---|---|
-| T-001 | 41 | 16 | 19 → 27 → 41 | a measured cheat, then a real bug found in code review |
-| T-002 | 296 | 24 | 194 → 229 → 282 → 296 | a measured cheat that survived the previous version |
-| T-003 | 116 | 20 | 85 → 116 | a lazy implementation that passed 85/85 clean |
+| ticket | tests | ACs | growth                | every addition driven by                               |
+| ------ | ----- | --- | --------------------- | ------------------------------------------------------ |
+| T-001  | 41    | 16  | 19 → 27 → 41          | a measured cheat, then a real bug found in code review |
+| T-002  | 296   | 24  | 194 → 229 → 282 → 296 | a measured cheat that survived the previous version    |
+| T-003  | 116   | 20  | 85 → 116              | a lazy implementation that passed 85/85 clean          |
 
 T-002's Test Agent, after materially changing its reference implementation for AC-24, **rebuilt
 and re-ran all five earlier cheats** rather than assuming they still bite — and found the eager
@@ -345,6 +349,7 @@ All three suites frozen. `phase=implement` set in every wave-1 worktree, guard v
 test edits by exit code in each.
 
 **Ticket T-001: review-passed** (attempt 2, commits ..10ac7f9, gates pass, wave 1)
+
 - Round-2 code review: **APPROVED** — 0 Critical, 0 Important. Round-1 findings I-1, M-1, M-2,
   M-3 all fixed.
 - The M-3 normalisation (`state` → true uint32) was the risky change, since it touches the state
@@ -387,8 +392,9 @@ clean by source read, and caller-controlled property access verified safe by liv
 (`__proto__`, `constructor`, `toString` all resolve to errors, never a prototype hop).
 
 Two **Important** findings, both reproduced by execution:
+
 - **DoS / contract breach:** `MAX_NESTING_DEPTH = 64` counts only paren and call nesting. Chained
-  binary/logical operators without parentheses parse *iteratively* (so the limit never trips) but
+  binary/logical operators without parentheses parse _iteratively_ (so the limit never trips) but
   build a left-deep AST walked with native recursion. `'1' + '+1'.repeat(10000)` crashes with an
   uncaught `RangeError`, **not** an `ExprError` — breaching the module's "every failure is an
   ExprError" contract and the spirit of AC-15 ("rather than overflowing the stack"). The frozen
@@ -417,7 +423,7 @@ height nor a walk frame — with no bypass across nine shapes, including 64 pare
 "4,000–4,688 across three machines", the reviewer lifted the cap in a scratch copy and bisected at
 controlled stack sizes: 18.3× margin at 4 MB (Node default), **3.4× at 1 MB (browser main
 thread), 1.5× at 0.5 MB (constrained worker)**. The docblock's figure is Node-only presented as
-host-general, overstating browser headroom ~2×. Also run-dependent, which argues *for* the fixed
+host-general, overstating browser headroom ~2×. Also run-dependent, which argues _for_ the fixed
 cap. Not blocking — breaching needs a host under ~0.35 MB, and height 1024 is ~100× taller than
 any plausible template (`floor(a/b)+c` is height 4).
 
@@ -436,6 +442,7 @@ this is robustness work, not a live defect, and Hermes' stack budget is unmeasur
 **Ticket T-002: review-passed** (attempt 2, commits ..917f8b0, gates pass, wave 1)
 
 Minor-fix pass closed all five. Two pieces of method worth keeping:
+
 - **No behaviour change was measured, not asserted:** a differential probe ran the approved build
   and the new one side by side over 9,631 expressions × 12 environments × both entry points =
   **231,144 paired calls**, comparing returned value or thrown code. Zero divergence, comparator
@@ -453,11 +460,11 @@ walks still recurse — pointing at T-025.
 
 **WAVE 1 COMPLETE — all three tickets review-passed.**
 
-| ticket | module | source | tests | ACs | attempts |
-|---|---|---|---|---|---|
-| T-001 | `engine/rng.ts` | 134 | 41 | 16 | 2 |
-| T-002 | `engine/questions/expr.ts` | ~700 | 335 | 26 | 2 |
-| T-003 | `content/schemas.ts`, `engine/questions/types.ts` | 264 | 116 | 20 | 1 |
+| ticket | module                                            | source | tests | ACs | attempts |
+| ------ | ------------------------------------------------- | ------ | ----- | --- | -------- |
+| T-001  | `engine/rng.ts`                                   | 134    | 41    | 16  | 2        |
+| T-002  | `engine/questions/expr.ts`                        | ~700   | 335   | 26  | 2        |
+| T-003  | `content/schemas.ts`, `engine/questions/types.ts` | 264    | 116   | 20  | 1        |
 
 Next: Integration Agent merges the three ticket branches into `swarm/engine-core` in dependency
 order, runs repo gates, and checks architecture drift against ARCHITECTURE.md §4/§8.
@@ -471,26 +478,27 @@ the branches touched strictly disjoint file sets, so nothing semantic had to be 
 diff: 9 files, 4,689 insertions, 0 deletions. `package.json` / `package-lock.json` byte-identical
 to both the pre-merge tip and `main` — no runtime dependency entered in this wave.
 
-| gate | result |
-|---|---|
-| `run-local-gates.sh` | exit 0 — format, lint, typecheck, unit, no-todos, no-skipped-tests, engine-purity all PASS |
-| `spec-lint.sh` × T-001/T-002/T-003 | exit 0 — 16 / 26 / 20 ACs mapped, both directions |
-| `npx vitest run` | **492 passed (492)**, 5 files, **1.00s** |
-| `npm audit --audit-level=high` | exit 0 — `found 0 vulnerabilities` (ran offline, not skipped) |
+| gate                               | result                                                                                     |
+| ---------------------------------- | ------------------------------------------------------------------------------------------ |
+| `run-local-gates.sh`               | exit 0 — format, lint, typecheck, unit, no-todos, no-skipped-tests, engine-purity all PASS |
+| `spec-lint.sh` × T-001/T-002/T-003 | exit 0 — 16 / 26 / 20 ACs mapped, both directions                                          |
+| `npx vitest run`                   | **492 passed (492)**, 5 files, **1.00s**                                                   |
+| `npm audit --audit-level=high`     | exit 0 — `found 0 vulnerabilities` (ran offline, not skipped)                              |
 
 **The 1.00s suite time was investigated rather than accepted.** T-002's four `node:worker_threads`
 non-termination tests do execute — verbose reporter shows them at 41–76 ms each. The 3 s figure is
-a *timeout ceiling reached only by a non-terminating implementation*, not a fixed cost. The suite
+a _timeout ceiling reached only by a non-terminating implementation_, not a fixed cost. The suite
 is fast because the implementation rejects non-finite values before `gcd`'s Euclid loop. Worth
 remembering before anyone "optimises" that harness away.
 
 **Cross-ticket compatibility verified — this was the wave's only unverified surface.** A scratchpad
 integration probe (10 assertions, written outside `src/`/`__tests__/` and deleted afterwards) ran
 all three modules in one process along the real generation path: `templateSchema.parse` → `createRng`
-+ `nextInt` per param → `evaluatePredicate` rejection sampling → `evaluateNumber` for answer and
-distractors → `shuffle` → `Question` with `SkillId` → `assertQuestion`. All green, plus: same seed
-reproduces the identical question, the three error taxonomies (`ExprError`, `QuestionGenerationError`,
-`RangeError`) stay distinct in one process, and export namespaces are fully disjoint (no shadowing).
+
+- `nextInt` per param → `evaluatePredicate` rejection sampling → `evaluateNumber` for answer and
+  distractors → `shuffle` → `Question` with `SkillId` → `assertQuestion`. All green, plus: same seed
+  reproduces the identical question, the three error taxonomies (`ExprError`, `QuestionGenerationError`,
+  `RangeError`) stay distinct in one process, and export namespaces are fully disjoint (no shadowing).
 
 Alias resolution proved with a **negative control**, not just a green typecheck: a temporary file
 assigning an invalid literal to `SkillId` was rejected by `tsc`, so `@content/schemas` is carrying the
@@ -507,15 +515,15 @@ zod never enters the engine module graph.
   commitment rather than violating it. Below the doc's altitude. No amendment needed.
 - **NOT drift — `createRng` throwing on out-of-range seeds.** §4.1/§4.2 commit to "seeded PRNG
   (mulberry32), seed carried in state"; `Rng` is still a plain JSON-serialisable `{state}`. Seed
-  *domain* is unspecified at architecture altitude, so this is input validation, not a contract change.
+  _domain_ is unspecified at architecture altitude, so this is input validation, not a contract change.
   Correctly propagated already via `4ec6bf8` — recorded, not absorbed.
 - **FINDING (Minor), ESCALATED — `templateSchema` is looser than §4.1 on distractor count.**
-  §4.1: *"one correct answer plus three engineered distractors"*, four-choice universally.
+  §4.1: _"one correct answer plus three engineered distractors"_, four-choice universally.
   `schemas.ts` implements `.min(3)`. Verified: a 4-distractor template **parses successfully**, and the
   resulting 5-choice `Question` is then rejected by T-003's own `assertQuestion` with `INVALID_QUESTION`.
   Two wave-1 modules disagree about one invariant. **Origin is the ticket spec, not the implementer** —
   `tickets/T-003.md:58` says `distractors: string[] (>=3)` and AC-4 says "at least three"; the frozen
-  tests pin `>=3`. Fails safe but *late* (generation time, not content-validation time, which is where
+  tests pin `>=3`. Fails safe but _late_ (generation time, not content-validation time, which is where
   §4.1 put the catch). No repair ticket written: this is not a gate failure and the fix depends on owner
   intent — tighten to `.length(3)` and re-freeze AC-4, amend §4.1, or accept as deliberate headroom and
   record why. **Must not be closed silently.**
@@ -530,11 +538,11 @@ Wave 1 worktrees torn down. Wave 2 worktrees created from a **clean committed tr
 observed: `git status --porcelain` verified empty first, and each worktree's ticket hash compared
 against the integration branch before dispatch).
 
-| ticket | tests | mutants killed | model |
-|---|---|---|---|
-| T-004 `tuning.ts` | 68 | 34/36 (2 survivors documented as intentional) | sonnet |
-| T-006 catalogs + loaders | 209 | 16/16 | sonnet |
-| T-026 exactly-3 distractors | 5 | — | haiku |
+| ticket                      | tests | mutants killed                                | model  |
+| --------------------------- | ----- | --------------------------------------------- | ------ |
+| T-004 `tuning.ts`           | 68    | 34/36 (2 survivors documented as intentional) | sonnet |
+| T-006 catalogs + loaders    | 209   | 16/16                                         | sonnet |
+| T-026 exactly-3 distractors | 5     | —                                             | haiku  |
 
 **Ticket T-026: review-passed** (commit `f8dd39f`, gates pass, wave 2). One line:
 `z.array(z.string()).min(3)` → `.length(3)`. Review confirmed `.length(3)` does **not** narrow the
@@ -549,14 +557,15 @@ generalise.
 ### Pre-freeze findings from the wave-2 Test Agents
 
 **T-004 — three real spec defects, all the L-005/L-006 patterns wave 1 produced:**
+
 - AC-4 contradicted its own rationale at exactly 8: at the boundary a floor-sized skill pool is
-  *fully* excluded, so T-007's fallback fires on every call and the recency feature is a permanent
+  _fully_ excluded, so T-007's fallback fires on every call and the recency feature is a permanent
   no-op. Corrected to `<= 7`.
 - AC-8's `BOT_ACCURACY_WINDOW >= 1` was unsatisfiable for its own consumer — T-021 needs a
   10-answer history, and at 1 the mercy system degenerates to a coin flip on the last answer.
   Corrected to `>= 10`.
 - AC-3/AC-6/AC-8 pinned **direction without magnitude**. The effect size for `QUALITY_WEIGHT` was
-  deferred to T-008 AC-16 — two waves *after* `tuning.ts` freezes. Derived in closed form from
+  deferred to T-008 AC-16 — two waves _after_ `tuning.ts` freezes. Derived in closed form from
   T-008's own formula and asserted here instead: `QUALITY_WEIGHT > 7/12`, set by `culverin` and
   `double_broadside`. Mutation shows the test bites exactly there (`0.5834` passes, `0.55` dies).
   Recorded as **L-018**.
@@ -570,7 +579,7 @@ D-3's body text — and it is exactly the value keeping the K-band starter unabl
 
 **T-026 — the Test Agent caught an orchestrator error.** The ticket claimed a frozen test asserted
 a 4-distractor template parses successfully, and on that basis **authorised a frozen-test edit**.
-The claim was false — transcribed from an integration report that verified the *behaviour* with an
+The claim was false — transcribed from an integration report that verified the _behaviour_ with an
 ad-hoc probe, not a test. The agent probed all four historical revisions of the file, found no such
 assertion, and made a purely additive change. Recorded as **L-019: never pair an unverified claim
 with an authorisation.**
@@ -578,7 +587,7 @@ with an authorisation.**
 ### Wave 2 implementations + security review
 
 **T-004** (`7a12402`): 32 constants, 560/560. Orchestrator probe confirmed the values that matter
-as *relationships* rather than magnitudes: `QUALITY_WEIGHT = 0.7` clears the derived `> 7/12`
+as _relationships_ rather than magnitudes: `QUALITY_WEIGHT = 0.7` clears the derived `> 7/12`
 effect-size floor (L-018); `RECENT_TEMPLATE_WINDOW = 5 <= 7`; `BOT_ACCURACY_WINDOW = 10`;
 `DISTRACTOR_ABS_FLOOR = 3`; hull curve 45/60/75/95/120 monotone and all under `4 × PLAYER_HULL`;
 `ONBOARDING_ENEMY_HULL = 24 < 45`; **deep freeze holds on nested objects** (what `as const` does
@@ -591,7 +600,7 @@ taught by ≥1 cannon; grades 0–5 with no gap; rank `tier` and `minWins` both 
 starters `swivel_gun` 8–12 reliable / `culverin` 4–16 volatile recoil 0 on the same symbolic-only
 skill; volatile recoils 5/8/10; no URLs.
 
-*Orchestrator false alarm, recorded for honesty:* my first probe failed to load the catalogs at all
+_Orchestrator false alarm, recorded for honesty:_ my first probe failed to load the catalogs at all
 under raw Node ESM (`ERR_IMPORT_ATTRIBUTE_MISSING`). That read as a portability defect until I
 checked the project's own config — `moduleResolution: "bundler"` targeting Metro, where bare JSON
 imports are correct, and vitest agrees. **The probe was wrong, not the code.** Same class as the
@@ -612,7 +621,7 @@ the frozen suite asserts the shipped catalogs validate before reaching a device.
 
 Code review found one Important: `ONBOARDING_ENEMY_HULL = 24` sank the tutorial sloop in **two**
 volleys, not the three PLAN.md:75 promises. In a guided duel that points at the correct tap the
-player is *always* inside the Perfect-Shot window, so each Swivel volley deals 13 and two reach 26.
+player is _always_ inside the Perfect-Shot window, so each Swivel volley deals 13 and two reach 26.
 AC-12 pinned only a ceiling, and the frozen test reached for the floor but stopped one volley short
 — excluding a one-volley tutorial and omitting the Perfect-Shot bonus.
 
@@ -633,21 +642,21 @@ ONBOARDING_ENEMY_HULL = 28
   first real duel (port_sumwich 45) -> 4-5 volleys (PLAN: 4-6)
 ```
 
-The tutorial now takes three volleys *however fast the child answers*, which is stronger than the
+The tutorial now takes three volleys _however fast the child answers_, which is stronger than the
 criterion required.
 
-*Second orchestrator false alarm, recorded:* my verification probe guessed `SWIVEL_DAMAGE_MAX` as
+_Second orchestrator false alarm, recorded:_ my verification probe guessed `SWIVEL_DAMAGE_MAX` as
 a `tuning.ts` export and produced `NaN`. Per-cannon damage correctly lives in the catalog, not
 tuning. The probe was wrong, not the code — the same shape as the JSON-import false alarm earlier
 in this wave. Verifying the verification is not optional.
 
 **WAVE 2 COMPLETE — all four tickets review-passed.**
 
-| ticket | deliverable | tests | ACs | attempts |
-|---|---|---|---|---|
-| T-004 | `engine/tuning.ts` (32 constants) | 70 | 12 | 2 |
-| T-006 | 5 catalogs + validated loaders | 209 | 16 | 2 |
-| T-026 | `templateSchema` exactly-3 distractors | 5 | 5 | 1 |
+| ticket | deliverable                            | tests | ACs | attempts |
+| ------ | -------------------------------------- | ----- | --- | -------- |
+| T-004  | `engine/tuning.ts` (32 constants)      | 70    | 12  | 2        |
+| T-006  | 5 catalogs + validated loaders         | 209   | 16  | 2        |
+| T-026  | `templateSchema` exactly-3 distractors | 5     | 5   | 1        |
 
 Follow-ups filed to backlog: **T-025** (iterative walks in the evaluator), **T-027**
 (`validateCatalogs` set-level corruption).
@@ -669,7 +678,7 @@ to `c5a3fc9`.
 
 ### Test count corrected: 776, not 68-era 774
 
-The wave-2 forecast of 774 was computed from the **68** recorded above at T-004's *first* freeze.
+The wave-2 forecast of 774 was computed from the **68** recorded above at T-004's _first_ freeze.
 The real figure is **70** — after the code review found the two-volley onboarding defect, AC-12 was
 amended (`b2c7a4a`), the suite was **re-frozen** with +2 tests (`9d592ba`: the "no fewer than three
 volleys" floor and the "window is non-empty" guard), and only then was the constant changed
@@ -687,7 +696,7 @@ three modules in one process for the first time. All green:
   T-004's tests could only check against a hardcoded order.
 - **Referential integrity.** All 10 cannons' `skill` resolves; all `rangeSkills`,
   `unlocksCannons`, `requiresIsland`, and `unlock.island` resolve; all 9 `SKILL_IDS` are authored.
-- **T-026 × T-006 — the tightening is inert, and that was *verified, not assumed*.** No entry in
+- **T-026 × T-006 — the tightening is inert, and that was _verified, not assumed_.** No entry in
   any of the five catalogs carries a `templates` or `distractors` field at all (checked entry by
   entry). `templateSchema` accepts 3 distractors and rejects both 4 and 2 on the merged tree.
   T-006's **import-time** validation ran against T-026's modified schema module and passed.
@@ -704,7 +713,7 @@ three modules in one process for the first time. All green:
   `assertQuestion`. Wave 1's open-finding note in `TICKETS.md` marked closed.
 - **FINDING (Minor), ESCALATED — `CHOICE_COUNT` now has two homes.** `src/engine/tuning.ts:120`
   exports it (T-004) and `src/engine/questions/types.ts:44` keeps a module-local `const` (T-003).
-  §4.3 (*"All tuning constants live in one file"*) and §8 (*"every magic number, one file"*) state
+  §4.3 (_"All tuning constants live in one file"_) and §8 (_"every magic number, one file"_) state
   the rule absolutely, and `T-004.md:50` claims `CHOICE_COUNT` for `tuning.ts`. T-003 was correct
   at the time — no `tuning.ts` existed — so **the merge itself creates the drift**, and no ticket
   is assigned to collapse it (T-005 and T-007 both consume the tuning copy, so the shadow persists).
@@ -717,14 +726,14 @@ three modules in one process for the first time. All green:
 - **NOT drift — `templateSchema` tightening.** §4.1's prose already fixes the count twice ("three
   engineered distractors", "answer + three distractors") under a "four-choice taps, universally"
   heading. The `distractors: string[]` in the doc's TS sketch is an illustrative signature, not a
-  cardinality spec. `.length(3)` encodes the prose exactly — code moving *toward* the architecture.
+  cardinality spec. `.length(3)` encodes the prose exactly — code moving _toward_ the architecture.
   No amendment needed.
 - **NOT drift — `ExprErrorCode`'s 7th member.** Concurring with wave 1, re-checked and unchanged.
   ARCHITECTURE.md never enumerates an error taxonomy for the "tiny safe evaluator over params", so
   there is no contract to drift from. Below the doc's altitude. No amendment needed.
 - **No magic-number leakage.** `src/content/index.ts` contains **zero** numeric literals. Catalog
   numbers are per-entity content attributes, which §4.3's own formula (`uniform(cannon.min,
-  cannon.max)`) and §4.4 both put in the catalog — the per-entity/cross-cutting line is held
+cannon.max)`) and §4.4 both put in the catalog — the per-entity/cross-cutting line is held
   cleanly. Every other T-004 constant appears nowhere in `src/` outside `tuning.ts` (grep-verified);
   `CHOICE_COUNT` is the sole exception, above.
 - **Doc-completeness note (not charged to any ticket).** §4.4 enumerates the `src/content/` files
@@ -733,14 +742,14 @@ three modules in one process for the first time. All green:
   one-line amendment when §4.4 is next touched. `index.ts` is a loader, correctly below that
   altitude; `templates/<skill>.json` is legitimately absent until wave 5.
 
-*Ledger cleanup:* removed an orphaned, header-less `T-026` table row stranded after the Rev 2
+_Ledger cleanup:_ removed an orphaned, header-less `T-026` table row stranded after the Rev 2
 table in `TICKETS.md`; T-026 now sits properly in the Wave 2 table.
 
 **Wave 3 is clear to dispatch** (T-005, T-008, T-009, T-010, T-011, T-012).
 
 ## PAUSED at wave 3 start — owner decision, 2026-07-28
 
-Owner: *"pause on wave 3 until we get the base design first."*
+Owner: _"pause on wave 3 until we get the base design first."_
 
 **State at pause — everything is committed and resumable:**
 
@@ -748,14 +757,14 @@ Owner: *"pause on wave 3 until we get the base design first."*
 - Six wave-3 worktrees are **created and ready**, each branched from a clean committed tree with
   its ticket verified current (L-008 observed) and `phase=tests` set:
 
-  | ticket | branch | ACs | file scope |
-  |---|---|---|---|
-  | T-005 | `ticket/T-005-distractors` | 14 | `src/engine/questions/distractors.ts` |
-  | T-008 | `ticket/T-008-damage-model` | 16 | `src/engine/duel/damage.ts` |
-  | T-009 | `ticket/T-009-economy` | 13 | `src/engine/economy.ts` |
-  | T-010 | `ticket/T-010-mastery` | 15 | `src/engine/mastery.ts` |
-  | T-011 | `ticket/T-011-placement` | 11 | `src/engine/placement.ts` |
-  | T-012 | `ticket/T-012-rank-ladder` | 11 | `src/engine/ranks.ts` |
+  | ticket | branch                      | ACs | file scope                            |
+  | ------ | --------------------------- | --- | ------------------------------------- |
+  | T-005  | `ticket/T-005-distractors`  | 14  | `src/engine/questions/distractors.ts` |
+  | T-008  | `ticket/T-008-damage-model` | 16  | `src/engine/duel/damage.ts`           |
+  | T-009  | `ticket/T-009-economy`      | 13  | `src/engine/economy.ts`               |
+  | T-010  | `ticket/T-010-mastery`      | 15  | `src/engine/mastery.ts`               |
+  | T-011  | `ticket/T-011-placement`    | 11  | `src/engine/placement.ts`             |
+  | T-012  | `ticket/T-012-rank-ladder`  | 11  | `src/engine/ranks.ts`                 |
 
   Verified: all six file scopes **disjoint**, so the wave parallelises safely.
 
@@ -765,11 +774,13 @@ Owner: *"pause on wave 3 until we get the base design first."*
 **To resume:** re-dispatch the six Test Agents. No setup work needs redoing.
 
 ### Owner decisions recorded this session
+
 - Captain-name wordlist: **SKIPPED** for MVP, with a written re-enable trigger in `posture.md`
   (before children play, or before the public leaderboard mirror ships).
 - CC0 source assets committed to the repo (~26 MB) so a clean checkout is self-contained.
 
 ### Non-swarm deliverables produced
+
 - `design/DESIGN-BRIEF.md` — standalone design prompt (audience-first, states-not-compositions,
   invites pushback and a cut list).
 - `assets/README.md` — every sprite the game needs, ordered by what it blocks, with MVP rows
@@ -804,14 +815,14 @@ crew/ranks being unconsumed matches PLAN.md's day-4 cut line.
 
 **Six Test Agents dispatched.** All seven wave-3 file scopes verified disjoint.
 
-| ticket | module | ACs | model |
-|---|---|---|---|
-| T-005 | `questions/distractors.ts` | 14 | opus |
-| T-008 | `duel/damage.ts` | 16 | opus |
-| T-009 | `economy.ts` | 13 | sonnet |
-| T-010 | `mastery.ts` | 15 | sonnet |
-| T-011 | `placement.ts` | 11 | sonnet |
-| T-012 | `ranks.ts` | 11 | haiku |
+| ticket | module                     | ACs | model  |
+| ------ | -------------------------- | --- | ------ |
+| T-005  | `questions/distractors.ts` | 14  | opus   |
+| T-008  | `duel/damage.ts`           | 16  | opus   |
+| T-009  | `economy.ts`               | 13  | sonnet |
+| T-010  | `mastery.ts`               | 15  | sonnet |
+| T-011  | `placement.ts`             | 11  | sonnet |
+| T-012  | `ranks.ts`                 | 11  | haiku  |
 
 **T-008 carries the T-031 ruling explicitly in its brief** so the damage model cannot infer the
 "bonus ball" reading before T-031 lands.

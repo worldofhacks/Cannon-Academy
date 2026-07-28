@@ -12,7 +12,7 @@ Grepped the file for every spelling named in the brief: `eval`, `Function`, `Ref
 `getPrototypeOf`, `setTimeout`, `setInterval`, `import(`, `require(`, `WebAssembly`,
 `Proxy`, `globalThis`, `window[`, `self[`, `with`, tagged templates. The only hits are:
 the class constructors `ExprError.constructor` (L56) and `Parser.constructor` (L199)
-— ordinary OOP syntax — and two comments discussing the *risk* of a `constructor`
+— ordinary OOP syntax — and two comments discussing the _risk_ of a `constructor`
 property (L410-413, L568-570), not a use of one.
 
 The module has **zero imports** and never references `Function`, `eval`, `Reflect`, or
@@ -31,7 +31,7 @@ Both passes were checked, per the brief's explicit warning that a guard in one i
 a guard in the other:
 
 - **Static pass** (`checkNode`, L473-515): identifier case uses `Object.hasOwn(env,
-  node.name)` (L479) before anything else.
+node.name)` (L479) before anything else.
 - **Eval pass** (`readIdentifier`, L521-527): also uses `Object.hasOwn(env, name)`
   (L523), and additionally rejects if the value is `undefined`.
 - **Function resolution** (`resolveWhitelistedCall`, L425-440): backed by a `Map`
@@ -42,16 +42,16 @@ a guard in the other:
 Ran a live probe (`evaluateNumber`/`evaluatePredicate` against real inputs, then
 deleted the probe file — not part of the frozen suite):
 
-| input | result |
-|---|---|
-| `__proto__` (empty env) | `ExprError UNKNOWN_IDENTIFIER` |
-| `constructor` (empty env) | `ExprError UNKNOWN_IDENTIFIER` |
-| `toString` (empty env) | `ExprError UNKNOWN_IDENTIFIER` |
-| `hasOwnProperty` (empty env) | `ExprError UNKNOWN_IDENTIFIER` |
-| `constructor(1)` | `ExprError UNKNOWN_FUNCTION` |
-| `toString()` / `valueOf()` | `ExprError PARSE_ERROR` (zero-arg call is a grammar violation before name resolution, per AC-18) |
-| `constructor` identifier, with `env = { constructor: 7 }` | `7` — correctly treated as an ordinary own-keyed parameter, no unsafe exposure |
-| `__proto__ == 0` as a predicate | `ExprError UNKNOWN_IDENTIFIER` |
+| input                                                     | result                                                                                           |
+| --------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| `__proto__` (empty env)                                   | `ExprError UNKNOWN_IDENTIFIER`                                                                   |
+| `constructor` (empty env)                                 | `ExprError UNKNOWN_IDENTIFIER`                                                                   |
+| `toString` (empty env)                                    | `ExprError UNKNOWN_IDENTIFIER`                                                                   |
+| `hasOwnProperty` (empty env)                              | `ExprError UNKNOWN_IDENTIFIER`                                                                   |
+| `constructor(1)`                                          | `ExprError UNKNOWN_FUNCTION`                                                                     |
+| `toString()` / `valueOf()`                                | `ExprError PARSE_ERROR` (zero-arg call is a grammar violation before name resolution, per AC-18) |
+| `constructor` identifier, with `env = { constructor: 7 }` | `7` — correctly treated as an ordinary own-keyed parameter, no unsafe exposure                   |
+| `__proto__ == 0` as a predicate                           | `ExprError UNKNOWN_IDENTIFIER`                                                                   |
 
 No route from a content-string identifier or function name to `Object.prototype` or
 any host constructor exists in either pass.
@@ -65,7 +65,7 @@ operators written without parentheses**, and `parseSum`/`parseProduct`/`parseOr`
 never recurses and never trips the limit, however long the chain.
 
 The resulting AST, however, is a left-deep chain of `binary` nodes whose depth equals
-the operator count. Both `checkNode` (L473-515, the static pass — runs *first*, before
+the operator count. Both `checkNode` (L473-515, the static pass — runs _first_, before
 any value is computed) and `computeNumber`/`computeBoolean` (L572-597, L619-632, the
 eval pass) walk that tree with plain **native recursion** on `node.left`. Recursion
 depth is therefore unbounded by anything the parser tracks.
@@ -97,7 +97,7 @@ large for a hand-authored template, but trivially producible by a buggy or malic
 content-generation step, and well within what a string field in a JSON/YAML catalog
 entry can hold. This is exactly the bypass shape the ticket's own comment on
 `MAX_NESTING_DEPTH` warns about ("a shape it does not count, such as deep call nesting
-or a long unary chain") — confirmed real for long *binary/logical* chains specifically.
+or a long unary chain") — confirmed real for long _binary/logical_ chains specifically.
 
 Everything else checked clean on this axis: the tokenizer has no regexes at all (hand-rolled
 character-class checks only, so no catastrophic backtracking is possible), tokenizing
@@ -107,7 +107,7 @@ and repeated-minus unary chains (`- - - -a`) cannot be constructed at all — th
 only accepts one leading `-` and `parseUnary` calls `parsePrimary` (not itself) for the
 operand, so a second `-` is an immediate `PARSE_ERROR` rather than a recursion vector.
 
-**Fix:** bound something that scales with *all* shapes, not just explicit nesting. The
+**Fix:** bound something that scales with _all_ shapes, not just explicit nesting. The
 minimal, surgical fix: cap total token count in `tokenize()` (e.g. reject with
 `PARSE_ERROR` above ~300–500 tokens) — since content-catalog expressions
 (`constraints`, `answerExpr`, distractors) are short by design, this costs nothing on
@@ -133,19 +133,19 @@ or `null`"; L646 `evaluateNumber` doc comment: "never returns `NaN` or `Infinity
 
 Live probe results (real module, not reasoned about):
 
-| expression | env | result |
-|---|---|---|
-| `a*a` | `{a: 1e200}` | `Infinity` (no throw) |
-| `a+a` | `{a: Number.MAX_VALUE}` | `Infinity` (no throw) |
-| `a` | `{a: NaN}` | `NaN` (no throw) |
-| `a` | `{a: Infinity}` | `Infinity` (no throw) |
-| `a > 0` | `{a: Infinity}` | `true` (no throw — a constraint or the answer-check could silently accept a degenerate sample) |
-| `a/b` | `{a:0, b:0}` | `ExprError DIVISION_BY_ZERO` — correct, division-by-zero path is guarded |
-| `1/a` | `{a: -0}` | `ExprError DIVISION_BY_ZERO` — correct |
+| expression | env                     | result                                                                                         |
+| ---------- | ----------------------- | ---------------------------------------------------------------------------------------------- |
+| `a*a`      | `{a: 1e200}`            | `Infinity` (no throw)                                                                          |
+| `a+a`      | `{a: Number.MAX_VALUE}` | `Infinity` (no throw)                                                                          |
+| `a`        | `{a: NaN}`              | `NaN` (no throw)                                                                               |
+| `a`        | `{a: Infinity}`         | `Infinity` (no throw)                                                                          |
+| `a > 0`    | `{a: Infinity}`         | `true` (no throw — a constraint or the answer-check could silently accept a degenerate sample) |
+| `a/b`      | `{a:0, b:0}`            | `ExprError DIVISION_BY_ZERO` — correct, division-by-zero path is guarded                       |
+| `1/a`      | `{a: -0}`               | `ExprError DIVISION_BY_ZERO` — correct                                                         |
 
 Reachability caveat, stated plainly: for a K-5 arithmetic game, legitimate sampled
 parameters are small (single/double-digit), so hitting `Infinity` via `*`/`+` overflow
-through *ordinary* content is unlikely — it takes deliberately extreme values. The `NaN`/
+through _ordinary_ content is unlikely — it takes deliberately extreme values. The `NaN`/
 `Infinity`-via-`env` path is more realistic as a **defense-in-depth gap**: if any
 upstream code (a sampler, a future template feature) ever computes a degenerate value
 and hands it to this evaluator, this module — the one place in the codebase that is
@@ -157,6 +157,7 @@ and the actual behavior is worth closing.
 
 **Fix:** add an explicit `Number.isFinite` check at the two production points and throw
 a typed `ExprError` instead of returning the value silently:
+
 - in `readIdentifier` (L521-527), after reading `value` from `env`;
 - in `applyArithmetic` (L529-548) (or once, centrally, wrapping `computeNumber`'s
   return in L572-597) after computing the arithmetic result.
@@ -180,13 +181,13 @@ is no server, no network boundary, and no remote input reachable from this modul
 
 ## Summary
 
-| # | Area | Finding | Severity |
-|---|---|---|---|
-| 1 | Dynamic code construction | None — structurally incapable, verified by source read + probe | — |
-| 2 | Caller-controlled property access | None — `Object.hasOwn` / `Map` used consistently on both passes, verified by probe | — |
-| 3 | Denial of service | Unparenthesized binary/logical operator chains bypass `MAX_NESTING_DEPTH` and crash with an uncaught `RangeError` (stack overflow) around ~10,000 chained terms, in both the static-check and eval walks | **Important** |
-| 4 | Numeric integrity | `NaN`/`Infinity` can escape via unchecked `+`/`-`/`*` overflow and via unchecked raw `env` values, contradicting the module's own documented "never NaN/Infinity" contract | **Important** |
-| 5 | Secrets/PII, dependency risk | Clean | — |
+| #   | Area                              | Finding                                                                                                                                                                                                  | Severity      |
+| --- | --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| 1   | Dynamic code construction         | None — structurally incapable, verified by source read + probe                                                                                                                                           | —             |
+| 2   | Caller-controlled property access | None — `Object.hasOwn` / `Map` used consistently on both passes, verified by probe                                                                                                                       | —             |
+| 3   | Denial of service                 | Unparenthesized binary/logical operator chains bypass `MAX_NESTING_DEPTH` and crash with an uncaught `RangeError` (stack overflow) around ~10,000 chained terms, in both the static-check and eval walks | **Important** |
+| 4   | Numeric integrity                 | `NaN`/`Infinity` can escape via unchecked `+`/`-`/`*` overflow and via unchecked raw `env` values, contradicting the module's own documented "never NaN/Infinity" contract                               | **Important** |
+| 5   | Secrets/PII, dependency risk      | Clean                                                                                                                                                                                                    | —             |
 
 Both findings are real and reproduced live, not hypothetical, but neither breaches the
 ticket's primary invariant (no code construction/execution — confirmed clean by direct

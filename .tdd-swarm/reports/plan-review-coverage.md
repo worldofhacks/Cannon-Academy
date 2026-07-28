@@ -6,12 +6,12 @@ Reviewer: independent plan-review pass (coverage/testability). Scope reviewed: `
 
 **Overall assessment up front, because it matters for how to read what follows:** this is an
 unusually disciplined plan. `traceability.md` already self-audits coverage line-by-line against
-both source docs, flags 16 open numeric questions and 12 planning gaps *in writing*, and every
+both source docs, flags 16 open numeric questions and 12 planning gaps _in writing_, and every
 ticket's Planning Decisions section explicitly labels each number as `locked-decision`,
 `proposed`, or `open-question`. I verified this self-audit rather than trusting it, and it holds
 up in almost every case I checked. The findings below are the places it doesn't — real gaps and
 one class of test-vs-implementation mismatch that the plan's own honesty mechanism didn't catch
-because the mismatch is *between* two tickets, not within one.
+because the mismatch is _between_ two tickets, not within one.
 
 ---
 
@@ -25,18 +25,19 @@ because the mismatch is *between* two tickets, not within one.
 **What's wrong.** T-005's plausibility rule (`T-005.md` lines 46-56) says a distractor `d` against
 answer `x` is valid when it's within `DISTRACTOR_ABS_FLOOR` of `x`, **or** within the
 magnitude-ratio band — but "the magnitude-ratio branch is skipped for a zero answer rather than
-dividing by zero" (AC-6, line 95). So for `x = 0`, plausibility collapses to *only*:
+dividing by zero" (AC-6, line 95). So for `x = 0`, plausibility collapses to _only_:
 `0 <= d <= DISTRACTOR_ABS_FLOOR` (negatives excluded by rule 3).
 
 The fixed near-miss ladder (locked in T-005, line 60) is
 `x+1, x-1, x+2, x-2, x+10, x-10, x*2, x+3, x-3`. At `x=0` this evaluates to
 `1, -1, 2, -2, 10, -10, 0, 3, -3`. Every negative entry is excluded by the no-negative-decoy rule,
 `x*2=0` collides with the answer itself, and `x+10=10` is only reachable if the abs floor is
-`>= 10`. That leaves exactly `{1, 2, 3}` as the full set of values the ladder can *ever* produce
+`>= 10`. That leaves exactly `{1, 2, 3}` as the full set of values the ladder can _ever_ produce
 for a zero answer — and only if `DISTRACTOR_ABS_FLOOR >= 3`.
 
 T-004's AC-5 only requires `DISTRACTOR_ABS_FLOOR` to be `an integer >= 1`. If the implementer
 (reasonably, since nothing tells them otherwise) picks `1` or `2`:
+
 - floor `= 1` → only `{1}` passes the floor test. **One** candidate, not the three AC-7 promises
   ("returns 3 values drawn from the fill ladder ... all distinct and all plausible").
 - floor `= 2` → only `{1, 2}` pass. Still short by one.
@@ -50,8 +51,8 @@ would fail the whole ticket, non-deterministically, depending on a constant chos
 earlier in a ticket that is by then already frozen.
 
 I also checked whether T-005's AC-6 "+2" tolerance (`within DISTRACTOR_ABS_FLOOR + 2 of 0`, line
-94-95) already covers this — it doesn't. That widened *bound* only describes how far a returned
-value may sit from zero; it does nothing to fix the *count* problem, because `isPlausibleDistractor`
+94-95) already covers this — it doesn't. That widened _bound_ only describes how far a returned
+value may sit from zero; it does nothing to fix the _count_ problem, because `isPlausibleDistractor`
 itself still filters ladder rungs by the un-widened floor. The "+2" reads like the test author
 noticed the ladder needs to reach its third positive rung (`x+3`) to gather three candidates when
 the floor is assumed to be `1`, and hard-coded that arithmetic into the assertion rather than
@@ -83,17 +84,17 @@ through a different constant.
 
 PLAN.md ("Questions, coaching, onboarding..." section) states the onboarding duel is "a guided
 first duel against a scripted pirate sloop that **politely sinks in three volleys**." T-018 ships
-the scripting *mechanism* (`createScriptedOpponent`) and says outright: "the concrete onboarding
+the scripting _mechanism_ (`createScriptedOpponent`) and says outright: "the concrete onboarding
 script is assembled by the caller from `ScriptedStep`s" (line 56) — i.e., out of this swarm's
 scope.
 
-That would be fine if the *hull number* that makes "three volleys" true were itself a named,
+That would be fine if the _hull number_ that makes "three volleys" true were itself a named,
 in-scope constant the out-of-scope caller could just read. It isn't. The only enemy-hull surface
 this swarm exports is `ENEMY_HULL_BY_ISLAND` (T-004), and T-008's own AC-13 (`tickets/T-008.md`
 lines 133-138) pins `port_sumwich`'s hull (40-50) to resolve in a **median of 4-6 volleys** even
 at a reasonably fast, correct pace — not three. If the onboarding encounter reuses that same
 per-island hull (the only one that exists), "three volleys" is false by this swarm's own damage
-math. If it's meant to use a *lower*, onboarding-specific hull, that number has no home in
+math. If it's meant to use a _lower_, onboarding-specific hull, that number has no home in
 `tuning.ts` — meaning whoever wires `app/onboarding.tsx` later must either invent a bare literal
 outside `tuning.ts` (directly contradicting ARCHITECTURE.md §4.3's "All tuning constants live in
 one file") or this claim silently never gets implemented as specified.
@@ -101,8 +102,8 @@ one file") or this claim silently never gets implemented as specified.
 `.tdd-swarm/traceability.md` lists "easy guided duel you win | T-018 | scripted opponent
 mechanism" as covered (line 145 area) without flagging that the specific "three volleys" number
 has no tuning-surface owner. This is exactly the "a ticket silently depends on something
-unresolved" failure mode the review brief calls out, one level removed: here it's a *future,
-out-of-scope* consumer that will silently depend on an invented number because this swarm didn't
+unresolved" failure mode the review brief calls out, one level removed: here it's a _future,
+out-of-scope_ consumer that will silently depend on an invented number because this swarm didn't
 name one.
 
 **Suggested fix:** add `ONBOARDING_ENEMY_HULL` (or similar) to T-004's Context export surface and
@@ -110,7 +111,7 @@ an AC pinning it strictly below `ENEMY_HULL_BY_ISLAND.port_sumwich`, and have T-
 that the concrete onboarding script should be built against that constant rather than an
 unspecified caller-supplied number. Cheap now; awkward once T-004 and T-018 are both frozen.
 
-### I-2. `QUALITY_WEIGHT` has no AC pinning that speed-aimed damage is *meaningful* — only that it's monotone
+### I-2. `QUALITY_WEIGHT` has no AC pinning that speed-aimed damage is _meaningful_ — only that it's monotone
 
 - **Ticket:** `tickets/T-004.md` AC-3 (line 107-109: `0 < QUALITY_WEIGHT <= 1`, no other
   constraint); `tickets/T-008.md` AC-5 (line 106-108, monotonicity only).
@@ -128,7 +129,7 @@ being wrong" the review brief asks for: nothing here would catch a build where f
 correct answers feel statistically indistinguishable, which is precisely the bug this system
 exists to prevent.
 
-**Suggested fix:** add an AC to T-008 (or T-004) asserting an *effect size*, e.g.: over N seeded
+**Suggested fix:** add an AC to T-008 (or T-004) asserting an _effect size_, e.g.: over N seeded
 trials at a fixed cannon, the mean `damageToEnemy` at `quality = 1` (elapsed = 0) must exceed the
 mean at `quality = ANSWER_QUALITY_FLOOR` (elapsed = timerMs) by at least some fraction of
 `(damageMax - damageMin)` — e.g. `>= 0.3 * range`. That pins the thing the design actually cares
@@ -144,7 +145,7 @@ about; monotonicity alone does not.
 All four are implemented as a literal substring scan over the module's source text. Each is easy
 to satisfy in letter while violating it in spirit: `const F = Function; F(userExpr)` never
 contains the substring `Function(`; `const D = Date; new D()` never contains `Date` followed
-directly by the banned pattern the test author had in mind (it *does* contain the bare word
+directly by the banned pattern the test author had in mind (it _does_ contain the bare word
 `Date`, so this specific case is actually caught — but `globalThis['Da' + 'te']` or
 `Reflect.construct(Date, [])` is not, and neither is any dynamic-property-access indirection for
 `eval`/`Function`). Nobody is going to do this maliciously in a solo 5-day project — but these
@@ -156,7 +157,7 @@ being exactly the thing it exists to catch.
 
 **Suggested fix:** keep the source scans (they're cheap and catch the common case) but back them
 with an ESLint rule (`no-restricted-syntax`/`no-restricted-globals`) that matches identifier
-*references*, not substrings — that catches aliasing and destructuring, which a grep cannot.
+_references_, not substrings — that catches aliasing and destructuring, which a grep cannot.
 `.tdd-swarm/posture.md` already lists "Engine purity lint" and "Determinism lint" as enforced
 gates; this is asking those existing lint rules to also cover `eval`/`Function`/network-literal
 bans, rather than leaning on a second, weaker mechanism (a test-time text scan) for the same job.
@@ -178,7 +179,7 @@ the citation to say "median-only, tail tolerance to 7."
 ### M-2. Intermediate-phase hull clamping is asserted only by the invariant fuzz (T-024), not directly by T-020
 
 `tickets/T-020.md`'s DoD says "Hulls are clamped at 0 and can never go negative" (line ~178), and
-AC-10/AC-11 (lines 110-116) check clamping *at the victory/defeat transition*, but no AC checks
+AC-10/AC-11 (lines 110-116) check clamping _at the victory/defeat transition_, but no AC checks
 that the `resolvePlayer`/`resolveRival` state itself (before the terminal `ANIMATION_DONE` check)
 already holds a clamped hull after a lethal overkill hit (e.g. hull=5, incoming damage=20). This is
 implicitly covered by T-024's invariant #1 (`0 <= enemyHull <= enemyMaxHull`, no phase qualifier)
@@ -239,7 +240,7 @@ add one concrete numeric example alongside AC-9.
   instead of returning `undefined`" pattern (T-006 AC-11, T-012 AC-10, T-019 AC-13) is applied
   consistently everywhere a `.find()`-style lookup would otherwise leak `T | undefined`.
 - **`exactOptionalPropertyTypes` handling:** T-003 AC-6 explicitly requires optional fields to be
-  *omitted*, not set to `undefined`, on successful parse — the correct behavior under this flag,
+  _omitted_, not set to `undefined`, on successful parse — the correct behavior under this flag,
   and it's tested.
 - **Determinism:** no `Map`/`Set` anywhere in serializable state (T-013 DoD explicitly bans them),
   no wall-clock reads found anywhere `elapsedMs`-shaped data is needed (always a parameter), and
@@ -251,8 +252,8 @@ add one concrete numeric example alongside AC-9.
   ARCHITECTURE.md verbatim (I checked all of T-004's `locked-decision` values against the source
   documents directly — all confirmed exact, no fabrication) or explicitly marked `open-question`
   with bounds-only ACs and a cross-reference into `traceability.md` §2. The two exceptions are C-1
-  and I-1 above, which are gaps in *what got a constant at all*, not fabricated values.
+  and I-1 above, which are gaps in _what got a constant at all_, not fabricated values.
 - **MVP "cannot slip" checklist:** walked all twelve lines against engine-ticket coverage. Eleven
   are fully covered or correctly, explicitly marked partial (persistence/UID lines are honestly
-  out of scope). The twelfth (guided duel) is covered as a *mechanism* but its specific "three
+  out of scope). The twelfth (guided duel) is covered as a _mechanism_ but its specific "three
   volleys" quantitative claim is the gap in I-1.

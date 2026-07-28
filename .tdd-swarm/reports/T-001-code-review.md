@@ -10,10 +10,10 @@ Gate status was supplied as ground truth and is not re-litigated here. (Independ
 
 **Verdict summary**
 
-| Dimension | Critical | Important | Minor |
-|---|---|---|---|
-| Spec compliance | 0 | 0 | 0 |
-| Code quality | 0 | **1** | 5 |
+| Dimension       | Critical | Important | Minor |
+| --------------- | -------- | --------- | ----- |
+| Spec compliance | 0        | 0         | 0     |
+| Code quality    | 0        | **1**     | 5     |
 
 ---
 
@@ -23,13 +23,13 @@ Gate status was supplied as ground truth and is not re-litigated here. (Independ
 
 Verified **independently of the frozen tests**, token by token, ticket pseudocode (`tickets/T-001.md:40-45`) against `src/engine/rng.ts:18-22`:
 
-| Spec line | Implementation | Verdict |
-|---|---|---|
-| `a = (a + 0x6D2B79F5) \| 0` | `const a = (state + 0x6d2b79f5) \| 0;` (:18) | exact — `\| 0` present, constant identical (case only) |
-| `t = Math.imul(a ^ (a >>> 15), 1 \| a)` | `let t = Math.imul(a ^ (a >>> 15), 1 \| a);` (:19) | exact — `>>>` not `>>`, shift `15`, `Math.imul`, `1 \| a` |
-| `t = (t + Math.imul(t ^ (t >>> 7), 61 \| t)) ^ t` | identical (:20) | exact — shift `7`, `61 \| t`, and the load-bearing parenthesisation `(t + imul(...)) ^ t`, not `t + (imul(...) ^ t)` |
-| `output = ((t ^ (t >>> 14)) >>> 0) / 4294967296` | `const value = ((t ^ (t >>> 14)) >>> 0) / 4294967296;` (:21) | exact — shift `14`, `>>> 0` applied **before** the divide, divisor `4294967296` |
-| `nextState = a` | `return { value, nextState: a };` (:22) | exact — next state is the post-`\| 0` `a`, not `t` |
+| Spec line                                         | Implementation                                               | Verdict                                                                                                              |
+| ------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------- |
+| `a = (a + 0x6D2B79F5) \| 0`                       | `const a = (state + 0x6d2b79f5) \| 0;` (:18)                 | exact — `\| 0` present, constant identical (case only)                                                               |
+| `t = Math.imul(a ^ (a >>> 15), 1 \| a)`           | `let t = Math.imul(a ^ (a >>> 15), 1 \| a);` (:19)           | exact — `>>>` not `>>`, shift `15`, `Math.imul`, `1 \| a`                                                            |
+| `t = (t + Math.imul(t ^ (t >>> 7), 61 \| t)) ^ t` | identical (:20)                                              | exact — shift `7`, `61 \| t`, and the load-bearing parenthesisation `(t + imul(...)) ^ t`, not `t + (imul(...) ^ t)` |
+| `output = ((t ^ (t >>> 14)) >>> 0) / 4294967296`  | `const value = ((t ^ (t >>> 14)) >>> 0) / 4294967296;` (:21) | exact — shift `14`, `>>> 0` applied **before** the divide, divisor `4294967296`                                      |
+| `nextState = a`                                   | `return { value, nextState: a };` (:22)                      | exact — next state is the post-`\| 0` `a`, not `t`                                                                   |
 
 No deviation. The source matches the ticket independently of the in-test oracle, so the "test and implementation agree with each other but both drift from the spec" failure mode is ruled out.
 
@@ -37,36 +37,36 @@ One representational note (not a divergence, see M-3): `createRng` normalises to
 
 ### 1.2 Acceptance criteria
 
-| AC | Verdict | Evidence |
-|---|---|---|
-| AC-1 reproducibility | **met** | `createRng` (:12-14) and `mulberry32Step` (:17-23) are pure functions of their arguments; identical seeds necessarily yield identical sequences. |
-| AC-2 seed sensitivity | **met** | State enters the step unmodified (`rng.state`, :27); distinct seeds give distinct `a` and thus distinct first outputs. |
-| AC-3 known-answer vs reference | **met** | Transcription table §1.1. Seed `4294967295` handled: `>>> 0` at :13 keeps it a uint32; seed `0` needs no special case. |
-| AC-4 range + mean | **met** | `value` is `uint32 / 2**32` (:21) ⇒ `0 ≤ v < 1` by construction; no clamping, no `Math.abs` fudge. |
-| AC-5 `nextInt(1,6)` uniformity | **met** | `min + Math.floor(f * range)` (:43-44), `range = max - min + 1` inclusive. Probed 200,000 draws: zero out-of-range values. |
-| AC-6 `nextInt(5,5)` advances | **met** | No early return for the degenerate range; `nextFloat` is always consumed (:42), and `nextState = (state + 0x6D2B79F5)\|0 ≠ state` for every state. Explicitly documented at :32-33. |
-| AC-7 `RangeError` on bad bounds | **met** | :36-38 (non-integer `min`/`max`, also catches `NaN`/`±Infinity`), :39-41 (`min > max`). |
-| AC-8 shuffle | **met** | `items.slice()` (:62) ⇒ new array, input never mutated; loop `i = len-1; i > 0; i -= 1` with `j = nextInt(rng, 0, i)` **inclusive of `i`** (:64-65) is textbook Fisher-Yates. Read the algorithm rather than trusting the band: no off-by-one — the classic bias is `nextInt(0, len-1)` inside the loop or `i >= 0` with an exclusive upper index; neither is present. All *n!* permutations equiprobable. |
-| AC-9 pick | **met** | Empty ⇒ `RangeError` (:77-79); returns a `[value, nextRng]` tuple (:81) with `nextRng !== rng`; uniform over `nextInt(0, len-1)`. |
-| AC-10 weightedPick + `{item, weight}` | **met** | Entry type is `{ readonly item: T; readonly weight: number }` (:85) — field is `item`, per the locked decision. Selection at :108-117. |
+| AC                                      | Verdict | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC-1 reproducibility                    | **met** | `createRng` (:12-14) and `mulberry32Step` (:17-23) are pure functions of their arguments; identical seeds necessarily yield identical sequences.                                                                                                                                                                                                                                                                                                     |
+| AC-2 seed sensitivity                   | **met** | State enters the step unmodified (`rng.state`, :27); distinct seeds give distinct `a` and thus distinct first outputs.                                                                                                                                                                                                                                                                                                                               |
+| AC-3 known-answer vs reference          | **met** | Transcription table §1.1. Seed `4294967295` handled: `>>> 0` at :13 keeps it a uint32; seed `0` needs no special case.                                                                                                                                                                                                                                                                                                                               |
+| AC-4 range + mean                       | **met** | `value` is `uint32 / 2**32` (:21) ⇒ `0 ≤ v < 1` by construction; no clamping, no `Math.abs` fudge.                                                                                                                                                                                                                                                                                                                                                   |
+| AC-5 `nextInt(1,6)` uniformity          | **met** | `min + Math.floor(f * range)` (:43-44), `range = max - min + 1` inclusive. Probed 200,000 draws: zero out-of-range values.                                                                                                                                                                                                                                                                                                                           |
+| AC-6 `nextInt(5,5)` advances            | **met** | No early return for the degenerate range; `nextFloat` is always consumed (:42), and `nextState = (state + 0x6D2B79F5)\|0 ≠ state` for every state. Explicitly documented at :32-33.                                                                                                                                                                                                                                                                  |
+| AC-7 `RangeError` on bad bounds         | **met** | :36-38 (non-integer `min`/`max`, also catches `NaN`/`±Infinity`), :39-41 (`min > max`).                                                                                                                                                                                                                                                                                                                                                              |
+| AC-8 shuffle                            | **met** | `items.slice()` (:62) ⇒ new array, input never mutated; loop `i = len-1; i > 0; i -= 1` with `j = nextInt(rng, 0, i)` **inclusive of `i`** (:64-65) is textbook Fisher-Yates. Read the algorithm rather than trusting the band: no off-by-one — the classic bias is `nextInt(0, len-1)` inside the loop or `i >= 0` with an exclusive upper index; neither is present. All _n!_ permutations equiprobable.                                           |
+| AC-9 pick                               | **met** | Empty ⇒ `RangeError` (:77-79); returns a `[value, nextRng]` tuple (:81) with `nextRng !== rng`; uniform over `nextInt(0, len-1)`.                                                                                                                                                                                                                                                                                                                    |
+| AC-10 weightedPick + `{item, weight}`   | **met** | Entry type is `{ readonly item: T; readonly weight: number }` (:85) — field is `item`, per the locked decision. Selection at :108-117.                                                                                                                                                                                                                                                                                                               |
 | AC-11 validation + zero-among-positives | **met** | Empty (:93-95), negative (:99-101), zero total (:104-106) all `RangeError`. Zero-weight-among-positives is correct **by construction, not by luck**: at a zero-weight entry `cumulative` is unchanged from the previous iteration, whose `target < cumulative` test already failed; if it is first, `cumulative === 0` and `target ≥ 0`, so strict `<` (:114) rejects it. Caveat M-1 below concerns non-finite weights, which this AC does not name. |
-| AC-12 JSON round-trip | **met** | `Rng` is `{ readonly state: number }` (:9) — a plain object literal, no prototype, no closure, no symbol. |
-| AC-13 purity / no hidden state | **met** | Whole-file read: zero module-scoped bindings other than the type alias at :85 and the four `function` declarations. No `let` outside function bodies, no cache, no counter, no lazily-initialised singleton, no `this`. Every export's output is a function of its arguments alone. |
-| AC-14 readonly parameters | **met** | `shuffle` (:61), `pick` (:76), `weightedPick` (:92) all take `readonly` arrays; `weightedPick` takes `readonly WeightedEntry<T>[]` with readonly fields, so T-009's `readonly { item: ChestRarity; weight: number }[]` binds. |
+| AC-12 JSON round-trip                   | **met** | `Rng` is `{ readonly state: number }` (:9) — a plain object literal, no prototype, no closure, no symbol.                                                                                                                                                                                                                                                                                                                                            |
+| AC-13 purity / no hidden state          | **met** | Whole-file read: zero module-scoped bindings other than the type alias at :85 and the four `function` declarations. No `let` outside function bodies, no cache, no counter, no lazily-initialised singleton, no `this`. Every export's output is a function of its arguments alone.                                                                                                                                                                  |
+| AC-14 readonly parameters               | **met** | `shuffle` (:61), `pick` (:76), `weightedPick` (:92) all take `readonly` arrays; `weightedPick` takes `readonly WeightedEntry<T>[]` with readonly fields, so T-009's `readonly { item: ChestRarity; weight: number }[]` binds.                                                                                                                                                                                                                        |
 
 **14/14 met. Nothing is cannot-verify.**
 
 ### 1.3 Definition of Done
 
-| DoD item | Verdict | Evidence |
-|---|---|---|
-| Every AC has a passing `spec(T-001:AC-n)` test | **met** | All 14 tags present in `__tests__/engine/rng.test.ts` (AC-7 ×3, AC-8 ×3, AC-9 ×3, AC-11 ×5, AC-13 ×5, rest ×1). Authored pre-implementation, unmodified. |
-| `run-local-gates.sh` green | **met** (parent-verified; spot-checked vitest + eslint) | |
-| `spec-lint.sh` green | **met** (parent-verified) | |
-| No `Math.random()`, no `Date`, no React/RN/Expo/Firebase | **met** | The file has **zero imports**. Only `Math.imul`/`Math.floor`/`Number.isInteger` are referenced. |
-| Explicit return types, no `any`, clean under `noUncheckedIndexedAccess` | **met literally** | All six exports carry explicit return types (:12, :26, :35, :61, :76, :92); no `any`; **no `!` and no `as` anywhere in the file**. Indexed reads are routed through the `requireAt` guard (:49-55) rather than silenced. But see **I-1** — the guard chosen is the wrong predicate, so this item is satisfied by a mechanism that is itself unsound. |
-| `Rng` plain serialisable, no closures returned | **met** | :9, :13, :28. No export returns a function. |
-| Files changed are exactly `file_scopes` | **met** | `git diff swarm/engine-core..HEAD -- src/` = `src/engine/rng.ts` only. The branch additionally carries the process-mandated `.tdd-swarm/reports/T-001-implementation.md` (separate commit `2063783`) and the pre-existing frozen-test commits; neither is a scope breach. |
+| DoD item                                                                | Verdict                                                 | Evidence                                                                                                                                                                                                                                                                                                                                             |
+| ----------------------------------------------------------------------- | ------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every AC has a passing `spec(T-001:AC-n)` test                          | **met**                                                 | All 14 tags present in `__tests__/engine/rng.test.ts` (AC-7 ×3, AC-8 ×3, AC-9 ×3, AC-11 ×5, AC-13 ×5, rest ×1). Authored pre-implementation, unmodified.                                                                                                                                                                                             |
+| `run-local-gates.sh` green                                              | **met** (parent-verified; spot-checked vitest + eslint) |                                                                                                                                                                                                                                                                                                                                                      |
+| `spec-lint.sh` green                                                    | **met** (parent-verified)                               |                                                                                                                                                                                                                                                                                                                                                      |
+| No `Math.random()`, no `Date`, no React/RN/Expo/Firebase                | **met**                                                 | The file has **zero imports**. Only `Math.imul`/`Math.floor`/`Number.isInteger` are referenced.                                                                                                                                                                                                                                                      |
+| Explicit return types, no `any`, clean under `noUncheckedIndexedAccess` | **met literally**                                       | All six exports carry explicit return types (:12, :26, :35, :61, :76, :92); no `any`; **no `!` and no `as` anywhere in the file**. Indexed reads are routed through the `requireAt` guard (:49-55) rather than silenced. But see **I-1** — the guard chosen is the wrong predicate, so this item is satisfied by a mechanism that is itself unsound. |
+| `Rng` plain serialisable, no closures returned                          | **met**                                                 | :9, :13, :28. No export returns a function.                                                                                                                                                                                                                                                                                                          |
+| Files changed are exactly `file_scopes`                                 | **met**                                                 | `git diff swarm/engine-core..HEAD -- src/` = `src/engine/rng.ts` only. The branch additionally carries the process-mandated `.tdd-swarm/reports/T-001-implementation.md` (separate commit `2063783`) and the pre-existing frozen-test commits; neither is a scope breach.                                                                            |
 
 ### 1.4 Iron Law — anything built that no failing test demanded?
 
@@ -94,7 +94,7 @@ function requireAt<T>(arr: readonly T[], index: number): T {
 
 The predicate tests the **value**, not the **index**. `T` is unconstrained, so `undefined` is a legal element of a legal input, and `shuffle`/`pick` then throw a `RangeError` on data they are contractually required to permute or select from. Empirically confirmed against the built module:
 
-- `shuffle(createRng(s), [undefined, 1, 2, 3])` throws for **37 of 50 seeds** (it throws whenever the swap touches the `undefined` slot — i.e. almost always, and *seed-dependently*).
+- `shuffle(createRng(s), [undefined, 1, 2, 3])` throws for **37 of 50 seeds** (it throws whenever the swap touches the `undefined` slot — i.e. almost always, and _seed-dependently_).
 - `pick(createRng(s), [undefined, 1, 2])` throws for **14 of 50 seeds**.
 - `shuffle(rng, new Array(4))` (sparse array) throws `index 3 out of bounds`.
 
@@ -106,7 +106,7 @@ Three things make this worse than a theoretical nit:
 
 The implementer's report asserts this guard is a "practically unreachable" `RangeError`. That is factually wrong, and the claim should not carry into the next review.
 
-The DoD asks for code that is *clean* under `noUncheckedIndexedAccess`, i.e. no unsound silencing. A bounds check plus one audited, guarded assertion is sound; a value check is not:
+The DoD asks for code that is _clean_ under `noUncheckedIndexedAccess`, i.e. no unsound silencing. A bounds check plus one audited, guarded assertion is sound; a value check is not:
 
 ```ts
 function requireAt<T>(arr: readonly T[], index: number): T {
@@ -174,6 +174,7 @@ Recorded so the next reader does not inherit them:
 - **Code quality: one Important finding (I-1).** The `undefined`-vs-out-of-bounds conflation in `requireAt` is a latent, seed-dependent crash with a misleading message, in the module five downstream tickets are about to freeze against. Two lines to fix, inside `file_scopes`, with no test churn.
 
 Required before approval:
+
 - **I-1** — replace the value check in `requireAt` with a bounds check (blocking).
 - **M-2** — remove the unreachable `weightedPick` fallback, or correct its comment (do this together with a decision on M-1; if M-1's finiteness guard is added, the fallback becomes provably dead and should go).
 - **M-1, M-3, M-4, M-5** — orchestrator's call. M-1 and M-3 are worth a decision before wave 3 (T-009 weights; T-013 persistence). None blocks on its own.

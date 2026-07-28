@@ -13,13 +13,13 @@ additive, not a rewrite.
 ## 0. Method, and what I actually executed
 
 This review is not a read-through. I reconstructed the ticket's mulberry32 stream in Node and ran
-candidate *cheating* implementations of every export against the exact seeds, sample counts and
+candidate _cheating_ implementations of every export against the exact seeds, sample counts and
 tolerance bands the frozen tests use, to measure which cheats survive. I also built a
 straightforward correct `src/engine/rng.ts` in a throwaway sandbox (symlinked `node_modules`, the
 project's own `vitest.config.ts`) and ran the frozen file against it end to end.
 
 Result of that last run: **all 23 tests pass, 2,841 ms.** So no band in this file is too tight, and
-nothing in it is unsatisfiable. Every finding below is about tests that are too *weak*, not too
+nothing in it is unsatisfiable. Every finding below is about tests that are too _weak_, not too
 strict.
 
 Two structural facts worth stating up front, because they organise everything else:
@@ -29,7 +29,7 @@ Two structural facts worth stating up front, because they organise everything el
   assertion in the file (AC-1, AC-2, AC-4, AC-12) is redundant belt-and-braces on top of it.
 - **AC-3 pins nothing about the four derived helpers.** `nextInt`, `shuffle`, `pick` and
   `weightedPick` — the four functions that T-005/T-007/T-008/T-009/T-021 actually call — are
-  constrained *only* by the statistical bands and the error cases. That is precisely where the
+  constrained _only_ by the statistical bands and the error cases. That is precisely where the
   suite is weakest, and all three Critical findings live there.
 
 ---
@@ -40,20 +40,20 @@ I checked each of AC-1…AC-12 against its test, clause by clause. **All twelve 
 encoded, not gestured at.** Numeric bounds, sample counts, seeds and error types are transcribed
 faithfully in every case:
 
-| AC | Test | Verdict |
-|---|---|---|
-| AC-1 | `rng.test.ts:55-61` | 1,000 draws, two `createRng(seed)`, element-wise — exact |
-| AC-2 | `rng.test.ts:77-81` | seeds 1/2, 10 draws, `not.toEqual` — exact |
-| AC-3 | `rng.test.ts:85-96` | seeds 0/1/42/4294967295, 100 draws, `toBe` per element — exact |
-| AC-4 | `rng.test.ts:100-117` | 100,000 draws, seed 12345, `0 <= v < 1`, mean in [0.49,0.51] — exact |
-| AC-5 | `rng.test.ts:121-142` | 60,000, seed 777, integers in [1,6], per-face [9000,11000] — exact |
-| AC-6 | `rng.test.ts:144-154` | returns 5, state advances, input unmutated — exact |
-| AC-7 | `rng.test.ts:156-169` | three tests: `min>max`, non-integer min, non-integer max — exact |
-| AC-8 | `rng.test.ts:173-207` | new array, unmutated input, permutation, idx-0 [700,1300] — exact |
-| AC-9 | `rng.test.ts:211-220` | empty throws `RangeError`, single returns element — exact |
-| AC-10 | `rng.test.ts:224-243` | 20,000, seed 2026, `b` in [14000,16000], only a/b — exact, and uses the locked `item` field |
-| AC-11 | `rng.test.ts:245-273` | four tests: empty, negative, all-zero, single-zero — exact |
-| AC-12 | `rng.test.ts:277-292` | JSON round-trip on a *non-initial* state, 50 subsequent draws — exact, and the "advance 5 first" refinement is better than the AC required |
+| AC    | Test                  | Verdict                                                                                                                                    |
+| ----- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| AC-1  | `rng.test.ts:55-61`   | 1,000 draws, two `createRng(seed)`, element-wise — exact                                                                                   |
+| AC-2  | `rng.test.ts:77-81`   | seeds 1/2, 10 draws, `not.toEqual` — exact                                                                                                 |
+| AC-3  | `rng.test.ts:85-96`   | seeds 0/1/42/4294967295, 100 draws, `toBe` per element — exact                                                                             |
+| AC-4  | `rng.test.ts:100-117` | 100,000 draws, seed 12345, `0 <= v < 1`, mean in [0.49,0.51] — exact                                                                       |
+| AC-5  | `rng.test.ts:121-142` | 60,000, seed 777, integers in [1,6], per-face [9000,11000] — exact                                                                         |
+| AC-6  | `rng.test.ts:144-154` | returns 5, state advances, input unmutated — exact                                                                                         |
+| AC-7  | `rng.test.ts:156-169` | three tests: `min>max`, non-integer min, non-integer max — exact                                                                           |
+| AC-8  | `rng.test.ts:173-207` | new array, unmutated input, permutation, idx-0 [700,1300] — exact                                                                          |
+| AC-9  | `rng.test.ts:211-220` | empty throws `RangeError`, single returns element — exact                                                                                  |
+| AC-10 | `rng.test.ts:224-243` | 20,000, seed 2026, `b` in [14000,16000], only a/b — exact, and uses the locked `item` field                                                |
+| AC-11 | `rng.test.ts:245-273` | four tests: empty, negative, all-zero, single-zero — exact                                                                                 |
+| AC-12 | `rng.test.ts:277-292` | JSON round-trip on a _non-initial_ state, 50 subsequent draws — exact, and the "advance 5 first" refinement is better than the AC required |
 
 `spec-lint.sh` will pass in both directions: every AC has ≥1 `spec(T-001:AC-n)` tag, and the file
 cites criteria throughout.
@@ -64,7 +64,7 @@ stale worktree copy. `diff` shows the worktree's `tickets/T-001.md` still has th
 uses `{ item, weight }` at `rng.test.ts:225-228` — i.e. it follows the newer, locked main-repo
 decision. **L-008's failure mode did not recur here.**
 
-The gaps in this module are therefore *not* AC-to-test translation failures. They are gaps in what
+The gaps in this module are therefore _not_ AC-to-test translation failures. They are gaps in what
 the ACs themselves ask for — which is exactly what a pre-freeze review is for, since the tests are
 what actually binds the implementer.
 
@@ -77,18 +77,18 @@ stream at the seeds and trial counts the frozen tests use.
 
 ### Cheats the suite **does** catch (verified)
 
-| Cheat | Outcome |
-|---|---|
-| Constant / trivially-incrementing `nextFloat` | Killed by AC-3 (exact known-answer, 4 seeds) |
-| `nextInt` off-by-one high (`min + floor(f*(max-min))`) | face 6 → 0 counts, fails |
-| `nextInt` off-by-one low (`ceil`) | face 1 → 0 counts, fails |
-| `nextInt` naive `Math.round` (edge bias) | faces 1/6 → 5,956/5,929, fails |
-| `weightedPick` ignoring weights entirely | b = 9,938 < 14,000, fails |
-| `weightedPick` always-last | b = 20,000 > 16,000, fails |
-| `shuffle` via `sort(() => rnd()-0.5)` | idx-0 counts 569–1905, fails the band |
-| `shuffle` that forgets to thread the rng inside the swap loop | idx-0 counts 0–5039, fails |
-| Mutation-in-place of the input `Rng` by `nextFloat` / `nextInt` / `shuffle` | caught at `:74`, `:153`, `:183` |
-| Wrong-reason `RangeError` (e.g. validating only `total<=0`, or only `weight<0`) | AC-11's four cases cover both directions |
+| Cheat                                                                           | Outcome                                      |
+| ------------------------------------------------------------------------------- | -------------------------------------------- |
+| Constant / trivially-incrementing `nextFloat`                                   | Killed by AC-3 (exact known-answer, 4 seeds) |
+| `nextInt` off-by-one high (`min + floor(f*(max-min))`)                          | face 6 → 0 counts, fails                     |
+| `nextInt` off-by-one low (`ceil`)                                               | face 1 → 0 counts, fails                     |
+| `nextInt` naive `Math.round` (edge bias)                                        | faces 1/6 → 5,956/5,929, fails               |
+| `weightedPick` ignoring weights entirely                                        | b = 9,938 < 14,000, fails                    |
+| `weightedPick` always-last                                                      | b = 20,000 > 16,000, fails                   |
+| `shuffle` via `sort(() => rnd()-0.5)`                                           | idx-0 counts 569–1905, fails the band        |
+| `shuffle` that forgets to thread the rng inside the swap loop                   | idx-0 counts 0–5039, fails                   |
+| Mutation-in-place of the input `Rng` by `nextFloat` / `nextInt` / `shuffle`     | caught at `:74`, `:153`, `:183`              |
+| Wrong-reason `RangeError` (e.g. validating only `total<=0`, or only `weight<0`) | AC-11's four cases cover both directions     |
 
 That is a real and non-trivial amount of adversarial coverage. The error-case suite in particular
 (`rng.test.ts:245-273`) is well constructed — it pins both halves of the validation, so an
@@ -101,12 +101,12 @@ implementation cannot satisfy it with a single sloppy check.
 The only uniformity assertion is on `result[0]` (`:195`). Measured against the ticket's stream,
 seed 99, 10 elements, 10,000 trials:
 
-| Implementation | idx-0 count range | AC-8 band [700,1300] | count range across **all 10** indices |
-|---|---|---|---|
-| correct Fisher-Yates (descending) | 937–1040 | PASS | 903–1104 |
-| correct Fisher-Yates (ascending) | 956–1054 | PASS | 923–1086 |
-| **`BIASED_oneSwap`** — swap `[0]` with one random index, leave 1–9 in input order | **946–1050** | **PASS** | **0–8987** |
-| **`BIASED_naiveSwap`** — classic n-pass biased swap | **734–1281** | **PASS** (by 34 counts) | 734–1291 |
+| Implementation                                                                    | idx-0 count range | AC-8 band [700,1300]    | count range across **all 10** indices |
+| --------------------------------------------------------------------------------- | ----------------- | ----------------------- | ------------------------------------- |
+| correct Fisher-Yates (descending)                                                 | 937–1040          | PASS                    | 903–1104                              |
+| correct Fisher-Yates (ascending)                                                  | 956–1054          | PASS                    | 923–1086                              |
+| **`BIASED_oneSwap`** — swap `[0]` with one random index, leave 1–9 in input order | **946–1050**      | **PASS**                | **0–8987**                            |
+| **`BIASED_naiveSwap`** — classic n-pass biased swap                               | **734–1281**      | **PASS** (by 34 counts) | 734–1291                              |
 
 `BIASED_oneSwap` also passes `:173-184` in full: it returns a new array, does not mutate the input,
 is a genuine permutation, and advances the `Rng`. **It passes 100% of the frozen shuffle contract
@@ -118,7 +118,7 @@ a one-swap or naive-swap `shuffle` frozen into the foundation, the correct answe
 predictable for three of the four positions. A child learns the position, not the math. That is the
 "the game teaches wrong math" catastrophe class named in `.tdd-swarm/posture.md`, arriving through a
 test that certified the bug. Note also that `naiveSwap` clearing the band by 34 counts means the
-[700,1300] band is not merely loose — it is *just* wide enough to bless a textbook-biased algorithm.
+[700,1300] band is not merely loose — it is _just_ wide enough to bless a textbook-biased algorithm.
 
 **Fix (verified against every legal variant):** add a full-permutation uniformity test on a
 4-element array — 24,000 shuffles threaded from `createRng(99)`, assert exactly 24 distinct
@@ -135,7 +135,7 @@ Keep the existing n=10 idx-0 test as well, and add the same [700,1300] assertion
 ### CRITICAL C-2 — Purity is asserted for `nextFloat` only. A `nextInt` that ignores the PRNG passes.
 
 `rng.test.ts:63-75` is the only repeat-call determinism test in the file, and it covers `nextFloat`.
-`nextInt` (`:144-154`) checks that the *input* object is unmutated but never calls twice.
+`nextInt` (`:144-154`) checks that the _input_ object is unmutated but never calls twice.
 `shuffle`, `pick` and `weightedPick` have no purity check at all. AC-12 (`:277-292`) round-trips only
 the `nextFloat` stream.
 
@@ -166,7 +166,7 @@ single-element case, and the tests encode exactly that. The consequence:
   its `Rng` advancement are completely unasserted** — `pick` could return a bare value and pass.
 
 Both consumers pick from real multi-element pools: `tickets/T-007.md:45` calls `pick(rng, eligible)`
-over a pool of up to 8 templates (this is *the* template-variety mechanism), and
+over a pool of up to 8 templates (this is _the_ template-variety mechanism), and
 `tickets/T-021.md:67` has the bot choose its cannon from `loadout` via `pick`. A constant `pick`
 means every question comes from the same template and every bot fires the same gun, forever.
 
@@ -183,12 +183,12 @@ Because the seeds are fixed and `nextFloat` is pinned exactly by AC-3, **none of
 flake** — they are deterministic. Flake risk is zero across the board. The only question that
 matters is power.
 
-| AC | Band | Slack vs σ | Power verdict |
-|---|---|---|---|
-| AC-4 mean | [0.49, 0.51] | σ(mean)=0.00091 → **±11σ** | Weak on its own (a constant 0.5 generator passes) but harmless: AC-3 already pins `nextFloat` exactly. Measured actual: **0.500675**. |
-| AC-5 per-face | [9000, 11000] | σ=91.3 → **±11σ** | Loose, but every realistic bias fails it by a wide margin (see §2 table). Modulo bias at range 6 from a 32-bit source is ~1e-9 and undetectable at any sample size, so the extra width costs nothing real. **Sound.** |
-| AC-8 idx-0 | [700, 1300] | σ=30 → **±10σ** | **Unsound — see C-1.** Certifies `naiveSwap` (734–1281) and `oneSwap` (946–1050). |
-| AC-10 `b` count | [14000, 16000] | σ=61.2 → **±16σ** | Loose, but both weight-ignoring cheats fail it decisively (9,938 and 20,000). **Sound.** |
+| AC              | Band           | Slack vs σ                 | Power verdict                                                                                                                                                                                                         |
+| --------------- | -------------- | -------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| AC-4 mean       | [0.49, 0.51]   | σ(mean)=0.00091 → **±11σ** | Weak on its own (a constant 0.5 generator passes) but harmless: AC-3 already pins `nextFloat` exactly. Measured actual: **0.500675**.                                                                                 |
+| AC-5 per-face   | [9000, 11000]  | σ=91.3 → **±11σ**          | Loose, but every realistic bias fails it by a wide margin (see §2 table). Modulo bias at range 6 from a 32-bit source is ~1e-9 and undetectable at any sample size, so the extra width costs nothing real. **Sound.** |
+| AC-8 idx-0      | [700, 1300]    | σ=30 → **±10σ**            | **Unsound — see C-1.** Certifies `naiveSwap` (734–1281) and `oneSwap` (946–1050).                                                                                                                                     |
+| AC-10 `b` count | [14000, 16000] | σ=61.2 → **±16σ**          | Loose, but both weight-ignoring cheats fail it decisively (9,938 and 20,000). **Sound.**                                                                                                                              |
 
 **Seed-luck / legal-reordering check — CLEAN.** I ran each band against every legal implementation
 variant I could construct, to see whether any band depends on one seed's luck in a way a different
@@ -211,12 +211,12 @@ Nothing in the file asserts an internal derivation. Specifically checked:
 
 - `rng.test.ts:73` compares `Rng` values with `toEqual`, not `toBe` — correctly declines to pin
   object identity, so an implementation that returns a fresh object per call is fine.
-- Nothing pins *how* `nextInt` maps a float to a range, *which direction* `shuffle` iterates, or
-  *which end* `weightedPick` scans from. Verified empirically that all these variants pass.
+- Nothing pins _how_ `nextInt` maps a float to a range, _which direction_ `shuffle` iterates, or
+  _which end_ `weightedPick` scans from. Verified empirically that all these variants pass.
 - The locked contract items — `Rng = { readonly state: number }`, `[value, nextRng]` tuples,
   `{ item, weight }` entries — are exercised through the public API and nothing beyond them.
 
-One item that *looks* like over-constraint but is not: `rng.test.ts:151` requires
+One item that _looks_ like over-constraint but is not: `rng.test.ts:151` requires
 `nextInt(rng, 5, 5)` to advance the `Rng`, which forbids the natural `if (min === max) return [min,
 rng]` shortcut. That is AC-6's explicit and deliberate requirement (uniform stream consumption keeps
 replay stable), correctly encoded. Not a defect.
@@ -230,13 +230,13 @@ replay stable), correctly encoded. Not a defect.
 Comparing `rng.test.ts:21-27` against the pseudocode at `tickets/T-001.md:40-46`, operator by
 operator:
 
-| Ticket line | Test line | Match |
-|---|---|---|
-| `a = (a + 0x6D2B79F5) \| 0` | `const a = (state + 0x6d2b79f5) \| 0;` | identical (hex case only) |
-| `t = Math.imul(a ^ (a >>> 15), 1 \| a)` | `let t = Math.imul(a ^ (a >>> 15), 1 \| a);` | identical — `>>>` not `>>`, shift 15, `1 \| a` |
-| `t = (t + Math.imul(t ^ (t >>> 7), 61 \| t)) ^ t` | `t = (t + Math.imul(t ^ (t >>> 7), 61 \| t)) ^ t;` | identical — including the parenthesisation that makes the addition bind before the final `^ t` |
-| `output = ((t ^ (t >>> 14)) >>> 0) / 4294967296` | `const value = ((t ^ (t >>> 14)) >>> 0) / 4294967296;` | identical — shift 14, `>>> 0` before the divide, divisor exactly 2³² |
-| `nextState = a` | `return { value, nextState: a };` | identical — the **post**-add value, not the pre-add state |
+| Ticket line                                       | Test line                                              | Match                                                                                          |
+| ------------------------------------------------- | ------------------------------------------------------ | ---------------------------------------------------------------------------------------------- |
+| `a = (a + 0x6D2B79F5) \| 0`                       | `const a = (state + 0x6d2b79f5) \| 0;`                 | identical (hex case only)                                                                      |
+| `t = Math.imul(a ^ (a >>> 15), 1 \| a)`           | `let t = Math.imul(a ^ (a >>> 15), 1 \| a);`           | identical — `>>>` not `>>`, shift 15, `1 \| a`                                                 |
+| `t = (t + Math.imul(t ^ (t >>> 7), 61 \| t)) ^ t` | `t = (t + Math.imul(t ^ (t >>> 7), 61 \| t)) ^ t;`     | identical — including the parenthesisation that makes the addition bind before the final `^ t` |
+| `output = ((t ^ (t >>> 14)) >>> 0) / 4294967296`  | `const value = ((t ^ (t >>> 14)) >>> 0) / 4294967296;` | identical — shift 14, `>>> 0` before the divide, divisor exactly 2³²                           |
+| `nextState = a`                                   | `return { value, nextState: a };`                      | identical — the **post**-add value, not the pre-add state                                      |
 
 I then executed the oracle against the canonical published mulberry32 (which writes `a |= 0` before
 the add) for 200 draws each across seeds `0, 1, 42, 4294967295, 123456789, 2026, 777, 99, 12345, -1,
@@ -244,7 +244,7 @@ the add) for 200 draws each across seeds `0, 1, 42, 4294967295, 123456789, 2026,
 `ToInt32` of a sum exact below 2⁵³, so the truncation happens either way. This matters because AC-3
 includes seed `4294967295`, the exact case where the two forms could have diverged; they do not.
 
-The driver at `rng.test.ts:29-38` is also correct: it emits the value derived from the *current*
+The driver at `rng.test.ts:29-38` is also correct: it emits the value derived from the _current_
 state and then adopts `nextState`, so the first emitted value is the one derived from the seed
 itself — matching AC-3's "advanced 100 times" and matching what any natural `createRng(seed)` +
 `nextFloat` implementation produces.
@@ -298,9 +298,9 @@ variety (`tickets/T-007.md:45`) and T-021's bot cannon choice (`tickets/T-021.md
 
 ### Important — should fix before freeze
 
-**I-1 · `rng.test.ts:245-273`** — a zero weight *among positive weights* is unspecified and
+**I-1 · `rng.test.ts:245-273`** — a zero weight _among positive weights_ is unspecified and
 untested. AC-11 covers empty / negative / all-zero only, so an implementation that throws
-`RangeError` on any zero weight and one that can *select* the zero-weight item both pass.
+`RangeError` on any zero weight and one that can _select_ the zero-weight item both pass.
 `tickets/T-009.md:53-63` builds `CHEST_RARITY_ENTRIES` from `CHEST_RARITY_WEIGHTS` in `tuning.ts`,
 where a rarity weight of 0 is a legal tuning value — so this freezes an ambiguity that will surface
 in wave 3 as either a crash or a silently-awarded disabled rarity. This is L-005 and L-009 in

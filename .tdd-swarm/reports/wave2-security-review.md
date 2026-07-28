@@ -7,7 +7,7 @@ Diffs reviewed: `git diff swarm/engine-core..HEAD -- src/` in `cannon-wt/wt-T-00
 
 This is an offline, single-player, no-network, no-account K-5 game. There is no server, no auth,
 no user-supplied strings reaching these two modules at runtime — `tuning.ts` is pure constants and
-`content/index.ts` loads catalogs the *developer* authored and bundled, not data a player can edit
+`content/index.ts` loads catalogs the _developer_ authored and bundled, not data a player can edit
 or submit. Accordingly this review does **not** examine SQLi, XSS, CSRF, authz/IDOR, SSRF, or
 network deserialization — there is no such surface in this diff, and I've confirmed that by
 reading every line of both diffs rather than assuming it. What does apply here: mutable shared
@@ -24,7 +24,7 @@ and content-file leakage (URLs/PII/paths breaking ARCHITECTURE §4.4's airplane-
 
 `parseCatalog` runs at module top level for all five catalogs (`index.ts:71-75`) and throws
 synchronously on the first invalid entry. In ES module semantics, a throw during top-level
-evaluation fails the whole module's instantiation; a *static* `import` of `@content/index`
+evaluation fails the whole module's instantiation; a _static_ `import` of `@content/index`
 elsewhere in the app has no way to catch that — it's not a wrapped exception, it's a failed
 module graph. So yes: a single malformed byte in a bundled catalog would hard-crash app startup
 with no in-app recovery path.
@@ -40,7 +40,7 @@ are developer-authored, version-controlled, and covered by CI-run tests before e
 device, "fail loudly at build/test time, never partially load a corrupt catalog on a player's
 device" (ARCHITECTURE.md §2, §4.4, as the module's own header states) is the correct posture, not
 an inline `try/catch`-and-continue. Flagging as informational: if a future ticket wants the loader
-to survive a *partially* bad catalog (e.g. skip one bad island, keep the rest) that would be a
+to survive a _partially_ bad catalog (e.g. skip one bad island, keep the rest) that would be a
 product decision, not a security gap — today's all-or-nothing failure is safe, just not graceful.
 
 ## 2. Lookup helpers — prototype pollution

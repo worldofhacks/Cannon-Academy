@@ -19,18 +19,18 @@ prove: fidelity to PLAN.md, playability of the arc, `index.ts` quality, the Iron
 Every row compared field by field against PLAN.md's table (PLAN.md:41-52 region) — skill, damage
 range, temperament, recoil, timer, grade band, how-earned.
 
-| Cannon | PLAN.md row | `cannons.json` | Verdict |
-|---|---|---|---|
-| Swivel Gun | Addition within 10 (K–1), 8–12, Reliable, 20s, Starter | `add_within_10`, 8–12, `reliable`, recoil 0, 20000, grades 0–1, `{kind:starter}` | match |
-| Culverin | Addition within 10 (K–1), 4–16, Volatile (crit), 20s, Starter | `add_within_10`, 4–16, `volatile`, recoil 0, 20000, 0–1, `{kind:starter}` | match (recoil 0 per locked ruling D-3) |
-| Six-Pounder | Addition within 20 (1–2), 10–16, Standard, 15s, Port Sumwich range | `add_within_20`, 10–16, `standard`, 0, 15000, 1–2, `{range, port_sumwich, tier 1}` | match |
-| Chain Shot | Subtraction within 20 (1–2), 10–16, Standard, 15s, Port Sumwich range | `sub_within_20`, 10–16, `standard`, 0, 15000, 1–2, `{range, port_sumwich, tier 1}` | match |
-| Nine-Pounder | Place value & compare (2), 12–18, Standard, 15s, Chest drop | `place_value_compare`, 12–18, `standard`, 0, 15000, 2–2, `{kind:chest}` | match |
-| Twelve-Pounder | Multiplication facts (3), 14–24, Standard, 12s, Isla Products range | `mult_facts`, 14–24, `standard`, 0, 12000, 3–3, `{range, isla_products, tier 1}` | match |
-| Mortar | Division facts (3–4), 14–24, Standard, 12s, Quotient Cove range | `div_facts`, 14–24, `standard`, 0, 12000, 3–4, `{range, quotient_cove, tier 1}` | match |
-| Double Broadside | Two-step add/sub (2–3), 16–28, Volatile (5), 15s, Port Sumwich tier 2 | `two_step_add_sub`, 16–28, `volatile`, 5, 15000, 2–3, `{range, port_sumwich, tier 2}` | match |
-| Powder Keg | Fractions, int-answerable (4–5), 20–34, Volatile (8), 18s, Fraction Reef range | `fractions_int`, 20–34, `volatile`, 8, 18000, 4–5, `{range, fraction_reef, tier 1}` | match |
-| Long Nine | Multi-digit ops / order of ops (5), 24–40, Volatile (10), 20s, Grandline Range | `multi_digit_order_ops`, 24–40, `volatile`, 10, 20000, 5–5, `{range, grandline, tier 1}` | match |
+| Cannon           | PLAN.md row                                                                    | `cannons.json`                                                                           | Verdict                                |
+| ---------------- | ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------- | -------------------------------------- |
+| Swivel Gun       | Addition within 10 (K–1), 8–12, Reliable, 20s, Starter                         | `add_within_10`, 8–12, `reliable`, recoil 0, 20000, grades 0–1, `{kind:starter}`         | match                                  |
+| Culverin         | Addition within 10 (K–1), 4–16, Volatile (crit), 20s, Starter                  | `add_within_10`, 4–16, `volatile`, recoil 0, 20000, 0–1, `{kind:starter}`                | match (recoil 0 per locked ruling D-3) |
+| Six-Pounder      | Addition within 20 (1–2), 10–16, Standard, 15s, Port Sumwich range             | `add_within_20`, 10–16, `standard`, 0, 15000, 1–2, `{range, port_sumwich, tier 1}`       | match                                  |
+| Chain Shot       | Subtraction within 20 (1–2), 10–16, Standard, 15s, Port Sumwich range          | `sub_within_20`, 10–16, `standard`, 0, 15000, 1–2, `{range, port_sumwich, tier 1}`       | match                                  |
+| Nine-Pounder     | Place value & compare (2), 12–18, Standard, 15s, Chest drop                    | `place_value_compare`, 12–18, `standard`, 0, 15000, 2–2, `{kind:chest}`                  | match                                  |
+| Twelve-Pounder   | Multiplication facts (3), 14–24, Standard, 12s, Isla Products range            | `mult_facts`, 14–24, `standard`, 0, 12000, 3–3, `{range, isla_products, tier 1}`         | match                                  |
+| Mortar           | Division facts (3–4), 14–24, Standard, 12s, Quotient Cove range                | `div_facts`, 14–24, `standard`, 0, 12000, 3–4, `{range, quotient_cove, tier 1}`          | match                                  |
+| Double Broadside | Two-step add/sub (2–3), 16–28, Volatile (5), 15s, Port Sumwich tier 2          | `two_step_add_sub`, 16–28, `volatile`, 5, 15000, 2–3, `{range, port_sumwich, tier 2}`    | match                                  |
+| Powder Keg       | Fractions, int-answerable (4–5), 20–34, Volatile (8), 18s, Fraction Reef range | `fractions_int`, 20–34, `volatile`, 8, 18000, 4–5, `{range, fraction_reef, tier 1}`      | match                                  |
+| Long Nine        | Multi-digit ops / order of ops (5), 24–40, Volatile (10), 20s, Grandline Range | `multi_digit_order_ops`, 24–40, `volatile`, 10, 20000, 5–5, `{range, grandline, tier 1}` | match                                  |
 
 **Ten of ten rows transcribe exactly.** All seven timers convert correctly to milliseconds
 (20s→20000, 15s→15000, 12s→12000, 18s→18000). No divergence found. The one row where the ticket
@@ -74,10 +74,10 @@ guaranteed damage floor `damageMin + 0.35 × (damageMax − damageMin)`.
 
 Port Sumwich hull is 45. With the two starters only:
 
-| Cannon | floor roll | volleys at the floor | volleys at max roll |
-|---|---|---|---|
-| `swivel_gun` 8–12 | 9.4 | ⌈45/9.4⌉ = **5** | ⌈45/12⌉ = **4** |
-| `culverin` 4–16 | 8.2 | ⌈45/8.2⌉ = **6** | ⌈45/16⌉ = **3** |
+| Cannon            | floor roll | volleys at the floor | volleys at max roll |
+| ----------------- | ---------- | -------------------- | ------------------- |
+| `swivel_gun` 8–12 | 9.4        | ⌈45/9.4⌉ = **5**     | ⌈45/12⌉ = **4**     |
+| `culverin` 4–16   | 8.2        | ⌈45/8.2⌉ = **6**     | ⌈45/16⌉ = **3**     |
 
 A K-band player with only the starters finishes in 4–6 volleys on every realistic line, including
 the pathological "every answer slow-but-correct" line. PLAN.md's promise holds. The Culverin's
@@ -90,16 +90,16 @@ what PLAN.md claims for it.
 The chain is self-sufficient, and this is worth stating precisely because it is not obvious.
 T-010's `resolveUnlocks` grants a `range` cannon when its skill is mastered, and lifts island
 `I`'s fog when at least one skill of `I.requiresIsland`'s `rangeSkills` is mastered. The **same
-mastery event** does both. Therefore arriving at island *N* logically implies holding at least one
-cannon unlocked at island *N−1*:
+mastery event** does both. Therefore arriving at island _N_ logically implies holding at least one
+cannon unlocked at island _N−1_:
 
-| Island | hull | cannon guaranteed on arrival | floor roll | volleys @ floor | volleys @ max |
-|---|---|---|---|---|---|
-| `port_sumwich` | 45 | starters (8–12 / 4–16) | 9.4 / 8.2 | 5 / 6 | 4 / 3 |
-| `isla_products` | 60 | `six_pounder` or `chain_shot` (10–16), or `double_broadside` (16–28) | 12.1 | 5 | 4 |
-| `quotient_cove` | 75 | `twelve_pounder` 14–24 | 17.5 | 5 | 4 |
-| `fraction_reef` | 95 | `mortar` 14–24 | 17.5 | 6 | 4 |
-| `grandline` | 120 | `powder_keg` 20–34 | 24.9 | 5 | 4 |
+| Island          | hull | cannon guaranteed on arrival                                         | floor roll | volleys @ floor | volleys @ max |
+| --------------- | ---- | -------------------------------------------------------------------- | ---------- | --------------- | ------------- |
+| `port_sumwich`  | 45   | starters (8–12 / 4–16)                                               | 9.4 / 8.2  | 5 / 6           | 4 / 3         |
+| `isla_products` | 60   | `six_pounder` or `chain_shot` (10–16), or `double_broadside` (16–28) | 12.1       | 5               | 4             |
+| `quotient_cove` | 75   | `twelve_pounder` 14–24                                               | 17.5       | 5               | 4             |
+| `fraction_reef` | 95   | `mortar` 14–24                                                       | 17.5       | 6               | 4             |
+| `grandline`     | 120  | `powder_keg` 20–34                                                   | 24.9       | 5               | 4             |
 
 **Every island is beatable in 4–6 volleys with the weakest cannon a player is guaranteed to hold
 on arrival**, before counting the stronger guns they will usually also have. The catalog's damage
@@ -227,7 +227,7 @@ metadata that the mastery rule reproduces by other means.
 
 ## 6. Findings
 
-### M-1 (Minor) — `validateCatalogs` detects no *set-level* corruption
+### M-1 (Minor) — `validateCatalogs` detects no _set-level_ corruption
 
 `src/content/index.ts:63-69` validates each entry in isolation. Undetected classes, all of which
 pass every schema:

@@ -26,7 +26,7 @@ island's cannon and lifts the fog on the next stretch of the sea chart.
 
 ## Audience — this is the constraint that matters most
 
-**Children aged roughly 5 to 11.** Design for the *bottom* of that range and let it scale up.
+**Children aged roughly 5 to 11.** Design for the _bottom_ of that range and let it scale up.
 
 - **A five-year-old may not read fluently.** Icons and colour must carry meaning; text is
   reinforcement, never the only channel. K-1 math questions are symbolic only (`3 + 4 = ?`),
@@ -36,7 +36,7 @@ island's cannon and lifts the fog on the next stretch of the sea chart.
 - **Losing must not feel like failure.** A loss still pays coins, never drops your rank, and
   resets your hull. The visual language of losing should read as "try again," not "you failed."
 - **No timers that feel like panic.** Timers exist, but the youngest band gets 20 seconds for
-  addition within 10. The timer should read as *pace*, not threat.
+  addition within 10. The timer should read as _pace_, not threat.
 
 ## Technical constraints — these are fixed, please design within them
 
@@ -47,11 +47,12 @@ island's cannon and lifts the fog on the next stretch of the sea chart.
   from free CC0 3D kits (Quaternius + Kenney pirate packs) via one locked orthographic camera.
   Think a clean, saturated, toy-like look — not painterly, not gritty, not pixel art.
 - **Grey-box art is acceptable in the design** — coloured rectangles standing in for sprites is
-  fine and expected. I need the *layout, hierarchy, states, and tokens* more than final artwork.
+  fine and expected. I need the _layout, hierarchy, states, and tokens_ more than final artwork.
 
 ## What I need from you, in priority order
 
 ### 1. A design token set
+
 Colours (with a dark-on-light and light-on-dark check for accessibility), type scale, spacing
 scale, corner radii, elevation/shadow steps. Name them semantically (`surface`, `danger`,
 `hull-remaining`) not literally (`blue-500`). This becomes a `theme/` module in code, so keep the
@@ -62,15 +63,17 @@ state may be communicated by colour alone (a colour-blind seven-year-old must st
 hull is low).
 
 ### 2. The duel screen — the heart of the product
+
 This is where 90% of playtime happens. Side view: your ship to port, the rival to starboard, sea
 and sky behind, hull bars for both.
 
 Design its **states**, not just one composition:
+
 - **Cannon select** — choosing between your available cannons. Each cannon needs to communicate
-  its damage range, its temperament (safe / standard / risky), and its math skill *at a glance,
-  to a non-reader*
+  its damage range, its temperament (safe / standard / risky), and its math skill _at a glance,
+  to a non-reader_
 - **Reload / question** — the math question, its countdown, and a 2×2 grid of four answer choices
-- **Perfect Shot** — the feedback for answering fast. This should feel *great*; it's the
+- **Perfect Shot** — the feedback for answering fast. This should feel _great_; it's the
   game's core reward loop
 - **Volley resolving** — cannonball arc, hit or splash, hull bar draining
 - **Rival's turn** — the player is watching, not acting. Make the difference obvious
@@ -78,20 +81,24 @@ Design its **states**, not just one composition:
 - **Timeout / misfire** — the question expired. Gentle, not punishing
 
 ### 3. The sea chart
+
 A hand-illustrated-feeling map with five island nodes, fog over the locked ones, and a clear sense
 of "you are here" and "this is next." Islands: Port Sumwich → Isla Products → Quotient Cove →
 Fraction Reef → the Grandline.
 
 ### 4. Onboarding
+
 Three beats: **grade picker** (K-1 / 2-3 / 4-5) → **pick a captain name and flag** → a guided
 first duel. The grade picker is chosen by a child who may not read the labels — it needs a visual
 answer to "which one am I?"
 
 ### 5. The reward moment
+
 Treasure chest opening. Coins, a new cannon, a crew member, or a cosmetic. This is the
 pack-opening dopamine beat — it should be the most animated thing in the game.
 
 ### 6. A gunnery range / practice screen
+
 Drills against a stationary target buoy, filling a mastery meter. Deliberately reuses the duel's
 question UI — please treat it as a variant, not a new mode.
 

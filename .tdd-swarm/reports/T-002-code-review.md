@@ -11,11 +11,11 @@
 
 ## Verdict summary
 
-| Dimension | Result |
-| --- | --- |
+| Dimension              | Result                                                        |
+| ---------------------- | ------------------------------------------------------------- |
 | **1. Spec compliance** | 24/24 ACs met. **1 DoD item NOT MET.** No Iron Law violation. |
-| **2. Code quality** | **1 Critical, 2 Important, 4 Minor.** |
-| **Overall** | **CHANGES REQUIRED** |
+| **2. Code quality**    | **1 Critical, 2 Important, 4 Minor.**                         |
+| **Overall**            | **CHANGES REQUIRED**                                          |
 
 Ground truth accepted as given and not re-derived: local gates green, 297/297, spec-lint 24/24, zero
 test files touched, independent codegen-poisoning probe clean, and the listed arithmetic spot checks.
@@ -30,46 +30,46 @@ literal magnitude**, and **the environment's value domain**.
 
 ## Acceptance criteria
 
-| AC | Result | Evidence |
-| --- | --- | --- |
-| **AC-1** — no banned substrings | **MET** | Scanned `expr.ts` for `eval(`, `new Function`, `Function(`, `setTimeout`, `setInterval`, `import(`: zero matches. The only `constructor` occurrences are the class constructor declarations at `expr.ts:56` and `expr.ts:199` and a doc comment at `:413` — none is a `Function(` match. |
-| **AC-21** — no dynamic-code route reached (authoritative) | **MET** | Behavioural ground truth accepted. Structurally corroborated: no `Reflect`, no `globalThis`, no `.constructor` read, no computed property access on any built-in anywhere in the file. Calls resolve only through `WHITELISTED_FUNCTIONS.get(name)` (`:426`); `Math.*` appears only as five static references inside the six literal map entries (`:416-421`). Environment lookup is `Object.hasOwn` (`:479`, `:523`), so `constructor`/`toString`/`__proto__` are `UNKNOWN_IDENTIFIER` (verified). Import-time side effects are one class, three frozen arrays and one `Map`. |
-| **AC-2** — precedence, parens | **MET** | Descent order `parseOr:270 → parseAnd:281 → parseCompare:293 → parseSum:302 → parseProduct:313 → parseUnary:325 → parsePrimary:334`. Parens re-enter at `:353-358`. |
-| **AC-3** — `- * / % unary-` | **MET** | `applyArithmetic:529-548`; real division at `:541`; unary negate `parseUnary:325-332` + `computeNumber:580-581`. |
-| **AC-4** — left associativity | **MET** | Read from the descent structure, not the tests: `parseSum:303-310` and `parseProduct:314-321` both fold with `left = { …, left, right: parseX() }` inside a `for(;;)` loop. That is left-associative by construction for `-`, `/` and `%`. Same shape for `parseOr:271-278` and `parseAnd:282-289`. |
-| **AC-5** — whitelisted calls | **MET** | `WHITELISTED_FUNCTIONS:415-422`; `greatestCommonDivisor:398-407`. |
-| **AC-6** — predicates | **MET** | `parseCompare:293-300`, `applyComparison:550-565`, `evaluatePredicate:652-656`. |
-| **AC-7** — six comparisons | **MET** | `applyComparison:551-564` — `===`/`!==` on numbers, correct. |
-| **AC-8** — `&&` tighter than `\|\|` | **MET** | `parseOr:270` delegates to `parseAnd:281`, so `\|\|` is the outer production. Verified by reading the descent, not the assertion. |
-| **AC-9** — `UNKNOWN_IDENTIFIER` naming the identifier | **MET** | `checkNode:478-482` + `unknownIdentifier:464-466`. |
-| **AC-10** — `UNKNOWN_FUNCTION` / `ARITY_MISMATCH` | **MET** | `resolveWhitelistedCall:425-440` — name resolved at `:426` **before** arity at `:433`, which is why `sqrt(a,b)` is `UNKNOWN_FUNCTION` not `ARITY_MISMATCH` (verified). |
-| **AC-11** — malformed input | **MET** | All six named inputs verified `PARSE_ERROR`, plus `+a`, `a!b`, `a---b`, `abs(a,)`. |
-| **AC-12** — `DIVISION_BY_ZERO` | **MET** | `:538-540`, `:543-545`. `right === 0` is true for `-0`, so `a % (b - c)` with `b === c` is covered (verified). |
-| **AC-13** — `TYPE_MISMATCH` both directions | **MET** | `requireType:458-462` invoked at the two public entry points `:644` and `:654`. |
-| **AC-14** — purity | **MET** | No module-level mutable state. `parse:386` constructs a fresh `Parser` per call; `Node` is fully `readonly`; nothing is cached (correctly — caching is Out of Scope). Purity is structural, not asserted. |
-| **AC-15** — depth limit, not stack overflow | **MET as worded** | `MAX_NESTING_DEPTH = 64` (`:188`), checked on entry (`enterNesting:257-268`). Verified paren depth 65 / 200 / 5,000 → `PARSE_ERROR`. **But see F-2:** the property AC-15 *names* ("rather than overflowing the stack") does not hold for a shape AC-15 does not describe. The AC is literally satisfied; the invariant is not. |
-| **AC-16** — JS remainder sign | **MET** | `:546`. Verified `-7 % 2 = -1`, `7 % -2 = 1`. |
-| **AC-17** — `gcd` on absolute values, `gcd(0,0)=0` | **MET for the pinned cases** | `:398-407`. Verified `gcd(-12,18)=6`, `gcd(12,-18)=6`, `gcd(0,5)=5`, `gcd(0,0)=0`. **See F-1** for the unpinned case the AC's own rationale anticipated and did not close. |
-| **AC-18** — `abs()` is `PARSE_ERROR` | **MET** | `parseArguments:371-382` demands one `expr` before any `,`. Verified for `abs()` and `abs(   )`. |
-| **AC-19** — type-only code union, runtime class | **MET** | `export type ExprErrorCode:44-50`; `export class ExprError extends Error:53-61` with `readonly code:54`. |
-| **AC-20** — 16 levels evaluate | **MET** | Limit is 64; verified 16 and 64 both evaluate. |
-| **AC-22** — closed whitelist vs `Math` own-properties | **MET** | The `Map` at `:415-422` is the *only* resolution path (`:426`). No name is ever used as a property key on a built-in, so the `Math[name]` cheat class is structurally impossible, not merely untested. Verified `sqrt`, `round`, `pow`, `log`, `cbrt`, `atan2` → `UNKNOWN_FUNCTION` at both arities. |
-| **AC-23** — short-circuit + static typing | **MET** | `computeBoolean:619-632` short-circuits at `:622` and `:625`; `checkNode:496-513` types **both** operands before any value exists. Verified all three ticket cases. |
-| **AC-24** — every identifier resolves statically | **MET** | `checkNode:478-482` runs over the whole tree from `:644`/`:654` before `computeNumber`/`computeBoolean` is entered. Verified. **See F-4** for one shape where the split leaks. |
+| AC                                                        | Result                       | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **AC-1** — no banned substrings                           | **MET**                      | Scanned `expr.ts` for `eval(`, `new Function`, `Function(`, `setTimeout`, `setInterval`, `import(`: zero matches. The only `constructor` occurrences are the class constructor declarations at `expr.ts:56` and `expr.ts:199` and a doc comment at `:413` — none is a `Function(` match.                                                                                                                                                                                                                                                                                       |
+| **AC-21** — no dynamic-code route reached (authoritative) | **MET**                      | Behavioural ground truth accepted. Structurally corroborated: no `Reflect`, no `globalThis`, no `.constructor` read, no computed property access on any built-in anywhere in the file. Calls resolve only through `WHITELISTED_FUNCTIONS.get(name)` (`:426`); `Math.*` appears only as five static references inside the six literal map entries (`:416-421`). Environment lookup is `Object.hasOwn` (`:479`, `:523`), so `constructor`/`toString`/`__proto__` are `UNKNOWN_IDENTIFIER` (verified). Import-time side effects are one class, three frozen arrays and one `Map`. |
+| **AC-2** — precedence, parens                             | **MET**                      | Descent order `parseOr:270 → parseAnd:281 → parseCompare:293 → parseSum:302 → parseProduct:313 → parseUnary:325 → parsePrimary:334`. Parens re-enter at `:353-358`.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **AC-3** — `- * / % unary-`                               | **MET**                      | `applyArithmetic:529-548`; real division at `:541`; unary negate `parseUnary:325-332` + `computeNumber:580-581`.                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **AC-4** — left associativity                             | **MET**                      | Read from the descent structure, not the tests: `parseSum:303-310` and `parseProduct:314-321` both fold with `left = { …, left, right: parseX() }` inside a `for(;;)` loop. That is left-associative by construction for `-`, `/` and `%`. Same shape for `parseOr:271-278` and `parseAnd:282-289`.                                                                                                                                                                                                                                                                            |
+| **AC-5** — whitelisted calls                              | **MET**                      | `WHITELISTED_FUNCTIONS:415-422`; `greatestCommonDivisor:398-407`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **AC-6** — predicates                                     | **MET**                      | `parseCompare:293-300`, `applyComparison:550-565`, `evaluatePredicate:652-656`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **AC-7** — six comparisons                                | **MET**                      | `applyComparison:551-564` — `===`/`!==` on numbers, correct.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| **AC-8** — `&&` tighter than `\|\|`                       | **MET**                      | `parseOr:270` delegates to `parseAnd:281`, so `\|\|` is the outer production. Verified by reading the descent, not the assertion.                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| **AC-9** — `UNKNOWN_IDENTIFIER` naming the identifier     | **MET**                      | `checkNode:478-482` + `unknownIdentifier:464-466`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **AC-10** — `UNKNOWN_FUNCTION` / `ARITY_MISMATCH`         | **MET**                      | `resolveWhitelistedCall:425-440` — name resolved at `:426` **before** arity at `:433`, which is why `sqrt(a,b)` is `UNKNOWN_FUNCTION` not `ARITY_MISMATCH` (verified).                                                                                                                                                                                                                                                                                                                                                                                                         |
+| **AC-11** — malformed input                               | **MET**                      | All six named inputs verified `PARSE_ERROR`, plus `+a`, `a!b`, `a---b`, `abs(a,)`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| **AC-12** — `DIVISION_BY_ZERO`                            | **MET**                      | `:538-540`, `:543-545`. `right === 0` is true for `-0`, so `a % (b - c)` with `b === c` is covered (verified).                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **AC-13** — `TYPE_MISMATCH` both directions               | **MET**                      | `requireType:458-462` invoked at the two public entry points `:644` and `:654`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| **AC-14** — purity                                        | **MET**                      | No module-level mutable state. `parse:386` constructs a fresh `Parser` per call; `Node` is fully `readonly`; nothing is cached (correctly — caching is Out of Scope). Purity is structural, not asserted.                                                                                                                                                                                                                                                                                                                                                                      |
+| **AC-15** — depth limit, not stack overflow               | **MET as worded**            | `MAX_NESTING_DEPTH = 64` (`:188`), checked on entry (`enterNesting:257-268`). Verified paren depth 65 / 200 / 5,000 → `PARSE_ERROR`. **But see F-2:** the property AC-15 _names_ ("rather than overflowing the stack") does not hold for a shape AC-15 does not describe. The AC is literally satisfied; the invariant is not.                                                                                                                                                                                                                                                 |
+| **AC-16** — JS remainder sign                             | **MET**                      | `:546`. Verified `-7 % 2 = -1`, `7 % -2 = 1`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| **AC-17** — `gcd` on absolute values, `gcd(0,0)=0`        | **MET for the pinned cases** | `:398-407`. Verified `gcd(-12,18)=6`, `gcd(12,-18)=6`, `gcd(0,5)=5`, `gcd(0,0)=0`. **See F-1** for the unpinned case the AC's own rationale anticipated and did not close.                                                                                                                                                                                                                                                                                                                                                                                                     |
+| **AC-18** — `abs()` is `PARSE_ERROR`                      | **MET**                      | `parseArguments:371-382` demands one `expr` before any `,`. Verified for `abs()` and `abs(   )`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                               |
+| **AC-19** — type-only code union, runtime class           | **MET**                      | `export type ExprErrorCode:44-50`; `export class ExprError extends Error:53-61` with `readonly code:54`.                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| **AC-20** — 16 levels evaluate                            | **MET**                      | Limit is 64; verified 16 and 64 both evaluate.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| **AC-22** — closed whitelist vs `Math` own-properties     | **MET**                      | The `Map` at `:415-422` is the _only_ resolution path (`:426`). No name is ever used as a property key on a built-in, so the `Math[name]` cheat class is structurally impossible, not merely untested. Verified `sqrt`, `round`, `pow`, `log`, `cbrt`, `atan2` → `UNKNOWN_FUNCTION` at both arities.                                                                                                                                                                                                                                                                           |
+| **AC-23** — short-circuit + static typing                 | **MET**                      | `computeBoolean:619-632` short-circuits at `:622` and `:625`; `checkNode:496-513` types **both** operands before any value exists. Verified all three ticket cases.                                                                                                                                                                                                                                                                                                                                                                                                            |
+| **AC-24** — every identifier resolves statically          | **MET**                      | `checkNode:478-482` runs over the whole tree from `:644`/`:654` before `computeNumber`/`computeBoolean` is entered. Verified. **See F-4** for one shape where the split leaks.                                                                                                                                                                                                                                                                                                                                                                                                 |
 
 **24/24 met.**
 
 ## Definition of Done
 
-| DoD item | Result | Evidence |
-| --- | --- | --- |
-| Every AC has a passing test tagged `spec(T-002:AC-n)` | **MET** | All 24 tags present; counts range 2–15 per AC; spec-lint 24/24. |
-| `run-local-gates.sh` green | **MET** | Ground truth. |
-| `spec-lint.sh` green | **MET** | Ground truth. |
-| No dynamic code construction anywhere | **MET** | AC-1 + AC-21 above. |
-| **Every failure path throws a typed `ExprError` with a `code` field — never returns `NaN`, `Infinity`, `null`, or `undefined`** | **NOT MET** | Two independent violations, both reachable through the public API from in-grammar input: (a) `evaluateNumber` **returns** `Infinity` and `NaN` — **F-3**; (b) a **`RangeError`**, not an `ExprError`, escapes `evaluateNumber` — **F-2**. |
-| Exports: `evaluateNumber`, `evaluatePredicate`, `ExprError`, `ExprErrorCode` | **MET** | `:642`, `:652`, `:53`, `:44`. Exactly these four; `Environment` (`:64`) is deliberately internal, which is correct — exporting it would be beyond the DoD. |
-| Files changed are exactly those in `file_scopes` | **MET** | `git diff swarm/engine-core...HEAD --name-status` (three-dot, merge-base `db7121c`) returns exactly `A src/engine/questions/expr.ts` and `A __tests__/engine/questions/expr.test.ts`. The implementation commit `a16b864` in isolation touches **only** `src/engine/questions/expr.ts`. (The two-dot range in the review brief also lists `LESSONS.md`, `TICKETS.md` and four ticket files — those are base-branch drift, not branch changes. Verified.) |
+| DoD item                                                                                                                        | Result      | Evidence                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ------------------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Every AC has a passing test tagged `spec(T-002:AC-n)`                                                                           | **MET**     | All 24 tags present; counts range 2–15 per AC; spec-lint 24/24.                                                                                                                                                                                                                                                                                                                                                                                          |
+| `run-local-gates.sh` green                                                                                                      | **MET**     | Ground truth.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `spec-lint.sh` green                                                                                                            | **MET**     | Ground truth.                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| No dynamic code construction anywhere                                                                                           | **MET**     | AC-1 + AC-21 above.                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| **Every failure path throws a typed `ExprError` with a `code` field — never returns `NaN`, `Infinity`, `null`, or `undefined`** | **NOT MET** | Two independent violations, both reachable through the public API from in-grammar input: (a) `evaluateNumber` **returns** `Infinity` and `NaN` — **F-3**; (b) a **`RangeError`**, not an `ExprError`, escapes `evaluateNumber` — **F-2**.                                                                                                                                                                                                                |
+| Exports: `evaluateNumber`, `evaluatePredicate`, `ExprError`, `ExprErrorCode`                                                    | **MET**     | `:642`, `:652`, `:53`, `:44`. Exactly these four; `Environment` (`:64`) is deliberately internal, which is correct — exporting it would be beyond the DoD.                                                                                                                                                                                                                                                                                               |
+| Files changed are exactly those in `file_scopes`                                                                                | **MET**     | `git diff swarm/engine-core...HEAD --name-status` (three-dot, merge-base `db7121c`) returns exactly `A src/engine/questions/expr.ts` and `A __tests__/engine/questions/expr.test.ts`. The implementation commit `a16b864` in isolation touches **only** `src/engine/questions/expr.ts`. (The two-dot range in the review brief also lists `LESSONS.md`, `TICKETS.md` and four ticket files — those are base-branch drift, not branch changes. Verified.) |
 
 **6/7 met. One NOT MET.**
 
@@ -77,14 +77,14 @@ literal magnitude**, and **the environment's value domain**.
 
 Nothing material. The module is 656 lines for a ticket that needs a tokeniser, a parser, a checker
 and a walker, with no speculative extension: no caching or memoisation (correctly deferred per
-*Out of Scope*), no configuration surface, no extra exports, no unused helpers, no template or
+_Out of Scope_), no configuration surface, no extra exports, no unused helpers, no template or
 distractor logic bleeding in from T-005/T-007.
 
 One item is genuinely beyond the ACs' letter and is called out honestly by the implementer:
 **function resolution and arity checking are performed statically** (`checkNode:489`), so
 `b == 0 || min(a) > 0` throws `ARITY_MISMATCH` even though that branch never runs. AC-24 mandates
-static *identifier* resolution and AC-23 mandates static *type* checking; neither mandates static
-*arity*. I rule this **consistent, not an over-reach** — see Ruling 2 below. It is unpinned
+static _identifier_ resolution and AC-23 mandates static _type_ checking; neither mandates static
+_arity_. I rule this **consistent, not an over-reach** — see Ruling 2 below. It is unpinned
 behaviour rather than unrequested behaviour, so it is not an Iron Law violation, but it should be
 pinned.
 
@@ -115,12 +115,12 @@ function greatestCommonDivisor(x: number, y: number): number {
 
 Reached through the public API, measured in a worker thread with an 8-second kill:
 
-| Call | Result |
-| --- | --- |
+| Call                                                                                          | Result                         |
+| --------------------------------------------------------------------------------------------- | ------------------------------ |
 | `evaluateNumber("gcd(" + "9".repeat(400) + ", 2)", {})` — **literal only, empty environment** | **HUNG** — terminated after 8s |
-| `evaluateNumber("gcd(a, b)", { a: Infinity, b: 2 })` | **HUNG** — terminated after 8s |
-| `evaluateNumber("gcd(a, b)", { a: NaN, b: 5 })` | **HUNG** — terminated after 8s |
-| `evaluateNumber("gcd(a, b)", { a: 12, b: 18 })` — control | returned `6` |
+| `evaluateNumber("gcd(a, b)", { a: Infinity, b: 2 })`                                          | **HUNG** — terminated after 8s |
+| `evaluateNumber("gcd(a, b)", { a: NaN, b: 5 })`                                               | **HUNG** — terminated after 8s |
+| `evaluateNumber("gcd(a, b)", { a: 12, b: 18 })` — control                                     | returned `6`                   |
 
 Loop-state trace with an iteration cap, from an exact copy of `:398-407`: `left=NaN, right=NaN`
 after 1,000 iterations for every non-finite input; `gcd(-12,18)` converges in 3, `gcd(0,0)` in 0,
@@ -133,9 +133,9 @@ constraint freezes the tab with no error, no stack trace and no rejection — th
 It is a strictly worse outcome than the wrong-answer class the ticket was written to prevent,
 because a wrong answer is at least observable.
 
-The ticket anticipated this class and closed only half of it. AC-17's own rationale reads: *"zero
+The ticket anticipated this class and closed only half of it. AC-17's own rationale reads: _"zero
 and negative arguments are reachable from constraint expressions and would otherwise be
-implementation-defined **or hang**."* Zero and negative were pinned; non-finite was not, and it is
+implementation-defined **or hang**."_ Zero and negative were pinned; non-finite was not, and it is
 the case that actually hangs.
 
 **Fix.** A finiteness guard. See F-3 for where it belongs — one check placed correctly makes both
@@ -146,7 +146,7 @@ defects unreachable.
 `src/engine/questions/expr.ts:188`, `:257-268`, `:355`, `:373`, `:473`, `:497`, `:572`
 
 `MAX_NESTING_DEPTH` is incremented in exactly two places — the `(` branch of `parsePrimary` (`:355`)
-and `parseArguments` (`:373`). Those are the only two recursion cycles in the *parser*, because the
+and `parseArguments` (`:373`). Those are the only two recursion cycles in the _parser_, because the
 binary productions fold **iteratively** (`parseSum:303-310`, `parseProduct:314-321`,
 `parseOr:271-278`, `parseAnd:282-289`). Parsing `1+1+1+…` is therefore O(n) with zero depth
 accounting — and correctly so.
@@ -171,10 +171,10 @@ Reproduces identically with `*` chains and, through `evaluatePredicate`, with `|
 sees it.
 
 **This directly falsifies a measured claim in the implementation report.** Report §"Claims backed
-by measurement" item 2 states depths *"65, 200, 1,000, 5,000 and 100,000 all throw
-`ExprError`/`PARSE_ERROR`, never a `RangeError`"*. That bisection swept nested parentheses and
+by measurement" item 2 states depths _"65, 200, 1,000, 5,000 and 100,000 all throw
+`ExprError`/`PARSE_ERROR`, never a `RangeError`"_. That bisection swept nested parentheses and
 nested `abs(` calls — the two shapes the counter was designed for. It did not sweep chain length,
-and chain length blows the stack at **4,562**, more than an order of magnitude *below* the 100,000
+and chain length blows the stack at **4,562**, more than an order of magnitude _below_ the 100,000
 the probe reported clean. This is L-015 exactly: the reachability claim was measured, but only
 over the shape the author had in mind.
 
@@ -202,24 +202,24 @@ implements that: `while (isDigit(...)) index += 1` then `Number(source.slice(sta
 
 Measured, **empty environment throughout**:
 
-| Expression | Returns |
-| --- | --- |
-| `"9" × 308` | `1e+308` |
-| `"9" × 309` | **`Infinity`** |
-| `"9…9 - 9…9"` (400 digits each) | **`NaN`** |
-| `"9…9 / 2"` | **`Infinity`** |
-| `"9…9 % 7"` | **`NaN`** |
-| `"floor(9…9)"` | **`Infinity`** |
+| Expression                      | Returns        |
+| ------------------------------- | -------------- |
+| `"9" × 308`                     | `1e+308`       |
+| `"9" × 309`                     | **`Infinity`** |
+| `"9…9 - 9…9"` (400 digits each) | **`NaN`**      |
+| `"9…9 / 2"`                     | **`Infinity`** |
+| `"9…9 % 7"`                     | **`NaN`**      |
+| `"floor(9…9)"`                  | **`Infinity`** |
 | `"9…9 * 9…9"` (200 digits each) | **`Infinity`** |
 
-The DoD states the invariant flatly and without qualification: *"never returns `NaN`, `Infinity`,
-`null`, or `undefined`."* It is violated by input the grammar explicitly admits.
+The DoD states the invariant flatly and without qualification: _"never returns `NaN`, `Infinity`,
+`null`, or `undefined`."_ It is violated by input the grammar explicitly admits.
 
 **This was raised before and dismissed on a false argument.** `T-002-test-design-review.md` §M4
-flagged it, and closed it as *"unreachable from realistic `params` ranges, so genuinely minor"* —
+flagged it, and closed it as _"unreachable from realistic `params` ranges, so genuinely minor"_ —
 using an environment-supplied example (`{ a: 1e308 }`). The literal route needs no `params` at
 all, so the reachability argument does not hold, and leaving it open is what left F-1 live. Same
-lesson, same ticket: **L-015**, *"finite weights can sum to `Infinity` by overflow."*
+lesson, same ticket: **L-015**, _"finite weights can sum to `Infinity` by overflow."_
 
 The frozen suite cannot catch this: the only finiteness sweep is `expr.test.ts:846-851`, seven
 expressions over the single environment `{ a: 7, b: 2 }` — precisely as M4 described.
@@ -252,8 +252,8 @@ checkNode:479        if (!Object.hasOwn(env, node.name)) { throw unknownIdentifi
 readIdentifier:523   if (!Object.hasOwn(env, name) || value === undefined) { throw unknownIdentifier(name); }
 ```
 
-An environment of shape `{ a: undefined }` therefore passes the *static* pass and throws
-`UNKNOWN_IDENTIFIER` from the *evaluation* pass. Verified. That is exactly the ordering AC-24's
+An environment of shape `{ a: undefined }` therefore passes the _static_ pass and throws
+`UNKNOWN_IDENTIFIER` from the _evaluation_ pass. Verified. That is exactly the ordering AC-24's
 rationale exists to prevent — the failure becomes branch-dependent again, since a short-circuited
 operand would never reach `readIdentifier`.
 
@@ -271,14 +271,14 @@ non-null assertions, **zero** `as` casts, **zero** `any`, **zero** `@ts-` commen
 
 **The probe was well-constructed on the axes it chose and blind on the axes that mattered.** It
 carried an L-014 teeth check (correct, and the reason I take its result seriously) and the
-implementer's caveat — *"not claiming these branches are provably dead"* — is honest and should be
+implementer's caveat — _"not claiming these branches are provably dead"_ — is honest and should be
 preserved. But three structural limits:
 
 1. **It asserts nothing about returned values.** Its two assertions are "no distinctive defensive
    message surfaced" and "no non-`ExprError` escaped". A returned `Infinity` is a **pass**. The
    probe could not have caught F-3 even with a 400-digit literal in the corpus.
 2. **The environment axis is 6 fixed maps.** Expressions were swept combinatorially (3,066);
-   environment *values* were not swept at all. F-4 reaches the `:523` guard — so "0 hits" is a
+   environment _values_ were not swept at all. F-4 reaches the `:523` guard — so "0 hits" is a
    statement about the corpus, not about the guard.
 3. **Assertion 2 was the right assertion and passed vacuously.** "No non-`ExprError` escaped" is
    exactly what would have caught F-2 — but no input in the corpus was 4,562 terms long.
@@ -343,7 +343,7 @@ Stated plainly, because it is most of the module:
   `gcd` over absolute values, `gcd(0,0) = 0`, division/remainder by zero (including `-0`) typed.
 - **Naming and clarity are strong.** One method per grammar production, names that match the
   grammar, no abbreviations, no clever control flow. The docblocks earn their space — `:103-108`,
-  `:182-187`, `:292`, `:324`, `:366-370`, `:409-414` and `:567-571` each record *why*, and the
+  `:182-187`, `:292`, `:324`, `:366-370`, `:409-414` and `:567-571` each record _why_, and the
   header at `:31-41` states the pinned semantics explicitly rather than leaving them to be
   inferred. This is well above the bar for readability.
 - **File scope is exact** and no test file was touched.
@@ -362,14 +362,14 @@ preserves the traversal shape.
 
 Verified against the full M3 family from the test-design review, and it is consistent in every case:
 
-| Expression | Code | Why |
-| --- | --- | --- |
+| Expression      | Code                 | Why                                                           |
+| --------------- | -------------------- | ------------------------------------------------------------- |
 | `b == 0 \|\| z` | `UNKNOWN_IDENTIFIER` | name resolved at `:479` before the type is combined at `:510` |
-| `b == 0 \|\| a` | `TYPE_MISMATCH` | `a` resolves, so the type check is reached — matches AC-23 |
-| `z \|\| b == 0` | `UNKNOWN_IDENTIFIER` | left operand, same rule |
-| `foo(z)` | `UNKNOWN_FUNCTION` | name at `:489` before args at `:490` |
-| `min(z)` | `ARITY_MISMATCH` | arity at `:433` before args at `:490` |
-| `z / 0` | `UNKNOWN_IDENTIFIER` | static beats value-dependent |
+| `b == 0 \|\| a` | `TYPE_MISMATCH`      | `a` resolves, so the type check is reached — matches AC-23    |
+| `z \|\| b == 0` | `UNKNOWN_IDENTIFIER` | left operand, same rule                                       |
+| `foo(z)`        | `UNKNOWN_FUNCTION`   | name at `:489` before args at `:490`                          |
+| `min(z)`        | `ARITY_MISMATCH`     | arity at `:433` before args at `:490`                         |
+| `z / 0`         | `UNKNOWN_IDENTIFIER` | static beats value-dependent                                  |
 
 The implementer was right not to invent a criterion, and right to flag it. **No code change.**
 Recommendation to the orchestrator: add one sentence to the module docblock (or an AC) stating the
@@ -378,9 +378,9 @@ changing a published contract rather than tidying. **Minor.**
 
 ## 2. Static arity checking · **consistent with AC-23/AC-24, not an over-reach — but pin it**
 
-AC-24's rationale is explicit about *why* identifier resolution is static: *"constraints are
+AC-24's rationale is explicit about _why_ identifier resolution is static: _"constraints are
 hand-authored content, so the evaluator should fail loudly on a name that cannot exist rather than
-silently skip it."* `min(a)` is exactly that class — an authoring error that cannot become correct
+silently skip it."_ `min(a)` is exactly that class — an authoring error that cannot become correct
 at any parameter value. Deferring it to evaluation would make it discoverable only when its branch
 happens to run, which is the failure mode AC-24 exists to prevent, and T-019's 1,000-sample sweep
 cannot guarantee that branch is ever taken.
@@ -406,13 +406,13 @@ does not conclude, as the implementer's own probe did, that nesting depth is the
 
 Ruled against, on both halves of the reasoning.
 
-- *"an `Infinity` or `NaN` passed in by a caller propagates"* — **incomplete**. It does not merely
+- _"an `Infinity` or `NaN` passed in by a caller propagates"_ — **incomplete**. It does not merely
   propagate through `gcd`; it **hangs** (F-1). A propagated bad value is observable and
   recoverable; a hang is neither.
-- *"the DoD line is met for every finite environment"* — **the environment is not the only route**.
+- _"the DoD line is met for every finite environment"_ — **the environment is not the only route**.
   A 309-digit literal reaches the identical state with an empty environment (F-3), so this cannot
   be characterised as the caller supplying garbage that the type signature disclaims.
-- *"adding a guard would be production code no failing test demands"* — **wrong test.** A DoD item
+- _"adding a guard would be production code no failing test demands"_ — **wrong test.** A DoD item
   is a requirement whether or not a frozen test happens to exercise it. The two blind spots here —
   M4 dismissed on a reachability argument that turns out to be false, and no test long enough to
   reach F-2 — are exactly what an independent review is for. "No failing test demands it" is the
@@ -424,14 +424,14 @@ Ruled against, on both halves of the reasoning.
 
 # Required changes
 
-| # | Change | Severity |
-| --- | --- | --- |
-| 1 | `gcd` must not be able to loop forever. Closed by a finiteness guard — see 2. | **Critical** |
-| 2 | Reject non-finite values: at tokenise time for over-large literals (`:132`), and in the static pass for environment values (`:478-482`). `evaluateNumber` must never return `Infinity` or `NaN`. Error-code choice is constrained by the `Exact<>` pin at `expr.test.ts:1130-1142` — escalate rather than invent a seventh code. | **Important** |
-| 3 | Bound total parse work, not only group nesting, so a long operator chain throws `PARSE_ERROR` instead of `RangeError`. A token-count cap in `parse:385-387` is sufficient. | **Important** |
-| 4 | Make `checkNode:479` and `readIdentifier:523` agree on what "resolved" means. | Minor |
-| 5 | `:604` — report `values.length`, not a hardcoded `0`. | Minor |
-| 6 | One comment at `:600` recording that the second `resolveWhitelistedCall` exists to re-narrow `spec.arity`. | Minor |
+| #   | Change                                                                                                                                                                                                                                                                                                                           | Severity      |
+| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------- |
+| 1   | `gcd` must not be able to loop forever. Closed by a finiteness guard — see 2.                                                                                                                                                                                                                                                    | **Critical**  |
+| 2   | Reject non-finite values: at tokenise time for over-large literals (`:132`), and in the static pass for environment values (`:478-482`). `evaluateNumber` must never return `Infinity` or `NaN`. Error-code choice is constrained by the `Exact<>` pin at `expr.test.ts:1130-1142` — escalate rather than invent a seventh code. | **Important** |
+| 3   | Bound total parse work, not only group nesting, so a long operator chain throws `PARSE_ERROR` instead of `RangeError`. A token-count cap in `parse:385-387` is sufficient.                                                                                                                                                       | **Important** |
+| 4   | Make `checkNode:479` and `readIdentifier:523` agree on what "resolved" means.                                                                                                                                                                                                                                                    | Minor         |
+| 5   | `:604` — report `values.length`, not a hardcoded `0`.                                                                                                                                                                                                                                                                            | Minor         |
+| 6   | One comment at `:600` recording that the second `resolveWhitelistedCall` exists to re-narrow `spec.arity`.                                                                                                                                                                                                                       | Minor         |
 
 **To the orchestrator, not the implementer:** M-3's DFS precedence rule and static arity checking
 are both correct and both unpinned. Each needs one AC (or one docblock sentence) so a later change

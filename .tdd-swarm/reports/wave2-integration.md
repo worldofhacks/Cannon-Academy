@@ -10,14 +10,14 @@
 
 ## Verdict
 
-| Dimension | Result |
-| --- | --- |
-| **Merges** | 3/3 clean — zero conflicts, textual or semantic |
-| **Repo gate suite** | ALL GREEN |
-| **Test suite** | **776 passed / 776**, 7 files, 1.52s |
-| **Cross-ticket compatibility** | VERIFIED — first-ever co-compilation and co-execution, clean (19/19 probe assertions) |
-| **Architecture drift** | **1 Minor finding**, escalated (not absorbed). 1 wave-1 finding CLOSED. 3 noted non-drift. |
-| **Overall** | **PASS** |
+| Dimension                      | Result                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------ |
+| **Merges**                     | 3/3 clean — zero conflicts, textual or semantic                                            |
+| **Repo gate suite**            | ALL GREEN                                                                                  |
+| **Test suite**                 | **776 passed / 776**, 7 files, 1.52s                                                       |
+| **Cross-ticket compatibility** | VERIFIED — first-ever co-compilation and co-execution, clean (19/19 probe assertions)      |
+| **Architecture drift**         | **1 Minor finding**, escalated (not absorbed). 1 wave-1 finding CLOSED. 3 noted non-drift. |
+| **Overall**                    | **PASS**                                                                                   |
 
 ---
 
@@ -27,11 +27,11 @@ All three branches merged with `--no-ff` in ticket-id order. Every merge reporte
 "Merge made by the 'ort' strategy" with exit 0. **No conflict at any point**, so no
 semantic conflict resolution was performed or required.
 
-| Merge commit | Branch | Files added / changed |
-| --- | --- | --- |
-| `1eb39b7` | `ticket/T-004-tuning` | `src/engine/tuning.ts`, `__tests__/engine/tuning.test.ts` |
-| `cd59688` | `ticket/T-006-catalogs` | `src/content/{skills,cannons,islands,ranks,crew}.json`, `src/content/index.ts`, `__tests__/content/catalogs.test.ts` |
-| `5ec09f6` | `ticket/T-026-exact-distractors` | `src/content/schemas.ts` (1 line), `__tests__/content/schemas.test.ts` |
+| Merge commit | Branch                           | Files added / changed                                                                                                |
+| ------------ | -------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `1eb39b7`    | `ticket/T-004-tuning`            | `src/engine/tuning.ts`, `__tests__/engine/tuning.test.ts`                                                            |
+| `cd59688`    | `ticket/T-006-catalogs`          | `src/content/{skills,cannons,islands,ranks,crew}.json`, `src/content/index.ts`, `__tests__/content/catalogs.test.ts` |
+| `5ec09f6`    | `ticket/T-026-exact-distractors` | `src/content/schemas.ts` (1 line), `__tests__/content/schemas.test.ts`                                               |
 
 The three branches touched **strictly disjoint file sets** — T-006 and T-026 both live under
 `src/content/` but T-026's only source edit is `schemas.ts:81`, which T-006 never touches.
@@ -55,20 +55,20 @@ T-006's loaders) predates the wave.
 
 Run on the fully merged tree at `5ec09f6`.
 
-| Gate | Command | Exit | Key output |
-| --- | --- | --- | --- |
-| Tier-1 local gates | `.tdd-swarm/run-local-gates.sh` | **0** | `== ALL LOCAL GATES PASS ==` |
-| ├ format | `npx prettier --check .` | 0 | `PASS  format` |
-| ├ lint | `npx eslint . --max-warnings 0` | 0 | `PASS  lint` |
-| ├ typecheck | `npx tsc --noEmit` | 0 | `PASS  typecheck` |
-| ├ unit | `npx vitest run` | 0 | `PASS  unit` |
-| ├ no-todos | grep `TODO\|FIXME\|HACK` | 0 | `PASS  no-todos` |
-| ├ no-skipped-tests | grep `.skip\|.only` | 0 | `PASS  no-skipped-tests` |
-| └ engine-purity | grep react/RN/expo/firebase in `src/engine` | 0 | `PASS  engine-purity` |
-| spec-lint T-004 | `.tdd-swarm/spec-lint.sh tickets/T-004.md` | **0** | `== SPEC-LINT PASS ==` — 12/12 AC covered |
-| spec-lint T-006 | `.tdd-swarm/spec-lint.sh tickets/T-006.md` | **0** | `== SPEC-LINT PASS ==` — 14/14 AC covered |
-| spec-lint T-026 | `.tdd-swarm/spec-lint.sh tickets/T-026.md` | **0** | `== SPEC-LINT PASS ==` — 5/5 AC covered |
-| dep-audit | `npm audit --audit-level=high` | **0** | `found 0 vulnerabilities` |
+| Gate               | Command                                     | Exit  | Key output                                |
+| ------------------ | ------------------------------------------- | ----- | ----------------------------------------- |
+| Tier-1 local gates | `.tdd-swarm/run-local-gates.sh`             | **0** | `== ALL LOCAL GATES PASS ==`              |
+| ├ format           | `npx prettier --check .`                    | 0     | `PASS  format`                            |
+| ├ lint             | `npx eslint . --max-warnings 0`             | 0     | `PASS  lint`                              |
+| ├ typecheck        | `npx tsc --noEmit`                          | 0     | `PASS  typecheck`                         |
+| ├ unit             | `npx vitest run`                            | 0     | `PASS  unit`                              |
+| ├ no-todos         | grep `TODO\|FIXME\|HACK`                    | 0     | `PASS  no-todos`                          |
+| ├ no-skipped-tests | grep `.skip\|.only`                         | 0     | `PASS  no-skipped-tests`                  |
+| └ engine-purity    | grep react/RN/expo/firebase in `src/engine` | 0     | `PASS  engine-purity`                     |
+| spec-lint T-004    | `.tdd-swarm/spec-lint.sh tickets/T-004.md`  | **0** | `== SPEC-LINT PASS ==` — 12/12 AC covered |
+| spec-lint T-006    | `.tdd-swarm/spec-lint.sh tickets/T-006.md`  | **0** | `== SPEC-LINT PASS ==` — 14/14 AC covered |
+| spec-lint T-026    | `.tdd-swarm/spec-lint.sh tickets/T-026.md`  | **0** | `== SPEC-LINT PASS ==` — 5/5 AC covered   |
+| dep-audit          | `npm audit --audit-level=high`              | **0** | `found 0 vulnerabilities`                 |
 
 Spec-lint's reverse direction (every test file must cite at least one criterion) also passed
 on all three runs, so no wave-2 test file is uncited.
@@ -92,12 +92,12 @@ on all three runs, so no wave-2 test file is uncited.
 The dispatch brief forecast **774** = 492 + 68 + 209 + 5. Actual is **776**. The +2 is fully
 accounted for and **legitimate** — it is not an unexplained test appearing or disappearing:
 
-| Source | Forecast | Actual | Reconciliation |
-| --- | --- | --- | --- |
-| Wave 1 baseline | 492 | 492 | `1 + 26 + 90 + 41 + 334` — unchanged |
-| T-026 | +5 | +5 | `schemas.test.ts` 90 → 95 |
-| T-006 | +209 | +209 | exact |
-| T-004 | +68 | **+70** | **AC-12 re-freeze, see below** |
+| Source          | Forecast | Actual  | Reconciliation                       |
+| --------------- | -------- | ------- | ------------------------------------ |
+| Wave 1 baseline | 492      | 492     | `1 + 26 + 90 + 41 + 334` — unchanged |
+| T-026           | +5       | +5      | `schemas.test.ts` 90 → 95            |
+| T-006           | +209     | +209    | exact                                |
+| T-004           | +68      | **+70** | **AC-12 re-freeze, see below**       |
 
 The T-004 forecast of 68 was taken from `progress.md:535`/`:648`, which record the suite size at
 **first** freeze. After first freeze, the independent code review found `ONBOARDING_ENEMY_HULL = 24`
@@ -139,7 +139,7 @@ time both sides exist together.
 - The two keysets are **exactly equal**, and both equal `ISLAND_IDS`:
   `port_sumwich, isla_products, quotient_cove, fraction_reef, grandline`.
 - Hull grows monotonically along the catalog's own `order` field: `45 → 60 → 75 → 95 → 120`.
-  (T-004's own test asserted monotonicity against a *hardcoded* island order; this is the first
+  (T-004's own test asserted monotonicity against a _hardcoded_ island order; this is the first
   check of it against the order T-006 actually authored.)
 
 `port_sumwich = 45` also lands inside ARCHITECTURE §4.3's documented "starter sloops 40–50".
@@ -176,12 +176,12 @@ not exist in T-004's worktree), so they hardcoded the Swivel's `8`/`12` damage r
 That assumption had never been checked against the catalog. Closing that loop is the single most
 load-bearing assertion in this report.
 
-| Check | Result |
-| --- | --- |
-| Catalog `swivel_gun.damageMin` | **8** — matches T-004's hardcoded literal |
-| Catalog `swivel_gun.damageMax` | **12** — matches T-004's hardcoded literal |
-| `ONBOARDING_ENEMY_HULL` | 28 |
-| Floor volley `ceil(8 + 0.35·(12−8))` | 10 → `2×10 = 20 < 28 ≤ 30 = 3×10` ⇒ **3 volleys** |
+| Check                                               | Result                                            |
+| --------------------------------------------------- | ------------------------------------------------- |
+| Catalog `swivel_gun.damageMin`                      | **8** — matches T-004's hardcoded literal         |
+| Catalog `swivel_gun.damageMax`                      | **12** — matches T-004's hardcoded literal        |
+| `ONBOARDING_ENEMY_HULL`                             | 28                                                |
+| Floor volley `ceil(8 + 0.35·(12−8))`                | 10 → `2×10 = 20 < 28 ≤ 30 = 3×10` ⇒ **3 volleys** |
 | Best volley `damageMax + PERFECT_SHOT_BONUS_DAMAGE` | 13 → `2×13 = 26 < 28 ≤ 39 = 3×13` ⇒ **3 volleys** |
 
 The decisive check simulates **every legal per-volley damage for a correct answer**, 10 through 13
@@ -203,10 +203,10 @@ Judged against ARCHITECTURE.md §4.1, §4.3 (tuning as the single home for every
 
 ### Module placement vs §8 — CONFORMS
 
-| §8 declares | Wave 2 ships | Verdict |
-| --- | --- | --- |
-| `src/engine/tuning.ts` — "every magic number, one file" | `src/engine/tuning.ts` | ✅ exact |
-| `src/content/` — "JSON catalogs + zod schemas" | `{skills,cannons,islands,ranks,crew}.json`, `schemas.ts`, `index.ts` | ✅ |
+| §8 declares                                             | Wave 2 ships                                                         | Verdict  |
+| ------------------------------------------------------- | -------------------------------------------------------------------- | -------- |
+| `src/engine/tuning.ts` — "every magic number, one file" | `src/engine/tuning.ts`                                               | ✅ exact |
+| `src/content/` — "JSON catalogs + zod schemas"          | `{skills,cannons,islands,ranks,crew}.json`, `schemas.ts`, `index.ts` | ✅       |
 
 `tuning.ts` depends on `@content/schemas` only via `import type`, so the import is fully erased at
 runtime and zod never enters the engine module graph — the engine-purity gate confirms this.
@@ -220,16 +220,16 @@ src/engine/tuning.ts:120           export const CHOICE_COUNT = 4;   (T-004, wave
 src/engine/questions/types.ts:44   const CHOICE_COUNT = 4;          (T-003, wave 1 — module-local)
 ```
 
-§4.3 states the rule absolutely: *"All tuning constants live in one file, `engine/tuning.ts`"*, and
-§8 repeats it: *"every magic number, one file"*. `tickets/T-004.md:50` explicitly claims
+§4.3 states the rule absolutely: _"All tuning constants live in one file, `engine/tuning.ts`"_, and
+§8 repeats it: _"every magic number, one file"_. `tickets/T-004.md:50` explicitly claims
 `CHOICE_COUNT` for `tuning.ts`. When T-003 shipped, `tuning.ts` did not yet exist, so its private
 copy was unavoidable and correct at the time. Wave 2 creates the duplication — **two sources of
 truth for the same number, with no ticket assigned to collapse them.** T-005 and T-007 both consume
 `CHOICE_COUNT` from T-004, so `types.ts` will keep its shadow copy indefinitely unless this is fixed.
 
 **Why it matters concretely, beyond tidiness.** §4.3's stated purpose for the one-file rule is the
-hidden dev slider screen: *"exposed on the hidden dev screen (`app/dev.tsx`) as sliders — this is how
-day 5 tuning happens without rebuilds."* Moving `CHOICE_COUNT` on that slider changes `tuning.ts`
+hidden dev slider screen: _"exposed on the hidden dev screen (`app/dev.tsx`) as sliders — this is how
+day 5 tuning happens without rebuilds."_ Moving `CHOICE_COUNT` on that slider changes `tuning.ts`
 only; `assertQuestion` keeps validating against its own hardcoded `4` and throws
 `INVALID_QUESTION` on every generated question. The failure is loud rather than silent, but it
 defeats the exact capability §4.3 built the rule to protect.
@@ -243,7 +243,7 @@ change with no behavioural difference at the current value. **Must not be closed
 
 ### CLOSED — wave 1's escalated Minor finding
 
-Wave 1 escalated: *"`templateSchema` is looser than §4.1 on distractor count"* — §4.1 requires
+Wave 1 escalated: _"`templateSchema` is looser than §4.1 on distractor count"_ — §4.1 requires
 "one correct answer plus three engineered distractors" while `schemas.ts` implemented `.min(3)`,
 letting a 4-distractor template parse only to be rejected later by `assertQuestion`. **T-026 closes
 this**, and Probe C proves it closed on the merged tree. The owner chose the "tighten to `.length(3)`
@@ -252,9 +252,9 @@ which is where §4.1 put the catch, rather than late at generation time.
 
 ### NOT drift — `templateSchema` tightening to `.length(3)` — no doc amendment needed
 
-§4.1's **prose** already fixes the count twice: *"one correct answer plus three engineered
-distractors"* and *"compute answer + three distractors"*, under a heading that declares four-choice
-taps *universally*. `CHOICE_COUNT = 4` in `tuning.ts` agrees. The `distractors: string[]` in §4.1's
+§4.1's **prose** already fixes the count twice: _"one correct answer plus three engineered
+distractors"_ and _"compute answer + three distractors"_, under a heading that declares four-choice
+taps _universally_. `CHOICE_COUNT = 4` in `tuning.ts` agrees. The `distractors: string[]` in §4.1's
 TypeScript sketch is an illustrative type signature, not a cardinality specification — TS cannot
 express a fixed-length array idiomatically there anyway, and the adjacent comment carries a
 three-element example. `.length(3)` **encodes the documented prose exactly**; this is code moving
@@ -263,7 +263,7 @@ into alignment with the architecture, not away from it. Below the doc's altitude
 ### NOT drift — `ExprErrorCode`'s 7th member (`NON_FINITE_VALUE`) — no doc amendment needed
 
 Concurring with wave 1's judgement, re-checked here and unchanged by wave 2. ARCHITECTURE.md
-describes T-002's subject only as a *"tiny safe evaluator over params"* and never enumerates an
+describes T-002's subject only as a _"tiny safe evaluator over params"_ and never enumerates an
 error taxonomy anywhere. There is no documented contract to drift from. An error taxonomy is an
 implementation-level concern the architecture deliberately does not reach down to; a sharper one
 honours the doc's actual commitment (a safe evaluator that fails rather than mis-evaluates). Below
@@ -288,17 +288,17 @@ Audited explicitly, since this is §4.3's core rule and wave 2 is the wave that 
 
 ### Minor doc-completeness note (not a wave-2 defect)
 
-§4.4 enumerates `src/content/` as holding *"`cannons.json`, `islands.json`, `crew.json`,
-`ranks.json`, `templates/<skill>.json`"* — it **omits `skills.json`**, which T-006 ships and which
+§4.4 enumerates `src/content/` as holding _"`cannons.json`, `islands.json`, `crew.json`,
+`ranks.json`, `templates/<skill>.json`"_ — it **omits `skills.json`**, which T-006 ships and which
 §4.1 clearly requires (the per-skill `symbolicOnly` flag, `SkillId`, per-skill grade bands all live
 there). The enumeration is itself at the doc's altitude, so its incompleteness is worth a one-line
 amendment when §4.4 is next touched. T-006 is right to ship the file; the doc is the incomplete
 party. `index.ts` is a loader, correctly below the enumeration's altitude, and `templates/<skill>.json`
 is legitimately absent until wave 5. Recording this as an observation, not charging it to any ticket.
 
-Also checked and clean: §4.4 says catalogs are *"zod-validated in a test"* while `index.ts` validates
-at **import time** and throws. §2 resolves this — *"runtime validation of all content catalogs at
-test time (and once at app boot in dev)"* — so import-time validation satisfies the documented
+Also checked and clean: §4.4 says catalogs are _"zod-validated in a test"_ while `index.ts` validates
+at **import time** and throws. §2 resolves this — _"runtime validation of all content catalogs at
+test time (and once at app boot in dev)"_ — so import-time validation satisfies the documented
 contract and is strictly stronger than the §4.4 phrasing alone. Not drift.
 
 ---

@@ -4,6 +4,7 @@
 **Date:** 2026-07-27
 **Ticket:** `/Users/quietguy/Documents/Dev/Gauntlet/Math Game/tickets/T-003.md` (main repo copy, 20 ACs)
 **Tests under review:**
+
 - `/Users/quietguy/Documents/Dev/Gauntlet/cannon-wt/wt-T-003/__tests__/content/schemas.test.ts` (60 tests)
 - `/Users/quietguy/Documents/Dev/Gauntlet/cannon-wt/wt-T-003/__tests__/engine/questions/types.test.ts` (25 tests)
 
@@ -52,23 +53,23 @@ wraps it. I checked this specifically because a mis-parse here would silently ma
 **It is sound.** I compiled the helper side by side with the canonical parenthesised form and
 asserted equality of their results. The parse is as intended: TypeScript's `parseTypeWorker`
 takes the early `isStartOfFunctionTypeOrConstructorType()` branch for the `extends` operand, and
-the function's *return* type is parsed with conditionals re-enabled, so `T extends B ? 1 : 2` is
+the function's _return_ type is parsed with conditionals re-enabled, so `T extends B ? 1 : 2` is
 consumed as the return type and the trailing `? true : false` binds to the outer conditional.
 Empirically confirmed — all of these compile clean under the project's own compiler options:
 
-| Probe | Expected | Result |
-|---|---|---|
-| `Exact<string, string>` | `true` | ✅ |
-| `Exact<'a'\|'b', 'b'\|'a'>` | `true` | ✅ |
-| `Exact<string, string \| number>` | `false` | ✅ |
-| `Exact<any, string>` | `false` | ✅ |
-| `Exact<unknown, string>` / `Exact<string, unknown>` | `false` | ✅ |
-| `Exact<string, never>` | `false` | ✅ |
-| `Exact<boolean, boolean \| undefined>` | `false` | ✅ (the AC-15 `isWordProblem` check bites) |
-| `Exact<{a?: 1}, {a: 1\|undefined}>` | `false` | ✅ |
-| `Exact<Readonly<Mut>, Mut>` where `Mut` has mutable props | `false` | ✅ (the AC-15/16 readonly check bites) |
-| `Exact<Readonly<Ro>, Ro>` where `Ro` is already readonly | `true` | ✅ (a correct impl passes) |
-| `Exact<Exact<X,Y>, ExactParen<X,Y>>` for 3 cases | `true` | ✅ (unparenthesised ≡ canonical) |
+| Probe                                                     | Expected | Result                                     |
+| --------------------------------------------------------- | -------- | ------------------------------------------ |
+| `Exact<string, string>`                                   | `true`   | ✅                                         |
+| `Exact<'a'\|'b', 'b'\|'a'>`                               | `true`   | ✅                                         |
+| `Exact<string, string \| number>`                         | `false`  | ✅                                         |
+| `Exact<any, string>`                                      | `false`  | ✅                                         |
+| `Exact<unknown, string>` / `Exact<string, unknown>`       | `false`  | ✅                                         |
+| `Exact<string, never>`                                    | `false`  | ✅                                         |
+| `Exact<boolean, boolean \| undefined>`                    | `false`  | ✅ (the AC-15 `isWordProblem` check bites) |
+| `Exact<{a?: 1}, {a: 1\|undefined}>`                       | `false`  | ✅                                         |
+| `Exact<Readonly<Mut>, Mut>` where `Mut` has mutable props | `false`  | ✅ (the AC-15/16 readonly check bites)     |
+| `Exact<Readonly<Ro>, Ro>` where `Ro` is already readonly  | `true`   | ✅ (a correct impl passes)                 |
+| `Exact<Exact<X,Y>, ExactParen<X,Y>>` for 3 cases          | `true`   | ✅ (unparenthesised ≡ canonical)           |
 
 `IsReadonlyArray<T> = T extends unknown[] ? false : true` (`schemas.test.ts:48`) is also correct:
 `true` for `as const` tuples and for `readonly string[]`, `false` for `string[]`. It admits a
@@ -77,7 +78,7 @@ plain `readonly SkillId[]` rather than strictly an `as const` tuple, but the com
 is no hole.
 
 **One limitation worth recording** (not a defect, and separately covered): `Exact<Readonly<T>, T>`
-compares property *modifiers* only. It cannot see whether an array-typed property is
+compares property _modifiers_ only. It cannot see whether an array-typed property is
 `readonly Choice[]` or `Choice[]` — I confirmed `Exact<Readonly<{readonly c: X[]}>, {readonly c: X[]}>`
 is `true`. That gap is closed by accident-of-good-design at `types.test.ts:19`
 (`const FOUR_CHOICES: readonly Choice[]`): mutating `Question.choices` to `Choice[]` produced
@@ -93,7 +94,7 @@ three `TS4104` errors. Credit where due — that fixture is doing real work.
 `schemas.test.ts:85-91` (`minGrade: 0, maxGrade: 1`).
 
 **What is wrong.** AC-7 gets this exactly right for cannon damage — `schemas.test.ts:394` rejects
-`damageMax < damageMin` and `schemas.test.ts:400` *accepts* `damageMax === damageMin`. AC-10 is
+`damageMax < damageMin` and `schemas.test.ts:400` _accepts_ `damageMax === damageMin`. AC-10 is
 worded in parallel but the equality boundary is missing. The four skill tests are: accept `(0,1)`,
 reject `(3,2)`, reject `minGrade: -1`, reject `maxGrade: 6`. A refinement written
 `s.maxGrade > s.minGrade` satisfies every one of them.
@@ -107,7 +108,7 @@ cannon damage refine: damageMax > damageMin       Tests  1 failed | 84 passed   
 ```
 
 **The cheat this permits, and why it lands two waves later.** `tickets/T-006.md:117-118` (AC-6)
-requires *every authored skill* to satisfy `0 <= minGrade <= maxGrade <= 5`, and T-006 AC-11
+requires _every authored skill_ to satisfy `0 <= minGrade <= maxGrade <= 5`, and T-006 AC-11
 requires each cannon's `[minGrade, maxGrade]` to equal its skill's. Single-grade skills are
 therefore legal, expected content — `fractions_int` or `multi_digit_order_ops` pinned to one grade
 is entirely plausible. T-006 authors `skills.json` against a frozen `schemas.ts` it cannot edit.
@@ -133,25 +134,25 @@ returns `success: true`"), so the test and the criterion agree.
 
 ### C2. Every id-union field except `template.skill` is unpinned
 
-**Where:** `schemas.test.ts:245-252` is the *only* test that rejects a value outside an id union
+**Where:** `schemas.test.ts:245-252` is the _only_ test that rejects a value outside an id union
 (`template.skill`). No test rejects a bad value for:
 
-| Schema field | Contract (ticket required-shapes) | Reject test |
-|---|---|---|
-| `skillSchema.id` | `SkillId` | ❌ none |
-| `cannonSchema.id` | `CannonId` | ❌ none |
-| `cannonSchema.skill` | `SkillId` | ❌ none |
-| `cannonSchema.temperament` | `Temperament` | ❌ none |
-| `islandSchema.id` | `IslandId` | ❌ none |
-| `islandSchema.rangeSkills` | `SkillId[]` | ❌ none |
-| `islandSchema.unlocksCannons` | `CannonId[]` | ❌ none |
-| `islandSchema.requiresIsland` | `IslandId?` | ❌ none (`schemas.test.ts:527` only accepts a valid one) |
-| `rankSchema.id` | `RankId` | ❌ none |
-| `unlock.island` (range variant) | `IslandId` | ❌ none |
+| Schema field                    | Contract (ticket required-shapes) | Reject test                                              |
+| ------------------------------- | --------------------------------- | -------------------------------------------------------- |
+| `skillSchema.id`                | `SkillId`                         | ❌ none                                                  |
+| `cannonSchema.id`               | `CannonId`                        | ❌ none                                                  |
+| `cannonSchema.skill`            | `SkillId`                         | ❌ none                                                  |
+| `cannonSchema.temperament`      | `Temperament`                     | ❌ none                                                  |
+| `islandSchema.id`               | `IslandId`                        | ❌ none                                                  |
+| `islandSchema.rangeSkills`      | `SkillId[]`                       | ❌ none                                                  |
+| `islandSchema.unlocksCannons`   | `CannonId[]`                      | ❌ none                                                  |
+| `islandSchema.requiresIsland`   | `IslandId?`                       | ❌ none (`schemas.test.ts:527` only accepts a valid one) |
+| `rankSchema.id`                 | `RankId`                          | ❌ none                                                  |
+| `unlock.island` (range variant) | `IslandId`                        | ❌ none                                                  |
 
 **Confirmed:** an implementation using `z.string()` for all ten passes 85/85 with `tsc --noEmit`
 clean. The happy-path assertions (`schemas.test.ts:382-392`, `512-519`, `540-546`) only read values
-back, and `const parsed: Cannon = cannonSchema.parse(...)` constrains nothing — assignment *to* a
+back, and `const parsed: Cannon = cannonSchema.parse(...)` constrains nothing — assignment _to_ a
 type is not a pin.
 
 **The cheat and its blast radius.** The whole point of this ticket is the id vocabulary
@@ -161,8 +162,8 @@ type is not a pin.
 `SkillId` gets a type error against a file it cannot edit; same for T-009 (`RankId`) and T-013.
 That is the "shape pinned wrongly propagates everywhere" case the review brief names.
 
-Note that T-006 AC-9 does referential-integrity checking on the *data*, so a typo in `islands.json`
-is eventually caught — but one wave later, and only for data. The *type* damage is permanent.
+Note that T-006 AC-9 does referential-integrity checking on the _data_, so a typo in `islands.json`
+is eventually caught — but one wave later, and only for data. The _type_ damage is permanent.
 
 **Fix.** One reject case per row, using the existing `withOverrides` helper — e.g.
 
@@ -171,7 +172,9 @@ it('spec(T-003:AC-1) cannonSchema rejects a skill outside SkillId', () => {
   expect(cannonSchema.safeParse(withOverrides(VALID_CANNON, { skill: 'algebra_ii' })).success).toBe(false);
 });
 it('spec(T-003:AC-1) islandSchema rejects a rangeSkills entry outside SkillId', () => {
-  expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { rangeSkills: ['algebra_ii'] })).success).toBe(false);
+  expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { rangeSkills: ['algebra_ii'] })).success).toBe(
+    false,
+  );
 });
 ```
 
@@ -181,7 +184,7 @@ which is stronger because it survives any future runtime-only refactor.
 
 ---
 
-### C3. `Question`'s field *types* are unpinned except `isWordProblem` / `readAloud`
+### C3. `Question`'s field _types_ are unpinned except `isWordProblem` / `readAloud`
 
 **Where:** `__tests__/engine/questions/types.test.ts:191-198` pins `keyof Question`;
 `types.test.ts:232-242` pins the two booleans; `types.test.ts:244-248` pins readonly modifiers.
@@ -204,7 +207,7 @@ types, so nothing notices.
 thinner shape frozen here would block T-007 two waves later." That is exactly what
 `params: Record<string, unknown>` does: T-017/T-020 doing arithmetic on `question.params[k]` get
 `unknown`, and cannot fix the declaration. `skill: string` breaks anything that needs `SkillId`.
-AC-15 as written only demands the key *set* and the two boolean types — but the required-shapes
+AC-15 as written only demands the key _set_ and the two boolean types — but the required-shapes
 block is the contract, and the tests are what make it binding.
 
 **Fix.** In `types.test.ts`, import `SkillId` from `@content/schemas` and add:
@@ -217,8 +220,14 @@ it('spec(T-003:AC-15) pins the type of every contract field', () => {
   const paramsAreNumbers: Exact<Question['params'], Readonly<Record<string, number>>> = true;
   const choicesAreReadonly: Exact<Question['choices'], readonly Choice[]> = true;
   const correctIndexIsNumber: Exact<Question['correctIndex'], number> = true;
-  expect([templateIdIsString, skillIsSkillId, textIsString, paramsAreNumbers,
-          choicesAreReadonly, correctIndexIsNumber]).toEqual([true, true, true, true, true, true]);
+  expect([
+    templateIdIsString,
+    skillIsSkillId,
+    textIsString,
+    paramsAreNumbers,
+    choicesAreReadonly,
+    correctIndexIsNumber,
+  ]).toEqual([true, true, true, true, true, true]);
 });
 ```
 
@@ -240,7 +249,7 @@ asserts each cannon's grade pair equals its skill's. **Confirmed:** declaring bo
 `maxGrade: 7` would validate cleanly.
 
 **Fix.** Mirror the skillSchema tests: reject `minGrade: -1`, reject `maxGrade: 6`, reject a
-non-integer grade. (Cannon grade *ordering* is not required by any AC — do not add it, or add an
+non-integer grade. (Cannon grade _ordering_ is not required by any AC — do not add it, or add an
 AC first.)
 
 ### I2. Integrality is tested on exactly one numeric field
@@ -281,11 +290,11 @@ entire purpose is to be a stable escape hatch for open question 2.10 — a fuzzy
 
 ### I5. (Process) The worktree's ticket copy is stale — L-008 recurrence
 
-`cannon-wt/wt-T-003/tickets/T-003.md` carries **17** ACs. It is missing AC-18, AC-19, AC-20 *and*
+`cannon-wt/wt-T-003/tickets/T-003.md` carries **17** ACs. It is missing AC-18, AC-19, AC-20 _and_
 the "Exported id-array names — locked by the orchestrator" block. The tests were correctly written
 against the newer main-repo copy, so the tests are fine — but the implementer dispatched into that
 worktree will read a superseded contract, and `.tdd-swarm/spec-lint.sh` run inside the worktree
-enumerates ACs from the *ticket*, so it would report green on 17/17 while three criteria go
+enumerates ACs from the _ticket_, so it would report green on 17/17 while three criteria go
 unchecked.
 
 **Fix.** Sync the ticket file into the worktree before dispatching, and re-run spec-lint there.
@@ -352,11 +361,11 @@ none can be `z.any()`.
 **All three cross-field refinements have accept AND reject cases, and no-op refinements die.**
 This is the specific concern the brief raised, and the suite handles it correctly:
 
-| Refinement | `() => true` (no-op) | `() => false` (always reject) |
-|---|---|---|
-| `damageMax >= damageMin` | 1 failed | 1 failed |
-| reliable ⇒ no recoil | 1 failed | 7 failed |
-| grade ordering | 1 failed | 1 failed |
+| Refinement               | `() => true` (no-op) | `() => false` (always reject) |
+| ------------------------ | -------------------- | ----------------------------- |
+| `damageMax >= damageMin` | 1 failed             | 1 failed                      |
+| reliable ⇒ no recoil     | 1 failed             | 7 failed                      |
+| grade ordering           | 1 failed             | 1 failed                      |
 
 (The only refinement defect is C1 — the `>`/`>=` boundary, not a no-op.)
 
@@ -391,16 +400,16 @@ positives here; every type-level const is consumed by an `expect`.
 
 ## Summary of required changes before freeze
 
-| # | Severity | File | Change |
-|---|---|---|---|
-| C1 | Critical | `schemas.test.ts` ~377 | Accept case for `minGrade === maxGrade`; amend AC-10 wording to match AC-7 |
-| C2 | Critical | `schemas.test.ts` | Reject case per id-union field (10 fields), or `Exact<>` pins on the derived types |
-| C3 | Critical | `types.test.ts` | `Exact<>` pins for `templateId`, `skill`, `text`, `params`, `correctIndex` (import `SkillId`) |
-| I1 | Important | `schemas.test.ts` ~507 | Cannon `minGrade`/`maxGrade` bound + integer rejects |
-| I2 | Important | `schemas.test.ts` | Non-integer reject for the 9 untested `int` fields |
-| I3 | Important | `schemas.test.ts` | Non-string reject for `distractors` / `constraints` elements |
-| I4 | Important | `schemas.test.ts` ~334 | `difficulty: 2.5` reject (or literal-union `Exact<>` pin) |
-| I5 | Important | worktree | Sync `tickets/T-003.md` into `wt-T-003` before dispatch; re-run spec-lint |
+| #   | Severity  | File                   | Change                                                                                        |
+| --- | --------- | ---------------------- | --------------------------------------------------------------------------------------------- |
+| C1  | Critical  | `schemas.test.ts` ~377 | Accept case for `minGrade === maxGrade`; amend AC-10 wording to match AC-7                    |
+| C2  | Critical  | `schemas.test.ts`      | Reject case per id-union field (10 fields), or `Exact<>` pins on the derived types            |
+| C3  | Critical  | `types.test.ts`        | `Exact<>` pins for `templateId`, `skill`, `text`, `params`, `correctIndex` (import `SkillId`) |
+| I1  | Important | `schemas.test.ts` ~507 | Cannon `minGrade`/`maxGrade` bound + integer rejects                                          |
+| I2  | Important | `schemas.test.ts`      | Non-integer reject for the 9 untested `int` fields                                            |
+| I3  | Important | `schemas.test.ts`      | Non-string reject for `distractors` / `constraints` elements                                  |
+| I4  | Important | `schemas.test.ts` ~334 | `difficulty: 2.5` reject (or literal-union `Exact<>` pin)                                     |
+| I5  | Important | worktree               | Sync `tickets/T-003.md` into `wt-T-003` before dispatch; re-run spec-lint                     |
 
 Estimated ~25 assertions, all using helpers and fixtures that already exist. C1 alone is worth the
 round trip: it is a one-line test that separates a correct implementation from one that will fail

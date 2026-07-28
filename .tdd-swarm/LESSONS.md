@@ -15,7 +15,7 @@ violating file and confirming ESLint errored — before any ticket relied on the
 **Why:** A misconfigured `no-restricted-imports` glob fails silently. Every ticket
 downstream would inherit false confidence that the engine stayed pure.
 
-**What to do instead:** Any gate that exists to *prevent* something must be shown
+**What to do instead:** Any gate that exists to _prevent_ something must be shown
 going red on a synthetic violation at setup time. A guard never observed failing
 is an assumption, not a gate.
 
@@ -51,7 +51,7 @@ Reach for `--force` only when the direct dependency itself is the vulnerable one
 
 ---
 
-## L-004 — Same-wave tickets that share an *interface* break parallel dispatch (Phase 1)
+## L-004 — Same-wave tickets that share an _interface_ break parallel dispatch (Phase 1)
 
 **Pattern:** A ticket was scheduled in the same wave as the ticket owning the file it
 imports, with no dependency edge. File scopes did not overlap, so the mechanical
@@ -62,8 +62,8 @@ earlier than the code.
 **Why:** "Exclusive file scopes" is necessary but NOT sufficient for parallel dispatch.
 Exclusivity prevents write collisions; it says nothing about read dependencies.
 
-**What to do instead:** For every same-wave pair, ask what each ticket *imports*, not
-just what it *writes*. Any cross-ticket import inside a wave needs a dependency edge.
+**What to do instead:** For every same-wave pair, ask what each ticket _imports_, not
+just what it _writes_. Any cross-ticket import inside a wave needs a dependency edge.
 Validate the graph the code implies, not only the graph the plan declares.
 
 ---
@@ -81,7 +81,7 @@ fabricating numbers, but the bounds themselves are a contract. A too-permissive 
 as much a defect as a wrong value, and far harder to trace.
 
 **What to do instead:** When a ticket pins bounds rather than a value, check every
-downstream consumer's guarantees against the *worst legal value* in that range —
+downstream consumer's guarantees against the _worst legal value_ in that range —
 especially degenerate inputs (zero, empty, equal operands). If the worst legal value
 breaks a consumer, tighten the bound in the ticket that owns the constant.
 
@@ -95,7 +95,7 @@ An implementation setting it to `0.001` would pass every acceptance criterion wh
 making the mechanic statistically undetectable in play.
 
 **Why:** Monotonicity proves a direction, not a magnitude. For any mechanic that must be
-*perceptible*, direction is not the requirement — effect size is.
+_perceptible_, direction is not the requirement — effect size is.
 
 **What to do instead:** When a criterion protects something a user must actually notice,
 assert an effect size over seeded samples, not just an inequality. Ask of every AC:
@@ -126,7 +126,7 @@ is not installed, whatever the settings file says. Corollary of [[L-001]].
 
 **Pattern:** Wave-1 worktrees were created with `git worktree add` while the Planner's
 latest ticket revisions still sat uncommitted in the main working tree. `git worktree add`
-branches from the *commit*, not the working tree, so the worktrees silently received the
+branches from the _commit_, not the working tree, so the worktrees silently received the
 previous revision of every ticket file. It happened to be harmless — the three wave-1
 tickets were byte-identical across the two revisions — but only by luck.
 
@@ -189,10 +189,10 @@ to; it is the reading an implementer will default to under time pressure.
 ## L-011 — Prove a frozen suite against a throwaway reference implementation (Phase 2)
 
 **Pattern:** Two Test Agents, independently, built a scratch implementation outside `src/`,
-ran the frozen suite against it to prove every criterion was *satisfiable* and every
+ran the frozen suite against it to prove every criterion was _satisfiable_ and every
 hand-computed expected value correct, then deliberately mutated that reference to prove each
 assertion had teeth — and deleted it. This caught a criterion that AC text alone made look
-fine, and confirmed that assertions which merely *looked* strong actually failed on a wrong
+fine, and confirmed that assertions which merely _looked_ strong actually failed on a wrong
 implementation.
 
 **Why:** A red suite proves only that code is missing. It cannot distinguish a correct
@@ -212,22 +212,23 @@ and it must be deleted before commit.
 **Pattern:** Every Critical finding in wave 1 had the same shape — a test that constrained an
 aggregate while leaving the mechanism free:
 
-| Assertion | What it measured | What slipped through |
-|---|---|---|
-| index-0 distribution uniform over 10,000 shuffles | one position | a shuffle that permutes only that position |
-| per-face counts perfect over 60,000 draws | the histogram | values from a module counter, not the seed |
-| every id field round-trips through the schema | runtime values | `z.string()`, collapsing the derived type to `string` |
+| Assertion                                         | What it measured | What slipped through                                  |
+| ------------------------------------------------- | ---------------- | ----------------------------------------------------- |
+| index-0 distribution uniform over 10,000 shuffles | one position     | a shuffle that permutes only that position            |
+| per-face counts perfect over 60,000 draws         | the histogram    | values from a module counter, not the seed            |
+| every id field round-trips through the schema     | runtime values   | `z.string()`, collapsing the derived type to `string` |
 
 Each looks rigorous — large samples, tight bands, real numbers. But an aggregate is a
-*projection* of behaviour, and a cheat only has to match the projection, which is a far weaker
+_projection_ of behaviour, and a cheat only has to match the projection, which is a far weaker
 obligation than being correct.
 
 **Why:** Big-N statistical tests feel like strong evidence, so they suppress the instinct to ask
 "what else satisfies this?" The tightness of the band is irrelevant when the cheat sits inside it
 by construction.
 
-**What to do instead:** For any aggregate assertion, ask what the *weakest* implementation
+**What to do instead:** For any aggregate assertion, ask what the _weakest_ implementation
 satisfying it looks like, and write it. Then assert the property that actually matters:
+
 - distribution over one position → **the full permutation set**
 - the output histogram → **purity: same input twice, same output**
 - runtime round-trip → **the derived type itself**
@@ -246,14 +247,14 @@ each expression to JavaScript and runs it via
 **229/229 frozen tests, `tsc` exit 0, and `eslint` exit 0.**
 
 Probing eight spellings against the real config, the lint rules caught **3 of 8**. They match the
-*bindings* literally named `eval` and `Function`; they do not follow aliasing, computed member
+_bindings_ literally named `eval` and `Function`; they do not follow aliasing, computed member
 access, or reflection. Adding `no-restricted-globals: Function` and
 `no-restricted-properties: Reflect.construct` raised it to 6 of 8. The last two —
 `globalThis['ev'+'al']` and `Object.getPrototypeOf(function(){}).constructor` — are not reachable
 by static lint at all.
 
-**Why:** Both defences check *how the threat is written*. The threat is defined by *what happens
-at runtime*, and the set of ways to spell it is open. Any enumeration of spellings is a
+**Why:** Both defences check _how the threat is written_. The threat is defined by _what happens
+at runtime_, and the set of ways to spell it is open. Any enumeration of spellings is a
 denylist, and a denylist for an open set is a false sense of safety — worse than none, because it
 gets cited as the authoritative guard (this ticket's own AC text did exactly that).
 
@@ -262,7 +263,7 @@ importing the module under test — for code construction that is `globalThis.Fu
 `globalThis.eval`, `Reflect.construct` called with `Function`, and the `constructor` getter on
 `Function.prototype` — then assert no route is reached while the module still returns correct
 results. Static checks stay as cheap secondary defence, never as the authority. Generally: when a
-requirement is "X never happens", the test must make X *observable*, not make its common
+requirement is "X never happens", the test must make X _observable_, not make its common
 spellings unwriteable.
 
 ---
@@ -296,20 +297,20 @@ unobserved success.
 
 1. An implementer described a code path as "practically unreachable". A reviewer measured it:
    the path threw for **37 of 50 seeds** on a legal input.
-2. A reviewer then proved a *different* path unreachable with a clean argument (two accumulators
+2. A reviewer then proved a _different_ path unreachable with a clean argument (two accumulators
    summing in the same order are bit-identical, and `nextFloat < 1` forces `target < total`).
    On re-review it disproved its own proof: finite weights can sum to `Infinity` by overflow, and
    at the denormal floor rounding is **absolute** rather than relative, so `f × total` can round
    up to exactly `total`. Measured: 3000/3000 and 1496/3000.
 
-**Why:** Reachability arguments are about the *whole input domain*, and the interesting inputs
+**Why:** Reachability arguments are about the _whole input domain_, and the interesting inputs
 live at the boundaries — overflow, denormals, `undefined` elements, empty collections. Reasoning
 about "normal" inputs and generalising is the default failure. Floating point is especially
 hostile: relative-error intuitions silently break at the denormal floor.
 
 **What to do instead:** Treat "this cannot happen" as a testable claim. Write the probe that
 tries to make it happen, sweeping the degenerate end of the domain. If the probe cannot reach it,
-say so with the probe attached. And when a path is unreachable only for *your current callers*,
+say so with the probe attached. And when a path is unreachable only for _your current callers_,
 write that — not "impossible" — because the caller set changes and the comment does not.
 
 ---
@@ -341,11 +342,11 @@ not measuring what it claims to measure.
 passes. Then a code review and a security review, working separately, found three defects — one
 Critical — that all lived on axes **nothing had ever varied**:
 
-| Axis | What every test used | What broke |
-|---|---|---|
-| Expression length | short expressions | a 4,000-term chain overflowed the stack, escaping as `RangeError` rather than the module's `ExprError` contract |
-| Literal magnitude | small numbers | `"9"×309` → `Infinity`; `"9"×400 - "9"×400` → `NaN` |
-| Environment value domain | small finite integers | `{a: Infinity}` → an infinite loop in `gcd`, unrecoverable |
+| Axis                     | What every test used  | What broke                                                                                                      |
+| ------------------------ | --------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Expression length        | short expressions     | a 4,000-term chain overflowed the stack, escaping as `RangeError` rather than the module's `ExprError` contract |
+| Literal magnitude        | small numbers         | `"9"×309` → `Infinity`; `"9"×400 - "9"×400` → `NaN`                                                             |
+| Environment value domain | small finite integers | `{a: Infinity}` → an infinite loop in `gcd`, unrecoverable                                                      |
 
 A fourth route surfaced only when a Test Agent went looking: `gcd(a * a, 2)` with `{a: 1e200}`,
 where the argument is finite **in the environment and as a literal** and becomes non-finite only
@@ -353,15 +354,15 @@ mid-evaluation. A guard at the input boundaries alone would not have caught it.
 
 **Why:** Tests are written case by case, and cases cluster around the shapes the author is
 picturing. Adding more cases in the same cluster raises the count without widening coverage.
-Every review had checked whether *behaviours* were covered; none had asked which *input
-dimensions* were being held constant. The implementer's own 36,792-call probe passed its "no
+Every review had checked whether _behaviours_ were covered; none had asked which _input
+dimensions_ were being held constant. The implementer's own 36,792-call probe passed its "no
 non-`ExprError` escaped" assertion **vacuously** — nothing in the corpus was long enough to
 overflow.
 
 **What to do instead:** Before freezing, enumerate the input **dimensions** — length, magnitude,
 sign, cardinality, nesting shape, value domain of every injected input — and confirm each is
 varied to its extreme, not merely represented. Where a value can be transformed mid-computation,
-check the *intermediate* domain too, not only the boundaries. And treat a passing assertion over
+check the _intermediate_ domain too, not only the boundaries. And treat a passing assertion over
 an unswept domain as no evidence at all.
 
 ---
@@ -395,7 +396,7 @@ legitimate when the constrained artefact is still editable at the point the cons
 **Pattern:** A ticket I wrote stated that the frozen test suite "currently asserts that a
 4-distractor template parses successfully", and on that basis **granted the Test Agent permission
 to edit a frozen test** — normally the most tightly guarded action in the system. The claim was
-false. It came from an integration report that had verified the *behaviour* with an ad-hoc probe
+false. It came from an integration report that had verified the _behaviour_ with an ad-hoc probe
 script, and I transcribed it as if the behaviour were encoded in a test.
 
 The Test Agent grepped every occurrence of the term across all four historical revisions of the
@@ -426,7 +427,7 @@ against an `Object.entries`-based implementation too: `tuning.ts`'s record happe
 keys in the same order as `CHEST_RARITIES`.
 
 The assertion was **true but vacuous**. It could not distinguish the correct implementation from
-the one it existed to forbid. Only a test that *reorders the source record* (via module mocking)
+the one it existed to forbid. Only a test that _reorders the source record_ (via module mocking)
 gives the guarantee teeth — and the agent confirmed the plain test's false pass first, before
 trusting the mocked test's catch.
 
@@ -436,7 +437,7 @@ the code is correct, and the guarantee is absent. It surfaces later, when someon
 record for readability and a downstream weighted draw silently mis-weights.
 
 **What to do instead:** When a test asserts that A is derived from B, ask whether A and B currently
-agree by *coincidence*. If they do, the test proves nothing until you perturb one of them. Mock the
+agree by _coincidence_. If they do, the test proves nothing until you perturb one of them. Mock the
 source into a different order, or construct a fixture where the two orderings genuinely differ.
 The general rule: **a test whose subject and expectation happen to agree today is measuring the
 coincidence, not the contract.**
