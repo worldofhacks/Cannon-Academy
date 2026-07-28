@@ -607,3 +607,47 @@ emails, paths or PII in the catalogs; dependencies unchanged.
 Informational, non-blocking: a malformed bundled catalog hard-crashes the module graph at import
 with no in-app recovery. Judged the right trade for developer-authored, CI-validated content, and
 the frozen suite asserts the shipped catalogs validate before reaching a device.
+
+**Ticket T-004: review-passed** (attempt 2, commit `6136bc3`, gates pass, wave 2)
+
+Code review found one Important: `ONBOARDING_ENEMY_HULL = 24` sank the tutorial sloop in **two**
+volleys, not the three PLAN.md:75 promises. In a guided duel that points at the correct tap the
+player is *always* inside the Perfect-Shot window, so each Swivel volley deals 13 and two reach 26.
+AC-12 pinned only a ceiling, and the frozen test reached for the floor but stopped one volley short
+— excluding a one-volley tutorial and omitting the Perfect-Shot bonus.
+
+**Fixed via spec → test → code, not a patch.** AC-12 amended to the window `[27, 30]`; the Test
+Agent tightened the floor **derived from `SWIVEL_DAMAGE_MAX + PERFECT_SHOT_BONUS_DAMAGE`** rather
+than hardcoded, and proved the derivation tracks: mutating the bonus `1 → 2` raises the floor and
+turns a previously-passing hull red. Boundary swept: RED at 24 and 26, GREEN at 27/28/30, RED at 31.
+
+Orchestrator verification of the shipped value, against the real catalog rather than assumed
+constants:
+
+```
+ONBOARDING_ENEMY_HULL = 28
+  Swivel best volley  = 13 -> 3 volleys   (needed >= 3)
+  Swivel floored-slow = 10 -> 3 volleys   (needed <= 3)
+  OLD value 24 at best speed -> 2 volleys  <- the defect
+  Culverin best volley = 17 -> 2 volleys   <- why T-018 must lock the Swivel
+  first real duel (port_sumwich 45) -> 4-5 volleys (PLAN: 4-6)
+```
+
+The tutorial now takes three volleys *however fast the child answers*, which is stronger than the
+criterion required.
+
+*Second orchestrator false alarm, recorded:* my verification probe guessed `SWIVEL_DAMAGE_MAX` as
+a `tuning.ts` export and produced `NaN`. Per-cannon damage correctly lives in the catalog, not
+tuning. The probe was wrong, not the code — the same shape as the JSON-import false alarm earlier
+in this wave. Verifying the verification is not optional.
+
+**WAVE 2 COMPLETE — all four tickets review-passed.**
+
+| ticket | deliverable | tests | ACs | attempts |
+|---|---|---|---|---|
+| T-004 | `engine/tuning.ts` (32 constants) | 68 | 12 | 2 |
+| T-006 | 5 catalogs + validated loaders | 209 | 16 | 2 |
+| T-026 | `templateSchema` exactly-3 distractors | 5 | 5 | 1 |
+
+Follow-ups filed to backlog: **T-025** (iterative walks in the evaluator), **T-027**
+(`validateCatalogs` set-level corruption).

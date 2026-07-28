@@ -53,7 +53,7 @@ Evidence: `.tdd-swarm/reports/wave1-integration.md`.
 
 | id | title | status | deps | branch | model | issue |
 |----|-------|--------|------|--------|-------|-------|
-| T-004 | Central tuning constants — every magic number in one file | backlog | T-003 | `ticket/T-004-tuning` | standard | — |
+| T-004 | Central tuning constants — every magic number in one file | review-passed | T-003 | `ticket/T-004-tuning` | standard | — |
 | T-006 | Catalog data (skills, cannons, islands, ranks, crew) and validated loaders | review-passed | T-003 | `ticket/T-006-catalogs` | standard | — |
 
 ## Wave 3 — the pure rule modules
