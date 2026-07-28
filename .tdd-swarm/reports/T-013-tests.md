@@ -54,7 +54,7 @@ sets, `RivalAction`, `RivalVolley`, `DuelResult`, `DuelTally`. `spec-lint.sh` ca
 | `@ts-expect-error` directives | 30 |
 | `Exact<>` assertions | 64 |
 | Negative control for `Exact<>` | Yes — an `Exact<>` that must resolve `false`, so a broken helper fails loudly rather than passing everything |
-| Commit | recorded below after commit |
+| Commit | `febe70c` (`febe70c5c5d688211c161dabf3b8872fea581137`) on `ticket/T-013-duel-types` |
 
 ---
 
