@@ -39,6 +39,21 @@
  *   - Identifier resolution, function resolution, arity and typing are all STATIC: they run over
  *     the whole tree before any value is computed, so a typo'd parameter in hand-authored content
  *     fails loudly even inside a short-circuited branch (AC-24).
+ *   - No non-finite number may enter, leave, or flow through an evaluation (AC-25). `gcd` is the
+ *     concrete hazard — `(NaN, NaN)` is a fixed point of the Euclid loop, so a single non-finite
+ *     argument would spin forever inside T-007's rejection-sampling loop, with no error and no
+ *     recovery.
+ *
+ * Two deterministic bounds keep the module total. Neither depends on how deep the host's stack
+ * happens to go, because that threshold is host-specific: measured on one machine, an operator
+ * chain overflowed at 4,688 terms; the code review bisected 4,562 and the orchestrator 4,000.
+ *
+ *   - `MAX_NESTING_DEPTH` bounds parenthesis and call nesting (AC-15, AC-20).
+ *   - `MAX_AST_DEPTH` bounds the height of the parsed tree (AC-26). The binary productions fold
+ *     iteratively, so an operator chain never touches the nesting counter — but it builds a
+ *     left-deep tree that the checking and evaluation passes then walk recursively. Height is
+ *     computed as the tree is built and checked at every node, so an over-long chain fails as
+ *     PARSE_ERROR during parsing rather than as a `RangeError` during the walk.
  */
 
 export type ExprErrorCode =
@@ -47,7 +62,8 @@ export type ExprErrorCode =
   | 'UNKNOWN_FUNCTION'
   | 'ARITY_MISMATCH'
   | 'DIVISION_BY_ZERO'
-  | 'TYPE_MISMATCH';
+  | 'TYPE_MISMATCH'
+  | 'NON_FINITE_VALUE';
 
 /** Every failure path in this module throws one of these — never `NaN`, `Infinity` or `null`. */
 export class ExprError extends Error {
@@ -105,6 +121,11 @@ function isWhitespace(ch: string): boolean {
  * (`0x10`, `0b11`, `0o17`) and digit separators (`1_000`) are outside the grammar; each of them
  * tokenises as a number immediately followed by an identifier, which the parser then rejects as
  * a trailing token.
+ *
+ * A literal too large for a double (`"9".repeat(309)`) is rejected here, at the source, because
+ * representability is a property of the text rather than of the parameters — so a bad literal in
+ * hand-authored content fails even when its branch is short-circuited. Non-finite *values* are a
+ * separate matter and are caught during evaluation; see `computeNumber`.
  */
 function tokenize(source: string): Token[] {
   const tokens: Token[] = [];
@@ -129,7 +150,15 @@ function tokenize(source: string): Token[] {
           index += 1;
         }
       }
-      tokens.push({ kind: 'number', value: Number(source.slice(start, index)), at: start });
+      const text = source.slice(start, index);
+      const value = Number(text);
+      if (!Number.isFinite(value)) {
+        throw new ExprError(
+          'NON_FINITE_VALUE',
+          `the numeric literal at position ${start} is too large to represent as a finite number`,
+        );
+      }
+      tokens.push({ kind: 'number', value, at: start });
       continue;
     }
 
@@ -167,17 +196,28 @@ function tokenize(source: string): Token[] {
 // Parser
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * `height` is the length of the longest path from this node to a leaf, and therefore exactly the
+ * recursion depth that `checkNode`, `computeNumber` and `computeBoolean` will reach on it. It is
+ * accumulated as the tree is built so the bound can be enforced during parsing.
+ */
 type Node =
-  | { readonly kind: 'number'; readonly value: number }
-  | { readonly kind: 'identifier'; readonly name: string }
-  | { readonly kind: 'negate'; readonly operand: Node }
+  | { readonly kind: 'number'; readonly value: number; readonly height: number }
+  | { readonly kind: 'identifier'; readonly name: string; readonly height: number }
+  | { readonly kind: 'negate'; readonly operand: Node; readonly height: number }
   | {
       readonly kind: 'binary';
       readonly op: BinaryOperator;
       readonly left: Node;
       readonly right: Node;
+      readonly height: number;
     }
-  | { readonly kind: 'call'; readonly name: string; readonly args: readonly Node[] };
+  | {
+      readonly kind: 'call';
+      readonly name: string;
+      readonly args: readonly Node[];
+      readonly height: number;
+    };
 
 /**
  * Maximum nesting of parenthesised groups and call argument lists. AC-20 requires 16 levels to
@@ -187,9 +227,32 @@ type Node =
  */
 const MAX_NESTING_DEPTH = 64;
 
+/**
+ * Maximum height of the parsed tree, which is the maximum recursion depth of every later walk.
+ *
+ * The window is bounded from below by the longest expression that must still evaluate — AC-26
+ * requires a 500-term operator chain, whose left-deep tree has height 500 — and from above by the
+ * host stack, measured at a first `RangeError` between 4,000 and 4,688 terms across three
+ * machines. 1024 is twice the required floor and roughly a quarter of the lowest observed
+ * ceiling. It is a fixed number rather than an emergent one: the same input is accepted or
+ * rejected identically on every host, which is what AC-26 asks for.
+ */
+const MAX_AST_DEPTH = 1024;
+
 const COMPARISON_OPERATORS: readonly ComparisonOperator[] = ['==', '!=', '<=', '>=', '<', '>'];
 const SUM_OPERATORS: readonly ArithmeticOperator[] = ['+', '-'];
 const PRODUCT_OPERATORS: readonly ArithmeticOperator[] = ['*', '/', '%'];
+
+/** Height of the tallest node in a non-empty list; `args` always has at least one member. */
+function tallest(nodes: readonly Node[]): number {
+  let best = 0;
+  for (const node of nodes) {
+    if (node.height > best) {
+      best = node.height;
+    }
+  }
+  return best;
+}
 
 class Parser {
   private readonly tokens: readonly Token[];
@@ -267,6 +330,34 @@ class Parser {
     return result;
   }
 
+  /**
+   * Rejects a tree taller than `MAX_AST_DEPTH`. Called at every node that can grow, so the
+   * failure happens while the tree is still being built — before any walk can recurse into it.
+   */
+  private withinAstDepth<T extends Node>(candidate: T): T {
+    if (candidate.height > MAX_AST_DEPTH) {
+      throw new ExprError(
+        'PARSE_ERROR',
+        `expression builds a tree taller than the limit of ${MAX_AST_DEPTH} levels`,
+      );
+    }
+    return candidate;
+  }
+
+  /**
+   * Binary productions fold iteratively, so an operator chain grows the tree one level per
+   * operator without ever touching the nesting counter. Checking here is what bounds it.
+   */
+  private makeBinary(op: BinaryOperator, left: Node, right: Node): Node {
+    return this.withinAstDepth({
+      kind: 'binary',
+      op,
+      left,
+      right,
+      height: Math.max(left.height, right.height) + 1,
+    });
+  }
+
   private parseOr(): Node {
     let left = this.parseAnd();
     for (;;) {
@@ -274,7 +365,7 @@ class Parser {
       if (op === undefined) {
         return left;
       }
-      left = { kind: 'binary', op, left, right: this.parseAnd() };
+      left = this.makeBinary(op, left, this.parseAnd());
     }
   }
 
@@ -285,7 +376,7 @@ class Parser {
       if (op === undefined) {
         return left;
       }
-      left = { kind: 'binary', op, left, right: this.parseCompare() };
+      left = this.makeBinary(op, left, this.parseCompare());
     }
   }
 
@@ -296,7 +387,7 @@ class Parser {
     if (op === undefined) {
       return left;
     }
-    return { kind: 'binary', op, left, right: this.parseSum() };
+    return this.makeBinary(op, left, this.parseSum());
   }
 
   private parseSum(): Node {
@@ -306,7 +397,7 @@ class Parser {
       if (op === undefined) {
         return left;
       }
-      left = { kind: 'binary', op, left, right: this.parseProduct() };
+      left = this.makeBinary(op, left, this.parseProduct());
     }
   }
 
@@ -317,7 +408,7 @@ class Parser {
       if (op === undefined) {
         return left;
       }
-      left = { kind: 'binary', op, left, right: this.parseUnary() };
+      left = this.makeBinary(op, left, this.parseUnary());
     }
   }
 
@@ -326,7 +417,8 @@ class Parser {
     const token = this.peek();
     if (token !== undefined && token.kind === 'operator' && token.op === '-') {
       this.index += 1;
-      return { kind: 'negate', operand: this.parsePrimary() };
+      const operand = this.parsePrimary();
+      return this.withinAstDepth({ kind: 'negate', operand, height: operand.height + 1 });
     }
     return this.parsePrimary();
   }
@@ -339,15 +431,21 @@ class Parser {
 
     if (token.kind === 'number') {
       this.index += 1;
-      return { kind: 'number', value: token.value };
+      return { kind: 'number', value: token.value, height: 1 };
     }
 
     if (token.kind === 'identifier') {
       this.index += 1;
       if (this.atPunctuation('(')) {
-        return { kind: 'call', name: token.name, args: this.parseArguments() };
+        const args = this.parseArguments();
+        return this.withinAstDepth({
+          kind: 'call',
+          name: token.name,
+          args,
+          height: tallest(args) + 1,
+        });
       }
-      return { kind: 'identifier', name: token.name };
+      return { kind: 'identifier', name: token.name, height: 1 };
     }
 
     if (token.op === '(') {
@@ -564,33 +662,52 @@ function applyComparison(op: ComparisonOperator, left: number, right: number): b
   }
 }
 
+/** Rejects `Infinity`, `-Infinity` and `NaN` wherever a number is produced (AC-25). */
+function requireFinite(value: number, source: string): number {
+  if (Number.isFinite(value)) {
+    return value;
+  }
+  throw new ExprError('NON_FINITE_VALUE', `${source} produced ${String(value)}, which is not finite`);
+}
+
 /**
- * The `TYPE_MISMATCH` throws below are defensive: `checkNode` has already proved every node's
- * type, so a boolean-valued node cannot arrive here. They exist so that a future change which
- * bypasses the static pass fails with a typed error rather than producing `NaN`.
+ * `computeNumber` is the single place a number is produced, so putting `requireFinite` on every
+ * one of its returns is the whole non-finite guard for values (AC-25). It covers a literal, a
+ * parameter read from the environment, a negation, a function result, and — the route a guard
+ * placed only on literals and on the environment would miss — an arithmetic result that becomes
+ * non-finite mid-evaluation, as in `gcd(a * a, 2)` with `a = 1e200`. Because a call's arguments
+ * are themselves produced here, no non-finite value can reach a whitelisted function; that is
+ * what stops `gcd` spinning forever on `(NaN, NaN)`, a fixed point of its Euclid loop.
+ *
+ * The `TYPE_MISMATCH` throws are defensive: `checkNode` has already proved every node's type, so
+ * a boolean-valued node cannot arrive here. They exist so that a future change which bypasses the
+ * static pass fails with a typed error rather than producing `NaN`.
  */
 function computeNumber(node: Node, env: Environment): number {
   switch (node.kind) {
     case 'number':
-      return node.value;
+      return requireFinite(node.value, 'a numeric literal');
 
     case 'identifier':
-      return readIdentifier(node.name, env);
+      return requireFinite(readIdentifier(node.name, env), `parameter "${node.name}"`);
 
     case 'negate':
-      return -computeNumber(node.operand, env);
+      return requireFinite(-computeNumber(node.operand, env), 'unary "-"');
 
     case 'call': {
       const values: number[] = [];
       for (const arg of node.args) {
         values.push(computeNumber(arg, env));
       }
-      return applyWhitelistedCall(node.name, values);
+      return requireFinite(applyWhitelistedCall(node.name, values), `function "${node.name}"`);
     }
 
     case 'binary':
       if (isArithmeticOperator(node.op)) {
-        return applyArithmetic(node.op, computeNumber(node.left, env), computeNumber(node.right, env));
+        return requireFinite(
+          applyArithmetic(node.op, computeNumber(node.left, env), computeNumber(node.right, env)),
+          `operator "${node.op}"`,
+        );
       }
       throw new ExprError('TYPE_MISMATCH', `operator "${node.op}" does not produce a number`);
   }
