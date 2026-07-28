@@ -49,11 +49,39 @@ interface ResolveShotInput {
 }
 
 /**
+ * Rejects any timing argument that is not a usable duration. Shared by all three exported entry
+ * points so they cannot disagree about what a legal input is.
+ *
+ * Both axes have the same hole, and a sign check does not close it: `NaN < 0` and `NaN <= 0` are
+ * both `false`, so a `NaN` sails past a bounds-only guard and propagates into `rollDamage` — a
+ * `NaN` hull in the duel reducer is a fight that never ends and throws nothing to trace.
+ * `Infinity` is worse than `NaN` rather than better: `1 - elapsedMs / Infinity` is `1`, so an
+ * impossible timer would report maximum quality, a maximum roll and a Perfect Shot all at once,
+ * with every output field perfectly finite and therefore invisible to any finiteness check made
+ * on the OUTPUT. Both are rejected here, on the input.
+ *
+ * This rejects a CLASS, not an axis: every finite positive timer is accepted, on or off the
+ * catalog's four values, as is every finite `elapsedMs >= 0` including overruns past the timer.
+ */
+function requireUsableTiming(elapsedMs: number, timerMs: number): void {
+  if (!Number.isFinite(elapsedMs) || elapsedMs < 0) {
+    throw new RangeError(`damage: elapsedMs must be a finite duration >= 0 (got ${elapsedMs})`);
+  }
+  if (!Number.isFinite(timerMs) || timerMs <= 0) {
+    throw new RangeError(`damage: timerMs must be a finite duration > 0 (got ${timerMs})`);
+  }
+}
+
+/**
  * How well the answer came in, in `[ANSWER_QUALITY_FLOOR, 1]` for a correct answer and exactly `0`
  * for a wrong one. Reaches the floor at 65 % of the timer and stays there, so overrunning the timer
  * with a correct answer is never worse than answering at the last tick.
  */
 export function answerQuality(correct: boolean, elapsedMs: number, timerMs: number): number {
+  // Guarded BEFORE the wrong-answer short-circuit. The ticket leaves that ordering open, but
+  // validating first is the reading under which all three entry points agree on every input,
+  // rather than only on the inputs that happen to reach the arithmetic.
+  requireUsableTiming(elapsedMs, timerMs);
   if (!correct) {
     return 0;
   }
@@ -67,6 +95,7 @@ export function answerQuality(correct: boolean, elapsedMs: number, timerMs: numb
  * `elapsedMs` exactly at `PERFECT_SHOT_TIMER_FRACTION * timerMs` is NOT a perfect shot.
  */
 export function isPerfectShot(correct: boolean, elapsedMs: number, timerMs: number): boolean {
+  requireUsableTiming(elapsedMs, timerMs);
   return correct && elapsedMs < PERFECT_SHOT_TIMER_FRACTION * timerMs;
 }
 
@@ -79,12 +108,7 @@ export function isPerfectShot(correct: boolean, elapsedMs: number, timerMs: numb
 export function resolveShot(input: ResolveShotInput): readonly [ShotOutcome, Rng] {
   const { cannon, correct, elapsedMs, rng } = input;
 
-  if (elapsedMs < 0) {
-    throw new RangeError(`resolveShot: elapsedMs must not be negative (got ${elapsedMs})`);
-  }
-  if (cannon.timerMs <= 0) {
-    throw new RangeError(`resolveShot: cannon.timerMs must be greater than 0 (got ${cannon.timerMs})`);
-  }
+  requireUsableTiming(elapsedMs, cannon.timerMs);
 
   // Drawn before the correctness branch so both paths consume exactly one step of the stream.
   const [u, nextRng] = nextFloat(rng);
@@ -114,12 +138,30 @@ export function resolveShot(input: ResolveShotInput): readonly [ShotOutcome, Rng
   const range = cannon.damageMax - cannon.damageMin;
 
   // The floor is applied HERE, to the roll's lower bound, which is what makes it a guarantee about
-  // the outcome rather than about an intermediate. Quality above the floor lifts the bound further,
-  // so speed shifts the whole distribution upward while genuine spread survives at every quality.
+  // the OUTCOME rather than about an intermediate. Genuine spread survives above that bound.
+  //
+  // Where speed actually pays, stated exactly because this is the module's most load-bearing line
+  // and its previous description was wrong. `max(quality * QUALITY_WEIGHT, ANSWER_QUALITY_FLOOR)`
+  // means quality moves the bound only once it rises above the crossover
+  // `ANSWER_QUALITY_FLOOR / QUALITY_WEIGHT` (0.5 at the shipped constants); at or below that the
+  // floor already dominates and answering faster buys literally nothing. `ceil` then freezes the
+  // INTEGER bound earlier still, so the flat region is wider than the raw crossover implies.
+  // Measured against this module at 1 ms resolution (AC-18): the slow 71 % of the answer window is
+  // completely flat on the Swivel Gun — the gun a five-year-old actually holds — and likewise on
+  // the Six-Pounder, Chain Shot and Nine-Pounder; 51-60 % on the wider guns. Speed aims the shot
+  // only across the fast remainder.
+  //
+  // `answerQuality` keeps moving across that flat region even though damage does not, so a UI
+  // meter driven off that field over-reports progress. AC-18 pins both halves so nobody quietly
+  // "fixes" one to match the other — which side should move is a design decision, not a defect.
   const lowerRaw = cannon.damageMin + Math.max(quality * QUALITY_WEIGHT, ANSWER_QUALITY_FLOOR) * range;
-  // The `min` binds only if `QUALITY_WEIGHT > 1` — for `w <= 1`, `lowerRaw <= damageMax` and
-  // `damageMax` is an integer, so `ceil` cannot pass it. `QUALITY_WEIGHT` is a live dev-screen
-  // slider, so the clamp stays rather than resting on today's value.
+  // The `min` binds only when `QUALITY_WEIGHT > 1`: for `w <= 1`, `lowerRaw <= damageMax`, and
+  // `damageMax` is an integer, so `ceil` cannot carry it past. That is an argument, so it carries
+  // its measurement (L-015) — AC-19 is the committed probe, and it checks both halves: the clamp
+  // is inert across the whole input surface at today's weight, and re-importing this module with
+  // `QUALITY_WEIGHT = 1.001` puts the unclamped bound at `damageMax + 1`, outside the cannon.
+  // That weight is a live dev-screen slider, so `w > 1` is reachable config rather than a
+  // hypothetical, and the clamp stays.
   const lower = Math.min(Math.ceil(lowerRaw), cannon.damageMax);
   const rollDamage = lower + Math.round(u * (cannon.damageMax - lower));
 
