@@ -1,0 +1,47 @@
+# Build Posture
+
+**Posture: `mvp`** — set by the owner at Phase 0, 2026-07-27.
+
+## Why
+
+Cannon Academy is a 5-day solo timebox (Day 1 = Tue Jul 28, submission Sat Aug 1)
+with an explicit cut list in `PLAN.md`. Correctness gates that protect a child's
+learning or the demo are fully enforced; infrastructure gates that cost more than
+they return at this scale are deferred, in writing, below.
+
+## Fully enforced (never deferred)
+
+These protect the two catastrophe classes named in `ARCHITECTURE.md` §9 — "the game
+teaches wrong math" and "a duel state machine that soft-locks a child mid-fight".
+
+| Gate | Rationale |
+|---|---|
+| Format / Lint / Typecheck | TS strict is an architecture decision (§2) |
+| Unit tests (frozen) | The whole point of the swarm |
+| Engine purity lint | `src/engine/` = zero React/RN/Expo/Firebase imports (§8) — verified firing at Phase 0 |
+| Determinism lint | `Math.random()` + `Date` banned in `src/engine/` (§4.1) — replay depends on it |
+| Golden template tests | 1,000 seeded samples/template (§9.1) — highest-value gate in the project |
+| Spec-lint | Every AC has a test; every test cites an AC |
+| No TODOs / no debug logging | `no-console` is lint-enforced in `src/` |
+| Coverage not reduced | Baseline recorded in `baselines.md` |
+
+## Deferred under MVP posture (written decisions, not silent skips)
+
+| Gate | Status | Reason | Re-enable when |
+|---|---|---|---|
+| Performance smoke (p50/p95, memory) | **DEFERRED** | The engine is pure synchronous TS; no latency surface exists yet. Real perf risk is duel *animation* framerate, which lives in RN and is out of this swarm's scope. | Perf becomes measurable in-app (day 3 juice pass) |
+| Migration validation | **N/A** | No database migrations. Firestore is schemaless and client-authoritative (§5). | A schema-versioned local store appears |
+| API compatibility / contract diff | **N/A** | No published API. Internal interfaces are compile-checked by `tsc`. | An external consumer exists |
+| Full build | **SUBSTITUTED** | No bundler in this scope; `tsc --noEmit` is the build correctness proxy for a pure-TS library layer. | Expo app is wired to the engine |
+| Integration/e2e suite | **OUT OF SCOPE** | Requires Expo/RN runtime + simulator; per §9.4 this project verifies UI by on-device scripted playtest, not automation. | Owner adds `jest-expo` |
+| GitHub Issues mirror | **SKIPPED** | No remote repo exists; creating one is the owner's call, not the swarm's. Ticket files in `tickets/` are the source of truth. | Owner creates a remote |
+| Secret scan (gitleaks) | **SUBSTITUTED** | `gitleaks` not installed. Substituted a grep-based credential pattern scan in `run-repo-gates.sh`. Engine layer handles no credentials by construction. | `gitleaks` is installed |
+
+## Scope of this swarm run
+
+**In:** `src/engine/**` and `src/content/**` — pure TypeScript, headless-verifiable.
+
+**Out:** `app/**` (expo-router screens), `src/components/**`, `src/stores/**`,
+`src/services/**` (Firebase), EAS builds, art pipeline. These cannot be gated in
+this environment (no Metro/simulator/EAS/live Firestore) and are verified by the
+owner's on-device playtest ritual per `ARCHITECTURE.md` §9.4.

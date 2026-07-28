@@ -1,0 +1,12 @@
+node_modules
+coverage
+dist
+package-lock.json
+
+# Human-authored planning artifacts — the swarm reads these, never reformats them.
+ARCHITECTURE.md
+PLAN.md
+README.md
+TICKETS.md
+tickets/
+.tdd-swarm/
