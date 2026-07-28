@@ -3,7 +3,10 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['node_modules/**', 'coverage/**', 'dist/**', '.tdd-swarm/**'],
+    // .tdd-swarm/ is process documentation and shell scripts, but the guard policy that
+    // lives there is executable code protecting the Iron Law — it gets linted like any
+    // other hook (LESSONS.md L-007).
+    ignores: ['node_modules/**', 'coverage/**', 'dist/**', '.tdd-swarm/**', '!.tdd-swarm/**/*.cjs'],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,
@@ -12,7 +15,7 @@ export default tseslint.config(
   // a broken hook fails OPEN and silently stops protecting frozen tests (LESSONS.md L-007) —
   // but they need Node globals and the CommonJS module system.
   {
-    files: ['.claude/hooks/**/*.cjs'],
+    files: ['.claude/hooks/**/*.cjs', '.cursor/hooks/**/*.cjs', '.tdd-swarm/**/*.cjs'],
     languageOptions: {
       sourceType: 'commonjs',
       globals: {

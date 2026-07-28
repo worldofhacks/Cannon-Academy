@@ -4,3 +4,8 @@ dist/
 .expo/
 *.log
 .DS_Store
+
+# Swarm control state — per worktree, never shared
+.worktrees/
+.tdd-swarm/phase
+.tdd-swarm/active-ticket

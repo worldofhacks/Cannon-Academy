@@ -632,3 +632,69 @@ failure one level up — prove the _harness_ is live.
   mutants killed by exactly one test.
 - **Make the runner fail loudly**: abort a mutant on any build or startup failure with a distinct
   status rather than counting it as "survived", and print which test file actually ran.
+
+---
+
+## L-029 — A guard is a claim about a host, not about a repository (Phase 5 → Wave 4 setup)
+
+**Pattern:** The frozen-test guard lived at `.claude/hooks/guard-writes.cjs` with
+`.claude/settings.json`. That is Claude Code configuration. When the run continued in Cursor — which
+reads `.cursor/hooks.json` — the hook was **not installed at all**. Nothing in the repository
+changed, nothing errored, and the file was still sitting there being read by anyone auditing the
+setup. The protection was zero.
+
+Two further holes surfaced only because the guard was rewritten and then _proven_:
+
+- The hook read `.tdd-swarm/phase` to decide whether to block test edits, but never protected that
+  file. An implementer could clear its own phase and unlock the frozen tests on the next tool call —
+  the guard trusted a control file its subject could write.
+- The header claimed territory enforcement ("an agent may only write inside its ticket's declared
+  scopes"). The implementation never read `file_scopes` or `test_scopes` at all. Any path outside
+  `__tests__/` was allowed, including another ticket's `src/` files.
+- `preToolUse` in Cursor fires for **every** tool, and `Read` carries a `path` too. The first
+  rewrite would have blocked an implementer from _reading_ the frozen tests it was implementing
+  against — a guard whose failure mode was to make the work impossible rather than to permit a
+  violation. Caught by adding a Read case to the proof, not by reasoning.
+
+**Why:** hook configuration is host-specific in a way that source code is not. "The guard is in the
+repo" and "the guard runs" are different claims, and reviewing the repo can only establish the
+first. [[L-007]] said a guard's real coverage is what it has been observed blocking; this is the
+same lesson one layer out — observed blocking _on the host actually in use_.
+
+**What to do instead:**
+
+- **One policy, thin adapters.** The decision now lives in `.tdd-swarm/guard-policy.cjs`; the Claude
+  and Cursor hooks are shims over it, so a fix cannot land in one host and miss the other.
+- **The control surface is unwritable while a phase is in force** — phase files, ticket specs, hook
+  config, and gate config. An agent must not be able to edit the files that constrain it.
+- **`.tdd-swarm/prove-guard.sh` asserts an exit code per direction** (28 cases: frozen test, foreign
+  territory, control surface, shell `cp`/`sed -i`/redirect/heredoc/`git checkout`, plus the
+  false-positive cases that must stay allowed, plus the orchestrator being unpoliced). Re-run it on
+  any host before trusting the guard, and after any edit to it.
+- **Fail closed while engaged, open when not.** An internal error inside a guarded unit blocks; with
+  no phase set it allows, so a bug cannot wedge the orchestrator.
+- **Residual limit, recorded rather than papered over:** the orchestrator's `SWARM_ORCHESTRATOR=1`
+  prefix is a documented bypass, and an agent that reads the policy can read that too. The guard is
+  the first layer; the `frozen-tests-unmodified` outcome gate and the orchestrator's own commit-level
+  diff remain the backstop. Defence in depth, not a wall.
+
+---
+
+## L-030 — Untracked evidence dies with the worktree (Phase 5)
+
+**Pattern:** Tearing down the wave-3 worktrees, `git status` showed only untracked files — phase
+files, `node_modules` symlinks, and **five implementation reports** (`T-005`, `T-008`, `T-009`,
+`T-010`, `T-011`) that existed in no other location. `git worktree remove --force` would have
+deleted all five. Only T-001's report had ever reached the integration branch, so the pattern had
+been silently broken since wave 1 without anyone noticing, because the reports were _read_ during
+review and never needed again until an audit asked for them.
+
+**Why:** this swarm's central claim is that every decision is auditable from written evidence. An
+implementation report is that evidence. Living in an untracked file inside a disposable directory,
+it has the lifetime of the worktree, not the lifetime of the decision it justifies — and the moment
+it is most likely to be deleted is the routine cleanup nobody reviews.
+
+**What to do instead:** commit the implementation report to the ticket branch as part of the DONE
+report, so it merges with the wave. Before any `worktree remove`, diff the untracked set and ask
+what is being destroyed — `--force` on a directory you have not read is a decision made blind. The
+five reports were preserved into `.tdd-swarm/reports/` before teardown proceeded.

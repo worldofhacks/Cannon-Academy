@@ -989,3 +989,56 @@ stream is provably live across 60 seeds, and the pure stages are provably seed-i
   still has one skill); only its tray premise needs correcting. T-030 already owns selection.
 - **Contracts changed without a ticket:** none. No consumed signature widened, narrowed or
   redefined. `CHOICE_COUNT` still duplicated, unchanged by this wave, still owned by T-028.
+
+---
+
+## Wave 4 preparation — guard rebuilt and proven, 2026-07-28
+
+The run continues on a different host (Cursor, Opus 5). Before dispatching anything, an independent
+review of the branch was requested by the owner and returned **two high-severity findings against
+`.claude/hooks/guard-writes.cjs`**. Both were real, and checking them surfaced a third that was
+worse than either.
+
+| finding                                                                                                                                            | status                                                                        |
+| -------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| The guard read `.tdd-swarm/phase` but never protected it — an implementer could clear it                                                           | **fixed** — the whole control surface is unwritable while a phase is in force |
+| The header promised territory enforcement; `file_scopes` / `test_scopes` were never read                                                           | **fixed** — territory is enforced from the active ticket's frontmatter        |
+| _(found while fixing)_ the hook is Claude Code config and **does not run in Cursor at all**                                                        | **fixed** — one shared policy, one adapter per host                           |
+| _(found by the proof)_ `preToolUse` fires for `Read` too, so the first rewrite would have blocked an implementer from reading its own frozen tests | **fixed** — only mutating tools get the write policy                          |
+
+**What now exists:**
+
+- `.tdd-swarm/guard-policy.cjs` — the single decision function. Phase separation, territory, control
+  surface, and the shell shapes L-023 identified (`cp`, `sed -i`, redirect, heredoc, `tee`,
+  `git checkout`). Deliberately **not** keyed on cwd: a shell can `cd` one line away from the rule.
+- `.cursor/hooks.json` + `.cursor/hooks/swarm-guard.cjs` — Cursor adapter, `preToolUse` and
+  `beforeShellExecution`, `failClosed: true`.
+- `.claude/hooks/guard-writes.cjs` — rewritten as a shim over the same policy so the two hosts cannot
+  drift.
+- `.tdd-swarm/prove-guard.sh` — **28 asserted directions, all observed.** Two of the first run's
+  cases came back wrong: one was a genuine policy hole (a redirect target with a directory prefix,
+  `> .worktrees/wt-T-007/.tdd-swarm/phase`, went unmatched) and one was a false failure caused by
+  quoting in the proof script itself. Both fixed; commands are now JSON-encoded by `node` rather than
+  hand-escaped, so a case can never fail merely because a quote was wrong.
+
+Engagement is per unit: a unit is guarded when `<unit>/.tdd-swarm/phase` exists. The orchestrator
+works in the repo root with no phase file and is therefore unpoliced, which the proof asserts
+explicitly in both directions.
+
+**Gate config corrected:** `.tdd-swarm/**` was ESLint-ignored, so the new policy module — the most
+load-bearing guard file in the repo — would have gone unlinted. Given that L-007 was caused by a
+module-system error in exactly this kind of file, `.cjs` files under `.tdd-swarm/` are now linted.
+All local gates green afterwards, **1,229/1,229 tests**, guard re-proven 28/28 after formatting.
+
+**Worktree model changed for this host.** Cursor's sandbox limits subagent writes to the workspace
+directory, so the external `../cannon-wt/` layout waves 1–3 used cannot be written to by a dispatched
+agent. Wave 4 worktrees go to `.worktrees/` **inside** the repo (gitignored), which also brings them
+under the project hook — the previous layout would have put every agent write outside the guard's
+jurisdiction.
+
+**Five implementation reports were rescued from the wave-3 worktrees before teardown** (`T-005`,
+`T-008`, `T-009`, `T-010`, `T-011`) — untracked, existing nowhere else, and one `--force` from gone.
+Recorded as **L-030**. The stale worktree directories themselves remain on disk; removing them is a
+destructive operation outside the workspace and is left for the owner.
+
+**Lessons added: L-029, L-030.**
