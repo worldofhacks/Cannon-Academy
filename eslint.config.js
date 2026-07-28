@@ -8,6 +8,26 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
 
+  // Swarm guard hooks are CommonJS Node scripts, not app source. They are still linted —
+  // a broken hook fails OPEN and silently stops protecting frozen tests (LESSONS.md L-007) —
+  // but they need Node globals and the CommonJS module system.
+  {
+    files: ['.claude/hooks/**/*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: {
+        require: 'readonly',
+        module: 'writable',
+        process: 'readonly',
+        console: 'readonly',
+        __dirname: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+    },
+  },
+
   // ARCHITECTURE.md §4.1 / §8: src/engine/ is PURE TypeScript.
   // No React imports, no Math.random() — every draw goes through the seeded PRNG.
   {
