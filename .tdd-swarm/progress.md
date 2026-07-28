@@ -574,3 +574,36 @@ The claim was false — transcribed from an integration report that verified the
 ad-hoc probe, not a test. The agent probed all four historical revisions of the file, found no such
 assertion, and made a purely additive change. Recorded as **L-019: never pair an unverified claim
 with an authorisation.**
+
+### Wave 2 implementations + security review
+
+**T-004** (`7a12402`): 32 constants, 560/560. Orchestrator probe confirmed the values that matter
+as *relationships* rather than magnitudes: `QUALITY_WEIGHT = 0.7` clears the derived `> 7/12`
+effect-size floor (L-018); `RECENT_TEMPLATE_WINDOW = 5 <= 7`; `BOT_ACCURACY_WINDOW = 10`;
+`DISTRACTOR_ABS_FLOOR = 3`; hull curve 45/60/75/95/120 monotone and all under `4 × PLAYER_HULL`;
+`ONBOARDING_ENEMY_HULL = 24 < 45`; **deep freeze holds on nested objects** (what `as const` does
+not give you); no non-finite numeric export.
+
+**T-006** (`e5f21fe`): five catalogs + validated loaders, 701/701. Orchestrator verified coherence
+**directly from the raw JSON**, independent of the code under test: unlock relation agrees in both
+directions; island order contiguous from 0 with exactly one root (`port_sumwich`); every skill
+taught by ≥1 cannon; grades 0–5 with no gap; rank `tier` and `minWins` both strictly increasing;
+starters `swivel_gun` 8–12 reliable / `culverin` 4–16 volatile recoil 0 on the same symbolic-only
+skill; volatile recoils 5/8/10; no URLs.
+
+*Orchestrator false alarm, recorded for honesty:* my first probe failed to load the catalogs at all
+under raw Node ESM (`ERR_IMPORT_ATTRIBUTE_MISSING`). That read as a portability defect until I
+checked the project's own config — `moduleResolution: "bundler"` targeting Metro, where bare JSON
+imports are correct, and vitest agrees. **The probe was wrong, not the code.** Same class as the
+T-002 implementer's "100,000 … never a RangeError" claim: a measurement that swept the wrong axis.
+
+**Security review (T-004 + T-006): PASS, no Critical or Important.** Verified by executed probe,
+not argument: deep freeze sound at every level; lookup helpers structurally immune to prototype
+pollution (array `.find` with `===` cannot match a prototype member — probed with `__proto__`,
+`constructor`, `prototype`, `toString`, `hasOwnProperty`, `valueOf`; all throw, `Object.prototype`
+stays clean); no dynamic code construction in any spelling; no `Math.random`/`Date`; no URLs,
+emails, paths or PII in the catalogs; dependencies unchanged.
+
+Informational, non-blocking: a malformed bundled catalog hard-crashes the module graph at import
+with no in-app recovery. Judged the right trade for developer-authored, CI-validated content, and
+the frozen suite asserts the shipped catalogs validate before reaching a device.
