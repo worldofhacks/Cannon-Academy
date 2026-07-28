@@ -737,3 +737,40 @@ three modules in one process for the first time. All green:
 table in `TICKETS.md`; T-026 now sits properly in the Wave 2 table.
 
 **Wave 3 is clear to dispatch** (T-005, T-008, T-009, T-010, T-011, T-012).
+
+## PAUSED at wave 3 start — owner decision, 2026-07-28
+
+Owner: *"pause on wave 3 until we get the base design first."*
+
+**State at pause — everything is committed and resumable:**
+
+- `swarm/engine-core` is at **776 tests green**, waves 1 and 2 fully merged and integrated.
+- Six wave-3 worktrees are **created and ready**, each branched from a clean committed tree with
+  its ticket verified current (L-008 observed) and `phase=tests` set:
+
+  | ticket | branch | ACs | file scope |
+  |---|---|---|---|
+  | T-005 | `ticket/T-005-distractors` | 14 | `src/engine/questions/distractors.ts` |
+  | T-008 | `ticket/T-008-damage-model` | 16 | `src/engine/duel/damage.ts` |
+  | T-009 | `ticket/T-009-economy` | 13 | `src/engine/economy.ts` |
+  | T-010 | `ticket/T-010-mastery` | 15 | `src/engine/mastery.ts` |
+  | T-011 | `ticket/T-011-placement` | 11 | `src/engine/placement.ts` |
+  | T-012 | `ticket/T-012-rank-ladder` | 11 | `src/engine/ranks.ts` |
+
+  Verified: all six file scopes **disjoint**, so the wave parallelises safely.
+
+- One Test Agent (T-008) was dispatched and **stopped before it authored anything**. Its worktree
+  is clean; no test file was written. Nothing to unwind.
+
+**To resume:** re-dispatch the six Test Agents. No setup work needs redoing.
+
+### Owner decisions recorded this session
+- Captain-name wordlist: **SKIPPED** for MVP, with a written re-enable trigger in `posture.md`
+  (before children play, or before the public leaderboard mirror ships).
+- CC0 source assets committed to the repo (~26 MB) so a clean checkout is self-contained.
+
+### Non-swarm deliverables produced
+- `design/DESIGN-BRIEF.md` — standalone design prompt (audience-first, states-not-compositions,
+  invites pushback and a cut list).
+- `assets/README.md` — every sprite the game needs, ordered by what it blocks, with MVP rows
+  marked grey-box-acceptable.
