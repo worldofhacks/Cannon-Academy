@@ -332,3 +332,34 @@ behaviourally ("no dynamic code construction") and never by spelling the banned 
 names a helper into a false failure. Where the property genuinely matters, the authoritative
 guard must be behavioural ([[L-013]]). A guard whose failure mode is "rename your function" is
 not measuring what it claims to measure.
+
+---
+
+## L-017 — Cover dimensions, not cases (Phase 4)
+
+**Pattern:** T-002 reached 296 tests across 24 criteria and survived three independent review
+passes. Then a code review and a security review, working separately, found three defects — one
+Critical — that all lived on axes **nothing had ever varied**:
+
+| Axis | What every test used | What broke |
+|---|---|---|
+| Expression length | short expressions | a 4,000-term chain overflowed the stack, escaping as `RangeError` rather than the module's `ExprError` contract |
+| Literal magnitude | small numbers | `"9"×309` → `Infinity`; `"9"×400 - "9"×400` → `NaN` |
+| Environment value domain | small finite integers | `{a: Infinity}` → an infinite loop in `gcd`, unrecoverable |
+
+A fourth route surfaced only when a Test Agent went looking: `gcd(a * a, 2)` with `{a: 1e200}`,
+where the argument is finite **in the environment and as a literal** and becomes non-finite only
+mid-evaluation. A guard at the input boundaries alone would not have caught it.
+
+**Why:** Tests are written case by case, and cases cluster around the shapes the author is
+picturing. Adding more cases in the same cluster raises the count without widening coverage.
+Every review had checked whether *behaviours* were covered; none had asked which *input
+dimensions* were being held constant. The implementer's own 36,792-call probe passed its "no
+non-`ExprError` escaped" assertion **vacuously** — nothing in the corpus was long enough to
+overflow.
+
+**What to do instead:** Before freezing, enumerate the input **dimensions** — length, magnitude,
+sign, cardinality, nesting shape, value domain of every injected input — and confirm each is
+varied to its extreme, not merely represented. Where a value can be transformed mid-computation,
+check the *intermediate* domain too, not only the boundaries. And treat a passing assertion over
+an unswept domain as no evidence at all.
