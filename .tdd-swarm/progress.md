@@ -774,3 +774,48 @@ Owner: *"pause on wave 3 until we get the base design first."*
   invites pushback and a cut list).
 - `assets/README.md` — every sprite the game needs, ordered by what it blocks, with MVP rows
   marked grey-box-acceptable.
+
+## Wave 3 — dispatched 2026-07-28 (resumed after the design pause)
+
+Owner resumed after an external design pass delivered tokens, ui-kit, a 10-state duel prototype,
+sea chart, onboarding, chest, gunnery range, motion table, and a critique + cut list.
+
+**The design review found three engine gaps our own process missed. All verified against the code
+before filing:**
+
+- **T-029** — grade 0 has exactly **one** skill (`add_within_10`) and both K-1 cannons use it, each
+  with `recoilDamage: 0`, so they differ only in variance. PLAN.md promises cannon choice is "a real
+  decision from the first duel" and the stated differentiator is that difficulty is a strategic
+  choice; neither holds at K-1. Resolution **adds rather than replaces**: keep both starters, add
+  `sub_within_10` plus a third reliable cannon → three cannons across two skills, exactly the duel
+  tray's capacity. Not "a JSON edit" — `SKILL_IDS`/`CANNON_IDS` are frozen unions with tests pinning
+  exact members and counts.
+- **T-030** — 2 starters + 3 from Port Sumwich = **5 cannons against a 3-slot tray**, with no rule
+  deciding which are equipped. Explicit persisted loadout, auto-fill fallback, and acquiring a
+  cannon never silently re-equips.
+- **T-031** — ARCHITECTURE §4.3 says a Perfect Shot grants "+1 bonus ball" while `tuning.ts`
+  implements **+1 damage**, and `BASE_BALLS_PER_VOLLEY = 1` makes the documented "shot spread"
+  reading impossible. The T-004 code review had independently flagged the second half.
+  **Ruled: damage is scalar, balls are presentation the engine ignores.** The felt reward is the
+  quality bias (Swivel 8–10 → 11–12, ~60%), not the `+1`.
+
+Two further design findings were **not** defects: Double-Shot is scheduled as T-022 (wave 6), and
+crew/ranks being unconsumed matches PLAN.md's day-4 cut line.
+
+**Six Test Agents dispatched.** All seven wave-3 file scopes verified disjoint.
+
+| ticket | module | ACs | model |
+|---|---|---|---|
+| T-005 | `questions/distractors.ts` | 14 | opus |
+| T-008 | `duel/damage.ts` | 16 | opus |
+| T-009 | `economy.ts` | 13 | sonnet |
+| T-010 | `mastery.ts` | 15 | sonnet |
+| T-011 | `placement.ts` | 11 | sonnet |
+| T-012 | `ranks.ts` | 11 | haiku |
+
+**T-008 carries the T-031 ruling explicitly in its brief** so the damage model cannot infer the
+"bonus ball" reading before T-031 lands.
+
+**T-010 and T-011 are told to derive from `SKILL_IDS`/`CANNON_IDS` rather than hardcode counts**,
+because T-029 will add a skill and a cannon. This turns a scheduling risk into better test design
+(L-012: assert the mechanism, not a projection of it).
