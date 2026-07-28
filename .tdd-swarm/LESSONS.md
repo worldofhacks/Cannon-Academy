@@ -363,3 +363,27 @@ sign, cardinality, nesting shape, value domain of every injected input — and c
 varied to its extreme, not merely represented. Where a value can be transformed mid-computation,
 check the *intermediate* domain too, not only the boundaries. And treat a passing assertion over
 an unswept domain as no evidence at all.
+
+---
+
+## L-018 — A criterion that defers its own effect size defers it past the freeze (Phase 2)
+
+**Pattern:** T-004 pinned `QUALITY_WEIGHT` as `0 < w <= 1` and explicitly deferred the effect size
+to T-008 AC-16 — a ticket two waves later. But `tuning.ts` **freezes in wave 2**. By the time
+T-008's criterion existed, the constant it constrains would already be immovable, so a value of
+`0.001` would have satisfied every criterion in force at freeze time while making speed-aimed
+damage — the game's stated pedagogical core — statistically invisible.
+
+The Test Agent closed it by deriving the bound in closed form from T-008's own published formula
+(`QUALITY_WEIGHT > 7/12`, set by the widest-range cannons) and asserting it in wave 2, where the
+constant actually freezes. Mutation confirmed the test bites exactly at that boundary and not
+before: `0.5834` passes, `0.55` and `0.001` die.
+
+**Why:** "A later ticket will constrain this" is only true if the later ticket can still change
+the artefact. Once a value is frozen, every constraint on it must already exist — a deferred
+constraint is not deferred, it is discarded.
+
+**What to do instead:** When a criterion defers a bound to a downstream ticket, check which
+artefact freezes first. If **this** one does, the bound must be derived and asserted **now**,
+using the downstream ticket's own stated formula so the two cannot disagree. Deferral is only
+legitimate when the constrained artefact is still editable at the point the constraint arrives.
