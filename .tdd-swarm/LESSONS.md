@@ -467,3 +467,27 @@ consumer's assertion exists, run candidate values through it and find the empiri
 where they disagree, the assertion wins. And when deriving before the consumer exists, prefer a
 bound with visible margin over a tight closed-form one — an approximation with slack is safe,
 an approximation at the knife edge is not.
+
+---
+
+## L-022 — A dispatch that restates a ticket's contract can drift from it (Phase 2)
+
+**Pattern:** T-005's ticket says plainly: *"the module takes no `Rng` parameter at all"*, and AC-10
+requires it to consume no randomness. My dispatch brief, written to be helpful, restated the
+contract as *"same seed + same answer → same distractor set, `Rng` threaded"* — the opposite. The
+Test Agent followed the **ticket**, which is correct, and flagged the contradiction rather than
+silently choosing.
+
+The same brief also asserted that `Math.random()` is lint-banned in the tests. It is not — that
+rule is scoped to `src/engine/**` and `src/content/**`. The agent proved purity **behaviourally**
+by poisoning `Math.random` instead of relying on a guard I had wrongly claimed existed.
+
+**Why:** a dispatch is written from memory of the ticket, and memory paraphrases. The paraphrase
+then arrives carrying the orchestrator's authority, which is exactly the weight needed to talk a
+careful agent out of the real contract. This is [[L-019]]'s shape — an unverified claim delivered
+with authority — appearing in the routine case rather than the dramatic one.
+
+**What to do instead:** dispatches should **point at** contracts, not restate them: "the signature
+is in the ticket's DoD — follow it." Reserve restating for things the ticket does *not* say, which
+is where a dispatch adds value. And never assert that a guard exists without checking its scope —
+if the brief claims a lint rule covers something, verify the rule's `files` glob first.
