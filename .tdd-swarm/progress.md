@@ -461,3 +461,65 @@ walks still recurse — pointing at T-025.
 
 Next: Integration Agent merges the three ticket branches into `swarm/engine-core` in dependency
 order, runs repo gates, and checks architecture drift against ARCHITECTURE.md §4/§8.
+
+---
+
+## Wave 1 integration — PASS (`1eb9cf8..ac34693`)
+
+Three branches merged into `swarm/engine-core` with `--no-ff` in id order. **Zero conflicts** —
+the branches touched strictly disjoint file sets, so nothing semantic had to be resolved. Net
+diff: 9 files, 4,689 insertions, 0 deletions. `package.json` / `package-lock.json` byte-identical
+to both the pre-merge tip and `main` — no runtime dependency entered in this wave.
+
+| gate | result |
+|---|---|
+| `run-local-gates.sh` | exit 0 — format, lint, typecheck, unit, no-todos, no-skipped-tests, engine-purity all PASS |
+| `spec-lint.sh` × T-001/T-002/T-003 | exit 0 — 16 / 26 / 20 ACs mapped, both directions |
+| `npx vitest run` | **492 passed (492)**, 5 files, **1.00s** |
+| `npm audit --audit-level=high` | exit 0 — `found 0 vulnerabilities` (ran offline, not skipped) |
+
+**The 1.00s suite time was investigated rather than accepted.** T-002's four `node:worker_threads`
+non-termination tests do execute — verbose reporter shows them at 41–76 ms each. The 3 s figure is
+a *timeout ceiling reached only by a non-terminating implementation*, not a fixed cost. The suite
+is fast because the implementation rejects non-finite values before `gcd`'s Euclid loop. Worth
+remembering before anyone "optimises" that harness away.
+
+**Cross-ticket compatibility verified — this was the wave's only unverified surface.** A scratchpad
+integration probe (10 assertions, written outside `src/`/`__tests__/` and deleted afterwards) ran
+all three modules in one process along the real generation path: `templateSchema.parse` → `createRng`
++ `nextInt` per param → `evaluatePredicate` rejection sampling → `evaluateNumber` for answer and
+distractors → `shuffle` → `Question` with `SkillId` → `assertQuestion`. All green, plus: same seed
+reproduces the identical question, the three error taxonomies (`ExprError`, `QuestionGenerationError`,
+`RangeError`) stay distinct in one process, and export namespaces are fully disjoint (no shadowing).
+
+Alias resolution proved with a **negative control**, not just a green typecheck: a temporary file
+assigning an invalid literal to `SkillId` was rejected by `tsc`, so `@content/schemas` is carrying the
+real literal union across the boundary rather than degrading to `any`. Engine runtime purity
+confirmed empirically — `@engine/questions/types` exports exactly
+`['QuestionGenerationError', 'assertQuestion']` at runtime, so the `import type` is fully erased and
+zod never enters the engine module graph.
+
+### Drift findings
+
+- **NOT drift — `ExprErrorCode`'s 7th member (`NON_FINITE_VALUE`).** ARCHITECTURE.md describes T-002's
+  subject only as a "tiny safe evaluator over params" and never enumerates an error taxonomy. There is
+  no documented contract to drift from; a sharper failure taxonomy honours the architecture's actual
+  commitment rather than violating it. Below the doc's altitude. No amendment needed.
+- **NOT drift — `createRng` throwing on out-of-range seeds.** §4.1/§4.2 commit to "seeded PRNG
+  (mulberry32), seed carried in state"; `Rng` is still a plain JSON-serialisable `{state}`. Seed
+  *domain* is unspecified at architecture altitude, so this is input validation, not a contract change.
+  Correctly propagated already via `4ec6bf8` — recorded, not absorbed.
+- **FINDING (Minor), ESCALATED — `templateSchema` is looser than §4.1 on distractor count.**
+  §4.1: *"one correct answer plus three engineered distractors"*, four-choice universally.
+  `schemas.ts` implements `.min(3)`. Verified: a 4-distractor template **parses successfully**, and the
+  resulting 5-choice `Question` is then rejected by T-003's own `assertQuestion` with `INVALID_QUESTION`.
+  Two wave-1 modules disagree about one invariant. **Origin is the ticket spec, not the implementer** —
+  `tickets/T-003.md:58` says `distractors: string[] (>=3)` and AC-4 says "at least three"; the frozen
+  tests pin `>=3`. Fails safe but *late* (generation time, not content-validation time, which is where
+  §4.1 put the catch). No repair ticket written: this is not a gate failure and the fix depends on owner
+  intent — tighten to `.length(3)` and re-freeze AC-4, amend §4.1, or accept as deliberate headroom and
+  record why. **Must not be closed silently.**
+
+Full evidence: `.tdd-swarm/reports/wave1-integration.md`.
+
+Next: wave 2 (T-004 tuning, T-006 catalogs) — both depend on T-003, now on `swarm/engine-core`.

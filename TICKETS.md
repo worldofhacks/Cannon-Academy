@@ -31,11 +31,23 @@ source of truth.
 
 ## Wave 1 — foundations (no dependencies)
 
+**Merged into `swarm/engine-core` (`1eb9cf8..ac34693`) — integration PASS.** Three clean merges,
+all repo gates green, **492/492 tests**, `npm audit` clean, manifests unchanged. Cross-module
+integration probe green. One Minor architecture finding open (distractor count, see below).
+Evidence: `.tdd-swarm/reports/wave1-integration.md`.
+
 | id | title | status | deps | branch | model | issue |
 |----|-------|--------|------|--------|-------|-------|
-| T-001 | Seeded mulberry32 PRNG with pure, state-threaded draw helpers | review-passed | — | `ticket/T-001-seeded-prng` | standard | — |
-| T-002 | Safe arithmetic expression and constraint predicate evaluator (no eval) | review-passed | — | `ticket/T-002-safe-expr-eval` | capable | — |
-| T-003 | Content zod schemas, id unions, and engine question types | review-passed | — | `ticket/T-003-schemas-and-types` | standard | — |
+| T-001 | Seeded mulberry32 PRNG with pure, state-threaded draw helpers | done | — | `ticket/T-001-seeded-prng` | standard | — |
+| T-002 | Safe arithmetic expression and constraint predicate evaluator (no eval) | done | — | `ticket/T-002-safe-expr-eval` | capable | — |
+| T-003 | Content zod schemas, id unions, and engine question types | done | — | `ticket/T-003-schemas-and-types` | standard | — |
+
+> **Open Minor finding (owner decision required, T-003).** `templateSchema` allows `.min(3)`
+> distractors; ARCHITECTURE.md §4.1 specifies exactly three ("four-choice taps, universally").
+> A 4-distractor template parses, then fails later at `assertQuestion` with `INVALID_QUESTION`.
+> Origin is the ticket spec (`T-003.md:58`, AC-4 = "at least three"), not the implementation, and
+> the frozen tests pin `>=3`. Fails safe but late. Resolve by tightening to `.length(3)` and
+> re-freezing AC-4, amending §4.1, or recording it as deliberate headroom.
 
 ## Wave 2 — constants and catalog data
 
