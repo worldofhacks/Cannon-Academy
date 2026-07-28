@@ -125,10 +125,15 @@ export function weightedPick<T>(rng: Rng, entries: readonly WeightedEntry<T>[]):
     }
   }
 
-  // Unreachable for any input this function accepts: every weight is finite and
-  // non-negative (checked above), so `total` is finite; `cumulative` sums the same
-  // weights in the same order, so it reaches `total` bit-for-bit on the last entry;
-  // and `nextFloat` returns a value in `[0, 1)`, so `target = f * total < total`
-  // whenever `total > 0`. Reaching this line means an invariant above was violated.
-  throw new Error('weightedPick: internal invariant violated (cumulative never reached total)');
+  // Unreachable for the weight ranges this game uses (small non-negative integers from
+  // tuning.ts): `cumulative` sums the same weights in the same order as `total`, so it
+  // reaches `total` bit-for-bit on the last entry, and `nextFloat`'s `[0, 1)` range then
+  // guarantees `target = f * total < total`. It IS reachable at the extremes of `number`,
+  // where the guards above don't help: weights can be finite individually yet sum to
+  // `Infinity` (e.g. two `Number.MAX_VALUE` entries), and at the denormal floor rounding
+  // is absolute rather than relative, so `f * total` can round up to exactly `total` (a
+  // weight as small as `5e-324` reproduces this). Both cases are caller-supplied weights
+  // landing outside this function's practical domain, not an internal logic error, so this
+  // throws the same error type as the rest of this function's validation.
+  throw new RangeError('weightedPick: weight total is not usable (overflow or denormal rounding)');
 }
