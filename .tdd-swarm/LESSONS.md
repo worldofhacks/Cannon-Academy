@@ -414,3 +414,29 @@ stop if it does not hold. Distinguish "this behaviour was observed" from "this b
 encoded in a test"; those come from different sources and only one of them is a file you can
 point at. And the narrower rule: **never pair an unverified claim with an authorisation** —
 verify first, then authorise, or make the authorisation conditional on the agent's own check.
+
+---
+
+## L-020 — A test can pass for the wrong reason when two orderings coincide (Phase 2)
+
+**Pattern:** T-009's `CHEST_RARITY_ENTRIES` must be built in the order of T-003's `CHEST_RARITIES`
+array, **not** from `Object.entries(CHEST_RARITY_WEIGHTS)` — object key order is an implementation
+detail, not a contract. The Test Agent wrote the obvious static assertion, then noticed it passed
+against an `Object.entries`-based implementation too: `tuning.ts`'s record happens to declare its
+keys in the same order as `CHEST_RARITIES`.
+
+The assertion was **true but vacuous**. It could not distinguish the correct implementation from
+the one it existed to forbid. Only a test that *reorders the source record* (via module mocking)
+gives the guarantee teeth — and the agent confirmed the plain test's false pass first, before
+trusting the mocked test's catch.
+
+**Why:** When two independent orderings coincide today, any test comparing one to the other passes
+regardless of which the implementation actually reads. Nothing signals this — the test is green,
+the code is correct, and the guarantee is absent. It surfaces later, when someone reorders a
+record for readability and a downstream weighted draw silently mis-weights.
+
+**What to do instead:** When a test asserts that A is derived from B, ask whether A and B currently
+agree by *coincidence*. If they do, the test proves nothing until you perturb one of them. Mock the
+source into a different order, or construct a fixture where the two orderings genuinely differ.
+The general rule: **a test whose subject and expectation happen to agree today is measuring the
+coincidence, not the contract.**
