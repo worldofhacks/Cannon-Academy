@@ -19,3 +19,25 @@ complete; resume at the first incomplete ticket. Never re-dispatch finished work
 - Lessons seeded: L-001, L-002, L-003.
 
 **Status: Phase 0 COMPLETE — all gates green.** Next: Phase 1 planning.
+
+---
+
+## Phase 1 — Planning (2026-07-27)
+
+- Decomposed `src/engine/**` + `src/content/**` into **24 tickets across 8 waves**
+  (`tickets/T-001.md` … `T-024.md`, index in `TICKETS.md`).
+- Wave assignment and `file_scopes` exclusivity verified mechanically: every ticket sits at the
+  earliest wave its dependencies allow, and no two tickets in a wave share a file. The only
+  cross-wave file overlaps are T-022 extending `duel/types.ts` (T-013) and `duel/reducer.ts`
+  (T-020), each as sole owner of those files in wave 7.
+- All 24 tickets parse under `spec-lint.sh` with contiguous `AC-n` ids; all currently RED, which
+  is correct before the Test Agent runs.
+- Every ticket has a non-empty `traces_to`. Coverage map and the explicit list of uncovered
+  in-scope work: `.tdd-swarm/traceability.md`.
+- **16 open questions raised for the human** (traceability.md §2) — unspecified numbers were
+  either named as behaviour-pinned `tuning.ts` constants or escalated; none was invented.
+- **12 planning gaps recorded** (traceability.md §3), incl. one recommended follow-up ticket
+  (captain-name wordlist filter, ARCHITECTURE.md §11).
+- No `Eval` rows anywhere: there is no LLM in this codebase.
+
+**Status: Phase 1 COMPLETE — tickets frozen, awaiting Wave 1 dispatch.**
