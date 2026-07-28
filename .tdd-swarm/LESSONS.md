@@ -752,3 +752,49 @@ any worktree. `.worktrees/**` is now ignored at the root; each worktree runs the
 itself. **When you move a directory into a repo, enumerate every tool that globs from the root** —
 `.gitignore` was fixed for this at the time, and the linter was missed because nothing had yet run
 it against an occupied worktree.
+
+---
+
+## L-032 — The coverage gate measures what the ticket _numbers_, not what it _requires_ (Wave 4, tests)
+
+**Pattern:** `spec-lint.sh` harvests criteria with `grep -oE '\*\*AC-[0-9]+\*\*'`. It therefore
+measures coverage of **numbered** acceptance criteria only. The T-013 Test Agent found that the
+`DuelEvent` union — the most-imported shape in its ticket — appears solely in prose, in `traces_to`,
+and in a Definition-of-Done checkbox, and **has no AC at all**. So `spec-lint` would report T-013
+fully covered while enforcing nothing whatsoever about it. The agent wrote thirteen tests for the
+union anyway and tagged them `dod(T-013:…)`, which the gate does not read: the tests exist, but
+nothing requires them and nothing would notice their deletion.
+
+**Why:** the gate was built to answer "is every criterion tested?", and we then let requirements
+accumulate in prose and DoD checkboxes as though those were criteria too. A requirement that is not
+numbered is not measured — and because the gate goes green, its silence reads as coverage. This is
+[[L-001]] pointed at a gate rather than a guard: it is worth only what it has been observed
+enforcing, and it has never been observed enforcing an unnumbered requirement, because it cannot.
+
+**What to do instead:** every requirement an implementer must satisfy gets a numbered AC. When a
+Test Agent reports that it had to invent a `dod(...)` tag, that is the gate telling you the ticket is
+under-specified — treat it as a spec defect, not as a tagging convention. T-013's proposed AC-13…
+AC-16 for the union are the fix for this instance; the systemic choice, deferred until the wave
+lands rather than changed under two running agents, is whether to number DoD items or teach the gate
+to harvest `dod(...)` as well.
+
+---
+
+## L-033 — Verify an agent's diff against the merge base, never the branch tip (Wave 4, tests)
+
+**Pattern:** T-013's first territory check, `git diff --stat swarm/engine-core..HEAD`, showed the
+agent **deleting 169 lines** across `guard-policy.cjs`, `LESSONS.md`, `prove-guard.sh`, `.gitignore`,
+`eslint.config.js` and `TICKETS.md` — every one a control-surface file it is forbidden to touch. It
+looked like a serious territory violation by an agent that had reported touching nothing.
+
+It had touched nothing. The integration branch had moved on _while the agent worked_ — my own guard
+commits landed after its branch point — so a tip-relative diff renders "commits the branch does not
+have yet" as deletions by the branch. Against the real merge base the diff was exactly two files.
+
+**Why:** `A..B` is not "what B changed", it is "what B has that A lacks". The two coincide only while
+A has not moved, which is precisely what stops being true during a wave with a long-running agent.
+
+**What to do instead:** `BASE=$(git merge-base <integration> HEAD)` and diff `$BASE..HEAD`. The
+verification of a territory claim is worthless if its baseline drifted mid-run, and the failure mode
+is the expensive direction — it accuses a clean agent, and doing that once teaches you to discount
+the check.

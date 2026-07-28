@@ -1103,5 +1103,68 @@ all observed**. Also fixed: `.gitignore`'s `node_modules/` never matched the wor
 ### Six spec ambiguities raised, awaiting orchestrator ruling — tests NOT yet frozen
 
 The agent tested a defensible reading of each and reported the reasoning rather than guessing
-silently. Two are load-bearing for T-024's replay proof. Rulings are pending, so **T-007's suite is
-committed but not frozen**, and the independent test-design review has not yet been dispatched.
+silently. Two are load-bearing for T-024's replay proof.
+
+**Owner ruling:** the pre-shuffle choice array is `[answer, ...distractors]` (answer first), matching
+the algorithm's step order. Sequencing ruling: **review first, amend once** — the independent
+test-design review weighs in on all six readings before the ticket is touched, so the ACs are not
+amended twice. T-007's suite is therefore committed but **not frozen**. Review dispatched on
+`gpt-5.6-terra-medium`, deliberately a different family from the Opus author, aimed hardest at the
+`composeExpected` oracle (agent-written code asserting agent-understood behaviour) and at
+independently measuring the AC-14 claim. Frozen file recorded at
+`12e82f4d…` for a tamper check on return.
+
+### T-013: tests-written (commits `febe70c`, `d817101`, `3d6ff2c`)
+
+Gates re-run by the orchestrator; every claim holds. 100 tests (87 `spec`-tagged, 13 `dod`-tagged),
+173 assertion sites, **40 of them compile-time probes** — 64 `Exact<>` assertions and 30
+`@ts-expect-error` directives, with a negative control on the `Exact<>` helper itself. **29 designed
+cheats, 29 killed**, and liveness proven first by three control mutants that _should_ be invisible
+and were. Widening every id to `string` passed every runtime test and was caught only at the type
+level.
+
+| check         | verified                                                                           |
+| ------------- | ---------------------------------------------------------------------------------- |
+| Diff scope    | exactly 2 files vs the **merge base**, 0 changes to `src/`, tickets or config      |
+| format / lint | exit 0 / exit 0                                                                    |
+| typecheck     | 75 errors, **all in its own test file**: 3× `TS2307` + 72 negative controls firing |
+| suite         | 1 collection error, **1229 other tests still pass**                                |
+| spec-lint     | `SPEC-LINT PASS`, 12 ACs mapped                                                    |
+
+The 72 non-`TS2307` errors are the suite's type probes proving they are wired to the absent module:
+with it missing, every imported type is `any`, so each `Exact<>` that must resolve `false` resolves
+`true` and each `@ts-expect-error` finds nothing to suppress. Consequence for the implementer, which
+the agent stated rather than leaving to be discovered: **expect `tsc` to go 75 → 0**, not merely for
+the module errors to clear. Positive-direction probes are vacuous while the module is absent, so the
+agent established the suite's teeth against a reference implementation (100/100 green, `tsc` clean)
+instead of trusting redness — L-024's lesson applied unprompted.
+
+Two cheats initially survived for **coincidental** reasons, the same shape T-007 hit independently:
+hardcoding `playerHull: 100` survived because `PLAYER_HULL` really is 100 (fixed by mocking tuning to
+a perturbed value), and an ordering assertion was **vacuously true** because the fixture's boolean
+sequence was palindromic (fixed to a non-palindromic pattern plus a fixture self-check). Two agents
+on different tickets both found that their own fixtures were hiding mutants — worth treating as the
+default suspicion rather than a curiosity.
+
+#### Three blocking spec defects, two verified arithmetically by the orchestrator
+
+- **AC-4 is provably false.** `createRng` validates seeds over `[-0xffffffff, 0xffffffff]` but stores
+  `seed >>> 0`, so `-1` and `0xffffffff` yield an identical `Rng`. Measured: **1000 of 1000**
+  `(-n, 2³² − n)` pairs collide — the entire negative half of the legal domain aliases onto the
+  positive half. "Distinct seeds produce distinct streams" cannot hold as written.
+- **AC-5 never mentions `seed` validation.** `DuelConfig.seed` is a caller-supplied replay key, so
+  masking it with `>>> 0` would map `NaN`, `2**33` and `-0.5` all onto seed `0` — reintroducing the
+  aliasing T-001's throw exists to prevent, in the one module whose whole purpose is replay.
+- **The `DuelEvent` union has no AC** — see L-032. The gate would call T-013 fully covered while
+  enforcing nothing about the ticket's most-imported shape.
+
+#### One escalation, confirmed: the onboarding duel cannot be constructed
+
+`ONBOARDING_ENEMY_HULL = 28` is frozen in tuning, but AC-2 forces
+`enemyMaxHull = ENEMY_HULL_BY_ISLAND.port_sumwich = 45` and `DuelConfig` has no override. Verified
+against the frozen content: `swivel_gun.damageMax = 12` and `PERFECT_SHOT_BONUS_DAMAGE = 1`, so a
+Perfect-Shot volley lands 13. **28 hull sinks in exactly 3 volleys; 45 needs 4** — even playing
+perfectly. PLAN.md's onboarding sloop that "politely sinks in three volleys" is unmeetable, and
+`ONBOARDING_ENEMY_HULL` is dead code, unless `DuelConfig` carries an `enemyMaxHull` override. The
+agent escalated rather than inventing the override, and deliberately avoided `keyof DuelConfig`
+exactness so that adding one lands additively with no test change. Affects T-018 and T-020.

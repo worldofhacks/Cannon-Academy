@@ -96,7 +96,7 @@ blocks the merge; both should close before wave 4 dispatches.
 | id    | title                                                                            | status        | deps                              | branch                            | model    | issue |
 | ----- | -------------------------------------------------------------------------------- | ------------- | --------------------------------- | --------------------------------- | -------- | ----- |
 | T-007 | Question generator — selection, rejection sampling, render, four-choice assembly | tests-written | T-001, T-002, T-003, T-004, T-005 | `ticket/T-007-question-generator` | capable  | —     |
-| T-013 | Duel state, events, action log, and initial-state construction                   | backlog       | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | —     |
+| T-013 | Duel state, events, action log, and initial-state construction                   | tests-written | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | —     |
 
 ## Wave 5 — template content, drill, opponents, the duel machine
 
