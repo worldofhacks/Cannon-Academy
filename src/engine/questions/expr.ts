@@ -44,9 +44,9 @@
  *     argument would spin forever inside T-007's rejection-sampling loop, with no error and no
  *     recovery.
  *
- * Two deterministic bounds keep the module total. Neither depends on how deep the host's stack
- * happens to go, because that threshold is host-specific: measured on one machine, an operator
- * chain overflowed at 4,688 terms; the code review bisected 4,562 and the orchestrator 4,000.
+ * Two deterministic bounds keep the module total. Both are fixed numbers, chosen so that no
+ * outcome depends on how deep the host's stack happens to go — see `MAX_AST_DEPTH` for the
+ * measured margins, which differ sharply between Node and a browser main thread.
  *
  *   - `MAX_NESTING_DEPTH` bounds parenthesis and call nesting (AC-15, AC-20).
  *   - `MAX_AST_DEPTH` bounds the height of the parsed tree (AC-26). The binary productions fold
@@ -230,12 +230,29 @@ const MAX_NESTING_DEPTH = 64;
 /**
  * Maximum height of the parsed tree, which is the maximum recursion depth of every later walk.
  *
- * The window is bounded from below by the longest expression that must still evaluate — AC-26
- * requires a 500-term operator chain, whose left-deep tree has height 500 — and from above by the
- * host stack, measured at a first `RangeError` between 4,000 and 4,688 terms across three
- * machines. 1024 is twice the required floor and roughly a quarter of the lowest observed
- * ceiling. It is a fixed number rather than an emergent one: the same input is accepted or
- * rejected identically on every host, which is what AC-26 asks for.
+ * Floor: the longest expression that must still evaluate. AC-26 requires a 500-term operator
+ * chain, whose left-deep tree has height 500, so the cap cannot go below that.
+ *
+ * Ceiling: the host stack. This is NOT one number — it varies by roughly an order of magnitude
+ * across the hosts this engine is expected to run on. Bisected with the cap lifted, at controlled
+ * stack sizes:
+ *
+ *     stack size                        longest chain that evaluates      margin over 1024
+ *     4 MB   (Node's default)           18,756 terms                      18.3x
+ *     1 MB   (approx. a browser main thread)   3,521 terms                 3.4x
+ *     0.5 MB (a constrained worker)      1,569 terms                       1.5x
+ *
+ * So the real headroom on a constrained worker is 1.5x, not the ~4x an earlier revision of this
+ * comment claimed from Node-only figures. The boundary is also run-dependent, not merely
+ * host-dependent: repeated bisections on one machine do not agree, because the frames already on
+ * the stack when the walk begins vary. That is an argument FOR a fixed cap — an emergent limit
+ * would make the same input succeed and fail on the same machine.
+ *
+ * 1024 is twice the required floor and stays inside the smallest measured ceiling, so the same
+ * input is accepted or rejected identically everywhere, which is what AC-26 asks for. It is a
+ * margin, not a proof: `checkNode`, `computeNumber` and `computeBoolean` still recurse, so this
+ * constant is what keeps them safe rather than anything structural. Converting those three walks
+ * to explicit-stack iteration would remove the dependence entirely; it is filed as a follow-up.
  */
 const MAX_AST_DEPTH = 1024;
 
@@ -564,6 +581,16 @@ function unknownIdentifier(name: string): ExprError {
 }
 
 /**
+ * The single membership rule for the environment, shared by the checking pass and the evaluation
+ * pass so the two cannot drift apart. Inherited members do not count: `constructor`, `toString`,
+ * `hasOwnProperty` and `__proto__` are all reachable on a plain object literal and none of them
+ * is a template parameter.
+ */
+function hasParameter(env: Environment, name: string): boolean {
+  return Object.hasOwn(env, name);
+}
+
+/**
  * Walks the entire tree, resolving every identifier and every call and typing every node. This
  * runs before evaluation and visits both operands of `&&` and `||`, which is what makes
  * identifier resolution and type checking survive short-circuiting (AC-23, AC-24).
@@ -574,7 +601,7 @@ function checkNode(node: Node, env: Environment): ValueType {
       return 'number';
 
     case 'identifier':
-      if (!Object.hasOwn(env, node.name)) {
+      if (!hasParameter(env, node.name)) {
         throw unknownIdentifier(node.name);
       }
       return 'number';
@@ -616,9 +643,19 @@ function checkNode(node: Node, env: Environment): ValueType {
 // Evaluation — a plain walk of the checked tree
 // ---------------------------------------------------------------------------------------------
 
+/**
+ * Applies the same `hasParameter` rule as the checking pass, so a name accepted there is accepted
+ * here. The second guard is not a second membership rule: `noUncheckedIndexedAccess` types
+ * `env[name]` as `number | undefined`, and this is the narrowing that removes the `undefined`.
+ * It can only fire if a caller stores an explicit `undefined` under a real key, which the
+ * `Environment` type forbids; the throw keeps that case typed rather than leaking `undefined`.
+ */
 function readIdentifier(name: string, env: Environment): number {
+  if (!hasParameter(env, name)) {
+    throw unknownIdentifier(name);
+  }
   const value = env[name];
-  if (!Object.hasOwn(env, name) || value === undefined) {
+  if (value === undefined) {
     throw unknownIdentifier(name);
   }
   return value;
@@ -671,13 +708,14 @@ function requireFinite(value: number, source: string): number {
 }
 
 /**
- * `computeNumber` is the single place a number is produced, so putting `requireFinite` on every
- * one of its returns is the whole non-finite guard for values (AC-25). It covers a literal, a
- * parameter read from the environment, a negation, a function result, and — the route a guard
- * placed only on literals and on the environment would miss — an arithmetic result that becomes
- * non-finite mid-evaluation, as in `gcd(a * a, 2)` with `a = 1e200`. Because a call's arguments
- * are themselves produced here, no non-finite value can reach a whitelisted function; that is
- * what stops `gcd` spinning forever on `(NaN, NaN)`, a fixed point of its Euclid loop.
+ * `computeNumber` is the single place a number is produced, so `requireFinite` on its returns is
+ * the whole non-finite guard for values (AC-25): a parameter read from the environment, a
+ * negation, a function result, and — the route a guard placed only on literals and on the
+ * environment would miss — an arithmetic result that becomes non-finite mid-evaluation, as in
+ * `gcd(a * a, 2)` with `a = 1e200`. Literals are the exception and are guarded one step earlier,
+ * in `tokenize`. Because a call's arguments are themselves produced here, no non-finite value can
+ * reach a whitelisted function; that is what stops `gcd` spinning forever on `(NaN, NaN)`, a
+ * fixed point of its Euclid loop.
  *
  * The `TYPE_MISMATCH` throws are defensive: `checkNode` has already proved every node's type, so
  * a boolean-valued node cannot arrive here. They exist so that a future change which bypasses the
@@ -685,8 +723,13 @@ function requireFinite(value: number, source: string): number {
  */
 function computeNumber(node: Node, env: Environment): number {
   switch (node.kind) {
+    // A literal is the one number this function does not have to check: `tokenize` rejects an
+    // unrepresentable literal at the source, so `node.value` is finite by construction. Probed
+    // rather than assumed — with the tokenise guard in place, 0 of 93 expressions placing an
+    // oversized literal in every syntactic position delivered a non-finite value here; with that
+    // guard removed, 87 of the same 93 did.
     case 'number':
-      return requireFinite(node.value, 'a numeric literal');
+      return node.value;
 
     case 'identifier':
       return requireFinite(readIdentifier(node.name, env), `parameter "${node.name}"`);
@@ -714,11 +757,20 @@ function computeNumber(node: Node, env: Environment): number {
 }
 
 function applyWhitelistedCall(name: string, values: readonly number[]): number {
+  // `checkNode` has already resolved this name and arity. Resolving again here is not a
+  // duplicated rule — `resolveWhitelistedCall` remains the only place the whitelist is read —
+  // it is how the evaluator recovers the spec, whose `arity` discriminant is what narrows
+  // `apply` to its one- or two-argument shape below. The alternative, threading the resolved
+  // spec from the checking pass into the evaluation pass, would make the tree stateful for no
+  // gain: resolution is a pure map lookup.
   const spec = resolveWhitelistedCall(name, values.length);
   const first = values[0];
   if (spec.arity === 1) {
     if (first === undefined) {
-      throw new ExprError('ARITY_MISMATCH', `function "${name}" takes 1 argument but received 0`);
+      throw new ExprError(
+        'ARITY_MISMATCH',
+        `function "${name}" takes 1 argument but received ${values.length}`,
+      );
     }
     return spec.apply(first);
   }
