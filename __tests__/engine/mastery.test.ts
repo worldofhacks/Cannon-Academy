@@ -44,7 +44,14 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { emptyMastery, applyAnswer, accuracy, meterPercent, isMastered, resolveUnlocks } from '@engine/mastery';
+import {
+  emptyMastery,
+  applyAnswer,
+  accuracy,
+  meterPercent,
+  isMastered,
+  resolveUnlocks,
+} from '@engine/mastery';
 import type { SkillMastery, MasterySource } from '@engine/mastery';
 import {
   MASTERY_THRESHOLD_CORRECT,
@@ -169,25 +176,28 @@ describe('applyAnswer', () => {
     ['range', false],
     ['duel', true],
     ['duel', false],
-  ])('spec(T-010:AC-4) applyAnswer(m, %s, %s) never mutates its input and returns a new object', (source, correct) => {
-    // Freeze the input: an implementation that mutates in place throws a TypeError here
-    // (ESM modules run in strict mode), which is a far stronger guarantee than re-reading
-    // fields after the call and hoping nothing changed them in place then back again.
-    const input: SkillMastery = Object.freeze({ weightedCorrect: 3, correct: 3, attempts: 5 });
-    let result: SkillMastery | undefined;
-    expect(() => {
-      result = applyAnswer(input, source, correct);
-    }).not.toThrow();
+  ])(
+    'spec(T-010:AC-4) applyAnswer(m, %s, %s) never mutates its input and returns a new object',
+    (source, correct) => {
+      // Freeze the input: an implementation that mutates in place throws a TypeError here
+      // (ESM modules run in strict mode), which is a far stronger guarantee than re-reading
+      // fields after the call and hoping nothing changed them in place then back again.
+      const input: SkillMastery = Object.freeze({ weightedCorrect: 3, correct: 3, attempts: 5 });
+      let result: SkillMastery | undefined;
+      expect(() => {
+        result = applyAnswer(input, source, correct);
+      }).not.toThrow();
 
-    expect(input.weightedCorrect).toBe(3);
-    expect(input.correct).toBe(3);
-    expect(input.attempts).toBe(5);
-    expect(result).not.toBe(input);
+      expect(input.weightedCorrect).toBe(3);
+      expect(input.correct).toBe(3);
+      expect(input.attempts).toBe(5);
+      expect(result).not.toBe(input);
 
-    // Purity: calling again with the same (still-frozen) input produces an equal result.
-    const result2 = applyAnswer(input, source, correct);
-    expect(result2).toEqual(result);
-  });
+      // Purity: calling again with the same (still-frozen) input produces an equal result.
+      const result2 = applyAnswer(input, source, correct);
+      expect(result2).toEqual(result);
+    },
+  );
 
   it('spec(T-010:AC-5) MASTERY_RATE_RANGE is exactly twice MASTERY_RATE_DUEL (not merely >=)', () => {
     // L-006: the whole "ranges are the fast lane" design collapses if this is only an
@@ -281,7 +291,10 @@ describe('meterPercent', () => {
     for (let i = 0; i <= 40; i++) {
       const weightedCorrect = i * 0.5; // exact: multiplying an integer by 0.5 has no float error
       const m: SkillMastery = { weightedCorrect, correct: 0, attempts: 0 };
-      const expected = Math.min(MASTERY_METER_MAX, Math.round((100 * weightedCorrect) / MASTERY_THRESHOLD_CORRECT));
+      const expected = Math.min(
+        MASTERY_METER_MAX,
+        Math.round((100 * weightedCorrect) / MASTERY_THRESHOLD_CORRECT),
+      );
       const actual = meterPercent(m);
 
       expect(Number.isInteger(actual)).toBe(true);
@@ -399,9 +412,7 @@ describe('isMastered', () => {
 
 describe('resolveUnlocks', () => {
   it('spec(T-010:AC-13) returns empty cannons and islands for an empty mastery map, and never throws', () => {
-    expect(() =>
-      resolveUnlocks({ mastery: {}, unlockedCannons: [], unlockedIslands: [] }),
-    ).not.toThrow();
+    expect(() => resolveUnlocks({ mastery: {}, unlockedCannons: [], unlockedIslands: [] })).not.toThrow();
 
     const result = resolveUnlocks({ mastery: {}, unlockedCannons: [], unlockedIslands: [] });
     expect(result.cannons).toEqual([]);
@@ -557,7 +568,10 @@ describe('resolveUnlocks', () => {
   it('spec(T-010:AC-14) resolving twice, merging the first result into the inputs, yields empty on the second call (idempotence)', () => {
     // Strongest form: master every skill at once so every cannon- and island-unlock branch
     // fires on the first call, then prove none of it duplicates on the second.
-    const everySkillId = new Set<SkillId>([...cannons.map((c) => c.skill), ...islands.flatMap((i) => i.rangeSkills)]);
+    const everySkillId = new Set<SkillId>([
+      ...cannons.map((c) => c.skill),
+      ...islands.flatMap((i) => i.rangeSkills),
+    ]);
     const mastery = masteryMapFor([...everySkillId]);
 
     const first = resolveUnlocks({ mastery, unlockedCannons: [], unlockedIslands: [] });
