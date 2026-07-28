@@ -304,6 +304,9 @@ waves and both deliberate:
 
 | id | title | status | deps | origin |
 |----|-------|--------|------|--------|
+| T-029 | Give K-1 a real cannon choice — add sub_within_10 and a third starter | backlog | T-003, T-006 | design review — grade 0 has one skill, so "choose a cannon" is not a choice |
+| T-030 | Loadout selection — which three cannons sail with you | backlog | T-006, T-010 | design review — 5 cannons available after island 1, tray fits 3, nothing decides |
+| T-031 | Resolve the Perfect Shot "bonus ball" contradiction | backlog | T-004 | design review + T-004 code review — ARCHITECTURE says "+1 ball", code says "+1 damage" |
 | T-028 | CHOICE_COUNT must have one home, not two | backlog | T-003, T-004 | wave-2 integration drift — the merge created a duplicate the dev-screen slider would arm |
 | T-027 | validateCatalogs must detect set-level catalog corruption | backlog | T-006 | T-006 code review M-1 — the function is weaker than its signature implies |
 | T-025 | Replace the expression evaluator's recursive walks with explicit-stack iteration | backlog | T-002 | T-002 code review — `MAX_AST_DEPTH` is a measured margin (1.5× at a 0.5 MB stack), not a guarantee by construction |
