@@ -304,5 +304,6 @@ waves and both deliberate:
 
 | id | title | status | deps | origin |
 |----|-------|--------|------|--------|
+| T-028 | CHOICE_COUNT must have one home, not two | backlog | T-003, T-004 | wave-2 integration drift — the merge created a duplicate the dev-screen slider would arm |
 | T-027 | validateCatalogs must detect set-level catalog corruption | backlog | T-006 | T-006 code review M-1 — the function is weaker than its signature implies |
 | T-025 | Replace the expression evaluator's recursive walks with explicit-stack iteration | backlog | T-002 | T-002 code review — `MAX_AST_DEPTH` is a measured margin (1.5× at a 0.5 MB stack), not a guarantee by construction |
