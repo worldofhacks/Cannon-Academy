@@ -1335,3 +1335,82 @@ describe('AC-23 — short-circuit evaluation of logical operators', () => {
     expect(evaluatePredicate('b == 0 || a % b == 0 || a / b > 1', { a: 5, b: 0 })).toBe(true);
   });
 });
+
+// --------------------------------------------------------------------------------------------
+// AC-24 — identifier resolution is STATIC, and survives short-circuiting
+//
+// Short-circuiting suppresses only genuinely value-dependent failures (DIVISION_BY_ZERO).
+// An identifier that cannot resolve is a defect in hand-authored content: a typo'd parameter
+// would otherwise sit undetected in a catalog for as long as its branch happened to be
+// short-circuited, and T-019's sample sweep cannot guarantee that branch is ever evaluated.
+// --------------------------------------------------------------------------------------------
+
+describe('AC-24 — every identifier must resolve, evaluated branch or not', () => {
+  it('spec(T-002:AC-24) an unknown identifier in a short-circuited || operand still throws', () => {
+    expectPredicateError('b == 0 || z > 0', { b: 0 }, 'UNKNOWN_IDENTIFIER');
+  });
+
+  it('spec(T-002:AC-24) an unknown identifier in an evaluated || operand throws', () => {
+    expectPredicateError('b == 1 || z > 0', { b: 0 }, 'UNKNOWN_IDENTIFIER');
+  });
+
+  it('spec(T-002:AC-24) an unknown identifier in a short-circuited && operand still throws', () => {
+    expectPredicateError('b != 0 && z > 0', { b: 0 }, 'UNKNOWN_IDENTIFIER');
+  });
+
+  it('spec(T-002:AC-24) an unknown identifier in an evaluated && operand throws', () => {
+    expectPredicateError('b == 0 && z > 0', { b: 0 }, 'UNKNOWN_IDENTIFIER');
+  });
+
+  it('spec(T-002:AC-24) an unknown identifier in the left operand throws', () => {
+    expectPredicateError('z > 0 || b == 0', { b: 0 }, 'UNKNOWN_IDENTIFIER');
+  });
+
+  it('spec(T-002:AC-24) the message names the unresolved identifier from the skipped branch', () => {
+    const err = expectPredicateError('b == 0 || z > 0', { b: 0 }, 'UNKNOWN_IDENTIFIER');
+    expect(err.message).toMatch(/\bz\b/);
+  });
+
+  it('spec(T-002:AC-24) an unknown identifier inside a short-circuited call argument throws', () => {
+    expectPredicateError('b == 0 || abs(z) > 0', { b: 0 }, 'UNKNOWN_IDENTIFIER');
+  });
+
+  it('spec(T-002:AC-24) a mistyped parameter in a guarded constraint is reported, not skipped', () => {
+    expectPredicateError('a % b == 0 || zz > 1', { a: 12, b: 4 }, 'UNKNOWN_IDENTIFIER');
+  });
+
+  it('spec(T-002:AC-24) an unknown identifier in a short-circuited third disjunct throws', () => {
+    expectPredicateError('b == 0 || a > 0 || z > 0', { a: 5, b: 0 }, 'UNKNOWN_IDENTIFIER');
+  });
+
+  // Positive controls — the rule must not be satisfiable by an evaluator that rejects everything.
+
+  it('spec(T-002:AC-24) a short-circuited || operand using a valid identifier still succeeds', () => {
+    expect(evaluatePredicate('b == 0 || a > 0', { a: 5, b: 0 })).toBe(true);
+  });
+
+  it('spec(T-002:AC-24) a short-circuited && operand using a valid identifier still succeeds', () => {
+    expect(evaluatePredicate('b != 0 && a > 0', { a: 5, b: 0 })).toBe(false);
+  });
+
+  it('spec(T-002:AC-24) a short-circuited call argument using a valid identifier still succeeds', () => {
+    expect(evaluatePredicate('b == 0 || abs(a) > 0', { a: 5, b: 0 })).toBe(true);
+  });
+
+  it('spec(T-002:AC-24) an environment key unused by the expression is not required', () => {
+    expect(evaluatePredicate('b == 0 || a > 0', { a: 5, b: 0, unused: 99 })).toBe(true);
+  });
+
+  // The distinction the ruling turns on: a value-dependent failure is suppressed, name
+  // resolution is not.
+
+  it('spec(T-002:AC-24) short-circuiting suppresses DIVISION_BY_ZERO but not UNKNOWN_IDENTIFIER', () => {
+    expect(evaluatePredicate('b == 0 || a % b == 0', { a: 5, b: 0 })).toBe(true);
+    expectPredicateError('b == 0 || z % 2 == 0', { a: 5, b: 0 }, 'UNKNOWN_IDENTIFIER');
+  });
+
+  // NOTE: `"b == 0 || z"` — where the skipped operand is BOTH unresolvable and of the wrong
+  // type — is deliberately NOT pinned. `UNKNOWN_IDENTIFIER` and `TYPE_MISMATCH` are each
+  // defensible depending on the order of the static passes, and no criterion rules on it
+  // (this is review finding M3, still open). Inventing an answer here would freeze a guess.
+});
