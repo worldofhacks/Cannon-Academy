@@ -160,3 +160,47 @@ unknown-key policy explicitly and test it. Default to strict for hand-authored c
 More generally: when a ticket specifies a validator, require the spec to state what it
 **rejects**, not only what it accepts — a criterion listing only accept cases is passed
 by a validator that accepts everything.
+
+---
+
+## L-010 — Language-level semantics must be pinned, not assumed shared (Phase 2)
+
+**Pattern:** A safe arithmetic evaluator specified `%`, `/`, and `gcd` without stating
+behaviour for negative or zero operands. Every one of those is reachable from a constraint
+expression, and each has two defensible answers: `%` is remainder (sign follows the
+dividend) in JS but modulo (always non-negative) in mathematics; `gcd(0,0)` is `0` by
+convention or an error by argument; a zero-argument call is a parse failure under one
+reading of the grammar and an arity failure under another.
+
+**Why:** Both the spec author and the implementer "know" what these mean — and know
+different things. Nothing surfaces the disagreement, because each side's tests agree with
+its own reading. In a K-5 math engine the downstream cost is not a crash: it is a
+divisibility constraint that quietly admits the wrong parameters and ships a question with
+a wrong answer.
+
+**What to do instead:** For any evaluator, parser, or numeric routine, require the spec to
+pin behaviour at the **degenerate inputs** — zero, negative, empty, and the arity/precedence
+boundaries — not merely the happy path. When two conventions exist, name the chosen one and
+say why. Prefer the host language's native semantics unless there is a concrete reason not
+to; it is the reading an implementer will default to under time pressure.
+
+---
+
+## L-011 — Prove a frozen suite against a throwaway reference implementation (Phase 2)
+
+**Pattern:** Two Test Agents, independently, built a scratch implementation outside `src/`,
+ran the frozen suite against it to prove every criterion was *satisfiable* and every
+hand-computed expected value correct, then deliberately mutated that reference to prove each
+assertion had teeth — and deleted it. This caught a criterion that AC text alone made look
+fine, and confirmed that assertions which merely *looked* strong actually failed on a wrong
+implementation.
+
+**Why:** A red suite proves only that code is missing. It cannot distinguish a correct
+frozen contract from an unsatisfiable one, a tautology, or a wrong expected value — all of
+which look identical while the module is absent, and all of which become extremely expensive
+the moment an implementer is bound by them.
+
+**What to do instead:** Before freezing, build a throwaway reference in the scratchpad, prove
+the suite goes fully green against it, then mutate it once per assertion class and confirm the
+matching tests fail. Never create it under `src/` — it is a proof device, not production code,
+and it must be deleted before commit.
