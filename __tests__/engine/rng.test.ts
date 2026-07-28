@@ -17,6 +17,15 @@ import { createRng, nextFloat, nextInt, pick, shuffle, weightedPick, type Rng } 
 // shuffle, `items[0]` pick) could satisfy. See `.tdd-swarm/reports/T-001-test-design-review.md`.
 // All array/entry fixtures below are typed `readonly` per AC-14 / finding I-2, so an
 // implementation that types its parameters as mutable arrays fails `tsc`, not just review.
+//
+// AC-15 (seed validation) and AC-16 (undefined-tolerant shuffle/pick), plus the non-finite
+// clause folded into AC-11, were added after an independent CODE review of the landed
+// implementation (`.tdd-swarm/reports/T-001-code-review.md`) found bugs no criterion had asked
+// about: `createRng` silently aliased `NaN`/`-0.5`/`2**33` to seed `0`; `weightedPick` silently
+// returned the last entry for a `NaN`/`Infinity` weight; and `shuffle`/`pick`'s internal bounds
+// helper checked whether the retrieved VALUE was `undefined` rather than the INDEX, so an array
+// legitimately containing `undefined` (routine under this repo's `noUncheckedIndexedAccess`)
+// made them throw a false "index out of bounds".
 
 // ---------------------------------------------------------------------------
 // Independent reference implementation, transcribed directly from the pseudocode in
@@ -56,6 +65,20 @@ function drawFloats(start: Rng, count: number): { values: number[]; end: Rng } {
   return { values, end: rng };
 }
 
+// A stable string key for an arbitrary element, including `undefined` — used to compare
+// multisets for AC-16's undefined-tolerant permutation check, where plain numeric/string
+// sort comparators break on `undefined`.
+function elementKey(value: unknown): string {
+  return typeof value === 'undefined' ? '<undefined>' : String(value);
+}
+
+function isPermutation(result: readonly unknown[], input: readonly unknown[]): boolean {
+  if (result.length !== input.length) return false;
+  const a = [...result].map(elementKey).sort();
+  const b = [...input].map(elementKey).sort();
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 describe('createRng / nextFloat — reproducibility and seed sensitivity', () => {
   it('spec(T-001:AC-1): identical seeds produce element-wise identical sequences over 1000 draws', () => {
     const seed = 123456789;
@@ -70,6 +93,15 @@ describe('createRng / nextFloat — reproducibility and seed sensitivity', () =>
     const b = drawFloats(createRng(2), 10);
     expect(a.values).not.toEqual(b.values);
   });
+});
+
+describe('createRng — seed validation', () => {
+  it.each([NaN, Infinity, -0.5, 2 ** 33])(
+    'spec(T-001:AC-15): createRng throws RangeError for a non-finite-integer seed (%s)',
+    (seed) => {
+      expect(() => createRng(seed)).toThrow(RangeError);
+    },
+  );
 });
 
 describe('createRng / nextFloat — known-answer test against an independent reference', () => {
@@ -266,6 +298,45 @@ describe('pick', () => {
   });
 });
 
+describe('shuffle / pick — tolerate legitimately undefined elements', () => {
+  // Seed 0 is a VERIFIED regression seed, not a guess: probed directly against the current
+  // src/engine/rng.ts across seeds 0..49, `shuffle(createRng(s), [undefined, 1, 2, 3])` throws
+  // for 37 of 50 seeds and `pick(createRng(s), [undefined, 1, 2])` throws for 14 of 50 — seed 0
+  // is in both sets (it throws "index 0 out of bounds", a false message: index 0 of a
+  // 4/3-element array is in bounds). Using a seed confirmed to trigger the bug makes this a
+  // genuine regression test rather than a pass that only holds by seed luck (cf. M-3 in the
+  // test-design review).
+  const REGRESSION_SEED = 0;
+
+  it('spec(T-001:AC-16): shuffle does not throw on an array containing undefined, and still returns a permutation (seed 0)', () => {
+    const items: readonly (number | undefined)[] = [undefined, 1, 2, 3];
+    const rng = createRng(REGRESSION_SEED);
+
+    const [result] = shuffle(rng, items);
+
+    expect(isPermutation(result, items)).toBe(true);
+  });
+
+  it('spec(T-001:AC-16): shuffle does not throw on a sparse array (new Array(4)), and still returns a permutation (seed 0)', () => {
+    const items: readonly unknown[] = new Array(4);
+    const rng = createRng(REGRESSION_SEED);
+
+    const [result] = shuffle(rng, items);
+
+    expect(result).toHaveLength(4);
+    expect(isPermutation(result, items)).toBe(true);
+  });
+
+  it('spec(T-001:AC-16): pick does not throw on an array containing undefined (seed 0)', () => {
+    const items: readonly (number | undefined)[] = [undefined, 1, 2];
+    const rng = createRng(REGRESSION_SEED);
+
+    const [value] = pick(rng, items);
+
+    expect(items).toContain(value);
+  });
+});
+
 describe('weightedPick', () => {
   it('spec(T-001:AC-10): weights [{item:a,weight:1},{item:b,weight:3}] over 20,000 draws from seed 2026 selects b between 14,000 and 16,000 times, and only a/b appear', () => {
     const entries: readonly { item: string; weight: number }[] = [
@@ -342,6 +413,18 @@ describe('weightedPick', () => {
     expect(values.every((v) => v === 'p')).toBe(true);
     expect(values).not.toContain('z');
   });
+
+  it.each([NaN, Infinity, -Infinity])(
+    'spec(T-001:AC-11): weightedPick throws RangeError when a weight is non-finite (%s)',
+    (weight) => {
+      const rng = createRng(1);
+      const entries: readonly { item: string; weight: number }[] = [
+        { item: 'a', weight },
+        { item: 'b', weight: 1 },
+      ];
+      expect(() => weightedPick(rng, entries)).toThrow(RangeError);
+    },
+  );
 });
 
 describe('purity — every draw function is a pure function of Rng, never hidden state (AC-13)', () => {
