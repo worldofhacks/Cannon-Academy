@@ -28,14 +28,14 @@ would need for that test to be green anyway.
 | **AC-2** initial state field values | 14 tests: `phase==='intro'`; `playerHull===enemyHull===enemyMaxHull` sourcing; `volleyNumber===1`; `turnToken` numeric; `actionLog`/`recentTemplateIds` empty; `tally` zeroed; config carry-through for all 5 config fields; + a test that **mocks `@engine/tuning` to a perturbed `PLAYER_HULL`** and re-imports | Hull: only if the implementation reads the real constant — the mock test kills a hardcoded `100` even though `PLAYER_HULL` *is* 100 (see cheat `player-hull-literal`, which survived until this test existed). Enemy hull is read from `ENEMY_HULL_BY_ISLAND[islandId]` for **every** island id, so a single-island coincidence can't hide. Carry-through is asserted per field, so `rivalLoadout: playerLoadout` fails. |
 | **AC-3** same config ⇒ deep-equal state and rng | 3 tests: full-state `toEqual` across two constructions; `rng` deep-equal; rng derived from `seed` alone (two configs differing in island/loadout, same seed ⇒ same rng) | An implementation injecting real nondeterminism (`Date.now`, `Math.random`) into any field would fail. It would pass wrongly only if the nondeterminism were confined to a field `toEqual` ignores — i.e. a non-enumerable or `undefined`-valued property, which AC-6's plain-JSON probe independently rejects. |
 | **AC-4** different seed ⇒ different rng | 2 tests: pairwise-distinct rng over a spread of seeds; explicit boundary seeds `0` and `0xffffffff` | Only if the implementation ignores the seed *and* the test's seed set collided — it can't, the assertion is pairwise distinctness over the set. **Deliberately confined to `[0, 0xffffffff]`** because AC-4 is false outside it (§6, A1). |
-| **AC-5** invalid config rejected | 9 tests: empty player loadout; empty rival loadout; unknown cannon id (via `as unknown as`); unknown island id (via `as unknown as`); 6 out-of-domain seeds (`NaN`, `0.5`, `-0.5`, `2**33`, `-(2**33)`, `Infinity`) | Asserts only *that it throws*, not the message or class — so it cannot pass wrongly by throwing for a different reason, but it also does not pin *which* error. That is intentional: AC-5 does not name an error type and I refuse to invent one. The cannon/island branches are statically unreachable from typed input (all 10 `CannonId`s are in `cannons.json`; `ENEMY_HULL_BY_ISLAND` is total over all 5 `IslandId`s) so per L-015 I **probed with a cast** rather than arguing them away. |
-| **AC-6** JSON round-trip | 10 tests: `JSON.parse(JSON.stringify(s))` deep-equals `s` for a state in **each of the 8 phases**; byte-identity of re-stringify; recursive plain-JSON structural probe | The probe walks the whole state rejecting functions, `Map`/`Set`, non-plain prototypes, and `undefined`-valued keys — so `toEqual` can't paper over a dropped `undefined` field or a class instance that happens to serialise. Passes wrongly only if a non-JSON value hides behind a getter the walker doesn't trigger. |
-| **AC-7** `isTerminalPhase` | 3 tests: all 8 phases table-driven against a literal expectation map; only `victory`/`defeat` true; exactly 2 terminal phases | The `TERMINAL_BY_PHASE` literal would have to be wrong. `Record<(typeof EXPECTED_PHASES)[number], boolean>` makes `tsc` demand an entry when a phase is added. |
+| **AC-5** invalid config rejected | 7 tests: empty player loadout; empty rival loadout; unknown cannon id (via `as unknown as`); unknown island id (via `as unknown as`); 6 out-of-domain seeds (`NaN`, `0.5`, `-0.5`, `2**33`, `-(2**33)`, `Infinity`) | Asserts only *that it throws*, not the message or class — so it cannot pass wrongly by throwing for a different reason, but it also does not pin *which* error. That is intentional: AC-5 does not name an error type and I refuse to invent one. The cannon/island branches are statically unreachable from typed input (all 10 `CannonId`s are in `cannons.json`; `ENEMY_HULL_BY_ISLAND` is total over all 5 `IslandId`s) so per L-015 I **probed with a cast** rather than arguing them away. |
+| **AC-6** JSON round-trip | 8 tests: round-trip deep-equality for a state in **each of the 8 phases**; byte-identity of re-stringify in every phase; recursive plain-JSON walker; round-trip of the freshly-constructed state for **every island**; a non-zero `turnToken` survives unchanged; an explicitly-`undefined` template-pool entry is rejected; plus 2 fixture preconditions (the `Question` fixture is a legal T-003 `Question`; every phase in the literal list has a fixture) | The walker rejects functions, `Map`/`Set`, non-plain prototypes and `undefined`-valued keys, so `toEqual` can't paper over a dropped `undefined` field or a class instance that happens to serialise. The two preconditions stop the whole group from going vacuous if a fixture silently stops being representative. Passes wrongly only if a non-JSON value hides behind a getter the walker doesn't trigger. |
+| **AC-7** `isTerminalPhase` | 4 tests: all 8 phases table-driven against a literal expectation map; only `victory`/`defeat` true; exactly 2 terminal phases | The `TERMINAL_BY_PHASE` literal would have to be wrong. `Record<(typeof EXPECTED_PHASES)[number], boolean>` makes `tsc` demand an entry when a phase is added. |
 | **AC-8** `toRivalView` projection | 8 tests: `Object.keys` **exactly** equals the literal `RivalView` key list (both directions — no missing, no extra); `Exact<keyof RivalView, …>`; per-field value correctness; explicit no-leak assertions for `seed`, `actionLog`, `templatesBySkill`, `rng`; plain-JSON probe | Key-set equality is asserted both ways, so leaking `seed` fails on the extra key and dropping a field fails on the missing one. Passes wrongly only if a leaked field were named identically to a legitimate one. |
 | **AC-9** `playerRecentCorrect` | 5 tests: player-only filtering (rival entries excluded); most-recent-first ordering; no truncation at `BOT_ACCURACY_WINDOW`; **non-palindromic fixture precondition**; empty log ⇒ empty array | The ordering test asserts both `toEqual(reversed)` and `not.toEqual(chronological)`, and the fixture carries a self-check that the chronological sequence is **not** its own reverse. Without that precondition the `not.toEqual` was vacuously true for my first fixture (`i % 3 !== 0` is palindromic at length 13) — a real near-miss, fixed to `i * 2 < count`. This is the L-020 shape: nothing here lets the implementation assume sorted input silently. |
-| **AC-10** discriminated-union narrowing | 8 tests: narrowing on `phase` inside helper functions for terminal/non-terminal splits; `Exact<>` on narrowed types; `@ts-expect-error` negative controls that a *wrong* narrowing is a type error | Compile-time. Includes negative controls, so it cannot pass vacuously — if `DuelState` were a wide non-discriminated interface, the `@ts-expect-error` directives become *unused* and `tsc` fails them. That inversion is what makes this probe honest. |
-| **AC-11** `ActionLogEntry` required fields | 10 tests: 4 required fields present; `Exact<>` per field type (kills `string`-widening); JSON round-trip identity; `readonly` per field; `@ts-expect-error` for each omitted field; `@ts-expect-error` for each mistyped field | This is the AC that catches the "ten id fields were `z.string()`" failure class. Each field's type is pinned invariantly with `Exact<>`, so `string` in place of a union is a type error, not a passing runtime test. Passes wrongly only if the implementer aliases the exact right union under a different name — which is fine and intended. |
-| **AC-12** immutability | 9 tests: `readonly` on `actionLog`, `playerLoadout`, `rivalLoadout`, `recentTemplateIds`; `@ts-expect-error` on reassignment, `push`, and index assignment; each probe runs against a **fresh disposable state copy** | Compile-time only (§9). Shared fixtures are frozen and each probe gets its own state, after an order-dependent leak where a `@ts-expect-error` probe mutated `STATE_BY_PHASE.playerChoose` at runtime and poisoned a later test. |
+| **AC-10** discriminated-union narrowing | 11 tests: narrowing on `phase` inside helper functions for terminal/non-terminal splits; `Exact<>` on narrowed types; `@ts-expect-error` negative controls that a *wrong* narrowing is a type error | Compile-time. Includes negative controls, so it cannot pass vacuously — if `DuelState` were a wide non-discriminated interface, the `@ts-expect-error` directives become *unused* and `tsc` fails them. That inversion is what makes this probe honest. |
+| **AC-11** `ActionLogEntry` required fields | 13 tests: 4 required fields present; `Exact<>` per field type (kills `string`-widening); JSON round-trip identity; `readonly` per field; `@ts-expect-error` for each omitted field; `@ts-expect-error` for each mistyped field | This is the AC that catches the "ten id fields were `z.string()`" failure class. Each field's type is pinned invariantly with `Exact<>`, so `string` in place of a union is a type error, not a passing runtime test. Passes wrongly only if the implementer aliases the exact right union under a different name — which is fine and intended. |
+| **AC-12** immutability | 6 tests: `readonly` typing on `actionLog`/`playerLoadout`; `@ts-expect-error` on reassignment; on `push`; on index assignment; a **positive control** (reading still works, and `push` on a deliberately mutable copy still type-checks); and a guard asserting the shared fixtures were left untouched by all the probes above | Compile-time only (§9). The positive control is what stops the three `@ts-expect-error` tests from passing because of an unrelated type error. Each probe runs against a fresh disposable copy and the shared fixtures are frozen — added after an order-dependent leak in which a probe mutated `STATE_BY_PHASE.playerChoose` at runtime and poisoned a later test. |
 
 **Not covered by any AC** — 13 tests tagged `dod(T-013:…)` instead, because the ticket's DoD requires these
 shapes but no numbered criterion does (see §6, A3): the 5-member `DuelEvent` union and its per-variant field
@@ -60,35 +60,78 @@ sets, `RivalAction`, `RivalVolley`, `DuelResult`, `DuelTally`. `spec-lint.sh` ca
 
 ## 4. RED evidence
 
-`npx tsc --noEmit`:
+All four measurements below were taken on the committed tree at `febe70c` (L-027), working tree clean.
+
+### `npx vitest run` — exit 1
 
 ```
-__tests__/engine/duel/types.test.ts(23,8): error TS2307: Cannot find module '@engine/duel/types' or its corresponding type declarations.
-__tests__/engine/duel/types.test.ts(43,30): error TS2307: Cannot find module '@engine/duel/types' or its corresponding type declarations.
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  __tests__/engine/duel/types.test.ts [ __tests__/engine/duel/types.test.ts ]
+Error: Cannot find module '@engine/duel/types' imported from
+'/Users/quietguy/.../.worktrees/wt-T-013/__tests__/engine/duel/types.test.ts'.
+
+ ❯ __tests__/engine/duel/types.test.ts:37:1
+     35| import { BOT_ACCURACY_WINDOW, ENEMY_HULL_BY_ISLAND, PLAYER_HULL } from…
+     36|
+     37| import { DUEL_PHASES, createDuelState, isTerminalPhase, toRivalView } …
+       | ^
+     38| import type {
+     39|   ActionLogEntry,
+
+ Test Files  1 failed | 13 passed (14)
+      Tests  1229 passed (1229)
 ```
 
-`npx vitest run`:
+One failed suite — mine — as a **collection** error, so none of my 100 tests even runs. All **1229 baseline
+tests still pass**, unchanged from the pre-start baseline.
+
+### `npx tsc --noEmit` — exit 2, 75 errors, all in `__tests__/engine/duel/types.test.ts`
 
 ```
-FAIL  __tests__/engine/duel/types.test.ts [ __tests__/engine/duel/types.test.ts ]
-Error: Failed to load url /Users/quietguy/Documents/Dev/Gauntlet/Math Game/.worktrees/wt-T-013/src/engine/duel/types.ts
-(resolved id: .../src/engine/duel/types.ts). Does the file exist?
-
-Test Files  1 failed | 63 passed (64)
-     Tests  1229 passed (1229)
+__tests__/engine/duel/types.test.ts(37,76): error TS2307: Cannot find module '@engine/duel/types' or its corresponding type declarations.
+__tests__/engine/duel/types.test.ts(49,8):  error TS2307: Cannot find module '@engine/duel/types' or its corresponding type declarations.
+__tests__/engine/duel/types.test.ts(409,11): error TS2322: Type 'true' is not assignable to type 'false'.
+__tests__/engine/duel/types.test.ts(441,5):  error TS2578: Unused '@ts-expect-error' directive.
+__tests__/engine/duel/types.test.ts(499,34): error TS2307: Cannot find module '@engine/duel/types' or its corresponding type declarations.
 ```
 
-**Why this is the right reason.** The failure is a module-resolution error naming exactly the file the ticket
-asks the implementer to create, `src/engine/duel/types.ts`, and confirmed absent (`Glob` on `src/engine/duel/`
-returns only the frozen `damage.ts`). It is not a typo, a bad alias, or a setup crash: the `@engine/*` alias
-resolves correctly — it resolves to the right absolute path and reports that path as missing, which is
-resolution succeeding and the file not existing. Every one of the other **1229 baseline tests still passes**, so
-nothing in my file perturbs the suite. And the same file, unmodified, goes fully green (100/100) when the alias
-is pointed at a reference implementation, which proves the redness is *only* the absent module and that the
-suite is satisfiable at all.
+Breakdown by code — no error appears in any file other than my test file:
 
-`npx prettier --check .` → clean. `npx eslint . --max-warnings 0` → clean, 0 warnings.
-`.tdd-swarm/spec-lint.sh tickets/T-013.md` → PASS, all 12 criteria cited, no test citing an unknown criterion.
+| Code | Count | What it is |
+| --- | --- | --- |
+| `TS2307` | 3 | **The root cause.** Cannot find module `@engine/duel/types`. |
+| `TS2322` | 47 | `Type 'true' is not assignable to type 'false'` — my `Exact<>` **negative controls** firing. |
+| `TS2578` | 25 | `Unused '@ts-expect-error' directive` — my illegal-shape probes no longer erroring. |
+
+**Why this is the right reason.** The three `TS2307`s name exactly the module the ticket instructs the
+implementer to create, and it is confirmed absent — `src/engine/duel/` contains only the frozen `damage.ts`. It
+is not a typo, a bad alias, or a setup crash: the `@engine/*` alias resolves fine everywhere else in the same
+run (the other 13 suites and 1229 tests pass, and the file's ten other imports from `@engine/*` and `@content/*`
+produce no errors), and Vitest reports the specifier as *not found* rather than mis-resolved.
+
+The other 72 errors are the **downstream cascade of that one absence, and they are the negative controls doing
+their job.** With the module missing, every imported type degrades to `any`; `any` is mutually assignable with
+everything, so (a) each `Exact<>` that must resolve `false` now resolves `true` (the 47 `TS2322`s) and (b) each
+`@ts-expect-error` guarding an illegal shape finds nothing to suppress (the 25 `TS2578`s). This is the L-015/L-012
+inversion working in my favour: it is positive proof that all 40 type-level probes are **wired to the module
+under test** rather than passing on their own.
+
+It also names a real limitation, which I'd rather state than have a reviewer discover: **while the module is
+absent, my `Exact<>` assertions in the positive direction are vacuous** (`Exact<any, X>` resolves `true`), so the
+RED state alone cannot demonstrate they have teeth. That is exactly why I validated the whole suite against a
+throwaway reference implementation instead of trusting redness — unmodified, the same file goes **100/100 green
+with zero `tsc` errors** once the alias points at a real implementation, which proves both that the redness is
+*only* the absent module and that the criteria are satisfiable at all.
+
+### `npx prettier --check .` → exit 0, "All matched files use Prettier code style!"
+
+### `npx eslint . --max-warnings 0` → exit 0, no output, 0 warnings
+
+### `.tdd-swarm/spec-lint.sh tickets/T-013.md` → `== SPEC-LINT PASS ==`
+
+All 12 criteria cited, none orphaned: AC-1→6, AC-2→14, AC-3→3, AC-4→2, AC-5→7, AC-6→8, AC-7→4, AC-8→8, AC-9→5,
+AC-10→11, AC-11→13, AC-12→6.
 
 ---
 
@@ -346,6 +389,13 @@ Committed on `ticket/T-013-duel-types` only — no merge, no push, no other bran
    `Readonly<Partial<Record<SkillId, readonly Template[]>>>`. A semantically equivalent but differently spelled
    type (notably one with an explicit `| undefined` member under `exactOptionalPropertyTypes`) will be rejected.
    That is deliberate, but the implementer should expect it rather than be surprised.
-10. **All measurements are from this worktree at `ce51e71` with `src/engine/duel/types.ts` absent** (L-027). The
-    mutation results specifically describe the suite's behaviour against *my* reference implementation, not
-    against whatever T-013's implementer writes.
+10. **Positive-direction `Exact<>` probes are vacuous in the current RED state** (see §4). Until the module
+    exists, every imported type is `any`, so only the negative controls fire. The suite's teeth were therefore
+    established against a reference implementation, not against redness. **The implementer should re-run
+    `tsc --noEmit` and expect the count to fall from 75 to 0 — not merely for the 3 `TS2307`s to disappear.** A
+    partial implementation that clears `TS2307` while leaving `TS2322`/`TS2578` errors has genuinely failed the
+    type contract, and that is the signal to read.
+11. **All measurements are from this worktree at `febe70c` (parent `ce51e71`) with `src/engine/duel/types.ts`
+    absent** (L-027). The mutation results describe the suite's behaviour against *my* reference implementation,
+    not against whatever T-013's implementer writes; a differently-structured implementation could be
+    mutation-tested differently.
