@@ -11,7 +11,7 @@ export default tseslint.config(
   // ARCHITECTURE.md §4.1 / §8: src/engine/ is PURE TypeScript.
   // No React imports, no Math.random() — every draw goes through the seeded PRNG.
   {
-    files: ['src/engine/**/*.ts'],
+    files: ['src/engine/**/*.ts', 'src/content/**/*.ts'],
     rules: {
       'no-restricted-imports': [
         'error',
@@ -28,11 +28,12 @@ export default tseslint.config(
                 '@react-native*',
               ],
               message:
-                'src/engine/ is pure TypeScript (ARCHITECTURE.md §8). No React/RN/Expo imports — the engine must run headless.',
+                'src/engine/ and src/content/ are pure TypeScript (ARCHITECTURE.md §8). No React/RN/Expo imports — this layer must run headless.',
             },
             {
               group: ['firebase', 'firebase/*', '@firebase/*'],
-              message: 'src/engine/ must not reach the network or backend. Keep Firebase in src/services/.',
+              message:
+                'The engine/content layer must not reach the network or backend. Keep Firebase in src/services/.',
             },
           ],
         },
@@ -43,7 +44,7 @@ export default tseslint.config(
           object: 'Math',
           property: 'random',
           message:
-            'Math.random() is banned in src/engine/ (ARCHITECTURE.md §4.1). Use the seeded mulberry32 PRNG so tests and duel replay are deterministic.',
+            'Math.random() is banned in src/engine/ and src/content/ (ARCHITECTURE.md §4.1). Use the seeded mulberry32 PRNG so tests and duel replay are deterministic.',
         },
       ],
       'no-restricted-globals': [
