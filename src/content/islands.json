@@ -1,0 +1,41 @@
+[
+  {
+    "id": "port_sumwich",
+    "displayName": "Port Sumwich",
+    "order": 0,
+    "rangeSkills": ["add_within_20", "sub_within_20", "two_step_add_sub"],
+    "unlocksCannons": ["six_pounder", "chain_shot", "double_broadside"]
+  },
+  {
+    "id": "isla_products",
+    "displayName": "Isla Products",
+    "order": 1,
+    "requiresIsland": "port_sumwich",
+    "rangeSkills": ["mult_facts"],
+    "unlocksCannons": ["twelve_pounder"]
+  },
+  {
+    "id": "quotient_cove",
+    "displayName": "Quotient Cove",
+    "order": 2,
+    "requiresIsland": "isla_products",
+    "rangeSkills": ["div_facts"],
+    "unlocksCannons": ["mortar"]
+  },
+  {
+    "id": "fraction_reef",
+    "displayName": "Fraction Reef",
+    "order": 3,
+    "requiresIsland": "quotient_cove",
+    "rangeSkills": ["fractions_int"],
+    "unlocksCannons": ["powder_keg"]
+  },
+  {
+    "id": "grandline",
+    "displayName": "The Grandline",
+    "order": 4,
+    "requiresIsland": "fraction_reef",
+    "rangeSkills": ["multi_digit_order_ops"],
+    "unlocksCannons": ["long_nine"]
+  }
+]
