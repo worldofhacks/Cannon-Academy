@@ -645,9 +645,95 @@ in this wave. Verifying the verification is not optional.
 
 | ticket | deliverable | tests | ACs | attempts |
 |---|---|---|---|---|
-| T-004 | `engine/tuning.ts` (32 constants) | 68 | 12 | 2 |
+| T-004 | `engine/tuning.ts` (32 constants) | 70 | 12 | 2 |
 | T-006 | 5 catalogs + validated loaders | 209 | 16 | 2 |
 | T-026 | `templateSchema` exactly-3 distractors | 5 | 5 | 1 |
 
 Follow-ups filed to backlog: **T-025** (iterative walks in the evaluator), **T-027**
 (`validateCatalogs` set-level corruption).
+
+## Wave 2 — integrated 2026-07-28
+
+**Merged into `swarm/engine-core` (`c5a3fc9..5ec09f6`) — integration PASS.** Independent
+integration agent; wrote none of this code and patched none of it. Full evidence:
+`.tdd-swarm/reports/wave2-integration.md`.
+
+Three `--no-ff` merges in ticket-id order, **all clean** — `1eb39b7` (T-004), `cd59688` (T-006),
+`5ec09f6` (T-026). Strictly disjoint file sets: T-006 and T-026 share `src/content/` but T-026's
+only source edit is `schemas.ts:81`, which T-006 never touches.
+
+Gates on the merged tree: `run-local-gates.sh` exit 0 (`== ALL LOCAL GATES PASS ==`), spec-lint
+exit 0 for all three tickets (12 + 14 + 5 ACs, reverse direction clean), `npm audit
+--audit-level=high` → **0 vulnerabilities**, `package.json` / `package-lock.json` **byte-identical**
+to `c5a3fc9`.
+
+### Test count corrected: 776, not 68-era 774
+
+The wave-2 forecast of 774 was computed from the **68** recorded above at T-004's *first* freeze.
+The real figure is **70** — after the code review found the two-volley onboarding defect, AC-12 was
+amended (`b2c7a4a`), the suite was **re-frozen** with +2 tests (`9d592ba`: the "no fewer than three
+volleys" floor and the "window is non-empty" guard), and only then was the constant changed
+(`6136bc3`, `src/engine/tuning.ts` only). Timestamps confirm spec 09:40 → test 09:43 → code 09:45.
+The table above is corrected to 70. **776/776 pass, 7 files, 1.52s.** No test file was touched by
+any implementer commit — verified over the whole merge range.
+
+### Cross-ticket compatibility — VERIFIED
+
+A 19-assertion integration probe (scratchpad only, deleted; repo tree untouched) exercised all
+three modules in one process for the first time. All green:
+
+- **`ENEMY_HULL_BY_ISLAND` × the islands catalog.** Keysets **exactly equal** and both equal
+  `ISLAND_IDS`; hull rises monotonically along the catalog's own `order` (45→60→75→95→120), which
+  T-004's tests could only check against a hardcoded order.
+- **Referential integrity.** All 10 cannons' `skill` resolves; all `rangeSkills`,
+  `unlocksCannons`, `requiresIsland`, and `unlock.island` resolve; all 9 `SKILL_IDS` are authored.
+- **T-026 × T-006 — the tightening is inert, and that was *verified, not assumed*.** No entry in
+  any of the five catalogs carries a `templates` or `distractors` field at all (checked entry by
+  entry). `templateSchema` accepts 3 distractors and rejects both 4 and 2 on the merged tree.
+  T-006's **import-time** validation ran against T-026's modified schema module and passed.
+- **The headline fix holds.** The catalog's `swivel_gun` is `damageMin 8 / damageMax 12` — matching
+  the literals T-004's frozen tests were forced to hardcode (they could not import `@content`).
+  Simulating **every** legal per-volley damage for a correct answer (10..13) against
+  `ONBOARDING_ENEMY_HULL = 28` gives **exactly 3 volleys in every case**.
+
+### Drift findings
+
+- **CLOSED — wave 1's escalated `templateSchema` Minor.** T-026 shipped the "tighten to
+  `.length(3)` and re-freeze" resolution; the probe proves it closed on the merged tree. The
+  invariant now fails at content-validation time, where §4.1 put the catch, instead of late at
+  `assertQuestion`. Wave 1's open-finding note in `TICKETS.md` marked closed.
+- **FINDING (Minor), ESCALATED — `CHOICE_COUNT` now has two homes.** `src/engine/tuning.ts:120`
+  exports it (T-004) and `src/engine/questions/types.ts:44` keeps a module-local `const` (T-003).
+  §4.3 (*"All tuning constants live in one file"*) and §8 (*"every magic number, one file"*) state
+  the rule absolutely, and `T-004.md:50` claims `CHOICE_COUNT` for `tuning.ts`. T-003 was correct
+  at the time — no `tuning.ts` existed — so **the merge itself creates the drift**, and no ticket
+  is assigned to collapse it (T-005 and T-007 both consume the tuning copy, so the shadow persists).
+  Not a gate failure: both hold `4`. But §4.3's stated purpose is the `app/dev.tsx` slider, and
+  moving the value there would leave `assertQuestion` checking a stale literal and throwing
+  `INVALID_QUESTION` on every question — defeating exactly the capability the rule protects.
+  **No repair ticket written and no code patched:** the one-line fix re-opens a review-passed
+  wave-1 file with frozen tests, which is an owner call. Recorded in `TICKETS.md`.
+  **Must not be closed silently.**
+- **NOT drift — `templateSchema` tightening.** §4.1's prose already fixes the count twice ("three
+  engineered distractors", "answer + three distractors") under a "four-choice taps, universally"
+  heading. The `distractors: string[]` in the doc's TS sketch is an illustrative signature, not a
+  cardinality spec. `.length(3)` encodes the prose exactly — code moving *toward* the architecture.
+  No amendment needed.
+- **NOT drift — `ExprErrorCode`'s 7th member.** Concurring with wave 1, re-checked and unchanged.
+  ARCHITECTURE.md never enumerates an error taxonomy for the "tiny safe evaluator over params", so
+  there is no contract to drift from. Below the doc's altitude. No amendment needed.
+- **No magic-number leakage.** `src/content/index.ts` contains **zero** numeric literals. Catalog
+  numbers are per-entity content attributes, which §4.3's own formula (`uniform(cannon.min,
+  cannon.max)`) and §4.4 both put in the catalog — the per-entity/cross-cutting line is held
+  cleanly. Every other T-004 constant appears nowhere in `src/` outside `tuning.ts` (grep-verified);
+  `CHOICE_COUNT` is the sole exception, above.
+- **Doc-completeness note (not charged to any ticket).** §4.4 enumerates the `src/content/` files
+  but **omits `skills.json`**, which T-006 rightly ships and §4.1 clearly requires (`symbolicOnly`,
+  `SkillId`, per-skill grade bands). The enumeration is at the doc's altitude, so it deserves a
+  one-line amendment when §4.4 is next touched. `index.ts` is a loader, correctly below that
+  altitude; `templates/<skill>.json` is legitimately absent until wave 5.
+
+*Ledger cleanup:* removed an orphaned, header-less `T-026` table row stranded after the Rev 2
+table in `TICKETS.md`; T-026 now sits properly in the Wave 2 table.
+
+**Wave 3 is clear to dispatch** (T-005, T-008, T-009, T-010, T-011, T-012).

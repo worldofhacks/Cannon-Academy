@@ -42,19 +42,38 @@ Evidence: `.tdd-swarm/reports/wave1-integration.md`.
 | T-002 | Safe arithmetic expression and constraint predicate evaluator (no eval) | done | — | `ticket/T-002-safe-expr-eval` | capable | — |
 | T-003 | Content zod schemas, id unions, and engine question types | done | — | `ticket/T-003-schemas-and-types` | standard | — |
 
-> **Open Minor finding (owner decision required, T-003).** `templateSchema` allows `.min(3)`
-> distractors; ARCHITECTURE.md §4.1 specifies exactly three ("four-choice taps, universally").
-> A 4-distractor template parses, then fails later at `assertQuestion` with `INVALID_QUESTION`.
-> Origin is the ticket spec (`T-003.md:58`, AC-4 = "at least three"), not the implementation, and
-> the frozen tests pin `>=3`. Fails safe but late. Resolve by tightening to `.length(3)` and
-> re-freezing AC-4, amending §4.1, or recording it as deliberate headroom.
+> **~~Open Minor finding (owner decision required, T-003).~~ CLOSED by T-026 in wave 2.**
+> `templateSchema` allowed `.min(3)` distractors; ARCHITECTURE.md §4.1 specifies exactly three
+> ("four-choice taps, universally"). A 4-distractor template parsed, then failed later at
+> `assertQuestion` with `INVALID_QUESTION`. Origin was the ticket spec (`T-003.md:58`, AC-4 =
+> "at least three"), not the implementation. The owner chose the "tighten to `.length(3)` and
+> re-freeze" resolution; T-026 shipped it and the wave-2 integration probe confirmed the
+> invariant now fails at content-validation time, where §4.1 put the catch.
 
 ## Wave 2 — constants and catalog data
+
+**Merged into `swarm/engine-core` (`c5a3fc9..5ec09f6`) — integration PASS.** Three clean merges,
+all repo gates green, **776/776 tests**, `npm audit` clean, manifests byte-identical. Cross-ticket
+integration probe green (19/19), including the headline three-volley onboarding fix verified
+against T-006's real catalog numbers. One Minor architecture finding open (`CHOICE_COUNT`
+duplication, see below). Evidence: `.tdd-swarm/reports/wave2-integration.md`.
 
 | id | title | status | deps | branch | model | issue |
 |----|-------|--------|------|--------|-------|-------|
 | T-004 | Central tuning constants — every magic number in one file | review-passed | T-003 | `ticket/T-004-tuning` | standard | — |
 | T-006 | Catalog data (skills, cannons, islands, ranks, crew) and validated loaders | review-passed | T-003 | `ticket/T-006-catalogs` | standard | — |
+| T-026 | templateSchema must require exactly three distractors | review-passed | T-003 | `ticket/T-026-exact-distractors` | cheap | — |
+
+> **Open Minor finding (owner decision required, T-003 × T-004).** `CHOICE_COUNT = 4` now has two
+> homes: `src/engine/tuning.ts:120` (exported, T-004) and `src/engine/questions/types.ts:44`
+> (module-local, T-003). ARCHITECTURE.md §4.3/§8 require one file for every magic number, and
+> `T-004.md:50` claims `CHOICE_COUNT` for `tuning.ts`. Correct when T-003 shipped (no `tuning.ts`
+> existed); the wave-2 merge creates the duplication, and no ticket is assigned to collapse it.
+> Nothing is broken today — both hold `4` — but moving the value on §4.3's dev slider would leave
+> `assertQuestion` validating against a stale literal and throwing `INVALID_QUESTION` on every
+> question, defeating the capability the one-file rule exists to protect. Fix is one line
+> (`types.ts` imports from `@engine/tuning`), but re-opens a review-passed wave-1 file with
+> frozen tests, so it needs the owner's call.
 
 ## Wave 3 — the pure rule modules
 
@@ -280,8 +299,6 @@ waves and both deliberate:
 | I-1 | `ONBOARDING_ENEMY_HULL` added to T-004 (AC-12), with T-018 AC-13 pinning the three-volley arithmetic against it. |
 | I-3 | Source-scan ACs in T-002, T-006, T-018, T-021 relabelled as secondary defence behind the ESLint guard, with an orchestrator action for the missing `no-eval` family. |
 | minors | T-008 AC-13 tightened to `[4, 6]` for every observation; T-020 AC-23 (intermediate overkill clamp) and AC-24; T-009 `CHEST_RARITY_ENTRIES` + AC-13; T-022 AC-9 given exact boundary arithmetic; T-005 exports `describeDistractorSources` so three content tickets stop reinventing it; missing edges added (T-015→T-006, T-019→T-005, T-020→T-006, T-018→T-004); module-level `proposed` tags added to T-011 and T-017; T-003's zod DoD line reworded. |
-
-| T-026 | templateSchema must require exactly three distractors | review-passed | T-003 | wave 2 (owner decision, 2026-07-28) |
 
 ## Backlog — filed during the run, not assigned to a wave
 
