@@ -42,17 +42,18 @@ function validateTier(tier: number, name: string): void {
  * AC-4: one win short of each boundary stays at tier - 1
  * AC-5: wins above highest minWins return tier 4 (fleet_legend)
  * AC-9: negative or non-integer wins throw RangeError
+ * AC-12: result is order-independent (does not depend on catalog array order)
  */
 export function rankTierForWins(wins: number): number {
   validateNonNegativeInteger(wins, 'wins');
 
   // Find the highest-tier rank whose minWins does not exceed wins.
-  // Because minWins is strictly increasing (T-006 AC-7), the last match is the answer.
+  // Use Math.max to ensure we find the greatest tier, independent of array order (AC-12).
   let resultTier = 0; // Default to cadet (tier 0)
 
   for (const rank of ranks) {
     if (rank.minWins <= wins) {
-      resultTier = rank.tier;
+      resultTier = Math.max(resultTier, rank.tier);
     }
   }
 
@@ -99,21 +100,11 @@ export function advanceRank(currentTier: number, wins: number): number {
 /**
  * Looks up a rank by its tier number (0..4).
  * Returns the Rank catalog entry or throws if tier is out of range.
+ * Delegates to getRankByTier from @content/index for the actual lookup and error handling.
  *
  * AC-10: rankByTier(t) for t in [0,4] returns matching catalog rank
  * AC-10: rankByTier(5) or rankByTier(-1) throw an Error naming the missing tier
  */
 export function rankByTier(tier: number): Rank {
-  // Use getRankByTier from @content/index, which throws if the tier is not found.
-  // Provide a better error message for out-of-range tiers.
-  try {
-    return getRankByTier(tier);
-  } catch (err) {
-    // Enrich the error message to clearly name the missing tier per AC-10
-    if (tier < 0 || tier > 4) {
-      throw new Error(`rankByTier: no rank with tier ${tier}`);
-    }
-    // If we still got an error despite tier being in range, re-throw the original
-    throw err;
-  }
+  return getRankByTier(tier);
 }
