@@ -40,4 +40,45 @@ complete; resume at the first incomplete ticket. Never re-dispatch finished work
   (captain-name wordlist filter, ARCHITECTURE.md §11).
 - No `Eval` rows anywhere: there is no LLM in this codebase.
 
+**Status: Phase 1 draft complete.** Superseded by the rev-2 entry below.
+
+---
+
+## Phase 1 rev 2 — post adversarial plan review (2026-07-27)
+
+Two independent reviewers (coupling/sequencing lens, coverage/testability lens) attacked the plan.
+Both mechanically confirmed file/test-scope exclusivity, absence of cycles and back-edges, engine
+purity, TS-strict handling, and that no numeric value was fabricated. Two Critical and eight
+Important findings were fixed:
+
+- **F1** — `T-005` imported four `tuning.ts` constants without declaring `T-004`. A compile
+  failure on dispatch, blocking the test agent a phase earlier. Edge added; T-005 → wave 3.
+- **C-1** — `DISTRACTOR_ABS_FLOOR >= 1` made a zero answer's distractor set unbuildable
+  (`sub_within_20` legally yields `0`). Now `>= 3`, with `MAX_DISTRACTOR_ATTEMPTS >= 9`; both
+  derived from the 9-rung ladder, not chosen.
+- **F6** — the damage curve floored `answerQuality` but not the roll, contradicting
+  ARCHITECTURE.md:206. **Formula corrected**, T-008 AC-15 added. Side effect: the 4–6 volley
+  tolerance tightened to match PLAN.md exactly.
+- **I-2** — T-008 AC-16 adds an effect-size floor so a near-zero `QUALITY_WEIGHT` cannot pass.
+- **F2/F4/F5** — T-013's action-log AC restated over *required* fields; T-003 gained exact
+  `Question`/`Choice` shapes and a `difficulty?` insurance field.
+- **F3** — the `T-018 → T-020` edge was phantom. Dropped; T-024 now drives 1,000 fuzz duels
+  through the real scripted and bot opponents, de-orphaning all of `src/engine/opponents/**`.
+- **F10, I-1, I-3** and six minors also fixed.
+
+**Wave count 8 → 7**, re-verified mechanically (24 tickets, 347 ACs, no cycles, no back-edges, no
+same-wave file or test-scope collisions, every AC id contiguous, every cross-ticket AC citation
+resolving). One reviewer claim was **not** accepted: its re-wave table is internally inconsistent
+with its own F3 recommendation — see `.tdd-swarm/traceability.md` §4.1 for the arithmetic.
+
+Two items now need the owner, not the planner: **2.18** (T-020 / T-021 exceed the half-day ticket
+rule — go/no-go on splitting) and **2.19** (whether `duel/replay.ts` is built at all, the plan's
+strongest cut-line candidate). Question **2.2** (Reliable vs Standard on a miss) must be answered
+before wave 3 — it is the only open question that could still force a reducer supersede.
+
+**Orchestrator action before dispatching T-002:** add `no-eval` / `no-implied-eval` /
+`no-new-func` to the engine+content ESLint block and prove them firing (L-001). They are not in
+`js.configs.recommended`, so nothing currently catches aliased dynamic code in the expression
+evaluator.
+
 **Status: Phase 1 COMPLETE — tickets frozen, awaiting Wave 1 dispatch.**

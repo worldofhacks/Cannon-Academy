@@ -55,6 +55,13 @@ export default tseslint.config(
             'Wall-clock time in the engine breaks deterministic replay. Pass elapsedMs in as a parameter.',
         },
       ],
+
+      // ARCHITECTURE.md §4.1: constraints and answer expressions are evaluated by a
+      // small purpose-built parser, never by the JS engine. These are NOT in
+      // js.configs.recommended — verified by probe, so they are declared explicitly.
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
     },
   },
 
