@@ -311,3 +311,24 @@ hostile: relative-error intuitions silently break at the denormal floor.
 tries to make it happen, sweeping the degenerate end of the domain. If the probe cannot reach it,
 say so with the probe attached. And when a path is unreachable only for *your current callers*,
 write that — not "impossible" — because the caller set changes and the comment does not.
+
+---
+
+## L-016 — A source-text ban can fail a correct implementation on its naming (Phase 3)
+
+**Pattern:** T-002's AC-1 scans the source for the substring `Function(`. A correct,
+codegen-free implementation went red on it — because it had named its helpers
+`resolveFunction(` and `applyWhitelistedFunction(`. Nothing was wrong with the code; the ban
+matched an ordinary identifier that happened to contain the forbidden spelling.
+
+**Why:** Text-level bans do not know about syntax. Their false-positive surface is every
+identifier, comment, and string that shares a substring with the thing being banned — and the
+failure arrives as "you violated the security rule", which is exactly the message most likely to
+send someone hunting for a vulnerability that does not exist, or worse, to weaken the check.
+
+**What to do instead:** Keep text scans as cheap secondary defence, but say so in the criterion,
+and warn the implementer in the dispatch that the ban is **literal** — describe the prohibition
+behaviourally ("no dynamic code construction") and never by spelling the banned token, so nobody
+names a helper into a false failure. Where the property genuinely matters, the authoritative
+guard must be behavioural ([[L-013]]). A guard whose failure mode is "rename your function" is
+not measuring what it claims to measure.
