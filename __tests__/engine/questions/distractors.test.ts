@@ -31,6 +31,9 @@
  * template whose `answerExpr` evaluates to 0 for the sampled params", and AC-10 pins the input
  * as "the same `(template, params)` pair". There is no `Rng` parameter (Definition of Done).
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { templateSchema } from '@content/schemas';
@@ -99,6 +102,16 @@ function makeTemplate(options: {
  * exported predicate agrees with it.
  */
 function satisfiesPlausibilityRule(candidate: number, answer: number): boolean {
+  return satisfiesRuleWithFloor(candidate, answer, DISTRACTOR_ABS_FLOOR);
+}
+
+/**
+ * The same rule with the near-miss floor left open, so AC-13 and AC-17 can ask the
+ * counterfactual question the frozen constant exists to answer: what would happen if
+ * `DISTRACTOR_ABS_FLOOR` were lowered? Only the floor varies; every other clause is shared with
+ * {@link satisfiesPlausibilityRule}, so the two cannot drift apart.
+ */
+function satisfiesRuleWithFloor(candidate: number, answer: number, floor: number): boolean {
   // 1. finite
   if (!Number.isFinite(candidate)) return false;
   // 2. same numeric type as the answer
@@ -106,7 +119,7 @@ function satisfiesPlausibilityRule(candidate: number, answer: number): boolean {
   // 3. no negative decoys when the answer is non-negative
   if (answer >= 0 && candidate < 0) return false;
   // 4a. near miss
-  if (Math.abs(candidate - answer) <= DISTRACTOR_ABS_FLOOR) return true;
+  if (Math.abs(candidate - answer) <= floor) return true;
   // 4b. same order of magnitude — undefined at a zero answer, so that branch is skipped
   if (answer === 0) return false;
   return (
@@ -134,12 +147,12 @@ function ladderRungs(answer: number): readonly number[] {
 }
 
 /** The ladder values that are legal for this answer, in ladder order (first plausible wins). */
-function legalLadderValues(answer: number): readonly number[] {
+function legalLadderValues(answer: number, floor: number = DISTRACTOR_ABS_FLOOR): readonly number[] {
   const seen: number[] = [];
   for (const rung of ladderRungs(answer)) {
     if (rung === answer) continue;
     if (seen.includes(rung)) continue;
-    if (!satisfiesPlausibilityRule(rung, answer)) continue;
+    if (!satisfiesRuleWithFloor(rung, answer, floor)) continue;
     seen.push(rung);
   }
   return seen;
@@ -1418,5 +1431,422 @@ describe('describeDistractorSources (AC-14)', () => {
     for (let call = 0; call < 20; call += 1) {
       expect(describeDistractorSources(ac2Template, AC2_PARAMS)).toEqual([...first]);
     }
+  });
+});
+
+// =============================================================================================
+// AC-15 — DISTRACTOR_FAILURE must be reproducible from its message alone
+// =============================================================================================
+
+/**
+ * `DISTRACTOR_FAILURE` only fires on specific sampled values, so the message is the whole
+ * forensic record: a catalog author reading it in CI has the template id, but not the draw.
+ * Without `params` they cannot re-run the failure, and the ladder's behaviour is entirely a
+ * function of the answer, which is a function of the draw.
+ */
+const AC15_ANSWER = 2e17;
+
+/** Two different draws of the SAME template that produce the SAME answer, and both exhaust. */
+const AC15_DRAW_ONE: Params = { leftFactor: 500000000, rightFactor: 400000000 };
+const AC15_DRAW_TWO: Params = { leftFactor: 1000000000, rightFactor: 200000000 };
+
+function ac15Template(params: Params, extraDistractors: readonly string[] = []): Template {
+  const ranges: Record<string, [number, number]> = {};
+  for (const [name, value] of Object.entries(params)) {
+    ranges[name] = [value, value];
+  }
+
+  // Cast rather than `templateSchema.parse` only when over-quota entries are supplied — the
+  // schema pins `.length(3)`, which is exactly the boundary AC-16 is about.
+  return {
+    id: 'multi_digit_order_ops__exhausted',
+    skill: 'multi_digit_order_ops',
+    text: 'fixture',
+    params: ranges,
+    answerExpr: 'leftFactor * rightFactor',
+    distractors: [
+      'leftFactor * rightFactor + 1',
+      'leftFactor * rightFactor - 1',
+      'leftFactor * rightFactor + 2',
+      ...extraDistractors,
+    ],
+  } as unknown as Template;
+}
+
+/** The `DISTRACTOR_FAILURE` message for a draw that cannot be built. */
+function failureMessage(template: Template, params: Params): string {
+  const thrown = captureThrow(() => buildDistractors(template, params));
+
+  expect(thrown).toBeInstanceOf(QuestionGenerationError);
+  expect((thrown as QuestionGenerationError).code).toBe('DISTRACTOR_FAILURE');
+  return (thrown as Error).message;
+}
+
+/**
+ * Pulls the rejected-candidate count out of the message. Deliberately tolerant about wording and
+ * about which side of the word the number sits on — the only vocabulary this pins is "reject",
+ * which is AC-15's own. It does NOT pin the count's *definition*: the assertions below only ever
+ * compare two messages against each other, so any consistent definition passes.
+ */
+function rejectedCountFrom(message: string): number {
+  expect(message, 'the failure message never mentions rejected candidates').toMatch(/reject/i);
+
+  const before = /(\d+)[^0-9]{0,40}?reject/i.exec(message);
+  const after = /reject[a-z]*[^0-9]{0,40}?(\d+)/i.exec(message);
+  const digits = before?.[1] ?? after?.[1];
+
+  expect(digits, `no rejected-candidate count found in: ${message}`).toBeDefined();
+  return Number(digits);
+}
+
+describe('DISTRACTOR_FAILURE is reproducible from its message (AC-15)', () => {
+  it('spec(T-005:AC-15) the two fixtures really are different draws with the same answer', () => {
+    // L-014 / L-015: prove the premise before trusting what the discriminator below demonstrates.
+    expect(AC15_DRAW_ONE).not.toEqual(AC15_DRAW_TWO);
+    expect(evaluateNumber('leftFactor * rightFactor', AC15_DRAW_ONE)).toBe(AC15_ANSWER);
+    expect(evaluateNumber('leftFactor * rightFactor', AC15_DRAW_TWO)).toBe(AC15_ANSWER);
+    expect(legalLadderValues(AC15_ANSWER).length).toBeLessThan(NEEDED);
+  });
+
+  it('spec(T-005:AC-15) two different draws of one template produce DIFFERENT messages', () => {
+    // The load-bearing assertion. Same template id, same answer, same counts — the ONLY thing
+    // that differs is `params`, so no message that omits the draw can pass this, however much
+    // other detail it carries. This is what `toContain(templateId)` could never catch.
+    const one = failureMessage(ac15Template(AC15_DRAW_ONE), AC15_DRAW_ONE);
+    const two = failureMessage(ac15Template(AC15_DRAW_TWO), AC15_DRAW_TWO);
+
+    expect(one).not.toBe(two);
+  });
+
+  it('spec(T-005:AC-15) the message carries every sampled parameter name', () => {
+    // `leftFactor` / `rightFactor` cannot appear incidentally in a message about distractors.
+    const message = failureMessage(ac15Template(AC15_DRAW_ONE), AC15_DRAW_ONE);
+
+    for (const name of Object.keys(AC15_DRAW_ONE)) {
+      expect(message, `parameter name "${name}" is missing`).toContain(name);
+    }
+  });
+
+  it('spec(T-005:AC-15) the message carries every sampled parameter value', () => {
+    const message = failureMessage(ac15Template(AC15_DRAW_ONE), AC15_DRAW_ONE);
+
+    for (const value of Object.values(AC15_DRAW_ONE)) {
+      expect(message, `parameter value ${value} is missing`).toContain(String(value));
+    }
+  });
+
+  it('spec(T-005:AC-15) a three-parameter draw carries all three, not just the first two', () => {
+    const params: Params = { leftFactor: 500000000, rightFactor: 400000000, scaleFactor: 1 };
+    const template = {
+      id: 'multi_digit_order_ops__three_params',
+      skill: 'multi_digit_order_ops',
+      text: 'fixture',
+      params: { leftFactor: [1, 1], rightFactor: [1, 1], scaleFactor: [1, 1] },
+      answerExpr: 'leftFactor * rightFactor * scaleFactor',
+      distractors: [
+        'leftFactor * rightFactor * scaleFactor + 1',
+        'leftFactor * rightFactor * scaleFactor - 1',
+        'leftFactor * rightFactor * scaleFactor + 2',
+      ],
+    } as unknown as Template;
+
+    const message = failureMessage(template, params);
+
+    expect(message).toContain('scaleFactor');
+    expect(message).toContain('1');
+  });
+
+  it('spec(T-005:AC-15) the message names how many candidates were rejected', () => {
+    const message = failureMessage(ac15Template(AC15_DRAW_ONE), AC15_DRAW_ONE);
+
+    expect(rejectedCountFrom(message)).toBeGreaterThan(0);
+  });
+
+  it('spec(T-005:AC-15) the rejected count tracks the number of rejections', () => {
+    // Definition-agnostic by construction. The three extra declared entries are distinct from
+    // each other AND from the answer, and each is rejected on the magnitude rule — so "rejected
+    // candidates", "rejected declared entries" and "distinct rejected values" all rise by
+    // exactly three. A hard-coded count, or one that merely restates `values.length`, fails.
+    const base = failureMessage(ac15Template(AC15_DRAW_ONE), AC15_DRAW_ONE);
+    const withThreeMore = failureMessage(ac15Template(AC15_DRAW_ONE, ['1', '2', '3']), AC15_DRAW_ONE);
+
+    for (const rejected of [1, 2, 3]) {
+      expect(satisfiesPlausibilityRule(rejected, AC15_ANSWER)).toBe(false);
+    }
+
+    expect(rejectedCountFrom(withThreeMore)).toBe(rejectedCountFrom(base) + 3);
+  });
+
+  it('spec(T-005:AC-15) it still names the template id and the answer', () => {
+    // Regression guard: extending the message must not cost the detail it already carried.
+    const template = ac15Template(AC15_DRAW_ONE);
+    const message = failureMessage(template, AC15_DRAW_ONE);
+
+    expect(message).toContain(template.id);
+    expect(message).toContain(String(AC15_ANSWER));
+  });
+});
+
+// =============================================================================================
+// AC-16 — the declared-quota cap, pinned by what it does rather than by its comment
+// =============================================================================================
+
+/**
+ * A template carrying more than `CHOICE_COUNT - 1` declared distractors. This is *type*-legal —
+ * `Template['distractors']` is `string[]` and only `templateSchema`'s `.length(3)` holds the
+ * line at the content boundary — so the cast below is the point of the fixture, not a shortcut.
+ */
+function overQuotaTemplate(count: number, params: Params): Template {
+  const ranges: Record<string, [number, number]> = {};
+  for (const [name, value] of Object.entries(params)) {
+    ranges[name] = [value, value];
+  }
+
+  return {
+    id: 'add_within_10__over_quota',
+    skill: 'add_within_10',
+    text: 'fixture',
+    params: ranges,
+    // a + b = 7, so these are 8, 9, 10, ... — each a distinct, plausible, non-colliding value.
+    answerExpr: 'a + b',
+    distractors: Array.from({ length: count }, (_, index) => `a + b + ${index + 1}`),
+  } as unknown as Template;
+}
+
+describe('buildDistractors — the declared-quota cap (AC-16)', () => {
+  const params: Params = { a: 3, b: 4 };
+
+  it('spec(T-005:AC-16) the over-quota fixture really does offer more usable candidates than the quota', () => {
+    // L-014: prove the premise. If entry 4 were rejected anyway the cap would never be exercised
+    // and every assertion below would pass vacuously.
+    const template = overQuotaTemplate(4, params);
+    const answer = evaluateNumber(template.answerExpr, params);
+
+    expect(answer).toBe(7);
+    expect(template.distractors).toHaveLength(4);
+
+    const evaluated = template.distractors.map((expr) => evaluateNumber(expr, params));
+
+    expect(evaluated).toEqual([8, 9, 10, 11]);
+    expect(new Set(evaluated).size).toBe(4);
+    for (const value of evaluated) {
+      expect(satisfiesPlausibilityRule(value, answer), `${value} is not usable`).toBe(true);
+      expect(value === answer).toBe(false);
+    }
+  });
+
+  it('spec(T-005:AC-16) a four-entry declared list yields exactly the quota, not four values', () => {
+    // This is the measurement the cap's comment must cite: FOUR usable declared candidates with
+    // the cap removed would return four values. Eight is the both-caps mutant, not this one.
+    const result = buildDistractors(overQuotaTemplate(4, params), params);
+
+    expect(result).toHaveLength(NEEDED);
+    expect(result).toEqual([8, 9, 10]);
+  });
+
+  it('spec(T-005:AC-16) the declared loop stops at the quota — the fourth value never appears', () => {
+    const result = buildDistractors(overQuotaTemplate(4, params), params);
+
+    expect(result).not.toContain(11);
+  });
+
+  it('spec(T-005:AC-16) no declared-list length can overshoot the quota', () => {
+    // The observable form of "values grows one per iteration with the guard before every push,
+    // so no path can overshoot": sweeping the length dimension (L-017) rather than asserting it
+    // in prose. `===` and `>=` are behaviourally identical precisely because this holds.
+    for (let count = 1; count <= 12; count += 1) {
+      const template = overQuotaTemplate(count, params);
+      const values = buildDistractors(template, params);
+      const sources = describeDistractorSources(template, params);
+
+      expect(values, `declared length ${count}`).toHaveLength(NEEDED);
+      expect(sources, `declared length ${count}`).toHaveLength(NEEDED);
+      expect(new Set(values).size, `declared length ${count}`).toBe(NEEDED);
+    }
+  });
+
+  it('spec(T-005:AC-16) an over-quota list is all declared — the ladder is never reached', () => {
+    for (const count of [4, 5, 6, 12]) {
+      const template = overQuotaTemplate(count, params);
+
+      expect(describeDistractorSources(template, params), `declared length ${count}`).toEqual([
+        'declared',
+        'declared',
+        'declared',
+      ]);
+    }
+  });
+
+  it('spec(T-005:AC-16) the over-quota shape is type-legal but rejected at the content boundary', () => {
+    // Why the cap is defence in depth rather than dead code: `templateSchema` is the only thing
+    // that stops a four-entry list, and it runs at the catalog boundary — not on the engine-side
+    // `Template` values this module is handed.
+    const asJson = {
+      id: 'add_within_10__over_quota',
+      skill: 'add_within_10',
+      text: 'fixture',
+      params: { a: [3, 3], b: [4, 4] },
+      answerExpr: 'a + b',
+      distractors: ['a + b + 1', 'a + b + 2', 'a + b + 3', 'a + b + 4'],
+    };
+
+    expect(templateSchema.safeParse(asJson).success).toBe(false);
+    expect(overQuotaTemplate(4, params).distractors).toHaveLength(4);
+  });
+
+  it('spec(T-005:AC-16) the cap does not disturb the exactly-three case', () => {
+    // The counterweight: a cap applied one entry too early would silently shorten every normal
+    // template. AC-1's fixture must be untouched by anything AC-16 pins.
+    expect(buildDistractors(ac1Template, AC1_PARAMS)).toEqual([8, 6, 12]);
+  });
+});
+
+// =============================================================================================
+// AC-17 — x = 0.5 is a second zero-headroom case, and it must be documented in src/
+// =============================================================================================
+
+const HALF_PARAMS: Params = { a: 1, b: 2 };
+const halfTemplate = makeTemplate({
+  id: 'fractions_int__a_over_b',
+  skill: 'fractions_int',
+  answerExpr: 'a / b',
+  distractors: ['a / b + 1', 'a / b - 1', 'a * b'],
+  params: HALF_PARAMS,
+});
+
+/** The module's own source, for the documentation criterion. */
+function distractorsSource(): string {
+  return readFileSync(
+    fileURLToPath(new URL('../../../src/engine/questions/distractors.ts', import.meta.url)),
+    'utf8',
+  );
+}
+
+/** The source with every comment removed, so a comment can be told apart from a literal. */
+function distractorsCodeWithoutComments(): string {
+  return distractorsSource()
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/\/\/[^\n]*/g, '');
+}
+
+describe('the x = 0.5 zero-headroom case (AC-17)', () => {
+  it('spec(T-005:AC-17) a legal fractions_int draw really does produce 0.5', () => {
+    expect(evaluateNumber('a / b', HALF_PARAMS)).toBe(0.5);
+    expect(Number.isInteger(0.5)).toBe(false);
+  });
+
+  it('spec(T-005:AC-17) the legal rungs at 0.5 are exactly {1.5, 2.5, 3.5} — zero headroom', () => {
+    expect(legalLadderValues(0.5)).toEqual([1.5, 2.5, 3.5]);
+    expect(legalLadderValues(0.5)).toHaveLength(NEEDED);
+  });
+
+  it('spec(T-005:AC-17) x * 2 is rejected at 0.5 because it is an INTEGER, not for magnitude', () => {
+    // The mechanism, isolated. `1` sits well inside the near-miss window of 0.5, so clause 4
+    // would admit it; only clause 2 removes it — which is why the fraction case is tight at all.
+    expect(0.5 * 2).toBe(1);
+    expect(Math.abs(1 - 0.5)).toBeLessThanOrEqual(DISTRACTOR_ABS_FLOOR);
+    expect(isPlausibleDistractor(1, 0.5)).toBe(false);
+    expect(ladderRungs(0.5)[6]).toBe(1);
+  });
+
+  it('spec(T-005:AC-17) DISTRACTOR_ABS_FLOOR binds on fractions exactly as it does on zero', () => {
+    // One notch lower and BOTH zero-headroom cases starve. This is the whole reason the case
+    // has to be written down beside the constant: the floor is dev-slider exposed.
+    expect(legalLadderValues(0.5, DISTRACTOR_ABS_FLOOR - 1).length).toBeLessThan(NEEDED);
+    expect(legalLadderValues(0, DISTRACTOR_ABS_FLOOR - 1).length).toBeLessThan(NEEDED);
+    expect(legalLadderValues(0.5, DISTRACTOR_ABS_FLOOR)).toHaveLength(NEEDED);
+    expect(legalLadderValues(0, DISTRACTOR_ABS_FLOOR)).toHaveLength(NEEDED);
+  });
+
+  it('spec(T-005:AC-17) 0 and 0.5 are the ONLY tight draws across the fractions_int grid', () => {
+    // L-017: sweep the dimension rather than asserting the one case. If some other draw were
+    // equally tight, documenting 0.5 alone would be documenting an example instead of the rule.
+    const tight: number[] = [];
+    let minimum = Number.POSITIVE_INFINITY;
+
+    for (let a = 0; a <= 12; a += 1) {
+      for (let b = 1; b <= 12; b += 1) {
+        const answer = a / b;
+        const headroom = legalLadderValues(answer).length;
+
+        expect(headroom, `a / b = ${a} / ${b} = ${answer} starves`).toBeGreaterThanOrEqual(NEEDED);
+        if (headroom < minimum) {
+          minimum = headroom;
+          tight.length = 0;
+        }
+        if (headroom === minimum && !tight.includes(answer)) {
+          tight.push(answer);
+        }
+      }
+    }
+
+    expect(minimum).toBe(NEEDED);
+    expect([...tight].sort((x, y) => x - y)).toEqual([0, 0.5]);
+  });
+
+  it('spec(T-005:AC-17) buildDistractors returns {1.5, 2.5, 3.5} whatever the declared list', () => {
+    for (const shape of DECLARED_SHAPES) {
+      const shaped = makeTemplate({
+        id: `fractions_int__half__${shape.name.replace(/[^a-z]+/gi, '_')}`,
+        skill: 'fractions_int',
+        answerExpr: 'a / b',
+        distractors: shape.of('a / b'),
+        params: HALF_PARAMS,
+      });
+
+      const result = expectValidDistractorSet(shaped, HALF_PARAMS);
+
+      expect(
+        [...result].sort((x, y) => x - y),
+        shape.name,
+      ).toEqual([1.5, 2.5, 3.5]);
+    }
+
+    expect(buildDistractors(halfTemplate, HALF_PARAMS)).toEqual([1.5, 2.5, 3.5]);
+  });
+
+  it('spec(T-005:AC-17) it never throws DISTRACTOR_FAILURE for a half-integer answer', () => {
+    for (let numerator = 1; numerator <= 25; numerator += 2) {
+      const drawn: Params = { a: numerator, b: 2 };
+      const template = makeTemplate({
+        id: 'fractions_int__halves',
+        skill: 'fractions_int',
+        answerExpr: 'a / b',
+        distractors: ['a / b', '(a / b) + 0', '(a / b) * 1'],
+        params: drawn,
+      });
+
+      expect(evaluateNumber('a / b', drawn)).toBe(numerator / 2);
+      expect(() => buildDistractors(template, drawn), `a = ${numerator}, b = 2`).not.toThrow();
+      expectValidDistractorSet(template, drawn);
+    }
+  });
+
+  it('spec(T-005:AC-17) the module documents the 0.5 case beside its use of the floor', () => {
+    // AC-17 is a documentation criterion: today the case lives only in a frozen-test comment and
+    // a review report, and `DISTRACTOR_ABS_FLOOR` is exposed on the dev slider, so the next
+    // person to lower it has nothing in `src/` telling them fractions starve too.
+    //
+    // Per LESSONS.md L-016 a text-level check must say plainly what it wants, so its failure
+    // reads as "write the comment" and never as "you broke something". Nothing about the
+    // wording is pinned — only that the value `0.5` appears somewhere in the file.
+    expect(
+      distractorsSource(),
+      'AC-17: add a comment beside the DISTRACTOR_ABS_FLOOR usage in ' +
+        'src/engine/questions/distractors.ts recording that a 0.5 answer has zero headroom too ' +
+        '(legal rungs {1.5, 2.5, 3.5}; x * 2 = 1 is rejected as an integer). ' +
+        'The check is satisfied by the literal text "0.5" appearing anywhere in the file.',
+    ).toContain('0.5');
+  });
+
+  it('spec(T-005:AC-17) documents it in a COMMENT, never as a new numeric literal', () => {
+    // The Definition of Done allows no numeric literal in the module except the ladder offsets,
+    // so satisfying the criterion above by introducing `0.5` into the code would trade one
+    // defect for another. Together the two assertions are satisfiable only by a comment.
+    expect(
+      distractorsCodeWithoutComments(),
+      'AC-17: "0.5" belongs in a comment, not in the code — the Definition of Done permits no ' +
+        'numeric literal in this module beyond the fill-ladder offsets.',
+    ).not.toContain('0.5');
   });
 });
