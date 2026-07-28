@@ -78,7 +78,7 @@ export const templateSchema = z
     params: z.record(paramRangeSchema),
     constraints: z.array(z.string()).optional(),
     answerExpr: z.string(),
-    distractors: z.array(z.string()).min(3),
+    distractors: z.array(z.string()).length(3),
     isWordProblem: z.boolean().optional(),
     readAloud: z.boolean().optional(),
     // Insurance for open question 2.10 — nothing in this swarm reads or writes it yet.
