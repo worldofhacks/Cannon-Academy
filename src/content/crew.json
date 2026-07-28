@@ -1,0 +1,17 @@
+[
+  {
+    "id": "gunner",
+    "displayName": "Gunner",
+    "role": "Crit-nudge specialist"
+  },
+  {
+    "id": "carpenter",
+    "displayName": "Carpenter",
+    "role": "Hull-repair specialist"
+  },
+  {
+    "id": "cook",
+    "displayName": "Cook",
+    "role": "Answer-reroll specialist"
+  }
+]
