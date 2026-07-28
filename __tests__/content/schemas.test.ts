@@ -558,15 +558,10 @@ describe('rankSchema', () => {
   });
 });
 
-// --- crewSchema ----------------------------------------------------------------------------
-// NOTE: `crewSchema { id: string; displayName: string; role: string }` is listed in T-003's
-// "Required shapes" block but is covered by NO acceptance criterion. It is exercised here
-// because T-006 authors `crew.json` against it and cannot edit this frozen file. These two
-// tests are deliberately left untagged rather than mis-attributed to an unrelated AC; the gap
-// is reported back to the orchestrator.
+// --- AC-18: crewSchema ---------------------------------------------------------------------
 
 describe('crewSchema', () => {
-  it('parses a crew member carrying id, displayName, and role', () => {
+  it('spec(T-003:AC-18) round-trips a crew member carrying id, displayName, and role', () => {
     const parsed: Crew = crewSchema.parse(VALID_CREW);
 
     expect(parsed.id).toBe('gunner');
@@ -574,8 +569,57 @@ describe('crewSchema', () => {
     expect(parsed.role).toBe('gunner');
   });
 
-  it('rejects a crew member with no role', () => {
+  it('spec(T-003:AC-18) rejects a crew member with no role', () => {
     const result = crewSchema.safeParse({ id: 'cook', displayName: 'Cook' });
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-18) rejects a crew member whose role is not a string', () => {
+    const result = crewSchema.safeParse(withOverrides(VALID_CREW, { role: 7 }));
+
+    expect(result.success).toBe(false);
+  });
+});
+
+// --- AC-19: unknown keys are rejected, never silently stripped -------------------------------
+// zod strips unknown keys by default, so a typo'd OPTIONAL field in a catalog would validate
+// cleanly and vanish. Each fixture below is otherwise valid and differs only by one extra key,
+// so these tests fail for exactly one reason: the schema is not strict.
+
+describe('unknown keys', () => {
+  it('spec(T-003:AC-19) templateSchema rejects a template carrying an unknown key', () => {
+    const result = templateSchema.safeParse(withOverrides(MINIMAL_TEMPLATE, { readAlound: true }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-19) cannonSchema rejects a cannon carrying an unknown key', () => {
+    const result = cannonSchema.safeParse(withOverrides(VALID_CANNON, { recoilDmg: 3 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-19) skillSchema rejects a skill carrying an unknown key', () => {
+    const result = skillSchema.safeParse(withOverrides(VALID_SKILL, { symbolicOnyl: true }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-19) islandSchema rejects an island carrying an unknown key', () => {
+    const result = islandSchema.safeParse(withOverrides(VALID_ISLAND, { requiresIsand: 'grandline' }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-19) rankSchema rejects a rank carrying an unknown key', () => {
+    const result = rankSchema.safeParse(withOverrides(VALID_RANK, { minWin: 3 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-19) crewSchema rejects a crew member carrying an unknown key', () => {
+    const result = crewSchema.safeParse(withOverrides(VALID_CREW, { roles: 'gunner' }));
 
     expect(result.success).toBe(false);
   });
