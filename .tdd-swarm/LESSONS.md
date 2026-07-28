@@ -441,3 +441,29 @@ agree by _coincidence_. If they do, the test proves nothing until you perturb on
 source into a different order, or construct a fixture where the two orderings genuinely differ.
 The general rule: **a test whose subject and expectation happen to agree today is measuring the
 coincidence, not the contract.**
+
+---
+
+## L-021 — A derived bound must be measured against the real assertion, not the formula it came from (Phase 3)
+
+**Pattern:** L-018 established that when a constant freezes before its consumer, the consumer's
+bound must be derived and asserted **now**. That was done for `QUALITY_WEIGHT`: the bound
+`> 7/12 ≈ 0.5833` was derived in closed form from T-008's published damage formula and frozen in
+wave 2.
+
+The derivation was wrong. It dropped the `ceil` in `lower = min(ceil(lowerRaw), damageMax)` — and
+that rounding is exactly what discretises the effect the criterion measures. When T-008's Test
+Agent ran candidate values against the **actual** AC-16 assertion, `0.5834` failed and the true
+threshold was `0.6`. The shipped `0.7` clears both, so nothing broke; but a later retune to `0.6`
+would have passed the guard and failed the consumer — reintroducing precisely the split-brain
+L-018 exists to prevent.
+
+**Why:** deriving from a formula is modelling, and a model omits whatever the modeller did not
+notice — here, an integer rounding step that looks incidental and is not. The derived bound then
+carries the authority of arithmetic while encoding an approximation.
+
+**What to do instead:** treat a derived bound as a **hypothesis to test**, not a result. Once the
+consumer's assertion exists, run candidate values through it and find the empirical bite point;
+where they disagree, the assertion wins. And when deriving before the consumer exists, prefer a
+bound with visible margin over a tight closed-form one — an approximation with slack is safe,
+an approximation at the knife edge is not.
