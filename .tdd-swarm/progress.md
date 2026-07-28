@@ -367,3 +367,35 @@ test edits by exit code in each.
 
 Lesson L-015 recorded: "unreachable" is a claim that needs a probe, not an argument — a
 reviewer's own clean proof of unreachability was disproved by measurement on re-review.
+
+### T-002 implementation + security review
+
+Implementation `a16b864`: tokenise → recursive-descent parse → static check pass (identifier
+resolution, whitelist/arity, typing) → evaluation pass with short-circuiting. 297/297 tests,
+all local gates green, spec-lint 24/24, zero test files touched.
+
+Orchestrator ran an **independent** codegen-poisoning probe (separate from the frozen suite's
+AC-21 trap): no route touched. Spot-checked `a+b*c=14`, `7/2=3.5`, `-7%2=-1`, `gcd(12,18)=6`,
+`sqrt`→`UNKNOWN_FUNCTION`, `1e3`→`PARSE_ERROR`, static identifier resolution, short-circuiting.
+
+Implementer applied L-015 correctly: rather than claiming three TS-exhaustiveness guards were
+unreachable, it probed **36,792 public-API calls** (0 hits) with a teeth-check proving the
+matcher fires on a synthetic message.
+
+**Security review: PASS** (no Critical). Primary invariant — no code construction — confirmed
+clean by source read, and caller-controlled property access verified safe by live probe
+(`__proto__`, `constructor`, `toString` all resolve to errors, never a prototype hop).
+
+Two **Important** findings, both reproduced by execution:
+- **DoS / contract breach:** `MAX_NESTING_DEPTH = 64` counts only paren and call nesting. Chained
+  binary/logical operators without parentheses parse *iteratively* (so the limit never trips) but
+  build a left-deep AST walked with native recursion. `'1' + '+1'.repeat(10000)` crashes with an
+  uncaught `RangeError`, **not** an `ExprError` — breaching the module's "every failure is an
+  ExprError" contract and the spirit of AC-15 ("rather than overflowing the stack"). The frozen
+  test covered only one shape of the threat.
+- **Numeric integrity:** doc comments claim "never NaN, Infinity", but `+`/`-`/`*` overflow is
+  unguarded (only `/`,`%` check zero) and raw `env` values are never `Number.isFinite`-checked.
+  `a*a` with `a=1e200` returns `Infinity` silently.
+
+Both are the same class: the module's stated contract is not enforced at its boundaries. Holding
+the amendment until the code review lands so both are handled in one spec-then-test round.
