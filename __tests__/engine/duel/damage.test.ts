@@ -1235,3 +1235,137 @@ describe('T-008 — the damageMax clamp carries a committed measurement, not an 
     ).toBe(true);
   });
 });
+
+// ===========================================================================================
+// AC-20 — a non-finite `timerMs` is the twin of AC-17's hole, and is rejected identically
+// ===========================================================================================
+
+describe('T-008 — a non-finite timerMs throws rather than fabricating a maximum volley', () => {
+  // Measured on the implementation under review, before this criterion existed:
+  //
+  //   timerMs        resolveShot(correct: true)              answerQuality   isPerfectShot
+  //   NaN            rollDamage NaN, damageToEnemy NaN       NaN             false
+  //   Infinity       rollDamage 12 (= damageMax),            1               true
+  //                  perfectShot true, damageToEnemy 13
+  //   -Infinity      throws RangeError                       1               false
+  //
+  // `NaN <= 0` is false, so AC-12's `timerMs <= 0` guard sails straight past a non-finite timer —
+  // the identical shape to `elapsedMs < 0` missing `NaN` (AC-17). `Infinity` is the worse of the
+  // two: `1 - elapsed/Infinity` is `1`, so an impossible timer reports the BEST possible outcome
+  // in every field at once — maximum quality, maximum roll, and a Perfect Shot. And `-Infinity`
+  // shows the three entry points already disagreeing: `resolveShot` throws while `answerQuality`
+  // returns 1, which is what AC-20's "guard identically" clause exists to close.
+  const NON_FINITE = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY] as const;
+
+  /** Classifies a call as having thrown, or as having returned a value. */
+  function classify(fn: () => unknown): { threw: boolean; error?: string; value?: unknown } {
+    try {
+      return { threw: false, value: fn() };
+    } catch (error) {
+      return { threw: true, error: (error as Error).constructor.name };
+    }
+  }
+
+  // spec(T-008:AC-20)
+  it('rejects a NaN, Infinity or -Infinity timerMs from resolveShot, on every cannon', () => {
+    for (const cannon of ALL_CANNONS) {
+      for (const timerMs of NON_FINITE) {
+        for (const correct of [true, false]) {
+          expect(() =>
+            resolveShot({ cannon: withTimer(cannon, timerMs), correct, elapsedMs: 0, rng: createRng(12) }),
+          ).toThrow(RangeError);
+        }
+      }
+    }
+  });
+
+  // spec(T-008:AC-20)
+  it('never lets a non-finite timer produce a volley — least of all a maximum one', () => {
+    // L-012: "it throws" is the mechanism. THIS is the property T-020 depends on: an impossible
+    // timer must not become a shot at all. Written as an outcome assertion so it survives any
+    // later decision to clamp rather than throw, and so it catches `Infinity` — whose fields are
+    // all perfectly FINITE and therefore invisible to a finiteness check alone.
+    for (const cannon of ALL_CANNONS) {
+      for (const timerMs of NON_FINITE) {
+        const result = classify(() =>
+          resolveShot({
+            cannon: withTimer(cannon, timerMs),
+            correct: true,
+            elapsedMs: 0,
+            rng: createRng(12),
+          }),
+        );
+        expect(result.threw).toBe(true);
+        expect(result.error).toBe('RangeError');
+      }
+    }
+  });
+
+  // spec(T-008:AC-20)
+  it('guards the exported predicates identically — all three entry points agree', () => {
+    // "the exported `answerQuality` and `isPerfectShot` guard identically". Swept as the full
+    // CROSS-PRODUCT of both parameters (L-017) rather than a list of cases: whenever EITHER
+    // argument is non-finite, all three entry points must reach the same verdict. Today they do
+    // not — at `timerMs = -Infinity`, `resolveShot` throws while `answerQuality` returns 1.
+    const elapsedAxis = [0, 5_000, ...NON_FINITE];
+    const timerAxis = [20_000, ...NON_FINITE];
+    let combinations = 0;
+
+    for (const cannon of ALL_CANNONS) {
+      for (const elapsedMs of elapsedAxis) {
+        for (const timerMs of timerAxis) {
+          const anyNonFinite = !Number.isFinite(elapsedMs) || !Number.isFinite(timerMs);
+          if (!anyNonFinite) continue;
+          combinations += 1;
+
+          const quality = classify(() => answerQuality(true, elapsedMs, timerMs));
+          const perfect = classify(() => isPerfectShot(true, elapsedMs, timerMs));
+          const shot = classify(() =>
+            resolveShot({
+              cannon: withTimer(cannon, timerMs),
+              correct: true,
+              elapsedMs,
+              rng: createRng(12),
+            }),
+          );
+
+          expect(quality.threw).toBe(true);
+          expect(perfect.threw).toBe(true);
+          expect(shot.threw).toBe(true);
+          expect([quality.error, perfect.error, shot.error]).toEqual([
+            'RangeError',
+            'RangeError',
+            'RangeError',
+          ]);
+        }
+      }
+    }
+    // L-017: a sweep that silently swept nothing is no evidence at all. 5 elapsed values x 4
+    // timers = 20 pairs, minus the 2 x 1 = 2 pairs where both are finite, leaves 18 per cannon.
+    expect(elapsedAxis.length * timerAxis.length).toBe(20);
+    expect(combinations).toBe(ALL_CANNONS.length * 18);
+  });
+
+  // spec(T-008:AC-20)
+  it('still accepts every finite positive timer — the guard rejects the class, not the axis', () => {
+    // L-009: `-Infinity` already threw from `resolveShot` before this criterion existed, so
+    // without a complement the whole AC could be "satisfied" by rejecting every timer outright.
+    // Finite positive timers off the catalog are included so the guard cannot degenerate into an
+    // allowlist of today's four values.
+    for (const timerMs of [1, 500, 12_000, 20_000, 60_000, Number.MAX_SAFE_INTEGER]) {
+      const cannon = withTimer(SWIVEL, timerMs);
+      expect(() => resolveShot({ cannon, correct: true, elapsedMs: 0, rng: createRng(12) })).not.toThrow();
+      expect(answerQuality(true, 0, timerMs)).toBe(1);
+      expect(answerQuality(true, timerMs, timerMs)).toBe(ANSWER_QUALITY_FLOOR);
+      expect(isPerfectShot(true, 0, timerMs)).toBe(true);
+      expect(isPerfectShot(true, timerMs, timerMs)).toBe(false);
+    }
+    // …and every real catalog timer still works across the whole quality axis.
+    for (const cannon of ALL_CANNONS) {
+      for (const elapsedMs of elapsedDimension(cannon.timerMs)) {
+        expect(() => resolveShot({ cannon, correct: true, elapsedMs, rng: createRng(12) })).not.toThrow();
+        expect(Number.isFinite(answerQuality(true, elapsedMs, cannon.timerMs))).toBe(true);
+      }
+    }
+  });
+});
