@@ -8,9 +8,17 @@ const path = require('path');
 
 function main() {
   let input = '';
-  try { input = fs.readFileSync(0, 'utf8'); } catch { process.exit(0); }
+  try {
+    input = fs.readFileSync(0, 'utf8');
+  } catch {
+    process.exit(0);
+  }
   let payload;
-  try { payload = JSON.parse(input); } catch { process.exit(0); }
+  try {
+    payload = JSON.parse(input);
+  } catch {
+    process.exit(0);
+  }
 
   const file = payload?.tool_input?.file_path;
   if (!file) process.exit(0);
@@ -46,4 +54,8 @@ function main() {
   process.exit(0);
 }
 
-try { main(); } catch { process.exit(0); }
+try {
+  main();
+} catch {
+  process.exit(0);
+}
