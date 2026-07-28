@@ -264,3 +264,26 @@ importing the module under test — for code construction that is `globalThis.Fu
 results. Static checks stay as cheap secondary defence, never as the authority. Generally: when a
 requirement is "X never happens", the test must make X *observable*, not make its common
 spellings unwriteable.
+
+---
+
+## L-014 — Verify the cheat is a real cheat before trusting that the guard beat it (Phase 2)
+
+**Pattern:** While proving a new test closed a hole, a Test Agent built the cheat it was meant to
+catch — an evaluator resolving calls via `Math[name]` — and the suite reported **282/282
+passing**. The natural read is "my guard already handles this". The truth was that the cheat was
+incomplete: only the static type pass had been patched, so the evaluator still rejected `sqrt`
+downstream and the cheat never actually exposed anything. Rebuilt properly, and independently
+proven to expose `sqrt(9)=3`, `round(7/2)=4`, `pow(2,10)=1024` via a throwaway probe **before**
+re-running the suite, it failed 22 tests.
+
+**Why:** A cheat that does not cheat produces a green run indistinguishable from a guard that
+works. The mutation-testing method (L-011) assumes the mutant is live; if it is dead on arrival,
+the method silently inverts and manufactures false confidence — the very failure mode it exists
+to prevent.
+
+**What to do instead:** Before concluding a guard caught a cheat, prove the cheat is real on its
+own terms — demonstrate the capability it was supposed to smuggle in, with a direct probe,
+independently of the suite under test. Only then does the suite's verdict mean anything. This is
+[[L-001]] applied to the mutant instead of the guard: never trust an unobserved failure OR an
+unobserved success.
