@@ -33,9 +33,9 @@ source of truth.
 
 | id | title | status | deps | branch | model | issue |
 |----|-------|--------|------|--------|-------|-------|
-| T-001 | Seeded mulberry32 PRNG with pure, state-threaded draw helpers | backlog | — | `ticket/T-001-seeded-prng` | standard | — |
-| T-002 | Safe arithmetic expression and constraint predicate evaluator (no eval) | backlog | — | `ticket/T-002-safe-expr-eval` | capable | — |
-| T-003 | Content zod schemas, id unions, and engine question types | backlog | — | `ticket/T-003-schemas-and-types` | standard | — |
+| T-001 | Seeded mulberry32 PRNG with pure, state-threaded draw helpers | in-progress | — | `ticket/T-001-seeded-prng` | standard | — |
+| T-002 | Safe arithmetic expression and constraint predicate evaluator (no eval) | tests-written | — | `ticket/T-002-safe-expr-eval` | capable | — |
+| T-003 | Content zod schemas, id unions, and engine question types | review-passed | — | `ticket/T-003-schemas-and-types` | standard | — |
 
 ## Wave 2 — constants and catalog data
 

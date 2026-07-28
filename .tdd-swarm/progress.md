@@ -288,3 +288,37 @@ rebase, so it went stale again. Verified current at 14 ACs before freezing.
 `phase=implement` set, guard verified flipping. Implementer dispatched (sonnet, per model_hint).
 
 Lesson L-012 recorded: aggregate assertions certify the projection, not the mechanism.
+
+## Phase 4 — Wave 1 ticket verification
+
+Orchestrator re-ran every local gate itself in both worktrees before accepting any DONE:
+format, lint, typecheck, unit, no-TODOs, no-skipped-tests, engine-purity, spec-lint — all green,
+and **zero test files modified by implementer commits** (verified at commit level).
+
+**Ticket T-003: review-passed** (commits ..fb5f78d, gates pass, wave 1)
+- Code review: **APPROVED** — 20/20 ACs, 8/8 DoD, no Critical/Important. Reviewer verified the
+  derived types with its own `Exact<>` probes rather than trusting the frozen tests, confirmed
+  `.strict()` on all six schemas AND all three `unlock` variants, and confirmed the id unions are
+  *consumed* by schema fields rather than merely declared (the L-012 failure mode). Zero `!`,
+  `as`, `any`, or ts-suppressions. Four Minor findings recorded, none blocking.
+- Security review: **PASS**. Prototype pollution checked by reading the installed zod source
+  (`parseUtil.js` guards `__proto__` for `ZodRecord`), not by assumption.
+
+**Ticket T-001: CHANGES REQUIRED** (attempt 1)
+- Code review verified the mulberry32 transcription token-by-token against the ticket pseudocode
+  — **exact**, ruling out the "test and implementation agree with each other but both drift from
+  the spec" failure. `shuffle` read as an algorithm and confirmed textbook Fisher-Yates with the
+  inclusive upper index. Spec compliance 14/14, DoD 7/7, no Iron Law violation.
+- **I-1 (Important, real bug):** the internal bounds helper tests whether the retrieved VALUE is
+  `undefined` rather than whether the INDEX is in range. `T` is unconstrained and
+  `noUncheckedIndexedAccess` makes `(T | undefined)[]` routine. Measured: `shuffle` throws for
+  **37 of 50 seeds** on `[undefined, 1, 2, 3]`; `pick` for 14 of 50; and the message claims
+  "index 3 out of bounds" for an in-bounds index. The implementation report called this
+  "practically unreachable" — factually wrong.
+- Non-finite weights flagged independently by BOTH the code review and the security review.
+- **Handled by spec-then-test, not by patching:** the Iron Law forbids production code no failing
+  test demands, so AC-11 was extended and AC-15/AC-16 added, and the Test Agent was re-dispatched
+  (`phase=tests`) to restore RED before the implementer fixes anything.
+
+**Ticket T-002: tests-written**, design review returned 1 Critical + 2 Important; Test Agent
+hardening. See L-013 — the anti-eval guard did not guard.
