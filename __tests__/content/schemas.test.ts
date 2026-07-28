@@ -385,6 +385,69 @@ describe('templateSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  // T-026 tightens the distractor count from "at least three" (T-003 AC-4, superseded) to
+  // "exactly three" — ARCHITECTURE.md §4.1 is four-choice universally, and a four-distractor
+  // template used to validate here only to be rejected later, far away, by assertQuestion's
+  // CHOICE_COUNT === 4 guard. This pins the located, immediate rejection instead.
+  //
+  // Note on provenance: T-003's frozen suite never actually contained an assertion that a
+  // four-distractor template parses successfully (verified: no such fixture exists in any
+  // revision of this file, and the only "accepts" case above uses exactly three). The
+  // over-permissive behaviour lived in `templateSchema`'s `.min(3)` alone — confirmed by a
+  // throwaway probe against the merged module before this edit — not in a frozen test that
+  // needed inverting. Nothing above this comment is touched; AC-1/AC-3/AC-4 below are added
+  // (not inverted) purely to give this ticket its own citations per spec-lint, alongside the
+  // pre-existing T-003 coverage that already establishes the same facts.
+  it('spec(T-026:AC-1) accepts a template carrying exactly three distractors', () => {
+    const result = templateSchema.safeParse(
+      withOverrides(MINIMAL_TEMPLATE, { distractors: ['a + b + 1', 'a + b - 1', 'a * b'] }),
+    );
+
+    expect(result.success).toBe(true);
+  });
+
+  it('spec(T-026:AC-2) rejects a template carrying four distractors, with the issue at path ["distractors"]', () => {
+    const result = templateSchema.safeParse(
+      withOverrides(MINIMAL_TEMPLATE, {
+        distractors: ['a + b + 1', 'a + b - 1', 'a * b', 'a - b'],
+      }),
+    );
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.map((issue: SchemaIssue) => issue.path)).toContainEqual(['distractors']);
+    }
+  });
+
+  it('spec(T-026:AC-3) rejects a template carrying only two distractors (lower bound unchanged)', () => {
+    const result = templateSchema.safeParse(
+      withOverrides(MINIMAL_TEMPLATE, { distractors: ['a + b + 1', 'a + b - 1'] }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-026:AC-4) keeps distractors typed as string[] with element type string', () => {
+    const distractorsAreStrings: Exact<Template['distractors'][number], string> = true;
+
+    expect(distractorsAreStrings).toBe(true);
+  });
+
+  // A scoped regression sentinel, not a re-verification of the whole 90-test suite (that is
+  // `npx vitest run` itself, per the ticket's own gate) — this pins that tightening the
+  // distractor count did not perturb any sibling field on templateSchema or leak into any
+  // other schema in this module.
+  it('spec(T-026:AC-5) leaves every other templateSchema field and every other schema unaffected', () => {
+    const parsed = templateSchema.parse(FULL_TEMPLATE);
+    expect(parsed).toEqual(FULL_TEMPLATE);
+
+    expect(skillSchema.safeParse(VALID_SKILL).success).toBe(true);
+    expect(cannonSchema.safeParse(VALID_CANNON).success).toBe(true);
+    expect(islandSchema.safeParse(VALID_ISLAND).success).toBe(true);
+    expect(rankSchema.safeParse(VALID_RANK).success).toBe(true);
+    expect(crewSchema.safeParse(VALID_CREW).success).toBe(true);
+  });
+
   it('spec(T-003:AC-5) rejects a param range with a single bound', () => {
     const result = templateSchema.safeParse(
       withOverrides(MINIMAL_TEMPLATE, { params: { a: [3], b: [1, 5] } }),
