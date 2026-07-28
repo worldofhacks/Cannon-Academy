@@ -971,6 +971,21 @@ describe('T-004 tuning — onboarding hull', () => {
     SWIVEL_DAMAGE_MIN + ANSWER_QUALITY_FLOOR * (SWIVEL_DAMAGE_MAX - SWIVEL_DAMAGE_MIN),
   );
 
+  /**
+   * The most damage one correct Swivel volley can ever deal: the top of the cannon's range
+   * plus the Perfect Shot bonus. T-008 caps `rollDamage` at `damageMax` and adds
+   * `PERFECT_SHOT_BONUS_DAMAGE` on top of it, so this is a hard ceiling on a single volley.
+   *
+   * This is the case a tutorial produces BY DEFAULT, not an outlier: the guided duel points at
+   * the correct tap, so answering inside the first 40% of a 20-second timer is the normal
+   * outcome, and every volley is a Perfect Shot.
+   *
+   * Derived from the constants rather than hardcoded — `PERFECT_SHOT_BONUS_DAMAGE` is read from
+   * the module under test, so buffing the bonus (or the Swivel's `damageMax`) raises this floor
+   * automatically instead of silently reopening the two-volley hole.
+   */
+  const swivelBestVolley = SWIVEL_DAMAGE_MAX + PERFECT_SHOT_BONUS_DAMAGE;
+
   // spec(T-004:AC-12)
   it('is a positive integer', () => {
     expect(Number.isInteger(ONBOARDING_ENEMY_HULL)).toBe(true);
@@ -987,13 +1002,59 @@ describe('T-004 tuning — onboarding hull', () => {
   });
 
   // spec(T-004:AC-12)
-  it('sinks in three volleys at the Swivel Gun guaranteed FLOOR damage', () => {
-    // AC-12's formula verbatim, with the Swivel's 8/12 hardcoded per the same-wave rule.
-    // The floor — not the mean — is the right bound: PLAN.md promises the tutorial sloop
-    // "politely sinks in three volleys" for every child, including the slowest correct answer.
+  it('sinks in NO MORE than three volleys at the Swivel Gun guaranteed FLOOR damage', () => {
+    // The CEILING half of the window. AC-12's formula verbatim, with the Swivel's 8/12
+    // hardcoded per the same-wave rule. The floor damage — not the mean — is the right bound
+    // here: PLAN.md promises the tutorial sloop sinks in three volleys for every child,
+    // including the slowest correct answer.
     expect(swivelFloorVolley).toBe(10);
     expect(ONBOARDING_ENEMY_HULL).toBeLessThanOrEqual(3 * swivelFloorVolley);
     expect(Math.ceil(ONBOARDING_ENEMY_HULL / swivelFloorVolley)).toBeLessThanOrEqual(3);
+  });
+
+  // spec(T-004:AC-12)
+  it('sinks in NO FEWER than three volleys, Perfect Shot bonus included', () => {
+    // The FLOOR half of the window — added after an independent code review found the shipped
+    // value satisfied every other AC-12 assertion while sinking the tutorial sloop in TWO
+    // volleys. L-005 in its purest form: AC-12 constrained only the ceiling, so the worst legal
+    // value sat at the unconstrained end.
+    //
+    // PLAN.md:75 promises "a scripted pirate sloop that politely sinks in three volleys", and
+    // "three" is the whole pedagogical point — the child must see choose → answer → fire cycle
+    // three times before the tutorial resolves. A two-volley tutorial is not a shorter version
+    // of that promise, it is a different one.
+    //
+    // The bound is derived, never hardcoded: the best a single Swivel volley can do is
+    // `SWIVEL_DAMAGE_MAX + PERFECT_SHOT_BONUS_DAMAGE`, so two such volleys deal
+    // `2 * swivelBestVolley`, and the hull must sit STRICTLY above that or a third volley is
+    // never reached. A future edit to the Swivel's damage or the Perfect Shot bonus moves this
+    // floor on its own — which is exactly what would have caught the original defect.
+    expect(
+      ONBOARDING_ENEMY_HULL,
+      `two Perfect Shots deal ${2 * swivelBestVolley}; a hull of ${ONBOARDING_ENEMY_HULL} ` +
+        `ends the tutorial one volley early`,
+    ).toBeGreaterThan(2 * swivelBestVolley);
+    // Stated the other way round, as the volley count PLAN.md actually promises: even when
+    // every volley is a Perfect Shot at the top of the range, three are required.
+    expect(Math.ceil(ONBOARDING_ENEMY_HULL / swivelBestVolley)).toBeGreaterThanOrEqual(3);
+  });
+
+  // spec(T-004:AC-12)
+  it('leaves the three-volley window itself non-empty', () => {
+    // Both ends are now derived from Swivel constants, so a future retune could in principle
+    // close the window entirely — the floor `2 * (damageMax + bonus)` could cross the ceiling
+    // `3 * ceil(damageMin + FLOOR * range)` — and every hull would fail with no legal value to
+    // pick. That failure must read as "the window is empty", not as "your constant is wrong",
+    // so assert the window's own existence rather than leaving an implementer to discover it.
+    const floorExclusive = 2 * swivelBestVolley;
+    const ceilingInclusive = 3 * swivelFloorVolley;
+    expect(
+      ceilingInclusive,
+      `no legal ONBOARDING_ENEMY_HULL exists: floor > ${floorExclusive}, ceiling <= ${ceilingInclusive}`,
+    ).toBeGreaterThan(floorExclusive);
+    // …and the frozen constant must land inside it, at both ends.
+    expect(ONBOARDING_ENEMY_HULL).toBeGreaterThan(floorExclusive);
+    expect(ONBOARDING_ENEMY_HULL).toBeLessThanOrEqual(ceilingInclusive);
   });
 
   // spec(T-004:AC-12)
@@ -1005,9 +1066,12 @@ describe('T-004 tuning — onboarding hull', () => {
     const onboardingVolleys = Math.ceil(ONBOARDING_ENEMY_HULL / swivelFloorVolley);
     const firstIslandVolleys = Math.ceil(ENEMY_HULL_BY_ISLAND.port_sumwich / swivelFloorVolley);
     expect(onboardingVolleys).toBeLessThan(firstIslandVolleys);
-    // And it must not be so small that the tutorial ends in one shot before the child has
-    // seen the loop twice — a one-volley tutorial teaches nothing about choosing a cannon.
-    expect(ONBOARDING_ENEMY_HULL).toBeGreaterThan(SWIVEL_DAMAGE_MAX);
+    // The lower end of the tutorial's length is owned by the "no fewer than three volleys"
+    // test above, which supersedes the one-volley exclusion this test originally carried —
+    // that assertion (`> SWIVEL_DAMAGE_MAX`) was the bound that stopped one volley short and
+    // let a two-volley tutorial through. Kept here only as the cross-check that the two
+    // constants still describe two different-length duels.
+    expect(onboardingVolleys).toBeGreaterThanOrEqual(3);
   });
 
   // spec(T-004:AC-12)
