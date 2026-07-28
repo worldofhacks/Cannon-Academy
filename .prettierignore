@@ -10,6 +10,10 @@ assets/audio/
 # Blender working files.
 tools/
 
+# Agent working artifacts — every dispatch writes one, and formatting them
+# gates the build on a byproduct rather than on source.
+.tdd-swarm/reports/
+
 node_modules/
 coverage/
 dist/
