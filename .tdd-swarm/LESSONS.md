@@ -698,3 +698,50 @@ it is most likely to be deleted is the routine cleanup nobody reviews.
 report, so it merges with the wave. Before any `worktree remove`, diff the untracked set and ask
 what is being destroyed — `--force` on a directory you have not read is a decision made blind. The
 five reports were preserved into `.tdd-swarm/reports/` before teardown proceeded.
+
+---
+
+## L-031 — An agent must assert which unit it is in before trusting any measurement (Wave 4, tests)
+
+**Pattern:** The T-007 Test Agent's shell tool **silently ignored its `working_directory`
+parameter**. Every command ran in the repo root while the agent believed it was in
+`.worktrees/wt-T-007`: `pwd` reported the root and `git branch --show-current` reported
+`swarm/engine-core`, not its ticket branch. Its first baseline measurement was therefore taken in
+the wrong unit. It caught this itself, by noticing `.tdd-swarm/phase` was absent where its brief
+said a phase was set, and re-ran everything behind an explicit `cd`.
+
+The root has no phase file — deliberately, so the orchestrator is not policed there — which means
+**the guard was inert in exactly the place the misdirected agent had landed.** Had it written
+instead of measured, it would have written `src/` on the integration branch, unguarded, while
+believing itself confined to a worktree. Nothing in the system would have objected.
+
+**Why:** the guard's engagement model assumes an agent's writes resolve inside its own worktree.
+That assumption is carried entirely by tooling the agent does not control, and when it broke it
+broke silently in the fail-open direction. This is [[L-007]] again from a new angle: the guard was
+installed, correct, and proven — and still absent from the one location that mattered, because
+engagement is a property of the path, not of the agent's intent.
+
+**What to do instead:**
+
+- **Agents assert their unit before their first measurement.** Check `git branch --show-current`
+  against the ticket branch and confirm `.tdd-swarm/active-ticket` matches the ticket id. A number
+  measured in an unverified unit is a number about an unknown state ([[L-027]]).
+- **The integration tree is now off limits to everyone while a wave is in flight.** `decideWrite`
+  refuses `src/**` and `__tests__/**` at the repo root whenever any unit is engaged: during a wave
+  the integration branch changes only by merge, so no hand write there is legitimate, and the block
+  message tells a misdirected agent exactly what has happened. Ledger, ticket and doc writes stay
+  open, because amending a ticket in response to a test agent's findings is the orchestrator's job
+  mid-wave. Proof extended to **37 directions**.
+- **Corollary for briefs:** state the absolute worktree path _and_ require the agent to echo back
+  the branch it verified. "Work in this directory" is an instruction; "prove you are in it" is a
+  gate.
+
+**The same confusion of units broke a gate, in the opposite direction.** Putting worktrees inside
+the repo (L-029) silently widened every root gate to cover them: the root `lint` gate began linting
+`.worktrees/*/`, reporting **82 errors** in _copies_ of the guard whose paths no longer matched
+`.cursor/hooks/**/*.cjs`, so the CommonJS config never applied to them. The gate was reporting
+another agent's checkout as this unit's failure, and would have failed on any in-progress work in
+any worktree. `.worktrees/**` is now ignored at the root; each worktree runs the same config on
+itself. **When you move a directory into a repo, enumerate every tool that globs from the root** —
+`.gitignore` was fixed for this at the time, and the linter was missed because nothing had yet run
+it against an occupied worktree.

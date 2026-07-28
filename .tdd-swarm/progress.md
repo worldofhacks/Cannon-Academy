@@ -1042,3 +1042,66 @@ Recorded as **L-030**. The stale worktree directories themselves remain on disk;
 destructive operation outside the workspace and is left for the owner.
 
 **Lessons added: L-029, L-030.**
+
+## Wave 4 — dispatched 2026-07-28
+
+Two Test Agents on `claude-opus-5-thinking-high`, worktrees at `.worktrees/wt-T-007` and
+`.worktrees/wt-T-013`, both branched from `ce51e71` with `phase=tests` and `active-ticket` set.
+Model policy for this wave, owner-selected: **authoring on Opus 5, independent review on a different
+model family**, so the cross-model adversarial property that caught wave 1's biased-shuffle and
+lazy-zod cheats survives.
+
+### T-007: tests-written (commits `2042114`, `5ce1ef5`)
+
+**Orchestrator re-ran every gate itself rather than accepting the DONE report.** All claims hold:
+
+| check           | verified                                                                       |
+| --------------- | ------------------------------------------------------------------------------ |
+| Diff scope      | exactly 2 files (test + report), **0** changes under `src/`                    |
+| Commit prefixes | both `test(T-007):` — the frozen-tests outcome gate accepts them               |
+| `generator.ts`  | does not exist; scratchpad deleted before commit                               |
+| format / lint   | exit 0 / exit 0                                                                |
+| typecheck       | **exactly one error**, `TS2307`, at the absent module's import — no other code |
+| suite           | 1 file failed on module resolution, **1229 other tests still pass**            |
+| spec-lint       | `SPEC-LINT PASS`, 16 ACs mapped both directions                                |
+
+57 tests, 123 assertion sites. **38 mutants, 38 killed**, with a varied kill profile and eight
+mutants dying to exactly one criterion each — so the suite discriminates rather than overlaps. The
+agent proved its harness live three ways before trusting any verdict (sentinel stub, dumped composed
+value, varied profile), and re-measured the whole matrix after editing the test file rather than
+citing the earlier run (L-027 applied without being told).
+
+Two of its own findings are worth keeping:
+
+- A mutant that **sorts the input pool survived at 57/57** — a dead mutant, not a clean suite: the
+  fixture ids `t1…t8` were already sorted, so the sort was a no-op. Same shape as L-020, caught by
+  L-014 discipline. Fixed by reversing the pool with assertions that it really is unsorted.
+- Its first RED typecheck reported `TS2307` **plus eight implicit-`any` errors**, manufactured by
+  the missing module rather than by the tests. Left alone, the implementer would have inherited a
+  frozen file that could not pass `tsc` until it wrote code, unable to tell the agent's noise from
+  its own. Now aliased behind an annotated const, which also turns the ticket's declared signature
+  into a compile-time assertion the moment the module lands.
+
+### The environment defect this wave exposed — L-031
+
+The T-007 agent's shell tool **silently ignored `working_directory`**; every command ran in the repo
+root while it believed it was in its worktree. The root carries no phase file by design, so **the
+guard was inert exactly where the misdirected agent had landed.** It caught the problem itself by
+noticing `.tdd-swarm/phase` was absent, and re-ran everything behind an explicit `cd`.
+
+Verified by the orchestrator: the root working tree is **clean** — nothing was written there, and
+the root is still at `ce51e71` with `swarm/engine-core` checked out. This was one misdirected write
+away from an unguarded change to the integration branch.
+
+**Closed:** `decideWrite` now refuses `src/**` and `__tests__/**` at the repo root whenever any unit
+is engaged, with a message that names the likely cause. During a wave the integration tree changes
+only by merge, so no hand write there is legitimate; ledger, ticket and doc writes stay open so the
+orchestrator can still amend a ticket in response to findings. Proof extended to **37 directions,
+all observed**. Also fixed: `.gitignore`'s `node_modules/` never matched the worktrees' `node_modules`
+**symlink**, so every worktree showed it as untracked and committable by accident.
+
+### Six spec ambiguities raised, awaiting orchestrator ruling — tests NOT yet frozen
+
+The agent tested a defensible reading of each and reported the reasoning rather than guessing
+silently. Two are load-bearing for T-024's replay proof. Rulings are pending, so **T-007's suite is
+committed but not frozen**, and the independent test-design review has not yet been dispatched.

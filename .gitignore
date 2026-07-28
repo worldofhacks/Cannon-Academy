@@ -1,3 +1,5 @@
+# Both forms: worktrees carry `node_modules` as a symlink, which `node_modules/` misses.
+node_modules
 node_modules/
 coverage/
 dist/
