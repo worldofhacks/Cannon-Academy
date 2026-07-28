@@ -576,3 +576,31 @@ its perspective every criterion it can see is covered.
 by exactly the number of criteria added. Never trust that a hand-written criterion parsed — count
 it. More generally: when a gate extracts structure from prose, any edit to that prose is an edit to
 the gate's input, and needs the same verification as an edit to the gate itself.
+
+---
+
+## L-027 — A measurement is evidence only of the state it was taken in (Phase 4)
+
+**Pattern:** The T-005 implementer justified a `>=` quota cap by citing a probe: "with the cap
+deleted the call returns **eight** values, not three." Both the code reviewer and the Test Agent
+later measured **four**. Re-measuring, the implementer found its own error precisely:
+
+> My "eight" was a mutant that had _also_ degraded the ladder cap, because I measured it before
+> changing that operator and never re-measured after. A two-cap measurement cited as evidence
+> about one cap.
+
+The overshoot risk it invoked to justify `>=` did not exist either — `===` and `>=` are
+behaviourally identical there, because the guard precedes every push. The **conclusion** held (the
+cap is load-bearing) while the **reasoning** under it did not, leaving a comment that would have
+sent the next editor hunting for an impossible overshoot.
+
+**Why:** a probe is a snapshot of one configuration. When the code under it changes — even in a
+part that feels unrelated — the number becomes a fact about a state that no longer exists. It
+still _reads_ as evidence, and it carries the authority of having been measured, which is exactly
+what stops anyone re-checking it.
+
+**What to do instead:** record the configuration alongside the number, and **re-measure after every
+change to the thing being measured** — including changes made for a different reason. When a probe
+result appears in a comment or a report, it should be reproducible from what is written down; if
+reproducing it requires state you did not record, it is an anecdote. Corollary of [[L-015]]: a
+measurement without its configuration is an argument wearing a number.
