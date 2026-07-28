@@ -3,13 +3,15 @@ import { createRng, nextFloat, nextInt, pick, shuffle, weightedPick, type Rng } 
 
 // T-001 — Seeded mulberry32 PRNG with pure, state-threaded draw helpers.
 //
-// API shape used throughout (from tickets/T-001.md "Planning Decisions"): every draw
-// function is pure and state-threaded, returning a `[value, nextRng]` tuple; `Rng` is
-// `{ readonly state: number }`, a plain JSON-serialisable object, never a closure.
+// API shape used throughout (from tickets/T-001.md "Planning Decisions", now
+// locked-decision): every draw function is pure and state-threaded, returning a
+// `[value, nextRng]` tuple; `Rng` is `{ readonly state: number }`, a plain
+// JSON-serialisable object, never a closure.
 //
-// `weightedPick` entries are assumed to be `{ value: T; weight: number }[]` — the ticket's
-// AC-10/AC-11 describe entries only informally (e.g. "[{a,1},{b,3}]"); this shape is the
-// most natural reading and is flagged as an assumption in the handoff report.
+// `weightedPick` entries are locked to `{ item: T; weight: number }[]` (AC-10) —
+// T-009 (economy, wave 3) already declares
+// `CHEST_RARITY_ENTRIES: readonly { item: ChestRarity; weight: number }[]` and calls
+// `weightedPick(rng, CHEST_RARITY_ENTRIES)` against this exact shape.
 
 // ---------------------------------------------------------------------------
 // Independent reference implementation, transcribed directly from the pseudocode in
@@ -219,10 +221,10 @@ describe('pick', () => {
 });
 
 describe('weightedPick', () => {
-  it('spec(T-001:AC-10): weights [{a,1},{b,3}] over 20,000 draws from seed 2026 selects b between 14,000 and 16,000 times, and only a/b appear', () => {
+  it('spec(T-001:AC-10): weights [{item:a,weight:1},{item:b,weight:3}] over 20,000 draws from seed 2026 selects b between 14,000 and 16,000 times, and only a/b appear', () => {
     const entries = [
-      { value: 'a', weight: 1 },
-      { value: 'b', weight: 3 },
+      { item: 'a', weight: 1 },
+      { item: 'b', weight: 3 },
     ];
     const trials = 20_000;
     let rng = createRng(2026);
@@ -249,8 +251,8 @@ describe('weightedPick', () => {
     const rng = createRng(1);
     expect(() =>
       weightedPick(rng, [
-        { value: 'a', weight: -1 },
-        { value: 'b', weight: 5 },
+        { item: 'a', weight: -1 },
+        { item: 'b', weight: 5 },
       ]),
     ).toThrow(RangeError);
   });
@@ -259,15 +261,15 @@ describe('weightedPick', () => {
     const rng = createRng(1);
     expect(() =>
       weightedPick(rng, [
-        { value: 'a', weight: 0 },
-        { value: 'b', weight: 0 },
+        { item: 'a', weight: 0 },
+        { item: 'b', weight: 0 },
       ]),
     ).toThrow(RangeError);
   });
 
   it('spec(T-001:AC-11): weightedPick throws RangeError when total weight is 0 (single zero-weight entry)', () => {
     const rng = createRng(1);
-    expect(() => weightedPick(rng, [{ value: 'a', weight: 0 }])).toThrow(RangeError);
+    expect(() => weightedPick(rng, [{ item: 'a', weight: 0 }])).toThrow(RangeError);
   });
 });
 
