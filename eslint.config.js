@@ -58,6 +58,32 @@ export default tseslint.config(
           ],
         },
       ],
+
+      // ARCHITECTURE.md §4.1: constraints and answer expressions are evaluated by a
+      // small purpose-built parser, never by the JS engine. These are NOT in
+      // js.configs.recommended — verified by probe, so they are declared explicitly.
+      'no-eval': 'error',
+      'no-implied-eval': 'error',
+      'no-new-func': 'error',
+
+      // These three catch only the bindings literally named `eval` and `Function` — measured
+      // 3 of 8 spellings in the T-002 test-design review. The rules below close two more
+      // routes (aliasing `Function`, and `Reflect.construct(Function, …)`). Neither lint can
+      // catch computed access like globalThis['ev'+'al'], so the AUTHORITATIVE guard is the
+      // behavioural trap in T-002 AC-21, which poisons every route before import.
+      'no-restricted-globals': [
+        'error',
+        {
+          name: 'Date',
+          message:
+            'Wall-clock time in the engine breaks deterministic replay. Pass elapsedMs in as a parameter.',
+        },
+        {
+          name: 'Function',
+          message:
+            'Referencing the Function constructor is dynamic code construction. The engine parses expressions; it never compiles them.',
+        },
+      ],
       'no-restricted-properties': [
         'error',
         {
@@ -66,22 +92,13 @@ export default tseslint.config(
           message:
             'Math.random() is banned in src/engine/ and src/content/ (ARCHITECTURE.md §4.1). Use the seeded mulberry32 PRNG so tests and duel replay are deterministic.',
         },
-      ],
-      'no-restricted-globals': [
-        'error',
         {
-          name: 'Date',
+          object: 'Reflect',
+          property: 'construct',
           message:
-            'Wall-clock time in the engine breaks deterministic replay. Pass elapsedMs in as a parameter.',
+            'Reflect.construct can reach the Function constructor and build code at runtime. Not permitted in the engine/content layer.',
         },
       ],
-
-      // ARCHITECTURE.md §4.1: constraints and answer expressions are evaluated by a
-      // small purpose-built parser, never by the JS engine. These are NOT in
-      // js.configs.recommended — verified by probe, so they are declared explicitly.
-      'no-eval': 'error',
-      'no-implied-eval': 'error',
-      'no-new-func': 'error',
     },
   },
 

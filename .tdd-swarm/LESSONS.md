@@ -233,3 +233,34 @@ satisfying it looks like, and write it. Then assert the property that actually m
 - runtime round-trip → **the derived type itself**
 
 A statistical band belongs alongside a structural assertion, never instead of one.
+
+---
+
+## L-013 — A guard that names a threat must be tested against the threat, not its spelling (Phase 2)
+
+**Pattern:** T-002's whole purpose is "evaluate expressions without dynamic code construction."
+Its guard was a substring scan for `eval(`, `new Function`, etc., backed by ESLint's
+`no-eval`/`no-implied-eval`/`no-new-func`. A reviewer wrote a complete evaluator that compiles
+each expression to JavaScript and runs it via
+`Reflect.construct(Object.getPrototypeOf(function(){}).constructor, [params, body])`. It passed
+**229/229 frozen tests, `tsc` exit 0, and `eslint` exit 0.**
+
+Probing eight spellings against the real config, the lint rules caught **3 of 8**. They match the
+*bindings* literally named `eval` and `Function`; they do not follow aliasing, computed member
+access, or reflection. Adding `no-restricted-globals: Function` and
+`no-restricted-properties: Reflect.construct` raised it to 6 of 8. The last two —
+`globalThis['ev'+'al']` and `Object.getPrototypeOf(function(){}).constructor` — are not reachable
+by static lint at all.
+
+**Why:** Both defences check *how the threat is written*. The threat is defined by *what happens
+at runtime*, and the set of ways to spell it is open. Any enumeration of spellings is a
+denylist, and a denylist for an open set is a false sense of safety — worse than none, because it
+gets cited as the authoritative guard (this ticket's own AC text did exactly that).
+
+**What to do instead:** Guard the behaviour. Poison every runtime route to the capability before
+importing the module under test — for code construction that is `globalThis.Function`,
+`globalThis.eval`, `Reflect.construct` called with `Function`, and the `constructor` getter on
+`Function.prototype` — then assert no route is reached while the module still returns correct
+results. Static checks stay as cheap secondary defence, never as the authority. Generally: when a
+requirement is "X never happens", the test must make X *observable*, not make its common
+spellings unwriteable.
