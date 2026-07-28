@@ -119,3 +119,22 @@ dangerous — nothing reports that it never worked.
 the **exit code**, not just that a message appeared. Check both directions: the case it
 must block AND the case it must allow. A guard that has never been observed returning 2
 is not installed, whatever the settings file says. Corollary of [[L-001]].
+
+---
+
+## L-008 — Create worktrees only from a committed state (Phase 2)
+
+**Pattern:** Wave-1 worktrees were created with `git worktree add` while the Planner's
+latest ticket revisions still sat uncommitted in the main working tree. `git worktree add`
+branches from the *commit*, not the working tree, so the worktrees silently received the
+previous revision of every ticket file. It happened to be harmless — the three wave-1
+tickets were byte-identical across the two revisions — but only by luck.
+
+**Why:** A Test Agent's entire brief is its ticket file. If that file is a revision behind,
+the agent writes frozen tests against a superseded contract, and nothing downstream will
+detect it: the tests will be internally consistent, pass review, and encode the wrong spec.
+
+**What to do instead:** Before `git worktree add`, assert the tree is clean
+(`git status --porcelain` empty) or commit first. After creating worktrees, diff each
+dispatched ticket file against the integration branch and confirm it is identical.
+Verify, then dispatch — never dispatch and then verify.
