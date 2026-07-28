@@ -677,6 +677,13 @@ same lesson one layer out — observed blocking _on the host actually in use_.
   prefix is a documented bypass, and an agent that reads the policy can read that too. The guard is
   the first layer; the `frozen-tests-unmodified` outcome gate and the orchestrator's own commit-level
   diff remain the backstop. Defence in depth, not a wall.
+- **The bypass must be the command's first token, and getting that wrong looks exactly like a
+  violation.** `SWARM_ORCHESTRATOR=1 printf … > …/phase` is honoured; `cd "$repo" &&
+SWARM_ORCHESTRATOR=1 printf …` is refused, because the regex is anchored at the start of the
+  command string. Anchoring is deliberate — an unanchored match would let any agent smuggle the
+  token into the middle of a pipeline — but the orchestrator, who needs a `cd` first, hits the
+  refusal and cannot tell it from a genuine policy hit. Put the assignment first, or set the phase
+  with a tool write from the repo root, where no phase is in force.
 
 ---
 
