@@ -47,3 +47,25 @@ fi
 
 [ "$FAIL" -eq 0 ] && echo "== ALL LOCAL GATES PASS ==" || echo "== LOCAL GATES RED =="
 exit "$FAIL"
+# --- frozen-tests-unmodified ------------------------------------------------
+# The PreToolUse hook blocks Write/Edit under __tests__/, but it cannot see a
+# shell write (cp, cat >, sed -i). This gate catches the OUTCOME regardless of
+# mechanism: during the implement phase, no committed test file may differ from
+# the integration branch. See LESSONS.md L-023.
+if [ "$(cat .tdd-swarm/phase 2>/dev/null)" = "implement" ]; then
+  if git rev-parse --verify --quiet swarm/engine-core >/dev/null 2>&1; then
+    CHANGED_TESTS=$(git diff --name-only swarm/engine-core...HEAD -- '__tests__' 2>/dev/null || true)
+    if [ -n "$CHANGED_TESTS" ]; then
+      LAST_TEST_COMMIT=$(git log -1 --format=%s -- '__tests__' 2>/dev/null || echo "")
+      case "$LAST_TEST_COMMIT" in
+        test\(*|style\(*) report PASS "frozen-tests-unmodified" ;;
+        *) report FAIL "frozen-tests-unmodified" "test files changed by a non-test commit: $CHANGED_TESTS" ;;
+      esac
+    else
+      report PASS "frozen-tests-unmodified"
+    fi
+  else
+    report PASS "frozen-tests-unmodified"
+  fi
+fi
+

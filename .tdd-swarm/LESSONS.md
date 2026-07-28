@@ -491,3 +491,42 @@ with authority — appearing in the routine case rather than the dramatic one.
 is in the ticket's DoD — follow it." Reserve restating for things the ticket does _not_ say, which
 is where a dispatch adds value. And never assert that a guard exists without checking its scope —
 if the brief claims a lint rule covers something, verify the rule's `files` glob first.
+
+---
+
+## L-023 — The frozen-test guard has a bash-shaped hole; gate the outcome instead (Phase 3)
+
+**Pattern:** The PreToolUse hook blocks `Write`/`Edit` under `__tests__/` during the implement
+phase. It does not see a shell write. Both the T-008 implementer and I independently copied a
+scratch probe into `__tests__/` with `cp` to borrow vitest's alias resolution — the hook never
+fired for either of us. It is a natural workflow, not an exotic bypass.
+
+**Why:** a hook intercepts _tool calls_, so its coverage is the set of tools it matches. Anything
+that reaches the filesystem another way is outside it. Per [[L-007]], a guard's real coverage is
+what it has been observed blocking — and shell writes were never in that set.
+
+**What to do instead:** guard the **outcome**, not the mechanism. `run-local-gates.sh` now carries
+a `frozen-tests-unmodified` gate: during the implement phase, any committed change under
+`__tests__/` that did not come from a `test(...)` or `style(...)` commit fails the run. That
+catches the result regardless of how the write happened, and it does not depend on the orchestrator
+remembering to inspect each commit.
+
+---
+
+## L-024 — A test file's type errors can hide until the module exists (Phase 3)
+
+**Pattern:** T-012's frozen suite passed `tsc --noEmit` in the RED state — the only errors were the
+expected `TS2307` for the absent module. Once the implementation landed, **five `TS2532` errors and
+an unused-import error appeared in the test file**, and the implementer was correctly blocked: it
+could not fix a frozen file, and the gate could not go green.
+
+The cause is structural. While the module is missing, its imports resolve to `any`, so
+`noUncheckedIndexedAccess` has nothing to narrow and `sequence[i].tier` typechecks fine. The moment
+real types exist, the same line is `T | undefined`. **The RED-state typecheck cannot see this class
+of error, by construction.**
+
+**What to do instead:** the L-011 probe already builds a throwaway reference implementation to
+prove the suite is satisfiable — **run `tsc --noEmit` against that probe too, not just `vitest`.**
+That is the only moment before freezing when the test file is typechecked against real types. Add
+it to the Test Agent's verification list: green vitest _and_ clean tsc against the reference, or
+the suite is not ready to freeze.
