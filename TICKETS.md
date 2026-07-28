@@ -54,7 +54,7 @@ Evidence: `.tdd-swarm/reports/wave1-integration.md`.
 | id | title | status | deps | branch | model | issue |
 |----|-------|--------|------|--------|-------|-------|
 | T-004 | Central tuning constants — every magic number in one file | backlog | T-003 | `ticket/T-004-tuning` | standard | — |
-| T-006 | Catalog data (skills, cannons, islands, ranks, crew) and validated loaders | backlog | T-003 | `ticket/T-006-catalogs` | standard | — |
+| T-006 | Catalog data (skills, cannons, islands, ranks, crew) and validated loaders | review-passed | T-003 | `ticket/T-006-catalogs` | standard | — |
 
 ## Wave 3 — the pure rule modules
 
@@ -287,4 +287,5 @@ waves and both deliberate:
 
 | id | title | status | deps | origin |
 |----|-------|--------|------|--------|
+| T-027 | validateCatalogs must detect set-level catalog corruption | backlog | T-006 | T-006 code review M-1 — the function is weaker than its signature implies |
 | T-025 | Replace the expression evaluator's recursive walks with explicit-stack iteration | backlog | T-002 | T-002 code review — `MAX_AST_DEPTH` is a measured margin (1.5× at a 0.5 MB stack), not a guarantee by construction |
