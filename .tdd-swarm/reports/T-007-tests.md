@@ -73,7 +73,7 @@ Every criterion resolves in both directions (`.tdd-swarm/spec-lint.sh tickets/T-
 | `expect(` call sites                    | **123** — many inside sweeps, so far more assertions execute per run       |
 | Largest sweeps                          | 2,000-seed shuffle sweep (×2), 1,000-question rejection sweeps (×3), 500-call recency sweeps (×2), 400-seed eligibility sweeps (×3), 14 templates × 14 seeds composition sweep |
 | Runtime of the file against a reference | ~150 ms                                                                   |
-| Commit                                  | `2af1a7f` — `test(T-007): frozen suite for the question generator`        |
+| Commit                                  | `2042114` — `test(T-007): frozen suite for the question generator` (this report's own hash correction is the follow-up commit on the same branch) |
 
 ---
 
