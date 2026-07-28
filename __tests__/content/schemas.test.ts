@@ -225,6 +225,94 @@ describe('id unions', () => {
   });
 });
 
+// --- AC-1 (continued): the schemas must actually CONSUME those id unions ---------------------
+// Declaring the arrays is half the criterion; a schema using `z.string()` for an id field
+// satisfies every happy-path test while making the `z.infer`-derived type resolve to `string`
+// everywhere downstream (T-007 `SkillId`, T-009 `RankId`, T-013). No AC names these fields
+// individually — the required-shapes block does — so they are tagged to AC-1, the criterion
+// that owns the id vocabulary. `unlock.island` is covered under AC-12, which owns that union.
+
+describe('id unions in schema fields', () => {
+  it('spec(T-003:AC-1) skillSchema rejects an id outside SkillId', () => {
+    expect(skillSchema.safeParse(withOverrides(VALID_SKILL, { id: 'algebra_ii' })).success).toBe(false);
+  });
+
+  it('spec(T-003:AC-1) cannonSchema rejects an id outside CannonId', () => {
+    expect(cannonSchema.safeParse(withOverrides(VALID_CANNON, { id: 'trebuchet' })).success).toBe(false);
+  });
+
+  it('spec(T-003:AC-1) cannonSchema rejects a skill outside SkillId', () => {
+    expect(cannonSchema.safeParse(withOverrides(VALID_CANNON, { skill: 'algebra_ii' })).success).toBe(false);
+  });
+
+  it('spec(T-003:AC-1) cannonSchema rejects a temperament outside Temperament', () => {
+    expect(cannonSchema.safeParse(withOverrides(VALID_CANNON, { temperament: 'spicy' })).success).toBe(false);
+  });
+
+  it('spec(T-003:AC-1) islandSchema rejects an id outside IslandId', () => {
+    expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { id: 'atlantis' })).success).toBe(false);
+  });
+
+  it('spec(T-003:AC-1) islandSchema rejects a rangeSkills entry outside SkillId', () => {
+    expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { rangeSkills: ['algebra_ii'] })).success).toBe(
+      false,
+    );
+  });
+
+  it('spec(T-003:AC-1) islandSchema rejects an unlocksCannons entry outside CannonId', () => {
+    expect(
+      islandSchema.safeParse(withOverrides(VALID_ISLAND, { unlocksCannons: ['trebuchet'] })).success,
+    ).toBe(false);
+  });
+
+  it('spec(T-003:AC-1) islandSchema rejects a requiresIsland outside IslandId', () => {
+    expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { requiresIsland: 'atlantis' })).success).toBe(
+      false,
+    );
+  });
+
+  it('spec(T-003:AC-1) islandSchema accepts and preserves an optional requiresIsland predecessor', () => {
+    const result = islandSchema.safeParse(
+      withOverrides(VALID_ISLAND, { id: 'isla_products', order: 1, requiresIsland: 'port_sumwich' }),
+    );
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.requiresIsland).toBe('port_sumwich');
+    }
+  });
+
+  it('spec(T-003:AC-1) rankSchema rejects an id outside RankId', () => {
+    expect(rankSchema.safeParse(withOverrides(VALID_RANK, { id: 'admiral' })).success).toBe(false);
+  });
+
+  it('spec(T-003:AC-1) derives every id-typed field as its union, never as string', () => {
+    const skillId: Exact<Skill['id'], SkillId> = true;
+    const templateSkill: Exact<Template['skill'], SkillId> = true;
+    const cannonId: Exact<Cannon['id'], CannonId> = true;
+    const cannonSkill: Exact<Cannon['skill'], SkillId> = true;
+    const cannonTemperament: Exact<Cannon['temperament'], Temperament> = true;
+    const islandId: Exact<Island['id'], IslandId> = true;
+    const rangeSkill: Exact<Island['rangeSkills'][number], SkillId> = true;
+    const unlocksCannon: Exact<Island['unlocksCannons'][number], CannonId> = true;
+    const requiresIsland: Exact<Island['requiresIsland'], IslandId | undefined> = true;
+    const rankId: Exact<Rank['id'], RankId> = true;
+
+    expect([
+      skillId,
+      templateSkill,
+      cannonId,
+      cannonSkill,
+      cannonTemperament,
+      islandId,
+      rangeSkill,
+      unlocksCannon,
+      requiresIsland,
+      rankId,
+    ]).toEqual([true, true, true, true, true, true, true, true, true, true]);
+  });
+});
+
 // --- AC-2 … AC-6, AC-17: templateSchema ----------------------------------------------------
 
 describe('templateSchema', () => {
@@ -263,6 +351,30 @@ describe('templateSchema', () => {
     const result = templateSchema.safeParse(withOverrides(MINIMAL_TEMPLATE, { distractors: [] }));
 
     expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-4) rejects distractors that are not expression strings', () => {
+    const result = templateSchema.safeParse(withOverrides(MINIMAL_TEMPLATE, { distractors: [1, 2, 3] }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-4) types distractors as strings so T-007 can evaluate them', () => {
+    const distractorsAreStrings: Exact<Template['distractors'][number], string> = true;
+
+    expect(distractorsAreStrings).toBe(true);
+  });
+
+  it('spec(T-003:AC-2) rejects constraints that are not expression strings', () => {
+    const result = templateSchema.safeParse(withOverrides(MINIMAL_TEMPLATE, { constraints: [7] }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-2) types constraints as strings', () => {
+    const constraintsAreStrings: Exact<NonNullable<Template['constraints']>[number], string> = true;
+
+    expect(constraintsAreStrings).toBe(true);
   });
 
   it('spec(T-003:AC-4) accepts a template carrying exactly three distractors', () => {
@@ -333,6 +445,20 @@ describe('templateSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  // Bounded is not enumerated: `z.number().min(1).max(3)` would accept 2.5 and infer `number`,
+  // defeating the field's purpose as a stable escape hatch for open question 2.10.
+  it('spec(T-003:AC-17) rejects a difficulty between the permitted literals', () => {
+    const result = templateSchema.safeParse(withOverrides(MINIMAL_TEMPLATE, { difficulty: 2.5 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-17) types difficulty as the literal union 1 | 2 | 3, not number', () => {
+    const difficultyIsALiteralUnion: Exact<Template['difficulty'], 1 | 2 | 3 | undefined> = true;
+
+    expect(difficultyIsALiteralUnion).toBe(true);
+  });
+
   it('spec(T-003:AC-17) omits difficulty entirely when the key is absent', () => {
     const result = templateSchema.safeParse(MINIMAL_TEMPLATE);
 
@@ -374,6 +500,26 @@ describe('skillSchema', () => {
 
     expect(result.success).toBe(false);
   });
+
+  // The equality boundary: without it a `maxGrade > minGrade` refinement passes every other
+  // test here, and T-006 authors single-grade skills against a frozen file it cannot edit.
+  it('spec(T-003:AC-10) accepts a single-grade skill whose maxGrade equals its minGrade', () => {
+    const result = skillSchema.safeParse(withOverrides(VALID_SKILL, { minGrade: 4, maxGrade: 4 }));
+
+    expect(result.success).toBe(true);
+  });
+
+  it('spec(T-003:AC-10) rejects a skill whose minGrade is not an integer', () => {
+    const result = skillSchema.safeParse(withOverrides(VALID_SKILL, { minGrade: 0.5 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-10) rejects a skill whose maxGrade is not an integer', () => {
+    const result = skillSchema.safeParse(withOverrides(VALID_SKILL, { maxGrade: 1.5 }));
+
+    expect(result.success).toBe(false);
+  });
 });
 
 // --- AC-7 … AC-9, AC-12: cannonSchema ------------------------------------------------------
@@ -382,13 +528,8 @@ describe('cannonSchema', () => {
   it('spec(T-003:AC-7) accepts a cannon whose damage range is well ordered', () => {
     const parsed: Cannon = cannonSchema.parse(VALID_CANNON);
 
-    expect(parsed.id).toBe('six_pounder');
-    expect(parsed.skill).toBe('add_within_20');
     expect(parsed.damageMin).toBe(10);
     expect(parsed.damageMax).toBe(16);
-    expect(parsed.temperament).toBe('standard');
-    expect(parsed.recoilDamage).toBe(0);
-    expect(parsed.timerMs).toBe(15000);
   });
 
   it('spec(T-003:AC-7) rejects a cannon whose damageMax is below its damageMin', () => {
@@ -405,6 +546,38 @@ describe('cannonSchema', () => {
 
   it('spec(T-003:AC-7) rejects a cannon whose damageMin is zero', () => {
     const result = cannonSchema.safeParse(withOverrides(VALID_CANNON, { damageMin: 0 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-7) rejects a cannon whose damageMin is not an integer', () => {
+    const result = cannonSchema.safeParse(withOverrides(VALID_CANNON, { damageMin: 10.5 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-7) rejects a cannon whose damageMax is not an integer', () => {
+    const result = cannonSchema.safeParse(withOverrides(VALID_CANNON, { damageMax: 16.5 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  // Cannon grade bounds: transcribed from the required-shapes block (`minGrade: 0..5;
+  // maxGrade: 0..5`), which no AC restates. T-006 AC-11 pins each cannon's pair to its skill's.
+  it('spec(T-003:AC-7) rejects a cannon whose minGrade is below grade 0', () => {
+    const result = cannonSchema.safeParse(withOverrides(VALID_CANNON, { minGrade: -1 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-7) rejects a cannon whose maxGrade is above grade 5', () => {
+    const result = cannonSchema.safeParse(withOverrides(VALID_CANNON, { maxGrade: 6 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-7) rejects a cannon whose minGrade is not an integer', () => {
+    const result = cannonSchema.safeParse(withOverrides(VALID_CANNON, { minGrade: 1.5 }));
 
     expect(result.success).toBe(false);
   });
@@ -436,6 +609,14 @@ describe('cannonSchema', () => {
   it('spec(T-003:AC-8) rejects a cannon with negative recoil damage', () => {
     const result = cannonSchema.safeParse(
       withOverrides(VALID_CANNON, { temperament: 'volatile', recoilDamage: -1 }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-8) rejects a cannon whose recoilDamage is not an integer', () => {
+    const result = cannonSchema.safeParse(
+      withOverrides(VALID_CANNON, { temperament: 'volatile', recoilDamage: 5.5 }),
     );
 
     expect(result.success).toBe(false);
@@ -499,6 +680,22 @@ describe('cannonSchema', () => {
     expect(result.success).toBe(false);
   });
 
+  it('spec(T-003:AC-12) rejects a range unlock whose tier is not an integer', () => {
+    const result = cannonSchema.safeParse(
+      withOverrides(VALID_CANNON, { unlock: { kind: 'range', island: 'port_sumwich', tier: 1.5 } }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-12) rejects a range unlock whose island is outside IslandId', () => {
+    const result = cannonSchema.safeParse(
+      withOverrides(VALID_CANNON, { unlock: { kind: 'range', island: 'atlantis', tier: 1 } }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
   it('spec(T-003:AC-12) rejects an unlock whose kind is outside the union', () => {
     const result = cannonSchema.safeParse(withOverrides(VALID_CANNON, { unlock: { kind: 'purchase' } }));
 
@@ -509,13 +706,10 @@ describe('cannonSchema', () => {
 // --- AC-11: islandSchema / rankSchema ------------------------------------------------------
 
 describe('islandSchema', () => {
-  it('spec(T-003:AC-11) accepts the first island at order 0 and preserves its id lists', () => {
+  it('spec(T-003:AC-11) accepts the first island at order 0', () => {
     const parsed: Island = islandSchema.parse(VALID_ISLAND);
 
-    expect(parsed.id).toBe('port_sumwich');
     expect(parsed.order).toBe(0);
-    expect(parsed.rangeSkills).toEqual(['add_within_10', 'add_within_20']);
-    expect(parsed.unlocksCannons).toEqual(['six_pounder', 'chain_shot']);
   });
 
   it('spec(T-003:AC-11) rejects an island whose order is negative', () => {
@@ -524,15 +718,10 @@ describe('islandSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('spec(T-003:AC-11) accepts and preserves an optional requiresIsland predecessor', () => {
-    const result = islandSchema.safeParse(
-      withOverrides(VALID_ISLAND, { id: 'isla_products', order: 1, requiresIsland: 'port_sumwich' }),
-    );
+  it('spec(T-003:AC-11) rejects an island whose order is not an integer', () => {
+    const result = islandSchema.safeParse(withOverrides(VALID_ISLAND, { order: 1.5 }));
 
-    expect(result.success).toBe(true);
-    if (result.success) {
-      expect(result.data.requiresIsland).toBe('port_sumwich');
-    }
+    expect(result.success).toBe(false);
   });
 });
 
@@ -540,7 +729,6 @@ describe('rankSchema', () => {
   it('spec(T-003:AC-11) accepts the first rank at tier 0 with zero required wins', () => {
     const parsed: Rank = rankSchema.parse(VALID_RANK);
 
-    expect(parsed.id).toBe('cadet');
     expect(parsed.tier).toBe(0);
     expect(parsed.minWins).toBe(0);
   });
@@ -553,6 +741,18 @@ describe('rankSchema', () => {
 
   it('spec(T-003:AC-11) rejects a rank whose minWins is negative', () => {
     const result = rankSchema.safeParse(withOverrides(VALID_RANK, { minWins: -1 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-11) rejects a rank whose tier is not an integer', () => {
+    const result = rankSchema.safeParse(withOverrides(VALID_RANK, { tier: 1.5 }));
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-11) rejects a rank whose minWins is not an integer', () => {
+    const result = rankSchema.safeParse(withOverrides(VALID_RANK, { minWins: 2.5 }));
 
     expect(result.success).toBe(false);
   });

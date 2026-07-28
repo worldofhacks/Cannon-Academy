@@ -12,6 +12,7 @@ import { describe, expect, it } from 'vitest';
 
 import { QuestionGenerationError, assertQuestion } from '@engine/questions/types';
 import type { Choice, Question, QuestionGenerationCode } from '@engine/questions/types';
+import type { SkillId } from '@content/schemas';
 
 /** Compile-time exact-type equality (invariant in both directions, unlike `extends`). */
 type Exact<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
@@ -75,6 +76,8 @@ describe('QuestionGenerationError', () => {
     expect(error.code).toBe('CONSTRAINTS_UNSATISFIED');
   });
 
+  // AC-14 supplies "msg" as the first constructor argument; this is the only assertion that
+  // pins what that argument means (i.e. that `super(message)` is called and not discarded).
   it('spec(T-003:AC-14) preserves the message it was constructed with', () => {
     const error = new QuestionGenerationError('msg', 'CONSTRAINTS_UNSATISFIED');
 
@@ -227,6 +230,27 @@ describe('Question', () => {
     };
 
     expect(question.text).toBe('3 + 4 = ?');
+  });
+
+  // The key SET is not the contract on its own: `skill: string` and
+  // `params: Readonly<Record<string, unknown>>` keep all eight keys while blocking T-007
+  // (`SkillId`) and T-017/T-020 (arithmetic on `params[k]`) against a file they cannot edit.
+  it('spec(T-003:AC-15) pins the type of every contract field, not just the key set', () => {
+    const templateIdIsString: Exact<Question['templateId'], string> = true;
+    const skillIsSkillId: Exact<Question['skill'], SkillId> = true;
+    const textIsString: Exact<Question['text'], string> = true;
+    const paramsAreNumbers: Exact<Question['params'], Readonly<Record<string, number>>> = true;
+    const choicesAreReadonlyChoices: Exact<Question['choices'], readonly Choice[]> = true;
+    const correctIndexIsNumber: Exact<Question['correctIndex'], number> = true;
+
+    expect([
+      templateIdIsString,
+      skillIsSkillId,
+      textIsString,
+      paramsAreNumbers,
+      choicesAreReadonlyChoices,
+      correctIndexIsNumber,
+    ]).toEqual([true, true, true, true, true, true]);
   });
 
   it('spec(T-003:AC-15) types isWordProblem as boolean, never boolean | undefined', () => {
