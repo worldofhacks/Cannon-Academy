@@ -287,3 +287,27 @@ own terms — demonstrate the capability it was supposed to smuggle in, with a d
 independently of the suite under test. Only then does the suite's verdict mean anything. This is
 [[L-001]] applied to the mutant instead of the guard: never trust an unobserved failure OR an
 unobserved success.
+
+---
+
+## L-015 — "Unreachable" is a claim that needs a probe, not an argument (Phase 4)
+
+**Pattern:** Twice in one ticket, a plausible reachability argument was wrong.
+
+1. An implementer described a code path as "practically unreachable". A reviewer measured it:
+   the path threw for **37 of 50 seeds** on a legal input.
+2. A reviewer then proved a *different* path unreachable with a clean argument (two accumulators
+   summing in the same order are bit-identical, and `nextFloat < 1` forces `target < total`).
+   On re-review it disproved its own proof: finite weights can sum to `Infinity` by overflow, and
+   at the denormal floor rounding is **absolute** rather than relative, so `f × total` can round
+   up to exactly `total`. Measured: 3000/3000 and 1496/3000.
+
+**Why:** Reachability arguments are about the *whole input domain*, and the interesting inputs
+live at the boundaries — overflow, denormals, `undefined` elements, empty collections. Reasoning
+about "normal" inputs and generalising is the default failure. Floating point is especially
+hostile: relative-error intuitions silently break at the denormal floor.
+
+**What to do instead:** Treat "this cannot happen" as a testable claim. Write the probe that
+tries to make it happen, sweeping the degenerate end of the domain. If the probe cannot reach it,
+say so with the probe attached. And when a path is unreachable only for *your current callers*,
+write that — not "impossible" — because the caller set changes and the comment does not.

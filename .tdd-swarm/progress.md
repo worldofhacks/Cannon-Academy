@@ -343,3 +343,27 @@ finding M-3, still open and non-blocking.
 
 All three suites frozen. `phase=implement` set in every wave-1 worktree, guard verified blocking
 test edits by exit code in each.
+
+**Ticket T-001: review-passed** (attempt 2, commits ..10ac7f9, gates pass, wave 1)
+- Round-2 code review: **APPROVED** — 0 Critical, 0 Important. Round-1 findings I-1, M-1, M-2,
+  M-3 all fixed.
+- The M-3 normalisation (`state` → true uint32) was the risky change, since it touches the state
+  threaded through every random draw in the game. Confirmed safe **algebraically** — the step's
+  `| 0` re-reduces mod 2³², so `>>> 0` changes the representative but never the residue class —
+  and empirically over 10 seeds × 20,000 draws with 0 mismatches. Orchestrator independently
+  verified the stream against a self-transcribed oracle (4 seeds × 100 draws, identical).
+- Reviewer verified the Test Agent's seed choice had teeth by replaying the OLD buggy code
+  against the CURRENT stream: at seed 0 all three AC-16 tests would have gone red.
+- Orchestrator probe: `shuffle`/`pick` on arrays containing `undefined` now throw **0/50 seeds**
+  (was 37/50 and 14/50).
+- **N-1 (Minor, accepted):** the M-2 invariant `throw` IS reachable in two float regimes the
+  comment calls impossible — total overflowing to `Infinity` (3000/3000) and denormal weights
+  where absolute rounding lets `f × total` reach `total` (1496/3000). Not a regression, and
+  unreachable from this game's data. Comment-only correction dispatched; no behaviour change,
+  since a guard is production code no failing test demands.
+- **Advisory recorded on T-013 and T-021:** `createRng` now throws on wide seeds instead of
+  truncating, so anything seeding from `Date.now()`, a hash, or a composed id must mask with
+  `>>> 0` first.
+
+Lesson L-015 recorded: "unreachable" is a claim that needs a probe, not an argument — a
+reviewer's own clean proof of unreachability was disproved by measurement on re-review.
