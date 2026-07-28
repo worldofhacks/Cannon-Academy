@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import * as ranksModule from '@engine/ranks';
-import { ranks, getRankByTier } from '@content/index';
+import { ranks } from '@content/index';
 
 // ==================== Utilities ====================
 
@@ -184,15 +184,27 @@ describe('T-012: Rank ladder — numeric tier from wins, ratcheted so a loss nev
 
       // Tier should never decrease
       for (let i = 1; i < sequence.length; i++) {
-        expect(sequence[i].tier).toBeGreaterThanOrEqual(sequence[i - 1].tier);
+        const curr = sequence[i];
+        const prev = sequence[i - 1];
+        expect(curr).toBeDefined();
+        expect(prev).toBeDefined();
+        if (curr && prev) {
+          expect(curr.tier).toBeGreaterThanOrEqual(prev.tier);
+        }
       }
 
       // On a loss, tier should not change
       for (let i = 0; i < shuffled.length; i++) {
         const duel = shuffled[i];
         if (!duel.won && i > 0) {
-          // Wins didn't increase, so tier should stay the same
-          expect(sequence[i].tier).toBe(sequence[i - 1].tier);
+          const curr = sequence[i];
+          const prev = sequence[i - 1];
+          expect(curr).toBeDefined();
+          expect(prev).toBeDefined();
+          if (curr && prev) {
+            // Wins didn't increase, so tier should stay the same
+            expect(curr.tier).toBe(prev.tier);
+          }
         }
       }
     });
@@ -261,7 +273,11 @@ describe('T-012: Rank ladder — numeric tier from wins, ratcheted so a loss nev
     it('every rank.tier matches its position in the catalog sorted by tier', () => {
       const sorted = [...ranks].sort((a, b) => a.tier - b.tier);
       for (let i = 0; i < sorted.length; i++) {
-        expect(sorted[i].tier).toBe(i);
+        const rank = sorted[i];
+        expect(rank).toBeDefined();
+        if (rank) {
+          expect(rank.tier).toBe(i);
+        }
       }
     });
 
@@ -274,14 +290,24 @@ describe('T-012: Rank ladder — numeric tier from wins, ratcheted so a loss nev
     it('minWins is strictly increasing across tiers', () => {
       const sorted = [...ranks].sort((a, b) => a.tier - b.tier);
       for (let i = 1; i < sorted.length; i++) {
-        expect(sorted[i].minWins).toBeGreaterThan(sorted[i - 1].minWins);
+        const curr = sorted[i];
+        const prev = sorted[i - 1];
+        expect(curr).toBeDefined();
+        expect(prev).toBeDefined();
+        if (curr && prev) {
+          expect(curr.minWins).toBeGreaterThan(prev.minWins);
+        }
       }
     });
 
     it('tiers are strictly increasing (0, 1, 2, 3, 4)', () => {
       const sorted = [...ranks].sort((a, b) => a.tier - b.tier);
       for (let i = 0; i < sorted.length; i++) {
-        expect(sorted[i].tier).toBe(i);
+        const rank = sorted[i];
+        expect(rank).toBeDefined();
+        if (rank) {
+          expect(rank.tier).toBe(i);
+        }
       }
     });
 
