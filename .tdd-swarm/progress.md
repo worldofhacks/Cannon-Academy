@@ -523,3 +523,54 @@ zod never enters the engine module graph.
 Full evidence: `.tdd-swarm/reports/wave1-integration.md`.
 
 Next: wave 2 (T-004 tuning, T-006 catalogs) — both depend on T-003, now on `swarm/engine-core`.
+
+## Wave 2 — dispatched 2026-07-28
+
+Wave 1 worktrees torn down. Wave 2 worktrees created from a **clean committed tree** (L-008
+observed: `git status --porcelain` verified empty first, and each worktree's ticket hash compared
+against the integration branch before dispatch).
+
+| ticket | tests | mutants killed | model |
+|---|---|---|---|
+| T-004 `tuning.ts` | 68 | 34/36 (2 survivors documented as intentional) | sonnet |
+| T-006 catalogs + loaders | 209 | 16/16 | sonnet |
+| T-026 exactly-3 distractors | 5 | — | haiku |
+
+**Ticket T-026: review-passed** (commit `f8dd39f`, gates pass, wave 2). One line:
+`z.array(z.string()).min(3)` → `.length(3)`. Review confirmed `.length(3)` does **not** narrow the
+inferred type to a tuple — `Template['distractors']` stays `string[]`, which runtime tests cannot
+see — and that zod emits `"Array must contain exactly 3 element(s)"` with path `["distractors"]`,
+locating the field for a catalog author. 497/497.
+
+Security review for T-026 **deferred with a written reason** in `posture.md` (one-line tightening
+of an existing validator adds no input surface or code path); explicitly scoped so it does not
+generalise.
+
+### Pre-freeze findings from the wave-2 Test Agents
+
+**T-004 — three real spec defects, all the L-005/L-006 patterns wave 1 produced:**
+- AC-4 contradicted its own rationale at exactly 8: at the boundary a floor-sized skill pool is
+  *fully* excluded, so T-007's fallback fires on every call and the recency feature is a permanent
+  no-op. Corrected to `<= 7`.
+- AC-8's `BOT_ACCURACY_WINDOW >= 1` was unsatisfiable for its own consumer — T-021 needs a
+  10-answer history, and at 1 the mercy system degenerates to a coin flip on the last answer.
+  Corrected to `>= 10`.
+- AC-3/AC-6/AC-8 pinned **direction without magnitude**. The effect size for `QUALITY_WEIGHT` was
+  deferred to T-008 AC-16 — two waves *after* `tuning.ts` freezes. Derived in closed form from
+  T-008's own formula and asserted here instead: `QUALITY_WEIGHT > 7/12`, set by `culverin` and
+  `double_broadside`. Mutation shows the test bites exactly there (`0.5834` passes, `0.55` dies).
+  Recorded as **L-018**.
+- Also ratified: AC-9's freeze is **deep** (`as const` freezes nothing at runtime), and AC-2 gains
+  a `4 * PLAYER_HULL` ceiling so no later island can be given an unwinnable hull.
+
+**T-006 — ratified three gaps the agent flagged rather than invented:** `validateCatalogs`'
+signature (pinned by no AC), `culverin.recoilDamage = 0` (pinned by no AC at all, only by ruling
+D-3's body text — and it is exactly the value keeping the K-band starter unable to punish), and
+`crew.json` contents (unconstrained, so AC-1 would have passed vacuously on an empty array).
+
+**T-026 — the Test Agent caught an orchestrator error.** The ticket claimed a frozen test asserted
+a 4-distractor template parses successfully, and on that basis **authorised a frozen-test edit**.
+The claim was false — transcribed from an integration report that verified the *behaviour* with an
+ad-hoc probe, not a test. The agent probed all four historical revisions of the file, found no such
+assertion, and made a purely additive change. Recorded as **L-019: never pair an unverified claim
+with an authorisation.**
