@@ -1,4 +1,4 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import * as ranksModule from '@engine/ranks';
 import { ranks } from '@content/index';
 
@@ -370,6 +370,94 @@ describe('T-012: Rank ladder — numeric tier from wins, ratcheted so a loss nev
         const tier = ranksModule.rankTierForWins(boundary.minWins - 1);
         expect(tier).toBe(boundary.tier - 1);
       }
+    });
+  });
+
+  // AC-12: Order independence — tier resolution must not depend on catalog array order
+  // Per L-020: the implementation must handle catalogs in any order
+  describe('AC-12: Order-independent tier resolution (mocked reorder test) — spec(T-012:AC-12)', () => {
+    /**
+     * Derive a map of (tier -> minWins) from the catalog, independent of array order.
+     * Used to compute expected results for mocked catalogs.
+     */
+    function getTierMinWinsMap(catalog: typeof ranks) {
+      const map = new Map<number, number>();
+      for (const rank of catalog) {
+        map.set(rank.tier, rank.minWins);
+      }
+      return map;
+    }
+
+    /**
+     * Compute expected tier for a given win count using the tier->minWins mapping.
+     * This is order-independent: it finds the highest tier whose minWins <= wins.
+     */
+    function expectedTierForWins(wins: number, tierMinWinsMap: Map<number, number>) {
+      for (let tier = 4; tier >= 0; tier--) {
+        const minWins = tierMinWinsMap.get(tier);
+        if (minWins !== undefined && wins >= minWins) {
+          return tier;
+        }
+      }
+      return 0; // fallback: cadet
+    }
+
+    it('tier functions return identical results with reversed catalog', async () => {
+      // Collect expected results using the original (sorted) catalog
+      const originalMap = getTierMinWinsMap(ranks);
+      const tierToRankMap = new Map(ranks.map((r) => [r.tier, r.id]));
+
+      const expectedTierResults = new Map<number, number>();
+      for (let wins = 0; wins <= 150; wins++) {
+        expectedTierResults.set(wins, expectedTierForWins(wins, originalMap));
+      }
+
+      // Reverse the catalog and mock @content/index
+      const reversedRanks = [...ranks].reverse();
+      vi.doMock('@content/index', () => ({
+        ranks: reversedRanks,
+        getRankByTier: (tier: number) => {
+          const found = reversedRanks.find((r) => r.tier === tier);
+          if (found === undefined) {
+            throw new Error(`getRankByTier: no rank with tier ${tier}`);
+          }
+          return found;
+        },
+      }));
+
+      // Reset and re-import to get the mocked version
+      vi.resetModules();
+      const mocked = await import('@engine/ranks');
+
+      // Test rankTierForWins across full range
+      for (let wins = 0; wins <= 150; wins++) {
+        const expectedTier = expectedTierResults.get(wins);
+        const actualTier = mocked.rankTierForWins(wins);
+        expect(actualTier).toBe(expectedTier);
+      }
+
+      // Test rankForWins across full range
+      for (let wins = 0; wins <= 150; wins++) {
+        const expectedTier = expectedTierResults.get(wins);
+        expect(expectedTier).toBeDefined();
+        if (expectedTier !== undefined) {
+          const expectedId = tierToRankMap.get(expectedTier);
+          const actual = mocked.rankForWins(wins);
+          expect(actual.tier).toBe(expectedTier);
+          expect(actual.id).toBe(expectedId);
+        }
+      }
+
+      // Test rankByTier for each valid tier
+      for (let tier = 0; tier <= 4; tier++) {
+        const expectedId = tierToRankMap.get(tier);
+        const actual = mocked.rankByTier(tier);
+        expect(actual.tier).toBe(tier);
+        expect(actual.id).toBe(expectedId);
+      }
+
+      vi.unmock('@content/index');
+      vi.resetModules();
     });
   });
 });
