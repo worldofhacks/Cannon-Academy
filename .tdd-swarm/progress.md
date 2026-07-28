@@ -196,3 +196,29 @@ Worktrees created off `swarm/engine-core`, each with a symlinked `node_modules`
 `phase=tests` written into each worktree, so the guard blocks any write to `src/`.
 Three Test Agents dispatched in parallel. Next: verify RED for the right reason, then
 independent test-design review before freezing.
+
+### Wave 1 test authoring — results
+
+| ticket | tests | ACs | RED verified by orchestrator | pre-freeze defects caught |
+|---|---|---|---|---|
+| T-001 | 19 | 12 | ✅ fails only on `Cannot find module '@engine/rng'` | `weightedPick` entry field named `value`, colliding with T-009's `{item, weight}` — would have hit a frozen file in wave 3 (L-004 class) |
+| T-003 | 85 | 20 | ✅ fails only on the two absent modules | zod stripped unknown keys by default (silent data loss on a typo'd optional field in a hand-authored catalog); `crewSchema` had no criterion at all; id-array export names unnamed; nested `unlock` strictness missing |
+
+Both Test Agents flagged ambiguities instead of guessing silently. The T-003 agent built a
+throwaway probe implementation in the scratchpad (never in `src/`) to prove its criteria were
+satisfiable, then mutation-tested every frozen assertion — M9 proved AC-20 catches what AC-19
+provably cannot, and M10 proved that covering all three `unlock` variants catches an
+implementation that strictens only the `range` branch.
+
+Ticket amendments made before freeze (orchestrator):
+- T-001: `weightedPick` entries locked to `{ item, weight }`; two `proposed` API decisions
+  promoted to `locked-decision` because five tickets couple to them.
+- T-003: AC-18 (crew schema), AC-19 (reject unknown keys), AC-20 (nested strictness);
+  id-array export names locked.
+
+Orchestrator errors found by agents and fixed: `.claude/hooks/guard-writes.cjs` was committed
+unformatted, which would have shown every implementer a red format gate they did not cause
+(the agent correctly refused to fix a file outside its scope and reported it instead).
+
+Lessons added: L-008 (worktrees must branch from a committed state), L-009 (default-permissive
+validation silently loses data).
