@@ -86,6 +86,11 @@ duplication, see below). Evidence: `.tdd-swarm/reports/wave2-integration.md`.
 | T-011 | Grade-band placement — pre-unlocked islands, cannons, starting bot band    | review-passed | T-003, T-004, T-006        | `ticket/T-011-placement`    | cheap    | —     |
 | T-012 | Rank ladder — numeric tier from wins, ratcheted so a loss never demotes    | review-passed | T-003, T-006               | `ticket/T-012-rank-ladder`  | cheap    | —     |
 
+**Wave 3 merged 2026-07-28** — `e8155ad..786abf7`, six clean merges, **1,229 tests passing**, all
+gates green. Integration report: `.tdd-swarm/reports/wave3-integration.md`. The wave is **PASS**;
+two findings were escalated rather than absorbed and filed as `T-032` and `T-033` below. Neither
+blocks the merge; both should close before wave 4 dispatches.
+
 ## Wave 4 — generator and duel vocabulary
 
 | id    | title                                                                            | status  | deps                              | branch                            | model    | issue |
@@ -302,11 +307,13 @@ waves and both deliberate:
 
 ## Backlog — filed during the run, not assigned to a wave
 
-| id    | title                                                                            | status  | deps         | origin                                                                                                             |
-| ----- | -------------------------------------------------------------------------------- | ------- | ------------ | ------------------------------------------------------------------------------------------------------------------ |
-| T-029 | Give K-1 a real cannon choice — add sub_within_10 and a third starter            | backlog | T-003, T-006 | design review — grade 0 has one skill, so "choose a cannon" is not a choice                                        |
-| T-030 | Loadout selection — which three cannons sail with you                            | backlog | T-006, T-010 | design review — 5 cannons available after island 1, tray fits 3, nothing decides                                   |
-| T-031 | Resolve the Perfect Shot "bonus ball" contradiction                              | backlog | T-004        | design review + T-004 code review — ARCHITECTURE says "+1 ball", code says "+1 damage"                             |
-| T-028 | CHOICE_COUNT must have one home, not two                                         | backlog | T-003, T-004 | wave-2 integration drift — the merge created a duplicate the dev-screen slider would arm                           |
-| T-027 | validateCatalogs must detect set-level catalog corruption                        | backlog | T-006        | T-006 code review M-1 — the function is weaker than its signature implies                                          |
-| T-025 | Replace the expression evaluator's recursive walks with explicit-stack iteration | backlog | T-002        | T-002 code review — `MAX_AST_DEPTH` is a measured margin (1.5× at a 0.5 MB stack), not a guarantee by construction |
+| id    | title                                                                            | status  | deps         | origin                                                                                                                                   |
+| ----- | -------------------------------------------------------------------------------- | ------- | ------------ | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| T-029 | Give K-1 a real cannon choice — add sub_within_10 and a third starter            | backlog | T-003, T-006 | design review — grade 0 has one skill, so "choose a cannon" is not a choice                                                              |
+| T-030 | Loadout selection — which three cannons sail with you                            | backlog | T-006, T-010 | design review — 5 cannons available after island 1, tray fits 3, nothing decides                                                         |
+| T-031 | Resolve the Perfect Shot "bonus ball" contradiction                              | backlog | T-004        | design review + T-004 code review — ARCHITECTURE says "+1 ball", code says "+1 damage"                                                   |
+| T-028 | CHOICE_COUNT must have one home, not two                                         | backlog | T-003, T-004 | wave-2 integration drift — the merge created a duplicate the dev-screen slider would arm                                                 |
+| T-032 | Placement pre-grants the range guns mastery is supposed to award                 | backlog | T-010, T-011 | wave-3 integration probe — at `g4_5` all 7 range guns and 5 islands are pre-granted, so mastery awards nothing, ever                     |
+| T-033 | The frozen-tests-unmodified gate is unreachable code and has never run           | backlog | —            | wave-3 integration — the gate sits after `exit`, calls an undefined `report`, and keys off a `.tdd-swarm/phase` file that does not exist |
+| T-027 | validateCatalogs must detect set-level catalog corruption                        | backlog | T-006        | T-006 code review M-1 — the function is weaker than its signature implies                                                                |
+| T-025 | Replace the expression evaluator's recursive walks with explicit-stack iteration | backlog | T-002        | T-002 code review — `MAX_AST_DEPTH` is a measured margin (1.5× at a 0.5 MB stack), not a guarantee by construction                       |

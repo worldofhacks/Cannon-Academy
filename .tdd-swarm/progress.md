@@ -913,3 +913,79 @@ Found real drift and fixed what was fixable:
 **Lessons this wave: L-020 through L-028.** Three came from agents catching their own errors —
 a test passing by coincidence, a measurement taken in a state that no longer existed, and a
 mutation matrix silently running the wrong file.
+
+---
+
+## Wave 3 INTEGRATED — `e8155ad..786abf7`, **PASS**
+
+Independent integration agent, 2026-07-28. Full report:
+`.tdd-swarm/reports/wave3-integration.md`.
+
+| Dimension                      | Result                                                                        |
+| ------------------------------ | ----------------------------------------------------------------------------- |
+| Merges                         | 6/6 clean, zero conflicts — twelve pairwise-disjoint files, no shared surface |
+| Tier 1 local gates             | ALL GREEN (7 gates; the 8th never ran — see below)                            |
+| spec-lint                      | 6/6 PASS across **88 acceptance criteria**, both directions                   |
+| Test suite                     | **1,229 passed / 1,229**, 13 files, 2.33s                                     |
+| `npm audit --audit-level=high` | 0 vulnerabilities                                                             |
+| `package.json` / lockfile      | byte-identical to the pre-merge head                                          |
+| Frozen tests                   | verified by hand: 6 `A`, **0 `M`** under `__tests__`                          |
+
+**The predicted 1,188 was wrong; the real count is 1,229.** The prediction subtracted a 41-test
+overlap allowance that does not exist — `776+170+51+22+47+123+40 = 1229` exactly. Six disjoint file
+pairs cannot overlap. Nothing was lost or double-counted.
+
+### Cross-ticket probe — 6/6 green, and it found something
+
+Written in a per-ticket scratchpad subdirectory per **L-028** and deleted after. The precaution
+earned its keep: the shared scratchpad root still holds a stray `probe.test.ts` from another
+session. Per L-028 I refused to take a uniform pass at face value and dumped the composed values to
+prove the harness was live.
+
+Every declared interlock verified in one process for the first time — T-005→T-002/T-004,
+T-008→T-001/T-004, T-011→T-008, and all four catalog consumers sharing one frozen parse. Seed
+reproducibility holds end-to-end (`toStrictEqual` **and** JSON-identical across two runs), the
+stream is provably live across 60 seeds, and the pure stages are provably seed-independent.
+
+### Two findings escalated, zero absorbed
+
+- **T-032 (new, `backlog`, owner decision)** — **placement pre-grants the range guns mastery is
+  supposed to award.** With every skill mastered: `k_1` can still earn 5 cannons / 4 islands,
+  `g2_3` 2 / 2, and **`g4_5` zero and zero**. A 5th grader can never earn a cannon or an island
+  through range mastery — placement hands over all seven range guns and all five islands at
+  onboarding, so `resolveUnlocks` returns empty forever and the meter gates nothing.
+  **Neither ticket is at fault**: T-011 AC-2/AC-4 require exactly this cannon set, T-010's delta
+  semantics are correct, and the boundary between them was never specified. No frozen suite could
+  catch it — nothing in either suite runs the two functions together, which is why it survived six
+  green gate runs, six approving code reviews and two security passes. Filed without acceptance
+  criteria on purpose: three options are on the table and the choice is the owner's.
+
+- **T-033 (new, `backlog`, `wave: 3-repair`)** — **the `frozen-tests-unmodified` gate has never
+  run.** Three independent faults, any one sufficient: it sits _after_ `exit "$FAIL"` (line 49 vs
+  50); it calls an undefined `report()` (the script defines `run()`); and its guard reads
+  `.tdd-swarm/phase`, **a file that does not exist and nothing creates**. The wave-3 run confirms
+  it — seven gate lines printed, no `frozen-tests-unmodified` line either way.
+  This contradicts the wave-3 dispatch premise _"now enforced mechanically"_. The property itself
+  **did** hold — I verified 0 `M` entries by hand — but it held on implementer discipline, not
+  enforcement, and that belief was load-bearing in the decision to merge. **L-007 restated: a
+  silent gate is indistinguishable from an absent one.** T-033 requires the repaired gate to be
+  _observed failing on a real violation_ before it is trusted, and waves 1–2 retro-checked.
+
+### Drift vs ARCHITECTURE.md — as expected, plus one asymmetry
+
+- **§8 placement:** 4 of 6 modules sit exactly where §8 declares. `placement.ts` and `ranks.ts` are
+  additive. T-011 argues its case explicitly (`proposed` — §8's list "reads as illustrative");
+  **T-012 carries no equivalent note for `ranks.ts`.** Both are fine on the merits; the asymmetry
+  is the issue. Recommend amending §8's engine list to name both when T-031 corrects §4.3 — a
+  one-line doc edit riding an existing ticket, not a new one.
+- **`ARCHITECTURE.md:202`** — confirmed **code matches the T-031 ruling**, doc remains known-stale.
+  Probe: `bonusDamage: 1`, `damageToEnemy: 17 = rollDamage 16 + 1`. `ballCount` participates in no
+  damage arithmetic and nothing in the engine reads it — presentation only, exactly as ruled. Not
+  re-raised.
+- **PLAN.md "two cannons"** — reported as pending decision, not drift. One correction the owner
+  needs before ruling on **T-029**: its rationale claims _"three cannons is exactly the duel tray's
+  capacity, so no loadout selection is needed at K-1."_ Shipped T-011 gives K-1 **four** owned
+  cannons, so selection is already needed there regardless. T-029's core argument survives (K-1
+  still has one skill); only its tray premise needs correcting. T-030 already owns selection.
+- **Contracts changed without a ticket:** none. No consumed signature widened, narrowed or
+  redefined. `CHOICE_COUNT` still duplicated, unchanged by this wave, still owned by T-028.
