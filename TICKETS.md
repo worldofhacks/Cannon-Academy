@@ -84,7 +84,7 @@ duplication, see below). Evidence: `.tdd-swarm/reports/wave2-integration.md`.
 | T-009 | Economy — performance coin payout and seeded chest rarity roll             | review-passed | T-001, T-003, T-004        | `ticket/T-009-economy`      | standard | —     |
 | T-010 | Mastery — dual-rate meters, threshold, and unlock resolution               | review-passed | T-003, T-004, T-006        | `ticket/T-010-mastery`      | standard | —     |
 | T-011 | Grade-band placement — pre-unlocked islands, cannons, starting bot band    | backlog       | T-003, T-004, T-006        | `ticket/T-011-placement`    | cheap    | —     |
-| T-012 | Rank ladder — numeric tier from wins, ratcheted so a loss never demotes    | backlog       | T-003, T-006               | `ticket/T-012-rank-ladder`  | cheap    | —     |
+| T-012 | Rank ladder — numeric tier from wins, ratcheted so a loss never demotes    | review-passed | T-003, T-006               | `ticket/T-012-rank-ladder`  | cheap    | —     |
 
 ## Wave 4 — generator and duel vocabulary
 
