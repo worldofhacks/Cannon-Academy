@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { evaluateNumber, evaluatePredicate, ExprError } from '@engine/questions/expr';
+import type { ExprErrorCode } from '@engine/questions/expr';
 
 /**
  * T-002 — Safe arithmetic expression and constraint predicate evaluator (no eval).
@@ -20,6 +21,9 @@ import { evaluateNumber, evaluatePredicate, ExprError } from '@engine/questions/
 // --------------------------------------------------------------------------------------------
 
 type Env = Record<string, number>;
+
+/** Compile-time exact-type equality (invariant in both directions, unlike `extends`). */
+type Exact<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
 
 /** Runs `fn`, asserts it threw an `ExprError`, and returns it for further assertions. */
 function catchExprError(fn: () => unknown): ExprError {
@@ -815,15 +819,212 @@ describe('AC-15 — parser depth limit instead of stack overflow', () => {
     expectPredicateError(expr, { a: 1 }, 'PARSE_ERROR');
   });
 
-  it('spec(T-002:AC-15) the depth limit is not so low that ordinary nesting breaks', () => {
-    const expr = `${'('.repeat(16)}a${')'.repeat(16)}`;
-    expect(evaluateNumber(expr, { a: 1 })).toBe(1);
-  });
-
   it('spec(T-002:AC-15) an over-deep expression throws ExprError, not a RangeError', () => {
     const expr = `${'('.repeat(5000)}a${')'.repeat(5000)}`;
     const err = catchExprError(() => evaluateNumber(expr, { a: 1 }));
     expect(err).not.toBeInstanceOf(RangeError);
     expect(err.code).toBe('PARSE_ERROR');
+  });
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-16 — `%` uses JavaScript remainder semantics (sign follows the dividend)
+// --------------------------------------------------------------------------------------------
+
+describe('AC-16 — remainder with negative operands', () => {
+  it('spec(T-002:AC-16) a negative left operand yields a negative remainder', () => {
+    expect(evaluateNumber('a % b', { a: -7, b: 2 })).toBe(-1);
+  });
+
+  it('spec(T-002:AC-16) a negative left operand does not yield the mathematical modulo', () => {
+    expect(evaluateNumber('a % b', { a: -7, b: 2 })).not.toBe(1);
+  });
+
+  it('spec(T-002:AC-16) a negative right operand yields a positive remainder', () => {
+    expect(evaluateNumber('a % b', { a: 7, b: -2 })).toBe(1);
+  });
+
+  it('spec(T-002:AC-16) both operands negative follows the dividend sign', () => {
+    expect(evaluateNumber('a % b', { a: -7, b: -2 })).toBe(-1);
+  });
+
+  it('spec(T-002:AC-16) a unary-minus dividend follows the same rule', () => {
+    expect(evaluateNumber('-a % b', { a: 7, b: 2 })).toBe(-1);
+  });
+
+  it('spec(T-002:AC-16) the documented true-modulo idiom recovers a non-negative result', () => {
+    expect(evaluateNumber('((a % b) + b) % b', { a: -7, b: 2 })).toBe(1);
+  });
+
+  it('spec(T-002:AC-16) the divisibility idiom still holds for a negative dividend', () => {
+    expect(evaluatePredicate('a % b == 0', { a: -12, b: 4 })).toBe(true);
+  });
+
+  it('spec(T-002:AC-16) the divisibility idiom still rejects an indivisible negative dividend', () => {
+    expect(evaluatePredicate('a % b == 0', { a: -13, b: 4 })).toBe(false);
+  });
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-17 — gcd operates on absolute values and terminates on zero
+// --------------------------------------------------------------------------------------------
+
+describe('AC-17 — gcd with zero and negative arguments', () => {
+  it('spec(T-002:AC-17) a negative first argument is taken by absolute value', () => {
+    expect(evaluateNumber('gcd(a, b)', { a: -12, b: 18 })).toBe(6);
+  });
+
+  it('spec(T-002:AC-17) a negative second argument is taken by absolute value', () => {
+    expect(evaluateNumber('gcd(a, b)', { a: 12, b: -18 })).toBe(6);
+  });
+
+  it('spec(T-002:AC-17) two negative arguments are taken by absolute value', () => {
+    expect(evaluateNumber('gcd(a, b)', { a: -12, b: -18 })).toBe(6);
+  });
+
+  it('spec(T-002:AC-17) gcd of zero and a non-zero value is that value', () => {
+    expect(evaluateNumber('gcd(a, b)', { a: 0, b: 5 })).toBe(5);
+  });
+
+  it('spec(T-002:AC-17) gcd is symmetric when the zero is the second argument', () => {
+    expect(evaluateNumber('gcd(a, b)', { a: 5, b: 0 })).toBe(5);
+  });
+
+  it('spec(T-002:AC-17) gcd of zero and zero is zero', () => {
+    expect(evaluateNumber('gcd(a, b)', { a: 0, b: 0 })).toBe(0);
+  });
+
+  it('spec(T-002:AC-17) gcd of a negative and zero is the absolute value', () => {
+    expect(evaluateNumber('gcd(a, b)', { a: -5, b: 0 })).toBe(5);
+  });
+
+  it('spec(T-002:AC-17) gcd result is a finite number for every degenerate pair', () => {
+    for (const [a, b] of [
+      [0, 0],
+      [0, 5],
+      [-12, 18],
+      [-12, -18],
+    ] as ReadonlyArray<[number, number]>) {
+      const result = evaluateNumber('gcd(a, b)', { a, b });
+      expect(Number.isFinite(result), `gcd(${a}, ${b}) produced ${String(result)}`).toBe(true);
+    }
+  });
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-18 — a zero-argument call is a grammar violation, not an arity violation
+// --------------------------------------------------------------------------------------------
+
+describe('AC-18 — zero-argument calls are PARSE_ERROR', () => {
+  for (const name of ['abs', 'floor', 'ceil', 'min', 'max', 'gcd']) {
+    it(`spec(T-002:AC-18) ${name}() throws PARSE_ERROR, not ARITY_MISMATCH`, () => {
+      expectNumberError(`${name}()`, { a: 1, b: 2 }, 'PARSE_ERROR');
+    });
+  }
+
+  it('spec(T-002:AC-18) a zero-argument call is rejected before the function name is resolved', () => {
+    expectNumberError('foo()', { a: 1 }, 'PARSE_ERROR');
+  });
+
+  it('spec(T-002:AC-18) a whitespace-only argument list is still PARSE_ERROR', () => {
+    expectNumberError('abs(   )', { a: 1 }, 'PARSE_ERROR');
+  });
+
+  it('spec(T-002:AC-18) one-too-few arguments remains ARITY_MISMATCH', () => {
+    expectNumberError('min(a)', { a: 1 }, 'ARITY_MISMATCH');
+  });
+
+  it('spec(T-002:AC-18) one-too-many arguments remains ARITY_MISMATCH', () => {
+    expectNumberError('abs(a, b)', { a: 1, b: 2 }, 'ARITY_MISMATCH');
+  });
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-19 — ExprErrorCode is a type-only export; ExprError is the runtime class
+// --------------------------------------------------------------------------------------------
+
+describe('AC-19 — the exported error contract', () => {
+  it('spec(T-002:AC-19) ExprErrorCode is exactly the six documented codes', () => {
+    const codeUnionIsExact: Exact<
+      ExprErrorCode,
+      | 'PARSE_ERROR'
+      | 'UNKNOWN_IDENTIFIER'
+      | 'UNKNOWN_FUNCTION'
+      | 'ARITY_MISMATCH'
+      | 'DIVISION_BY_ZERO'
+      | 'TYPE_MISMATCH'
+    > = true;
+
+    expect(codeUnionIsExact).toBe(true);
+  });
+
+  it('spec(T-002:AC-19) a thrown ExprError carries a code assignable to ExprErrorCode', () => {
+    const err = catchExprError(() => evaluateNumber('a +', { a: 1 }));
+    const code: ExprErrorCode = err.code;
+    expect(code).toBe('PARSE_ERROR');
+  });
+
+  it('spec(T-002:AC-19) ExprErrorCode has no runtime value binding', async () => {
+    const mod = await import('@engine/questions/expr');
+    expect(Object.keys(mod)).not.toContain('ExprErrorCode');
+    // @ts-expect-error `ExprErrorCode` is a type-only export, so it is not on the value namespace.
+    expect(mod.ExprErrorCode).toBeUndefined();
+  });
+
+  it('spec(T-002:AC-19) the module exports evaluateNumber and evaluatePredicate as functions', async () => {
+    const mod = await import('@engine/questions/expr');
+    expect(typeof mod.evaluateNumber).toBe('function');
+    expect(typeof mod.evaluatePredicate).toBe('function');
+  });
+
+  it('spec(T-002:AC-19) ExprError is a runtime class whose prototype chain reaches Error', () => {
+    expect(typeof ExprError).toBe('function');
+    expect(Object.getPrototypeOf(ExprError.prototype)).toBe(Error.prototype);
+  });
+
+  it('spec(T-002:AC-19) every documented code is reachable from a real evaluation', () => {
+    const observed = new Set<ExprErrorCode>([
+      catchExprError(() => evaluateNumber('a +', { a: 1 })).code,
+      catchExprError(() => evaluateNumber('a + z', { a: 1 })).code,
+      catchExprError(() => evaluateNumber('foo(a)', { a: 1 })).code,
+      catchExprError(() => evaluateNumber('min(a)', { a: 1 })).code,
+      catchExprError(() => evaluateNumber('a / b', { a: 1, b: 0 })).code,
+      catchExprError(() => evaluateNumber('a > b', { a: 2, b: 1 })).code,
+    ]);
+
+    expect([...observed].sort()).toEqual([
+      'ARITY_MISMATCH',
+      'DIVISION_BY_ZERO',
+      'PARSE_ERROR',
+      'TYPE_MISMATCH',
+      'UNKNOWN_FUNCTION',
+      'UNKNOWN_IDENTIFIER',
+    ]);
+  });
+});
+
+// --------------------------------------------------------------------------------------------
+// AC-20 — the depth limit has a usable floor
+// --------------------------------------------------------------------------------------------
+
+describe('AC-20 — 16 nested levels must still evaluate', () => {
+  it('spec(T-002:AC-20) 16 nested parentheses evaluate successfully', () => {
+    const expr = `${'('.repeat(16)}a${')'.repeat(16)}`;
+    expect(evaluateNumber(expr, { a: 1 })).toBe(1);
+  });
+
+  it('spec(T-002:AC-20) 16 nested parentheses around a compound expression evaluate', () => {
+    const expr = `${'('.repeat(16)}a + b * c${')'.repeat(16)}`;
+    expect(evaluateNumber(expr, { a: 2, b: 3, c: 4 })).toBe(14);
+  });
+
+  it('spec(T-002:AC-20) 16 nested function calls evaluate successfully', () => {
+    const expr = `${'abs('.repeat(16)}a${')'.repeat(16)}`;
+    expect(evaluateNumber(expr, { a: 5 })).toBe(5);
+  });
+
+  it('spec(T-002:AC-20) a 16-level nested predicate evaluates successfully', () => {
+    const expr = `${'('.repeat(16)}a + b <= 20${')'.repeat(16)}`;
+    expect(evaluatePredicate(expr, { a: 9, b: 9 })).toBe(true);
   });
 });
