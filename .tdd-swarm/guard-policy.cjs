@@ -39,6 +39,17 @@ const CONTROL_SURFACE = [
   '.gitignore',
 ];
 
+/**
+ * Writable by any agent regardless of phase or territory.
+ *
+ * `scratchpad/` is where an agent builds throwaway reference implementations and
+ * mutation harnesses (per-ticket subdirectory, L-028). It is gitignored, so nothing
+ * here can reach a commit. `.tdd-swarm/reports/` is where an agent writes its own
+ * evidence — L-030 exists because those reports were being lost, so they must be
+ * writable even though the rest of the control surface is not.
+ */
+const AGENT_WRITABLE = ['scratchpad/', '.tdd-swarm/reports/'];
+
 function isTestPath(rel) {
   return rel.startsWith('__tests__/') || /\.test\.ts$/.test(rel);
 }
@@ -118,6 +129,10 @@ function decideWrite({ repoRoot, absPath }) {
   if (!phase) return { allow: true, engaged: false };
 
   const { rel } = unit;
+
+  if (AGENT_WRITABLE.some((prefix) => rel.startsWith(prefix))) {
+    return { allow: true, engaged: true };
+  }
 
   if (isControlPath(rel)) {
     return {
@@ -238,7 +253,8 @@ function decideShell({ repoRoot, command }) {
   if (/^\s*SWARM_ORCHESTRATOR=1\b/.test(command)) return { allow: true, engaged: true };
 
   const guarded = [
-    '\\.tdd-swarm/',
+    // Everything under .tdd-swarm/ except reports/, which agents own (see AGENT_WRITABLE).
+    '\\.tdd-swarm/(?!reports/)',
     'tickets/',
     '\\.cursor/',
     '\\.claude/',

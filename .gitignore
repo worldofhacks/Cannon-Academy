@@ -9,3 +9,7 @@ dist/
 .worktrees/
 .tdd-swarm/phase
 .tdd-swarm/active-ticket
+
+# Agent scratch space: throwaway reference implementations and mutation harnesses.
+# Never committed, so nothing built here can be mistaken for production code.
+scratchpad/

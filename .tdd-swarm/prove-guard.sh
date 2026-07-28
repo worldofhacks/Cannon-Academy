@@ -15,10 +15,15 @@ CURSOR_ADAPTER=".cursor/hooks/swarm-guard.cjs"
 CLAUDE_ADAPTER=".claude/hooks/guard-writes.cjs"
 UNIT=".worktrees/prove-T-007"
 
+# The unengaged cases run against a pristine root of their own. Engagement is global by
+# design, so once a real wave is in flight the live repo is never unengaged and asserting
+# against it would test the wave rather than the guard.
+CLEAN=".worktrees/prove-clean"
+
 PASS=0
 FAIL=0
 
-cleanup() { rm -rf "$ROOT/$UNIT"; }
+cleanup() { rm -rf "$ROOT/$UNIT" "$ROOT/$CLEAN"; }
 trap cleanup EXIT
 
 set_phase() {
@@ -28,14 +33,14 @@ set_phase() {
   cp "$ROOT/tickets/T-007.md" "$ROOT/$UNIT/tickets/T-007.md"
 }
 
-# check <label> <expect: allow|block> <adapter> <payload-json>
+# check <label> <expect: allow|block> <adapter> <payload-json> [project-root]
 check() {
-  local label="$1" expect="$2" adapter="$3" payload="$4"
+  local label="$1" expect="$2" adapter="$3" payload="$4" root="${5:-$ROOT}"
   local rc want
   want=$([ "$expect" = block ] && echo 2 || echo 0)
 
-  printf '%s' "$payload" | CURSOR_PROJECT_DIR="$ROOT" CLAUDE_PROJECT_DIR="$ROOT" \
-    node "$adapter" > /dev/null 2>&1
+  printf '%s' "$payload" | CURSOR_PROJECT_DIR="$root" CLAUDE_PROJECT_DIR="$root" \
+    node "$ROOT/$adapter" > /dev/null 2>&1
   rc=$?
 
   if [ "$rc" -eq "$want" ]; then
@@ -47,9 +52,20 @@ check() {
   fi
 }
 
-write_payload() {
+# A pristine project root, carrying the policy module so an allow verdict there is a real
+# decision rather than a silent load failure.
+setup_clean_root() {
+  mkdir -p "$ROOT/$CLEAN/.tdd-swarm"
+  cp "$ROOT/.tdd-swarm/guard-policy.cjs" "$ROOT/$CLEAN/.tdd-swarm/guard-policy.cjs"
+}
+
+write_payload_at() {
   printf '{"hook_event_name":"preToolUse","tool_name":"Write","tool_input":{"file_path":"%s/%s"}}' \
-    "$ROOT" "$1"
+    "$1" "$2"
+}
+
+write_payload() {
+  write_payload_at "$ROOT" "$1"
 }
 
 read_payload() {
@@ -76,6 +92,10 @@ check "the phase file itself"          block "$CURSOR_ADAPTER" "$(write_payload 
 check "its own ticket spec"            block "$CURSOR_ADAPTER" "$(write_payload "$UNIT/tickets/T-007.md")"
 check "gate config"                    block "$CURSOR_ADAPTER" "$(write_payload "$UNIT/eslint.config.js")"
 check "Read of a frozen test"          allow "$CURSOR_ADAPTER" "$(read_payload "$UNIT/__tests__/engine/questions/generator.test.ts")"
+check "its own scratchpad"             allow "$CURSOR_ADAPTER" "$(write_payload "$UNIT/scratchpad/t007/probe.ts")"
+check "its own evidence report"        allow "$CURSOR_ADAPTER" "$(write_payload "$UNIT/.tdd-swarm/reports/T-007-implementation.md")"
+check "shell write to a report"        allow "$CURSOR_ADAPTER" "$(shell_payload 'echo done > .tdd-swarm/reports/T-007-implementation.md')"
+check "shell write to baselines"       block "$CURSOR_ADAPTER" "$(shell_payload 'echo x > .tdd-swarm/baselines.md')"
 check "shell cp into __tests__"        block "$CURSOR_ADAPTER" "$(shell_payload 'cp /tmp/p.test.ts __tests__/engine/questions/generator.test.ts')"
 check "shell redirect onto phase"      block "$CURSOR_ADAPTER" "$(shell_payload 'echo tests > .worktrees/prove-T-007/.tdd-swarm/phase')"
 check "shell sed -i on a test"         block "$CURSOR_ADAPTER" "$(shell_payload 'sed -i "" s/x/y/ __tests__/engine/rng.test.ts')"
@@ -103,12 +123,15 @@ check "own src file"                   allow "$CLAUDE_ADAPTER" "$(printf '{"tool
 check "shell cp into __tests__"        block "$CLAUDE_ADAPTER" "$(printf '{"tool_input":{"command":"cp /tmp/p.test.ts __tests__/x.test.ts"}}')"
 
 echo
-echo "-- not engaged: the orchestrator must not be policed --"
+echo "-- no phase in force: the orchestrator must not be policed --"
 cleanup
-check "orchestrator writes src"        allow "$CURSOR_ADAPTER" "$(write_payload "src/engine/rng.ts")"
-check "orchestrator writes ledger"     allow "$CURSOR_ADAPTER" "$(write_payload ".tdd-swarm/progress.md")"
-check "orchestrator writes a test"     allow "$CURSOR_ADAPTER" "$(write_payload "__tests__/engine/rng.test.ts")"
-check "orchestrator shell redirect"    allow "$CURSOR_ADAPTER" "$(shell_payload 'echo implement > .tdd-swarm/phase')"
+setup_clean_root
+CR="$ROOT/$CLEAN"
+check "orchestrator writes src"        allow "$CURSOR_ADAPTER" "$(write_payload_at "$CR" "src/engine/rng.ts")"                 "$CR"
+check "orchestrator writes ledger"     allow "$CURSOR_ADAPTER" "$(write_payload_at "$CR" ".tdd-swarm/progress.md")"            "$CR"
+check "orchestrator writes a test"     allow "$CURSOR_ADAPTER" "$(write_payload_at "$CR" "__tests__/engine/rng.test.ts")"      "$CR"
+check "orchestrator writes gate config" allow "$CURSOR_ADAPTER" "$(write_payload_at "$CR" "eslint.config.js")"                 "$CR"
+check "orchestrator shell redirect"    allow "$CURSOR_ADAPTER" "$(shell_payload 'echo implement > .tdd-swarm/phase')"          "$CR"
 
 echo
 printf '== %d observed correct, %d wrong ==\n' "$PASS" "$FAIL"
