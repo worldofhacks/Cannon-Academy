@@ -82,3 +82,49 @@ before wave 3 — it is the only open question that could still force a reducer 
 evaluator.
 
 **Status: Phase 1 COMPLETE — tickets frozen, awaiting Wave 1 dispatch.**
+
+## Phase 1 — Plan (2026-07-27)
+
+- Planner (opus) decomposed PLAN.md + ARCHITECTURE.md §4 into 24 tickets / 8 waves / 347 ACs.
+- **Two adversarial Plan Reviewers dispatched in parallel on different models**, different lenses:
+  coverage+testability (sonnet) and coupling+sequencing+architecture (opus).
+  Result: **2 Critical, 13 Important**. Both independently CONFIRMED: file/test-scope
+  exclusivity holds, no cycles, engine purity across all 24 tickets, TS-strict handling
+  correct, and **no fabricated numbers anywhere**.
+- Criticals fixed:
+  - T-005 imported `tuning.ts` while in the same wave as its owner T-004 — could not have
+    compiled in its worktree. (Exclusive file scopes govern *writes*, not *reads*.)
+  - `DISTRACTOR_ABS_FLOOR >= 1` made T-005's three-distinct-distractors requirement
+    unsatisfiable for a zero answer, which `sub_within_20` legally produces.
+- Design corrections (both would have passed their own tests):
+  - Damage curve violated ARCHITECTURE.md:206's written guarantee that a slow-but-correct
+    answer always lands a respectable mid-range volley. Floor now constrains the roll
+    outcome, not just the quality input.
+  - `QUALITY_WEIGHT` had no effect-size floor — an implementation could have made
+    speed-aimed damage statistically undetectable while passing every AC.
+- Orchestrator gate fixes (my own errors, found by review):
+  - Determinism/purity lint covered only `src/engine/**`, not `src/content/**`. Extended, re-verified firing.
+  - `no-eval` / `no-implied-eval` / `no-new-func` are NOT in `js.configs.recommended` —
+    **verified by probe that `eval()` and `new Function()` passed lint silently.** Now
+    declared explicitly and verified firing. Load-bearing: T-002 is defined by not using eval.
+- Planner rejected one reviewer claim with arithmetic (the proposed re-wave table was
+  inconsistent with the recommendation it accompanied). Orchestrator sided with the Planner.
+- Plan structure independently re-verified by orchestrator script: 24 tickets, 7 waves,
+  347 ACs, no cycles, no back-edges, every ticket at earliest wave, no same-wave collisions.
+
+### CHECKPOINT — owner approved the plan, 2026-07-27
+
+Owner decisions, now locked (recorded in traceability.md §2):
+
+| id | question | ruling |
+|---|---|---|
+| D-1 | Template count (docs contradicted: 15–25 vs ≥8) | **Floor of 8/skill, no cap.** `PLAN.md:73` edited to remove the contradiction. |
+| D-2 | Double-Shot "harder variant" | **Shortened timer**, same question pool. `difficulty?: 1\|2\|3` kept as schema insurance. |
+| D-3 | Culverin recoil ("Volatile (crit)", no number) | **recoilDamage = 0.** Keeps the K-band starter unable to punish. |
+| D-4 | Reliable vs Standard on a miss | **Identical** — flavour only, no recoil, no re-answer. Volatile tier (5/8/10) already provides the "powerful guns that punish" the owner wanted. Closed before wave 3, so T-020 cannot be superseded by it. |
+| D-5 | Build `duel/replay.ts` (T-023)? | **CUT.** Replaced by replay-proof ACs inside T-024's fuzz suite, including a wrong-seed negative control. Engine stays provably replayable; only the wrapper is deferred. |
+
+Still open, none blocking waves 1–3: 2.5 (chest tier count), 2.14 (fog-lift rule),
+2.16 / gap 3.9 (captain-name wordlist — the one child-safety promise with no test).
+
+**Status: Phase 1 COMPLETE, owner-approved.** Next: Phase 2 — write and freeze wave 1 tests.

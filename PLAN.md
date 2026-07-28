@@ -70,7 +70,7 @@ The design question is never "what math problem comes next?" but "what does the 
 
 ### Questions, coaching, onboarding, opponents — carried forward
 
-The template engine is unchanged from v1: 15–25 golden parameterized shapes per skill, constrained random params, **four-choice output with engineered distractors**, no LLM in the hot path, pure functions unit-tested day 1. **K-1 templates are symbolic-only** (`{a} + {b} = ?`, never word problems) so a non-reader is never blocked by reading; word-problem shapes are gated to grade 2+. Missed questions trigger a **Navigator's coach card** after the duel — the worked solution in one screen, with a read-aloud button (expo-speech, \~1h, day 4) so the remediation isn't reading-gated either.
+The template engine is unchanged from v1: **a floor of 8 golden parameterized shapes per skill** (the build target; 15–25 per skill is the post-MVP content goal, not a day-3 requirement — see the day-3 row), constrained random params, **four-choice output with engineered distractors**, no LLM in the hot path, pure functions unit-tested day 1. **K-1 templates are symbolic-only** (`{a} + {b} = ?`, never word problems) so a non-reader is never blocked by reading; word-problem shapes are gated to grade 2+. Missed questions trigger a **Navigator's coach card** after the duel — the worked solution in one screen, with a read-aloud button (expo-speech, \~1h, day 4) so the remediation isn't reading-gated either.
 
 Onboarding: **grade picker** (K-1 / 2-3 / 4-5) → pick a captain name and flag (anonymous Firebase auth, username-only, COPPA-friendly) → a guided first duel against a scripted pirate sloop that politely sinks in three volleys; **first reward inside 90 seconds** (worded so a chest-cut can't break the promise).
 

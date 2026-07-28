@@ -100,3 +100,22 @@ making the mechanic statistically undetectable in play.
 **What to do instead:** When a criterion protects something a user must actually notice,
 assert an effect size over seeded samples, not just an inequality. Ask of every AC:
 "what is the laziest implementation that passes this, and is it still the product?"
+
+---
+
+## L-007 — A crashing guard hook fails OPEN, not closed (Phase 1)
+
+**Pattern:** The PreToolUse hook protecting frozen tests was written as `.js` in a
+package with `"type": "module"`, so `require` threw on every invocation. Node exited
+**1** — and only exit **2** blocks a tool call. The hook was therefore a no-op that
+looked installed: implementers could have edited frozen tests freely while the config
+claimed they could not.
+
+**Why:** Guard failures are silent by design (hooks fail open so a broken hook cannot
+wedge a session). That safety property is exactly what makes an unverified hook
+dangerous — nothing reports that it never worked.
+
+**What to do instead:** Probe every hook with the actual JSON payload shape and assert
+the **exit code**, not just that a message appeared. Check both directions: the case it
+must block AND the case it must allow. A guard that has never been observed returning 2
+is not installed, whatever the settings file says. Corollary of [[L-001]].
