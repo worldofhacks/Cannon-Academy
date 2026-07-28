@@ -624,3 +624,36 @@ describe('unknown keys', () => {
     expect(result.success).toBe(false);
   });
 });
+
+// --- AC-20: strictness reaches inside the nested unlock union --------------------------------
+// `unlock` is the most typo-prone shape in the catalog (`teir`/`tier`, `iland`/`island`), and
+// top-level strictness alone does not cover it. Every variant is covered so an implementation
+// that strictens only the `range` branch is caught.
+
+describe('unknown keys inside the unlock union', () => {
+  it('spec(T-003:AC-20) rejects a range unlock carrying an unknown key', () => {
+    const result = cannonSchema.safeParse(
+      withOverrides(VALID_CANNON, {
+        unlock: { kind: 'range', island: 'port_sumwich', tier: 2, teir: 2 },
+      }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-20) rejects a starter unlock carrying an unknown key', () => {
+    const result = cannonSchema.safeParse(
+      withOverrides(VALID_CANNON, { unlock: { kind: 'starter', island: 'port_sumwich' } }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+
+  it('spec(T-003:AC-20) rejects a chest unlock carrying an unknown key', () => {
+    const result = cannonSchema.safeParse(
+      withOverrides(VALID_CANNON, { unlock: { kind: 'chest', tier: 1 } }),
+    );
+
+    expect(result.success).toBe(false);
+  });
+});
