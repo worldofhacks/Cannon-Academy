@@ -265,3 +265,26 @@ Over-constraint checked in both directions — valid alternative implementations
 Worktrees rebased onto the integration branch, closing the L-008 staleness (I5 in the T-003
 review). `phase=implement` set in wt-T-003 and the guard verified flipping: edits to frozen
 tests now blocked (exit 2), writes to `src/` allowed.
+
+### T-001 hardened and frozen
+
+Suite grown 19 → 27 tests (14 ACs). Cheat-mutation verified by the Test Agent against a
+correct implementation in a sandbox:
+
+| cheat | outcome |
+|---|---|
+| correct implementation | 31/31 pass, tsc clean |
+| `oneSwap` shuffle | caught — index-5 count 0, only 4/24 permutations |
+| `naiveSwap` shuffle | caught — passes BOTH index bands, fails permutation count at 827 < 850 |
+| counter-based `nextInt` | caught — scores a perfect [10000×6] on AC-5, fails AC-13 purity and cascades |
+| `pick = items[0]` | caught — 0/10000 for 9 of 10 elements |
+| `pick` returning a bare value | caught at compile time by the tuple destructuring |
+
+Also took M-4: bulk loops converted to collect-then-assert-once; suite runs ~35ms (was 2.8s).
+
+Worktree rebased a second time — the ticket had been amended (AC-13, AC-14) *after* the first
+rebase, so it went stale again. Verified current at 14 ACs before freezing.
+
+`phase=implement` set, guard verified flipping. Implementer dispatched (sonnet, per model_hint).
+
+Lesson L-012 recorded: aggregate assertions certify the projection, not the mechanism.

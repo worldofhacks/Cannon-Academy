@@ -204,3 +204,32 @@ the moment an implementer is bound by them.
 the suite goes fully green against it, then mutate it once per assertion class and confirm the
 matching tests fail. Never create it under `src/` — it is a proof device, not production code,
 and it must be deleted before commit.
+
+---
+
+## L-012 — Aggregate assertions certify the projection, not the mechanism (Phase 2)
+
+**Pattern:** Every Critical finding in wave 1 had the same shape — a test that constrained an
+aggregate while leaving the mechanism free:
+
+| Assertion | What it measured | What slipped through |
+|---|---|---|
+| index-0 distribution uniform over 10,000 shuffles | one position | a shuffle that permutes only that position |
+| per-face counts perfect over 60,000 draws | the histogram | values from a module counter, not the seed |
+| every id field round-trips through the schema | runtime values | `z.string()`, collapsing the derived type to `string` |
+
+Each looks rigorous — large samples, tight bands, real numbers. But an aggregate is a
+*projection* of behaviour, and a cheat only has to match the projection, which is a far weaker
+obligation than being correct.
+
+**Why:** Big-N statistical tests feel like strong evidence, so they suppress the instinct to ask
+"what else satisfies this?" The tightness of the band is irrelevant when the cheat sits inside it
+by construction.
+
+**What to do instead:** For any aggregate assertion, ask what the *weakest* implementation
+satisfying it looks like, and write it. Then assert the property that actually matters:
+- distribution over one position → **the full permutation set**
+- the output histogram → **purity: same input twice, same output**
+- runtime round-trip → **the derived type itself**
+
+A statistical band belongs alongside a structural assertion, never instead of one.
