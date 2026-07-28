@@ -222,3 +222,46 @@ unformatted, which would have shown every implementer a red format gate they did
 
 Lessons added: L-008 (worktrees must branch from a committed state), L-009 (default-permissive
 validation silently loses data).
+
+### Wave 1 — test-design reviews (the highest-value gate so far)
+
+Each suite was attacked by an independent reviewer that built a **deliberately lazy but
+plausible implementation** and measured which cheats survived. Both completed reviews returned
+**DO NOT FREEZE**, and neither defect would have failed a test.
+
+**T-001 — 3 Critical.** The reviewer's cheats, measured against the frozen bands:
+- A `shuffle` swapping index 0 with one random position and leaving positions 1–9 in input order
+  scored **946–1050 at index 0** — inside the required [700,1300] — while producing only **4 of
+  24 permutations**. It also passed the new-array, no-mutation, and is-a-permutation assertions.
+  T-007 uses `shuffle` to place the correct answer among four choices, so this freezes a
+  predictable answer slot: a child learns the position, not the math (ARCHITECTURE §9.1's
+  catastrophe class). The classic biased n-pass swap also passed, by 34 counts.
+- A `nextInt` advancing the `Rng` correctly but deriving its VALUE from a module-scoped counter
+  scored a perfect [10000×6] and passed **every test in the file**, while making draws a
+  function of process history rather than the serialised seed — destroying replay after relaunch.
+- `pick = items[0]` passed, as did returning a bare value instead of a `[value, nextRng]` tuple.
+Verified CLEAN: the mulberry32 oracle, checked character-by-character against the ticket
+pseudocode and executed against canonical mulberry32 over 11 seeds × 200 draws — **0 mismatches**,
+including the `4294967295` edge case. The expensive thing to get wrong was right.
+→ AC-8, AC-9, AC-11 extended; AC-13 (purity of all five draw functions) and AC-14 (readonly
+array params) added.
+
+**T-003 — 3 Critical.** The lazy implementation passed **85/85 with clean typecheck**:
+`maxGrade > minGrade` (rejecting legal single-grade skills T-006 authors), ten id-union fields
+as `z.string()` (making `Cannon['skill']` resolve to `string` everywhere downstream), and
+`Question`'s field types unpinned except two booleans.
+→ AC-10 amended; suite grown 85 → **116 tests**. Re-verified: the same lazy implementation now
+fails **27 tests + 15 type errors**; a correct implementation passes 117/117 with tsc exit 0.
+Over-constraint checked in both directions — valid alternative implementations still pass.
+
+### Status
+
+| ticket | tests | design review | state |
+|---|---|---|---|
+| T-001 | 19 → hardening | 3 Critical | Test Agent fixing |
+| T-002 | 229 | review running | — |
+| T-003 | **116** | 3 Critical, **all closed** | **tests FROZEN**, implementer dispatched (sonnet) |
+
+Worktrees rebased onto the integration branch, closing the L-008 staleness (I5 in the T-003
+review). `phase=implement` set in wt-T-003 and the guard verified flipping: edits to frozen
+tests now blocked (exit 2), writes to `src/` allowed.
