@@ -432,3 +432,32 @@ dropped when forwarding only the Critical/Important findings; my omission).
 AC-26 from "holds with a measured margin" into "holds by construction". Raised by the implementer
 as its own residual concern and confirmed by the reviewer's measurements. Not wave-assigned —
 this is robustness work, not a live defect, and Hermes' stack budget is unmeasured by this run.
+
+**Ticket T-002: review-passed** (attempt 2, commits ..917f8b0, gates pass, wave 1)
+
+Minor-fix pass closed all five. Two pieces of method worth keeping:
+- **No behaviour change was measured, not asserted:** a differential probe ran the approved build
+  and the new one side by side over 9,631 expressions × 12 environments × both entry points =
+  **231,144 paired calls**, comparing returned value or thrown code. Zero divergence, comparator
+  teeth-checked.
+- **Dead code removed with evidence, not argument:** rather than claim `requireFinite` on the
+  literal path was unreachable, the implementer instrumented the branch with a distinctive marker
+  — **0 hits** across a 93-case corpus placing an oversized literal in every syntactic position —
+  then deleted the tokenise guard as a teeth check and got **87 hits from the same 93**. Each
+  value class is now guarded exactly once, at its only producer, with the measurement cited in the
+  comment. This is L-015 done properly.
+
+The `MAX_AST_DEPTH` docblock now states the margin per host class (18.3× / 3.4× / 1.5×), records
+the run-dependence, and says plainly that the cap is a margin rather than a proof because the
+walks still recurse — pointing at T-025.
+
+**WAVE 1 COMPLETE — all three tickets review-passed.**
+
+| ticket | module | source | tests | ACs | attempts |
+|---|---|---|---|---|---|
+| T-001 | `engine/rng.ts` | 134 | 41 | 16 | 2 |
+| T-002 | `engine/questions/expr.ts` | ~700 | 335 | 26 | 2 |
+| T-003 | `content/schemas.ts`, `engine/questions/types.ts` | 264 | 116 | 20 | 1 |
+
+Next: Integration Agent merges the three ticket branches into `swarm/engine-core` in dependency
+order, runs repo gates, and checks architecture drift against ARCHITECTURE.md §4/§8.
