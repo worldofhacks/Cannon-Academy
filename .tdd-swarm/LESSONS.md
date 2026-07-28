@@ -553,3 +553,26 @@ the orchestrator's side: the number resolves fine in my copy.
 requirement as the ticket. Commit lessons **before** rebasing worktrees, never in the same
 command, and verify the file hash alongside the ticket hash in the pre-dispatch check. If a brief
 cites a lesson number, that number must resolve in the agent's worktree, not only in mine.
+
+---
+
+## L-026 — An acceptance criterion the gate cannot parse is not a criterion (Phase 4)
+
+**Pattern:** I amended three tickets with seven new criteria, writing them as
+`**AC-15 (new): the thing must hold.**`. `spec-lint.sh` extracts criteria with
+`grep -oE '\*\*AC-[0-9]+\*\*'`, which requires the closing `**` immediately after the number. My
+format put it after the parenthetical, so **all seven were invisible to the gate**. Spec-lint would
+have reported the ticket fully covered while enforcing nothing for them, and a Test Agent reading
+the gate's output rather than the prose could reasonably have skipped them.
+
+I caught it only because a routine pre-dispatch check printed an AC count that disagreed with what
+I had just written — 14 where I expected 17.
+
+**Why:** a criterion has two audiences, a human and a parser, and prose formatting satisfies only
+the first. The failure is silent in the worst direction: the gate reports **green**, because from
+its perspective every criterion it can see is covered.
+
+**What to do instead:** after amending a ticket, re-run `spec-lint` and confirm the **count** rose
+by exactly the number of criteria added. Never trust that a hand-written criterion parsed — count
+it. More generally: when a gate extracts structure from prose, any edit to that prose is an edit to
+the gate's input, and needs the same verification as an edit to the gate itself.
