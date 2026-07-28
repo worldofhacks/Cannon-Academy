@@ -63,6 +63,19 @@ export function isPlausibleDistractor(candidate: number, answer: number): boolea
   }
 
   // 4a. A near miss is always plausible.
+  //
+  // DISTRACTOR_ABS_FLOOR is dev-slider exposed, and TWO answers sit at zero headroom against it
+  // — lower it by one and both starve, which surfaces as a rare DISTRACTOR_FAILURE mid-duel
+  // rather than as a failing build:
+  //
+  //   x = 0   (a legal `sub_within_20` draw, a == b)  -> legal rungs exactly {1, 2, 3}
+  //   x = 0.5 (a legal `fractions_int` draw, 1 / 2)   -> legal rungs exactly {1.5, 2.5, 3.5}
+  //
+  // The fraction case is the non-obvious one and is NOT just an example: sweeping a / b over
+  // a in 0..12, b in 1..12, those two answers are the only draws that reach the minimum. It is
+  // tight for a different reason than the zero case — the `x * 2` rung is 1, which clause 2
+  // rejects for being an INTEGER against a non-integer answer, not for magnitude. So the floor
+  // binds on fractions as well as on subtraction (AC-17).
   if (Math.abs(candidate - answer) <= DISTRACTOR_ABS_FLOOR) {
     return true;
   }
@@ -102,6 +115,13 @@ function ladderRungs(answer: number): readonly number[] {
   return rungs.slice(0, MAX_DISTRACTOR_ATTEMPTS);
 }
 
+/** Renders a draw as `name=value` pairs so a `DISTRACTOR_FAILURE` can be replayed (AC-15). */
+function describeParams(params: Params): string {
+  return Object.entries(params)
+    .map(([name, value]) => `${name}=${value}`)
+    .join(', ');
+}
+
 interface BuiltDistractors {
   readonly values: readonly number[];
   readonly sources: readonly DistractorSource[];
@@ -122,6 +142,8 @@ function buildInternal(template: Template, params: Params): BuiltDistractors {
 
   const values: number[] = [];
   const sources: DistractorSource[] = [];
+  /** Candidates screened and turned away — declared and ladder alike (AC-15). */
+  let rejected = 0;
 
   /** A candidate is usable when it is not the answer, not already taken, and plausible. */
   const isUsable = (candidate: number): boolean =>
@@ -132,16 +154,28 @@ function buildInternal(template: Template, params: Params): BuiltDistractors {
     sources.push(source);
   };
 
-  // `>=` rather than `===`: a template carrying more than three declared distractors is
-  // type-legal (`Template['distractors']` is `string[]`; only `templateSchema`'s `.length(3)`
-  // holds the line at the content boundary), and an exact-equality cap that gets overshot stops
-  // capping at all. Probed: without this cap a four-entry list returns eight values.
+  // The quota cap. A template carrying more than `DISTRACTORS_NEEDED` declared distractors is
+  // type-legal — `Template['distractors']` is `string[]`, and only `templateSchema`'s
+  // `.length(3)` holds the line at the content boundary — so without this cap the loop returns
+  // one value per usable declared entry and the four-choice contract breaks.
+  //
+  // Measured on this file, four usable declared entries (`a + b + 1 .. + 4`, answer 7):
+  //   with the cap                -> [8, 9, 10]      (3 values)
+  //   with the cap removed        -> [8, 9, 10, 11]  (4 values)
+  // `>=` and `===` are behaviourally IDENTICAL here, verified over declared lengths 1..12:
+  // `values` grows by exactly one per iteration with the guard before every push, so its length
+  // can never step past the quota and an exact-equality test can never be missed. `>=` is
+  // defensive only. (An earlier version of this comment claimed eight values and an overshoot
+  // risk; both came from a mutant that had also degraded the ladder cap below to `===`, which
+  // is a measurement of the two caps together and says nothing about this one — AC-16.)
   for (const value of declared) {
     if (values.length >= DISTRACTORS_NEEDED) {
       break;
     }
     if (isUsable(value)) {
       accept(value, 'declared');
+    } else {
+      rejected += 1;
     }
   }
 
@@ -151,15 +185,24 @@ function buildInternal(template: Template, params: Params): BuiltDistractors {
     }
     if (isUsable(rung)) {
       accept(rung, 'ladder');
+    } else {
+      rejected += 1;
     }
   }
 
   // Never degrade: a short list, a duplicate, or the answer itself would each break the 2x2
   // answer grid contract (ARCHITECTURE.md §3.6). Failing loudly is the locked decision.
+  //
+  // The message is the whole forensic record (AC-15). This failure fires only on specific
+  // sampled values, and the ladder's behaviour is entirely a function of the answer, which is a
+  // function of the draw — so the id alone leaves a catalog author unable to reproduce it. Two
+  // different draws of one template that both exhaust must read differently, which is why
+  // `params` is carried verbatim rather than summarised.
   if (values.length < DISTRACTORS_NEEDED) {
     throw new QuestionGenerationError(
-      `template "${template.id}": could only build ${values.length} of ${DISTRACTORS_NEEDED} ` +
-        `distinct plausible distractors for answer ${answer}`,
+      `template "${template.id}" could not build ${DISTRACTORS_NEEDED} distinct plausible ` +
+        `distractors for answer ${answer} (built ${values.length}, ` +
+        `${rejected} candidates rejected) from params {${describeParams(params)}}`,
       'DISTRACTOR_FAILURE',
     );
   }
