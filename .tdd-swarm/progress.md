@@ -399,3 +399,36 @@ Two **Important** findings, both reproduced by execution:
 
 Both are the same class: the module's stated contract is not enforced at its boundaries. Holding
 the amendment until the code review lands so both are handled in one spec-then-test round.
+
+**Ticket T-002: code review round 2 APPROVED** — 26/26 ACs, 7/7 DoD (the failing one now passes),
+0 Critical, 0 Important, 5 Minor.
+
+The reviewer verified the guard placement structurally and then probed **six consumption routes
+the implementer's own four did not cover** — right-hand argument, negated argument, nested call,
+`gcd` of a `gcd`, parenthesised, and `min(a*a, 1)`. All `NON_FINITE_VALUE`. The last is the
+sharpest: `Math.min(Infinity, 1)` is a perfectly finite `1`, and it is still rejected, proving the
+guard sits genuinely upstream of function application.
+
+`MAX_AST_DEPTH` verified by induction — three growth sites, leaves height 1, parens adding neither
+height nor a walk frame — with no bypass across nine shapes, including 64 parens around a
+1024-chain evaluating to exactly 1024.
+
+**The margin is thinner than the implementer measured.** Rather than accept the docblock's
+"4,000–4,688 across three machines", the reviewer lifted the cap in a scratch copy and bisected at
+controlled stack sizes: 18.3× margin at 4 MB (Node default), **3.4× at 1 MB (browser main
+thread), 1.5× at 0.5 MB (constrained worker)**. The docblock's figure is Node-only presented as
+host-general, overstating browser headroom ~2×. Also run-dependent, which argues *for* the fixed
+cap. Not blocking — breaching needs a host under ~0.35 MB, and height 1024 is ~100× taller than
+any plausible template (`floor(a/b)+c` is height 4).
+
+38 realistic template expressions and constraint predicates: **0 regressions**. Extreme-but-finite
+inputs (`1e150*1e150`, `MAX_SAFE_INTEGER`, denormals, `gcd(1e308, 5e-324)`, 308-digit literal,
+200/500-term chains) all evaluate in 0–1 ms — no slow-`gcd` path.
+
+Minor-fix pass dispatched (docblock correction plus four carried Minors — three of which I had
+dropped when forwarding only the Critical/Important findings; my omission).
+
+**T-025 filed to backlog**: convert the three recursive walks to explicit-stack iteration, turning
+AC-26 from "holds with a measured margin" into "holds by construction". Raised by the implementer
+as its own residual concern and confirmed by the reviewer's measurements. Not wave-assigned —
+this is robustness work, not a live defect, and Hermes' stack budget is unmeasured by this run.

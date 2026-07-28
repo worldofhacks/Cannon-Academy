@@ -268,3 +268,9 @@ waves and both deliberate:
 | I-1 | `ONBOARDING_ENEMY_HULL` added to T-004 (AC-12), with T-018 AC-13 pinning the three-volley arithmetic against it. |
 | I-3 | Source-scan ACs in T-002, T-006, T-018, T-021 relabelled as secondary defence behind the ESLint guard, with an orchestrator action for the missing `no-eval` family. |
 | minors | T-008 AC-13 tightened to `[4, 6]` for every observation; T-020 AC-23 (intermediate overkill clamp) and AC-24; T-009 `CHEST_RARITY_ENTRIES` + AC-13; T-022 AC-9 given exact boundary arithmetic; T-005 exports `describeDistractorSources` so three content tickets stop reinventing it; missing edges added (T-015→T-006, T-019→T-005, T-020→T-006, T-018→T-004); module-level `proposed` tags added to T-011 and T-017; T-003's zod DoD line reworded. |
+
+## Backlog — filed during the run, not assigned to a wave
+
+| id | title | status | deps | origin |
+|----|-------|--------|------|--------|
+| T-025 | Replace the expression evaluator's recursive walks with explicit-stack iteration | backlog | T-002 | T-002 code review — `MAX_AST_DEPTH` is a measured margin (1.5× at a 0.5 MB stack), not a guarantee by construction |
