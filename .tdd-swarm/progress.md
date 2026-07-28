@@ -884,3 +884,32 @@ Found real drift and fixed what was fixable:
 - `PLAN.md` states the starting loadout is **two** cannons, twice. **T-029** proposes a third
   (`sub_within_10`) to give K-1 a real choice — **awaiting owner approval**, so PLAN is correct as
   written until that lands.
+
+### Wave 3 COMPLETE — all six review-passed
+
+| ticket | module                     | tests | attempts |
+| ------ | -------------------------- | ----- | -------- |
+| T-005  | `questions/distractors.ts` | 170   | 2        |
+| T-008  | `duel/damage.ts`           | 51    | 2        |
+| T-009  | `economy.ts`               | 22    | 1        |
+| T-010  | `mastery.ts`               | 47    | 1        |
+| T-011  | `placement.ts`             | 123   | 1        |
+| T-012  | `ranks.ts`                 | 40    | 2        |
+
+**Post-review fixes, all through spec → test → code rather than direct patches:**
+
+- **T-008** — non-finite `elapsedMs` **and** `timerMs` rejected from all three entry points. The
+  worst case was `timerMs: Infinity`, which reported the **best possible outcome in every field at
+  once** (quality 1, damage = max, perfectShot true), and `-Infinity`, where the three entry points
+  disagreed. Orchestrator-verified: all five non-finite cases now throw from `resolveShot`,
+  `answerQuality` and `isPerfectShot`, while off-catalog finite timers still evaluate.
+  Also: the crossover comment was false and is now measured per cannon.
+- **T-005** — the failure message now carries the sampled `params`. Verified independently: two
+  different draws of one template, same id and same answer, now produce messages differing exactly
+  where the draw differs.
+- **T-012** — order-independent tier resolution, verified against a shuffled catalog
+  (`0→0, 10→1, 25→2, 50→3, 100→4`).
+
+**Lessons this wave: L-020 through L-028.** Three came from agents catching their own errors —
+a test passing by coincidence, a measurement taken in a state that no longer existed, and a
+mutation matrix silently running the wrong file.

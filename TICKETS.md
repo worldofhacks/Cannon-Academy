@@ -80,7 +80,7 @@ duplication, see below). Evidence: `.tdd-swarm/reports/wave2-integration.md`.
 | id    | title                                                                      | status        | deps                       | branch                      | model    | issue |
 | ----- | -------------------------------------------------------------------------- | ------------- | -------------------------- | --------------------------- | -------- | ----- |
 | T-005 | Distractor construction and plausibility validation                        | review-passed | T-002, T-003, T-004        | `ticket/T-005-distractors`  | capable  | —     |
-| T-008 | Damage model — answer quality, floored roll, perfect shot, volatile recoil | backlog       | T-001, T-003, T-004, T-006 | `ticket/T-008-damage-model` | capable  | —     |
+| T-008 | Damage model — answer quality, floored roll, perfect shot, volatile recoil | review-passed | T-001, T-003, T-004, T-006 | `ticket/T-008-damage-model` | capable  | —     |
 | T-009 | Economy — performance coin payout and seeded chest rarity roll             | review-passed | T-001, T-003, T-004        | `ticket/T-009-economy`      | standard | —     |
 | T-010 | Mastery — dual-rate meters, threshold, and unlock resolution               | review-passed | T-003, T-004, T-006        | `ticket/T-010-mastery`      | standard | —     |
 | T-011 | Grade-band placement — pre-unlocked islands, cannons, starting bot band    | review-passed | T-003, T-004, T-006        | `ticket/T-011-placement`    | cheap    | —     |
