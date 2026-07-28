@@ -42,3 +42,15 @@ Run all at once: `.tdd-swarm/run-repo-gates.sh`
 sub-agent work here. This swarm's scope (`src/engine/**`, `src/content/**`) imports
 none of them by construction — the engine-purity lint guard _enforces_ that, so no
 in-scope code can develop a dependency on an ungateable surface without going red.
+
+## Scratchpad convention (added 2026-07-28, from L-028)
+
+Agents build throwaway reference implementations and mutation harnesses under the session
+scratchpad. **That root is shared across concurrent agent sessions.** A T-008 mutation matrix was
+silently invalidated when a concurrently-running T-005 session wrote `probe.test.ts` into the same
+directory — all 30 mutants reported as surviving, with no error, because the harness was running
+another ticket's test file.
+
+**Every agent must work in a per-ticket subdirectory**, e.g. `scratchpad/t008-probe/`, and must
+delete it before committing. A mutation matrix with a uniform result (all killed or all survived)
+is a harness fault until proven otherwise.

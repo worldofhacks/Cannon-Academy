@@ -604,3 +604,31 @@ change to the thing being measured** — including changes made for a different 
 result appears in a comment or a report, it should be reproducible from what is written down; if
 reproducing it requires state you did not record, it is an anecdote. Corollary of [[L-015]]: a
 measurement without its configuration is an argument wearing a number.
+
+---
+
+## L-028 — A uniform mutation result is reporting on the harness, not the mutants (Phase 4)
+
+**Pattern:** The T-008 Test Agent's first mutation matrix reported **all 30 mutants surviving**.
+Nothing errored. The cause was filesystem collision: the scratchpad root is shared across
+concurrent agent sessions, and another session (T-005) had written its own `probe.test.ts` into it,
+clobbering T-008's. All 30 runs executed a T-005 distractor test against T-008 mutants — and passed,
+because those mutants do not affect distractors.
+
+The tell was the **implausibility of the result**, not any failure signal. A harness that runs the
+wrong file reports success just as confidently as one that runs the right file.
+
+**Why:** mutation testing is this run's primary verification method, and it is verified by nothing
+itself. Its output is a list of pass/fail results, and "everything passed" is indistinguishable
+from "nothing under test was reached." [[L-014]] says prove the mutant is live; this is the same
+failure one level up — prove the _harness_ is live.
+
+**What to do instead:**
+
+- **Namespace scratchpad work per ticket** (`scratchpad/t008-probe/`, never the shared root).
+  Concurrent agents are the norm in this swarm, not the exception.
+- **Treat a uniform matrix as a harness fault until proven otherwise.** All-survived and
+  all-killed are both suspicious; a real mutant set produces a varied kill profile with several
+  mutants killed by exactly one test.
+- **Make the runner fail loudly**: abort a mutant on any build or startup failure with a distinct
+  status rather than counting it as "survived", and print which test file actually ran.
