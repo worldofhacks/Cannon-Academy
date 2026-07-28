@@ -387,3 +387,30 @@ constraint is not deferred, it is discarded.
 artefact freezes first. If **this** one does, the bound must be derived and asserted **now**,
 using the downstream ticket's own stated formula so the two cannot disagree. Deferral is only
 legitimate when the constrained artefact is still editable at the point the constraint arrives.
+
+---
+
+## L-019 — An orchestrator claim about existing artefacts is a claim, not a fact (Phase 2)
+
+**Pattern:** A ticket I wrote stated that the frozen test suite "currently asserts that a
+4-distractor template parses successfully", and on that basis **granted the Test Agent permission
+to edit a frozen test** — normally the most tightly guarded action in the system. The claim was
+false. It came from an integration report that had verified the *behaviour* with an ad-hoc probe
+script, and I transcribed it as if the behaviour were encoded in a test.
+
+The Test Agent grepped every occurrence of the term across all four historical revisions of the
+file, found no such assertion had ever existed, and made a purely additive change instead — 90
+pre-existing assertions untouched.
+
+**Why this is worse than an ordinary mistake:** the false claim came bundled with an
+authorisation. A less careful agent would have gone looking for something to invert, "found" the
+nearest plausible assertion, and damaged a frozen contract with the orchestrator's blessing. The
+guard hook does not help here — the edit was explicitly permitted.
+
+**What to do instead:** Any dispatch asserting that an artefact already contains something —
+especially one that unlocks a normally-forbidden action — must either carry the evidence
+(file:line, the quoted assertion) or instruct the agent to verify the claim before acting and to
+stop if it does not hold. Distinguish "this behaviour was observed" from "this behaviour is
+encoded in a test"; those come from different sources and only one of them is a file you can
+point at. And the narrower rule: **never pair an unverified claim with an authorisation** —
+verify first, then authorise, or make the authorisation conditional on the agent's own check.
