@@ -322,3 +322,24 @@ and **zero test files modified by implementer commits** (verified at commit leve
 
 **Ticket T-002: tests-written**, design review returned 1 Critical + 2 Important; Test Agent
 hardening. See L-013 — the anti-eval guard did not guard.
+
+### Wave 1 test suites — final frozen state
+
+| ticket | tests | ACs | growth | every addition driven by |
+|---|---|---|---|---|
+| T-001 | 41 | 16 | 19 → 27 → 41 | a measured cheat, then a real bug found in code review |
+| T-002 | 296 | 24 | 194 → 229 → 282 → 296 | a measured cheat that survived the previous version |
+| T-003 | 116 | 20 | 85 → 116 | a lazy implementation that passed 85/85 clean |
+
+T-002's Test Agent, after materially changing its reference implementation for AC-24, **rebuilt
+and re-ran all five earlier cheats** rather than assuming they still bite — and found the eager
+`&&`/`||` cheat now correctly trips an AC-24 test as well. Cheat isolation is clean throughout:
+each cheat fails only its own criterion, so the tests discriminate rather than overlap.
+
+T-002 also deliberately left ONE case unpinned (an operand that is both unresolvable and
+wrongly typed — `UNKNOWN_IDENTIFIER` vs `TYPE_MISMATCH` depends on static-pass ordering, and no
+criterion rules on it). Recorded in the suite as a decision, not an oversight. That is review
+finding M-3, still open and non-blocking.
+
+All three suites frozen. `phase=implement` set in every wave-1 worktree, guard verified blocking
+test edits by exit code in each.
