@@ -10,6 +10,9 @@ export type Rng = { readonly state: number };
 
 /** Creates a new `Rng` from an integer seed. */
 export function createRng(seed: number): Rng {
+  if (!Number.isInteger(seed) || seed < -0xffffffff || seed > 0xffffffff) {
+    throw new RangeError('createRng: seed must be a finite integer representable in 32 bits');
+  }
   return { state: seed >>> 0 };
 }
 
@@ -25,7 +28,9 @@ function mulberry32Step(state: number): { readonly value: number; readonly nextS
 /** Draws a float in `[0, 1)`, returning the value and the advanced `Rng`. */
 export function nextFloat(rng: Rng): readonly [number, Rng] {
   const { value, nextState } = mulberry32Step(rng.state);
-  return [value, { state: nextState }];
+  // Normalise to uint32 at the public boundary so `Rng.state` is genuinely the "boxed uint32"
+  // the type doc promises (mod-2^32 arithmetic makes this a no-op on the resulting stream).
+  return [value, { state: nextState >>> 0 }];
 }
 
 /**
@@ -45,13 +50,17 @@ export function nextInt(rng: Rng, min: number, max: number): readonly [number, R
   return [value, nextRng];
 }
 
-/** Reads `arr[index]`, throwing rather than silently propagating `undefined`. */
+/**
+ * Reads `arr[index]`, throwing only when `index` is actually out of bounds. `T` is
+ * unconstrained, so a legal element may itself be `undefined` (e.g. `[undefined, 1, 2]` or a
+ * sparse array) — the guard must check the INDEX, not the retrieved value, or it throws on
+ * data it is contractually required to permute or select from.
+ */
 function requireAt<T>(arr: readonly T[], index: number): T {
-  const value = arr[index];
-  if (value === undefined) {
-    throw new RangeError(`index ${index} out of bounds`);
+  if (index < 0 || index >= arr.length) {
+    throw new RangeError(`index ${index} out of bounds (length ${arr.length})`);
   }
-  return value;
+  return arr[index] as T; // sound: bounds proven immediately above
 }
 
 /**
@@ -96,8 +105,8 @@ export function weightedPick<T>(rng: Rng, entries: readonly WeightedEntry<T>[]):
 
   let total = 0;
   for (const entry of entries) {
-    if (entry.weight < 0) {
-      throw new RangeError('weightedPick: weights must not be negative');
+    if (!Number.isFinite(entry.weight) || entry.weight < 0) {
+      throw new RangeError('weightedPick: weights must be finite and not negative');
     }
     total += entry.weight;
   }
@@ -116,7 +125,10 @@ export function weightedPick<T>(rng: Rng, entries: readonly WeightedEntry<T>[]):
     }
   }
 
-  // Floating-point edge case at the top boundary (target ~= total): fall back to the
-  // last entry, which is guaranteed to exist because `entries` is non-empty.
-  return [requireAt(entries, entries.length - 1).item, nextRng];
+  // Unreachable for any input this function accepts: every weight is finite and
+  // non-negative (checked above), so `total` is finite; `cumulative` sums the same
+  // weights in the same order, so it reaches `total` bit-for-bit on the last entry;
+  // and `nextFloat` returns a value in `[0, 1)`, so `target = f * total < total`
+  // whenever `total > 0`. Reaching this line means an invariant above was violated.
+  throw new Error('weightedPick: internal invariant violated (cumulative never reached total)');
 }
