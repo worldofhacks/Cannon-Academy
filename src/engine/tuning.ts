@@ -52,10 +52,16 @@ const ENEMY_HULL_BY_ISLAND_RAW: Record<IslandId, number> = {
 export const ENEMY_HULL_BY_ISLAND: Readonly<Record<IslandId, number>> = deepFreeze(ENEMY_HULL_BY_ISLAND_RAW);
 
 /**
- * unspecified — PLAN.md's onboarding sloop "politely sinks in three volleys" (AC-12), pinned
+ * unspecified — PLAN.md:75's onboarding sloop "politely sinks in three volleys" (AC-12), pinned
  * against the Swivel Gun's guaranteed floor damage rather than invented as a bare literal.
+ * Window is `[27, 30]`: the ceiling comes from the FLOOR volley (`3 * swivelFloorVolley`, the
+ * same worst-case-correct-answer guarantee used everywhere else); the floor comes from the fact
+ * that a guided tutorial pointing at the correct tap is a Perfect-Shot scenario BY
+ * CONSTRUCTION, not an average one — every volley lands `SWIVEL_DAMAGE_MAX +
+ * PERFECT_SHOT_BONUS_DAMAGE`, so the hull must clear twice that or the sloop sinks in two
+ * volleys, not three (AC-12, corrected after review found the original value did exactly that).
  */
-export const ONBOARDING_ENEMY_HULL = 24;
+export const ONBOARDING_ENEMY_HULL = 28;
 
 // ============================================================================================
 // Damage
