@@ -209,7 +209,7 @@ volatile guns: wrong answer → recoil damage to self
 
 ### 4.4 Content catalogs
 
-`src/content/` holds `cannons.json`, `islands.json`, `crew.json`, `ranks.json`, `templates/<skill>.json` — all typed, all zod-validated in a test that also golden-tests every template (1,000 samples per template: constraints hold, answer expression evaluates, params in range). Content ships in the bundle; **no network call in the play path, ever**. The whole game must be playable in airplane mode except the leaderboard.
+`src/content/` holds `skills.json`, `cannons.json`, `islands.json`, `crew.json`, `ranks.json`, `templates/<skill>.json` — all typed, all zod-validated in a test that also golden-tests every template (1,000 samples per template: constraints hold, answer expression evaluates, params in range). Content ships in the bundle; **no network call in the play path, ever**. The whole game must be playable in airplane mode except the leaderboard.
 
 ## 5. Backend
 

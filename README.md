@@ -12,14 +12,15 @@ Solo build, 5-day timebox. **Day 1 is Tuesday July 28, 2026. Submission is Satur
 
 Planning is complete and adversarially reviewed. Nothing is open; the next action is code.
 
-| Artifact                                           | State                               |
-| -------------------------------------------------- | ----------------------------------- |
-| Concept, name, differentiation                     | Locked (`PLAN.md`)                  |
-| Game design + 5-day schedule                       | Locked (`PLAN.md`)                  |
-| Technical architecture                             | Locked (`ARCHITECTURE.md`)          |
-| UI approach + art pipeline                         | Locked (`ARCHITECTURE.md` §3.6, §7) |
-| Adversarial review (schedule / technical / design) | Complete — findings folded in       |
-| Repo scaffold                                      | **Not started ← you are here**      |
+| Artifact                                           | State                                                 |
+| -------------------------------------------------- | ----------------------------------------------------- |
+| Concept, name, differentiation                     | Locked (`PLAN.md`)                                    |
+| Game design + 5-day schedule                       | Locked (`PLAN.md`)                                    |
+| Technical architecture                             | Locked (`ARCHITECTURE.md`)                            |
+| UI approach + art pipeline                         | Locked (`ARCHITECTURE.md` §3.6, §7)                   |
+| Adversarial review (schedule / technical / design) | Complete — findings folded in                         |
+| Repo scaffold                                      | Complete (Vitest + TS strict + lint gates)            |
+| Engine core (`src/engine/`, `src/content/`)        | **Waves 1–2 merged, wave 3 in review ← you are here** |
 
 ## Documents
 

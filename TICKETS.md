@@ -36,11 +36,11 @@ all repo gates green, **492/492 tests**, `npm audit` clean, manifests unchanged.
 integration probe green. One Minor architecture finding open (distractor count, see below).
 Evidence: `.tdd-swarm/reports/wave1-integration.md`.
 
-| id    | title                                                                   | status | deps | branch                           | model    | issue |
-| ----- | ----------------------------------------------------------------------- | ------ | ---- | -------------------------------- | -------- | ----- |
-| T-001 | Seeded mulberry32 PRNG with pure, state-threaded draw helpers           | done   | —    | `ticket/T-001-seeded-prng`       | standard | —     |
-| T-002 | Safe arithmetic expression and constraint predicate evaluator (no eval) | done   | —    | `ticket/T-002-safe-expr-eval`    | capable  | —     |
-| T-003 | Content zod schemas, id unions, and engine question types               | done   | —    | `ticket/T-003-schemas-and-types` | standard | —     |
+| id    | title                                                                   | status        | deps | branch                           | model    | issue |
+| ----- | ----------------------------------------------------------------------- | ------------- | ---- | -------------------------------- | -------- | ----- |
+| T-001 | Seeded mulberry32 PRNG with pure, state-threaded draw helpers           | review-passed | —    | `ticket/T-001-seeded-prng`       | standard | —     |
+| T-002 | Safe arithmetic expression and constraint predicate evaluator (no eval) | review-passed | —    | `ticket/T-002-safe-expr-eval`    | capable  | —     |
+| T-003 | Content zod schemas, id unions, and engine question types               | review-passed | —    | `ticket/T-003-schemas-and-types` | standard | —     |
 
 > **~~Open Minor finding (owner decision required, T-003).~~ CLOSED by T-026 in wave 2.**
 > `templateSchema` allowed `.min(3)` distractors; ARCHITECTURE.md §4.1 specifies exactly three
@@ -77,14 +77,14 @@ duplication, see below). Evidence: `.tdd-swarm/reports/wave2-integration.md`.
 
 ## Wave 3 — the pure rule modules
 
-| id    | title                                                                      | status  | deps                       | branch                      | model    | issue |
-| ----- | -------------------------------------------------------------------------- | ------- | -------------------------- | --------------------------- | -------- | ----- |
-| T-005 | Distractor construction and plausibility validation                        | backlog | T-002, T-003, T-004        | `ticket/T-005-distractors`  | capable  | —     |
-| T-008 | Damage model — answer quality, floored roll, perfect shot, volatile recoil | backlog | T-001, T-003, T-004, T-006 | `ticket/T-008-damage-model` | capable  | —     |
-| T-009 | Economy — performance coin payout and seeded chest rarity roll             | backlog | T-001, T-003, T-004        | `ticket/T-009-economy`      | standard | —     |
-| T-010 | Mastery — dual-rate meters, threshold, and unlock resolution               | backlog | T-003, T-004, T-006        | `ticket/T-010-mastery`      | standard | —     |
-| T-011 | Grade-band placement — pre-unlocked islands, cannons, starting bot band    | backlog | T-003, T-004, T-006        | `ticket/T-011-placement`    | cheap    | —     |
-| T-012 | Rank ladder — numeric tier from wins, ratcheted so a loss never demotes    | backlog | T-003, T-006               | `ticket/T-012-rank-ladder`  | cheap    | —     |
+| id    | title                                                                      | status        | deps                       | branch                      | model    | issue |
+| ----- | -------------------------------------------------------------------------- | ------------- | -------------------------- | --------------------------- | -------- | ----- |
+| T-005 | Distractor construction and plausibility validation                        | backlog       | T-002, T-003, T-004        | `ticket/T-005-distractors`  | capable  | —     |
+| T-008 | Damage model — answer quality, floored roll, perfect shot, volatile recoil | backlog       | T-001, T-003, T-004, T-006 | `ticket/T-008-damage-model` | capable  | —     |
+| T-009 | Economy — performance coin payout and seeded chest rarity roll             | review-passed | T-001, T-003, T-004        | `ticket/T-009-economy`      | standard | —     |
+| T-010 | Mastery — dual-rate meters, threshold, and unlock resolution               | review-passed | T-003, T-004, T-006        | `ticket/T-010-mastery`      | standard | —     |
+| T-011 | Grade-band placement — pre-unlocked islands, cannons, starting bot band    | backlog       | T-003, T-004, T-006        | `ticket/T-011-placement`    | cheap    | —     |
+| T-012 | Rank ladder — numeric tier from wins, ratcheted so a loss never demotes    | backlog       | T-003, T-006               | `ticket/T-012-rank-ladder`  | cheap    | —     |
 
 ## Wave 4 — generator and duel vocabulary
 

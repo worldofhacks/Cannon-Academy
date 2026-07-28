@@ -830,3 +830,57 @@ crew/ranks being unconsumed matches PLAN.md's day-4 cut line.
 **T-010 and T-011 are told to derive from `SKILL_IDS`/`CANNON_IDS` rather than hardcode counts**,
 because T-029 will add a skill and a cannon. This turns a scheduling risk into better test design
 (L-012: assert the mechanism, not a projection of it).
+
+### Wave 3 — implementation and review
+
+All six implemented; every gate re-run by the orchestrator, one implementation commit each, zero
+non-test commits touching frozen tests (now enforced mechanically by the `frozen-tests-unmodified`
+gate rather than by inspection).
+
+| ticket | module                     | tests | code review                                 | security |
+| ------ | -------------------------- | ----- | ------------------------------------------- | -------- |
+| T-005  | `questions/distractors.ts` | 922   | 1 Important → fixing                        | PASS     |
+| T-008  | `duel/damage.ts`           | 811   | APPROVED, 4 Minor → fixing                  | PASS     |
+| T-009  | `economy.ts`               | 798   | **APPROVED**                                | PASS     |
+| T-010  | `mastery.ts`               | 823   | **APPROVED** (called the cleanest of three) | PASS     |
+| T-011  | `placement.ts`             | 899   | **APPROVED**                                | PASS     |
+| T-012  | `ranks.ts`                 | 816   | 1 Important → fixing                        | PASS     |
+
+**Security: PASS on all six, zero findings at any severity.** Verified by live probe rather than
+argument — including a `node -e` check that `JSON.parse` makes `"__proto__"` an own data property
+that reads back safely, and a proof that `rollDamage` is always an integer inside
+`[damageMin, damageMax]` traced against `nextFloat`'s `[0,1)` range.
+
+**The three findings driving fix rounds:**
+
+- **T-012 — L-020 in production logic.** `rankTierForWins` assumes the `ranks` array is pre-sorted
+  by tier; T-006 guarantees increasing `minWins` only _when sorted_. Reordering the same records by
+  position alone returns the wrong tier. Invisible today because `ranks.json` ships sorted, and the
+  ratchet's `Math.max` would **hide** it — a wrongly-low tier throws nothing, the player just stops
+  being promoted. T-009 defends the identical risk with a mocked-reorder test; same repo, same day.
+- **T-008 — a `NaN` that never throws.** `elapsedMs: NaN` yields `NaN` damage, which becomes a
+  `NaN` hull in T-020: a duel that never ends with nothing to trace. Also: the comment on the
+  module's most load-bearing line is false, and the dead zone is **71% of the answer window on the
+  K-1 starter**, not the ~50% previously believed.
+- **T-005 — an irreproducible failure.** `DISTRACTOR_FAILURE` omits the sampled `params`, so a
+  draw-dependent failure cannot be reproduced from its message.
+
+### Documentation audit (owner-requested, 2026-07-28)
+
+Found real drift and fixed what was fixable:
+
+- `README.md` claimed **"Repo scaffold: Not started ← you are here"** — badly stale at 776 merged
+  tests. Corrected.
+- `ARCHITECTURE.md` §4.4's catalog list omitted `skills.json`, which T-006 ships and §4.1 requires.
+  Flagged by wave-2 integration; now corrected.
+- `TICKETS.md` had **5 status cells** disagreeing with their ticket files. Synced; ticket files are
+  authoritative.
+- This ledger was two rounds behind; caught up above.
+
+**Known-stale and blocked on decisions, not oversight:**
+
+- `ARCHITECTURE.md:202` still says a Perfect Shot grants "+1 bonus ball". **T-031** carries the
+  correction; the ruling (damage is scalar, balls are presentation) is already binding on T-008.
+- `PLAN.md` states the starting loadout is **two** cannons, twice. **T-029** proposes a third
+  (`sub_within_10`) to give K-1 a real choice — **awaiting owner approval**, so PLAN is correct as
+  written until that lands.
