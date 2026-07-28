@@ -530,3 +530,26 @@ prove the suite is satisfiable — **run `tsc --noEmit` against that probe too, 
 That is the only moment before freezing when the test file is typechecked against real types. Add
 it to the Test Agent's verification list: green vitest _and_ clean tsc against the reference, or
 the suite is not ready to freeze.
+
+---
+
+## L-025 — Worktrees go stale on the lessons file too, and dispatches cite it by number (Phase 3)
+
+**Pattern:** The T-005 implementer reported that `LESSONS.md` L-022 "does not exist" — its copy
+ended at L-021. It was right about what it could see. I had appended L-022 and rebased the six
+worktrees **in the same command**, with the rebase running before the commit, so every worktree
+carried a lessons file one entry short.
+
+This is [[L-008]] wearing different clothes. There I checked ticket freshness after creating
+worktrees; I never thought to check the lessons file, because it reads like ambient documentation
+rather than a contract.
+
+**Why it matters:** dispatch briefs cite lessons **by number** — "per L-014, prove the mutant is
+live". A stale lessons file turns a specific instruction into a dangling reference, and an agent
+that follows it either guesses or, as here, correctly stops and asks. The failure is silent from
+the orchestrator's side: the number resolves fine in my copy.
+
+**What to do instead:** treat `LESSONS.md` as a dispatched artefact with the same freshness
+requirement as the ticket. Commit lessons **before** rebasing worktrees, never in the same
+command, and verify the file hash alongside the ticket hash in the pre-dispatch check. If a brief
+cites a lesson number, that number must resolve in the agent's worktree, not only in mine.
