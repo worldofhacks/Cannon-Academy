@@ -190,12 +190,12 @@ const ambientSdk: FirebaseSdk = {
   getStorage,
 };
 
-const ambientClient = (() => {
+const ambientClient = await (async (): Promise<FirebaseClient> => {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- avoids loading Flow syntax in node-only tests.
-    const nativeRuntime = require('react-native') as { Platform: { OS: string } };
-    // eslint-disable-next-line @typescript-eslint/no-require-imports -- native-only dependency is injected in unit tests.
-    const nativeStorage = require('@react-native-async-storage/async-storage') as { default: unknown };
+    const parsed = parseFirebaseConfig(process.env);
+    if (!parsed.enabled) return parsed;
+    const nativeRuntime = await import('react-native');
+    const nativeStorage = await import('@react-native-async-storage/async-storage');
     return createFirebaseClient({
       env: process.env,
       platform:
