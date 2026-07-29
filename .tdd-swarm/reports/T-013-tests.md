@@ -17,6 +17,7 @@ Asserted before any measurement, from an explicit `cd` into the worktree:
 | --- | --- |
 | **Starting** (expected `89dcd0f9…`) | `89dcd0f967db0e9fdc487927fd5e593353e151e313987bcc3563076d7dd9d030` ✅ matches |
 | **Ending** | ``154ebee16c995de53f805bb964316f4c441e362cb2f9a4be945c9397589c5e2d`` |
+| Commit | `74d2c21` (`74d2c2144b794363629fad2abf0c00c7501cab6f`) on `ticket/T-013-duel-types` |
 
 The restored file matched the expected digest exactly, so the aborted rebase cost nothing.
 
