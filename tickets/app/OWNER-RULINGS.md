@@ -115,3 +115,28 @@ implements it under T-029, with the fog decision named explicitly rather than di
 None. `src/services/range.ts` reads `rangeSkills(island)` from the catalog, and `chartNodes` reads
 fog from `resolveUnlocks`. Both follow the content automatically — which is the point of having
 kept them catalog-driven.
+
+## D-8 — A timeout counts against nothing (2026-07-29, ruled in session)
+
+**The question.** `src/stores/duel.ts` counted a burned fuse as `asked + 1` in both the aggregate
+counter and the per-skill tally, never as `correct` — so accuracy fell, and a child who timed out
+often enough could fill the mastery meter and still be refused the cannon. Meanwhile the timeout
+panel said **"Damp powder. The fuse burned out. Nothing lost."** The screen and the tally
+disagreed in front of a child. A-017 documents the three coherent resolutions.
+
+**The ruling.** Resolution 2 — **exclude it**. A timeout counts in neither `asked` nor `correct`,
+in the aggregate and in the per-skill tally. The copy is unchanged and becomes true. The
+pedagogical ground: kindergartners time out because they are five, not because they are wrong,
+and the game's stated rule is that fluency shapes the QUALITY of an action, never PERMISSION to
+act. A reading-speed penalty on unlocks violated that.
+
+**Scope of the ruling — both lanes, one rule.** The same `{correct, asked}` tally shape feeds
+mastery from two places:
+
+- **Duel lane** (`src/stores/duel.ts` `TIMEOUT` case) — app track, implemented under A-017.
+- **Range lane** (`src/engine/drill.ts`, where `choiceIndex: null` is "counted as an incorrect
+  attempt") — engine track, delegated under this ruling. The drill must not charge an expired
+  timer against mastery; whether the drill serves a replacement question is the engine's design
+  call within the ruling.
+
+The lanes must not drift: a timeout is free in both, or the ruling is not implemented.
