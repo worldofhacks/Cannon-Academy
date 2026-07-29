@@ -13,6 +13,7 @@
  */
 import { islands, getIsland } from '@content/index';
 import type { Island } from '@content/schemas';
+import { emptyMastery, isMastered } from '@engine/mastery';
 
 import type { Captain } from '../stores/player';
 
@@ -22,6 +23,8 @@ export interface ChartNode {
   readonly fogged: boolean;
   /** The captain's ship is drawn here. */
   readonly isCurrent: boolean;
+  /** True only after every practice skill taught by this island is mastered. */
+  readonly cleared?: boolean;
 }
 
 /**
@@ -35,11 +38,15 @@ export function chartNodes(captain: Captain): readonly ChartNode[] {
   const unlocked = new Set(captain.unlockedIslands);
   return [...islands]
     .sort((a, b) => a.order - b.order)
-    .map((island) => ({
-      island,
-      fogged: !unlocked.has(island.id),
-      isCurrent: captain.currentIsland === island.id,
-    }));
+    .map((island) => {
+      const fogged = !unlocked.has(island.id);
+      return {
+        island,
+        fogged,
+        isCurrent: captain.currentIsland === island.id,
+        cleared: island.rangeSkills.every((skill) => isMastered(captain.mastery[skill] ?? emptyMastery)),
+      };
+    });
 }
 
 /**

@@ -19,7 +19,7 @@ import { CHOICE_COUNT } from '@engine/tuning';
 
 export interface DrillAnswer {
   readonly templateId: string;
-  /** `null` means the timer expired — counted as an incorrect attempt. */
+  /** `null` means the timer expired — D-8: charges neither mastery attempts nor correct. */
   readonly choiceIndex: number | null;
   readonly correct: boolean;
   readonly elapsedMs: number;
@@ -133,8 +133,9 @@ export function startDrill(input: {
 }
 
 /**
- * Grades one answer against `session.current`, applies full-rate range mastery, records the
- * attempt, and either generates the next question or marks the session complete.
+ * Grades one answer against `session.current`. Real choices apply full-rate range mastery and
+ * advance the session; a timeout (`choiceIndex === null`) is D-8 free — logged only, same question
+ * kept for retry.
  */
 export function answerDrill(
   session: DrillSession,
@@ -148,16 +149,28 @@ export function answerDrill(
   assertValidAnswer(choiceIndex, elapsedMs);
 
   const current = session.current;
-  const correct = choiceIndex !== null && choiceIndex === current.correctIndex;
+
+  // D-8 / T-036: a burned fuse charges nothing and burns no drill slot — retry the same question.
+  if (choiceIndex === null) {
+    return {
+      skillId: session.skillId,
+      rng: session.rng,
+      length: session.length,
+      answered: session.answered,
+      correct: session.correct,
+      recentTemplateIds: session.recentTemplateIds,
+      mastery: copyMastery(session.mastery),
+      current,
+      complete: false,
+      log: [...session.log, { templateId: current.templateId, choiceIndex: null, correct: false, elapsedMs }],
+      templates: session.templates,
+    };
+  }
+
+  const correct = choiceIndex === current.correctIndex;
   const mastery = applyAnswer(session.mastery, 'range', correct);
   const answered = session.answered + 1;
-  const entry: DrillAnswer = {
-    templateId: current.templateId,
-    choiceIndex,
-    correct,
-    elapsedMs,
-  };
-  const log = [...session.log, entry];
+  const log = [...session.log, { templateId: current.templateId, choiceIndex, correct, elapsedMs }];
   // Most-recent-first: newest id at index 0 (T-007 / generateQuestion window contract).
   const recentTemplateIds = [current.templateId, ...session.recentTemplateIds];
 

@@ -115,6 +115,7 @@ Cross-ticket probe green (T-007 × T-013). Evidence: `.tdd-swarm/reports/wave4-i
 | T-032 | Placement grants starter cannons only (D-6)                                    | done   | T-010, T-011                             | `ticket/T-032-placement-unlock-overlap` | standard | D-6; impl `ff66b32`; merge landed; security PASS                                    |
 | T-034 | Narrow template param keys to the expression-identifier grammar                | done   | T-003                                    | `ticket/T-034-param-key-grammar`        | standard | frozen `fcf0e43f…`; impl `9947577`; merge landed; security PASS_WITH_NOTES          |
 | T-035 | Export duel tray capacity (`TRAY_CAPACITY`) in tuning                          | done   | T-004                                    | `ticket/T-035-tray-capacity`            | standard | frozen `b994d1f714e4b150…`; unblocks A-011; T-030 consumes constant                 |
+| T-036 | D-8 — range-drill timeout charges neither asked nor correct                    | done   | T-017                                    | `ticket/T-036-d8-timeout-free`          | standard | supersedes T-017 AC-5; app mirrors under A-017                                      |
 
 ## Wave 6 — golden gate, mercy bot, machine extension
 

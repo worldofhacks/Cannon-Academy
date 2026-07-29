@@ -2056,3 +2056,23 @@ Owner ruling D-7 implemented:
 - **Fog decision named:** early Isla Products fog lift **accepted as harmless** — band-gating still governs served content; predecessor rule unchanged
 - Frozen T-003/T-006/T-008/T-032 pins amended (11 cannons, 8 range guns), not deleted
 - Original third-starter/`sub_within_10` idea deferred
+
+## App demo-readiness epic — Phase 1 correction (2026-07-29)
+
+- Owner approved immediate parallel execution, permanent Firestore `nam5`, Storage
+  `cannon-academy.firebasestorage.app` in `us-central1`, and Blaze billing is active.
+- Functional, Firebase, and documentation gap audits completed. Canonical plan:
+  `tickets/INDEX.md`; active contracts A-025…A-041 plus amended A-010/A-012/A-015.
+- First adversarial plan review returned `CHANGES_REQUIRED`: two competing duel reducers,
+  persisted-profile coupling, undefined atomic chest purchases, starter-path contradiction,
+  incomplete Firebase/privacy evidence, undefined rival loadout, and no rollback.
+- Corrections written before RED dispatch: A-039 makes the engine duel reducer canonical; A-041
+  freezes durable mercy/receipt fields; A-032 defines atomic idempotent duel/store settlement;
+  A-026/A-040 split Auth from private-profile sync; D-9 records starter exceptions; Firebase/EAS
+  provisioning, configured-online release gates, and rollback are explicit.
+- Mechanical plan validation passes: Prettier clean, no same-wave exact file-scope collisions, and
+  no backward app-ticket dependencies. Owner ordered immediate dispatch on the fast model.
+
+**Checkpoint exit still required before Test Agents:** final adversarial verdict clean, exact
+planning snapshot committed, T-036 integrated/verified, and dispatched worktree ticket +
+`.tdd-swarm/LESSONS.md` hashes equal the integration commit.
