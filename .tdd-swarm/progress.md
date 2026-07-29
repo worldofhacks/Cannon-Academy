@@ -1864,3 +1864,9 @@ Frozen hash `a987150c86df4bc8…`. Full suite **1620/1620**.
 
 Worktree `.worktrees/wt-T-017` on `ticket/T-017-range-drill` from `swarm/engine-core` @ current tip.
 Phase `tests`. Publish session API in COORDINATION.md after merge.
+
+### T-017 RED landed (`6451010`)
+
+[T-017 Test Agent](f0837bc4-dbeb-4184-aea3-7da24f170fe3): spec-lint PASS; drill suite RED (missing module); baseline 1620.
+**Adjudication:** `recentTemplateIds` = most-recent-first (T-007). Other ambiguities accepted as suite-pinned.
+Test-design review dispatched.
