@@ -18,7 +18,7 @@
  */
 import type { ShipCosmetics } from '../components/duel/Ship';
 import type { Captain } from '../stores/player';
-import { flagById } from './flags';
+import { DEFAULT_FLAG_ID, flagById } from './flags';
 import { color } from './tokens';
 
 /**
@@ -52,8 +52,10 @@ const HULL_AND_RIGGING = {
  * than to a broken screen.
  */
 export function shipCosmeticsForCaptain(captain: Captain): ShipCosmetics {
+  const flag = flagById(captain.flag);
   return {
     ...HULL_AND_RIGGING,
-    pennant: flagById(captain.flag)?.color ?? DEFAULT_PENNANT,
+    pennant: flag?.color ?? DEFAULT_PENNANT,
+    pennantFlagId: flag?.id ?? DEFAULT_FLAG_ID,
   };
 }
