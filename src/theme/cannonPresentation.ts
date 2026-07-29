@@ -19,7 +19,7 @@ import { color } from './tokens';
 export type Projectile = 'iron' | 'chain' | 'wobble' | 'fire' | 'bolt' | 'tentacle';
 
 /**
- * Arc height. Three shapes cover all ten cannons — the boards' single best-value decision, because
+ * Arc height. Three shapes cover every catalog cannon — the boards' single best-value decision, because
  * it costs one keyframe and makes ten guns feel like ten weapons without touching a damage number.
  * Volatile guns get `high`: long hang-time reads as "anything could happen", which is exactly what
  * their damage band already says.

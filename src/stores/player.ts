@@ -39,6 +39,8 @@ export interface Captain {
   ownedCannons: CannonId[];
   /** The subset that sails with you. A-011 manages this; the duel tray renders it. */
   equippedCannons: CannonId[];
+  /** Owned cannons the captain has inspected on the gun deck — drives the "new" badge (A-011). */
+  seenCannons: CannonId[];
   unlockedIslands: IslandId[];
   rankTier: number;
   wins: number;
@@ -67,6 +69,8 @@ export interface CaptainState {
 
   recordDuelResult: (result: { won: boolean }) => void;
   equipCannons: (ids: readonly CannonId[]) => void;
+  /** Union into `seenCannons` — opening the deck marks what is on it, without replacing prior seen. */
+  markCannonsSeen: (ids: readonly CannonId[]) => void;
   setCurrentIsland: (id: IslandId) => void;
 
   /** Replaces the whole captain — used by rehydration (A-002) and by the dev screen. */
@@ -98,6 +102,7 @@ export function emptyCaptain(): Captain {
     mastery: {},
     ownedCannons: [],
     equippedCannons: [],
+    seenCannons: [],
     unlockedIslands: [],
     rankTier: 0,
     wins: 0,
@@ -204,6 +209,14 @@ export function createCaptainStore(initial?: Captain): CaptainStore {
           // Owning is the precondition for equipping. Filtering here rather than trusting the
           // caller means no screen can equip a gun the captain has not earned.
           equippedCannons: ids.filter((id) => s.captain.ownedCannons.includes(id)),
+        },
+      })),
+
+    markCannonsSeen: (ids) =>
+      set((s) => ({
+        captain: {
+          ...s.captain,
+          seenCannons: [...new Set([...s.captain.seenCannons, ...ids])],
         },
       })),
 
