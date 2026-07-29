@@ -844,6 +844,45 @@ imagination.
 
 ---
 
+## L-036 — A gate closed at severity WARN is a gate that has not been closed (Wave 4, resumption)
+
+**Pattern:** L-032 recorded that `spec-lint` measured only numbered ACs, so Definition-of-Done
+items were unenforced. The fix landed: the gate now harvests DoD checkboxes and looks for tests
+tagged `dod(<id>:<n>)`. On resuming, I ran it against T-013 — the very ticket the lesson was
+written about — and it printed:
+
+```
+  WARN  DoD-1 has no test tagged dod(T-013:1)
+  … nine of nine uncovered …
+== SPEC-LINT PASS ==
+```
+
+**Two independent defects, either one sufficient to make the fix inert.** First, a DoD miss was
+`WARN`, which does not set `FAIL`, so the gate reported PASS with every item uncovered. Second,
+the fourteen assertions already written for T-013 tag by **name** — `dod(T-013:events)`,
+`dod(T-013:rival-shapes)` — while the gate numbers items in file order and looks for
+`dod(T-013:1)`. The two vocabularies could not match, and nothing said so.
+
+**Why:** the fix was verified as _present_ rather than as _effective_ — the same distinction that
+[[L-029]] drew between a guard being in the repo and a guard running. `WARN` is the natural
+severity to reach for when you fear reddening a green baseline, and it converts a gate into a
+comment. The vocabulary mismatch compounds it: even at `FAIL`, tag names the gate cannot parse are
+[[L-026]] again, where a requirement the parser cannot see is not a requirement.
+
+**What to do instead:**
+
+- **Observe the new gate failing on the case that motivated it**, before believing it closed
+  anything. DoD misses now `FAIL`, proven both directions: T-013 exits 1, a grandfathered ticket
+  exits 0.
+- **When a green baseline is the obstacle, grandfather explicitly rather than lowering severity.**
+  Twelve merged tickets are named in `DOD_GRANDFATHERED` and warn only; everything else fails.
+  The list can only shrink, and new tickets are enforced by default — the safe direction.
+- **Check exit codes without a pipe.** My first reading showed `exit=0` for a run that printed
+  `SPEC-LINT RED`, because `cmd | tail` reports `tail`'s status. I nearly recorded a working gate
+  as broken. [[L-027]] in miniature: the measurement described the pipeline, not the thing measured.
+
+---
+
 ## L-035 — Documentation drifts silently, so it needs a regression suite (Phase 5)
 
 **Pattern:** Across this run, documentation drifted six distinguishable ways, and **not one of them

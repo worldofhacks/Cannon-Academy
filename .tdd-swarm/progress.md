@@ -1251,6 +1251,54 @@ this narrows the schema by accident.
    surfaced: T-013's `tsc` must go **75 → 0**, not merely lose its `TS2307`s, and T-007's suite is one
    failing _file_, not one failing assertion.
 
+## Resumed 2026-07-28 evening — amendment round complete, agents not yet re-dispatched
+
+Baseline re-established before touching anything: all local gates PASS, guard proven **37/37** on
+this host. Two concurrent tracks are now live (`COORDINATION.md`); this track stayed inside
+`src/engine/**`, `src/content/**`, `__tests__/**`, `tickets/**`, `.tdd-swarm/**` throughout.
+
+**Tickets amended, each count-verified per L-026.** T-007 **16 → 19** criteria, T-013 **12 → 15**,
+every new one confirmed to parse rather than assumed:
+
+| ticket | amendment                                                                                                                        |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| T-007  | AC-7/AC-11 now demand the error **type and code on every swept seed**, closing the bare-`catch` hole                             |
+| T-007  | AC-12 extended to `skill`, `templateId`, `label`                                                                                 |
+| T-007  | AC-14 rewritten — the old wording was measurably false                                                                           |
+| T-007  | **AC-17** lexicographic param order + answer-first pre-shuffle order (both load-bearing for T-024)                               |
+| T-007  | **AC-18** zero-parameter templates must succeed                                                                                  |
+| T-007  | **AC-19** param keys are identifier-shaped; every declared token substituted                                                     |
+| T-007  | DoD carve-out: `NO_TEMPLATE` cannot name a template id                                                                           |
+| T-013  | AC-2 gains the optional `enemyMaxHull` override; AC-4 reworded to "distinct modulo 2³²"                                          |
+| T-013  | AC-5 gains seed validation — validate and throw, never mask                                                                      |
+| T-013  | **AC-13** per-variant `DuelEvent` payload exactness; **AC-14** `Exact<Readonly<T>, T>` throughout; **AC-15** closed rival shapes |
+
+The drafted AC-15 from the review round was **not** adopted as written — it required `RivalVolley`'s
+"actions" to be ordered, and `RivalVolley` has no such field. Rewritten as a closed-shape criterion.
+
+**Owner rulings applied this round:** narrow the schema to the identifier grammar (now **T-034**,
+wave 5 — it edits merged wave-1 code, so it is a ticket rather than an edit, which is also what the
+guard enforces mid-wave), and make DoD coverage a failing gate for new work while grandfathering the
+twelve merged tickets.
+
+**L-036 — the gate that closed L-032 was itself inert.** It reported `SPEC-LINT PASS` for T-013 with
+all nine DoD items uncovered: misses were `WARN`, and the existing tests tag by name
+(`dod(T-013:events)`) where the gate numbers by file order. Both now fixed and **proven in both
+directions** — T-013 and T-007 exit 1, a grandfathered ticket exits 0.
+
+**Both wave-4 tickets are now legitimately RED** on spec-lint: the new criteria have no citing tests
+and the DoD items are untagged. That is the intended pre-dispatch state, not a regression.
+
+### Still to do on resume
+
+Re-dispatch both Test Agents (resume them — they hold the context) to fix the five live mutants,
+cover AC-17/18/19 and AC-13/14/15, and tag every DoD item `dod(<id>:<n>)` in file order. Then
+re-review cross-model, freeze, and only then implement. The two RED-state facts for implementers
+still stand: T-013's `tsc` must go 75 → 0, and T-007's suite is one failing _file_.
+
+**Blocked on owner, not on me:** T-029 (does K-1 get a third starter cannon) and T-032 (placement
+pre-grants the cannons mastery is meant to award, so a 4–5 player can currently earn zero).
+
 ## Open decision, deferred deliberately
 
 **L-032:** `spec-lint` harvests only numbered `**AC-n**`, so DoD checkboxes and prose requirements are
