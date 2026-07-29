@@ -1536,6 +1536,12 @@ T-013 residuals recorded, not blockers: `startsWith` terminal equivalent on eigh
 - **T-013:** **88** errors all in suite (3×TS2307, 51×TS2322, 34×TS2578). Target: **88 → 0**,
   not merely clearing the three import errors — positive `Exact<>` probes fire in RED.
 
+## T-007 implementation — verified green, pending code review
+
+Implementer DONE (`a358270`). Re-verified: frozen suite still `1a586570…`; commit touches only
+`generator.ts` + implementation report; prettier/eslint/tsc 0; **1310/1310**; spec-lint PASS;
+`run-local-gates` ALL PASS including `frozen-tests-unmodified`.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
