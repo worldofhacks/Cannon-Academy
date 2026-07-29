@@ -2034,3 +2034,7 @@ Child-safety rival: accuracy tracks player − margin inside band; two losses ar
 
 ARCHITECTURE §4.3 corrected: +1 damage + presentation arc. `BASE_BALLS_PER_VOLLEY` reclassified.
 `QUALITY_WEIGHT` bound tightened to >0.6 (value stays 0.7). Frozen `d9a938bbe96cf2af…`.
+
+### T-028 — done (merged) — CHOICE_COUNT single home
+
+`types.ts` imports from `@engine/tuning`. Frozen `76dafbc2a5ea4aa5…`.
