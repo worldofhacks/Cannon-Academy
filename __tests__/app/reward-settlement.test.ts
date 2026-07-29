@@ -6,16 +6,14 @@
  */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { cannons, getCannon } from '../../src/content/index';
-import type { Cannon, CannonId, GradeBand, SkillId } from '../../src/content/schemas';
-import { CANNON_IDS, GRADE_BANDS } from '../../src/content/schemas';
+import { getCannon } from '../../src/content/index';
+import type { Cannon } from '../../src/content/schemas';
+import { CANNON_IDS } from '../../src/content/schemas';
 import { rollChest } from '../../src/engine/economy';
-import { maxGradeForBand, resolvePlacement } from '../../src/engine/placement';
 import { createRng } from '../../src/engine/rng';
 import {
   duelReceiptKey,
   purchaseReceiptKey,
-  type ChestReceipt,
 } from '../../src/contracts/rewards';
 import { hashReceiptKey, missingChestOnlyCannon, rollChestSettlement } from '../../src/services/chestSettlement';
 import {
@@ -26,7 +24,7 @@ import {
 } from '../../src/services/rewardSettlement';
 import { applyDuelOutcome } from '../../src/services/duelRewards';
 import { duelReducer, initialDuelState, type DuelState } from '../../src/stores/duel';
-import { applyCaptainTally, createCaptainStore, type Captain, type CaptainStore } from '../../src/stores/player';
+import { createCaptainStore, type Captain, type CaptainStore } from '../../src/stores/player';
 import { hydrate, persist, type KeyValueStore } from '../../src/services/persistence';
 
 const SWIVEL = getCannon('swivel_gun');
@@ -40,10 +38,6 @@ function findSeed(predicate: (seed: number) => boolean, limit = 200_000): number
 
 function findRareSeed(): number {
   return findSeed((seed) => rollChest(createRng(seed))[0].rarity === 'rare');
-}
-
-function findNonRareSeed(): number {
-  return findSeed((seed) => rollChest(createRng(seed))[0].rarity !== 'rare');
 }
 
 interface Plan {
@@ -83,10 +77,14 @@ const lose = (cannon: Cannon = SWIVEL): Plan => ({
   correctOnTurn: (turn) => turn <= 2,
 });
 
+function canonicalDuelSeed(state: DuelState): number {
+  return parseInt(state.duelId.slice('duel-'.length), 36) >>> 0;
+}
+
 function duelInput(state: DuelState): DuelSettlementInput {
   return {
     duelId: state.duelId,
-    seed: state.rng.state,
+    seed: canonicalDuelSeed(state),
     won: state.phase === 'victory',
     purseCoins: state.coins,
     skillTally: state.skillTally,
@@ -131,7 +129,7 @@ describe('A-032 chest settlement', () => {
     const key = duelReceiptKey(state.duelId);
     expect(committed.rewardReceipts[key]).toBeDefined();
     expect(committed.rewardReceipts[key]?.source).toBe('duel');
-    expect(committed.rewardReceipts[key]?.seed).toBe(state.rng.state);
+    expect(committed.rewardReceipts[key]?.seed).toBe(canonicalDuelSeed(state));
     expect(committed.coins).toBe(before.coins + state.coins + outcome.chestCoins);
     expect(committed.wins).toBe(before.wins + 1);
     expect(committed.mastery).not.toEqual(before.mastery);
@@ -176,7 +174,7 @@ describe('A-032 chest settlement', () => {
     });
 
     const state = playDuel(rareSeed, win());
-    const expected = rollChestSettlement(state.rng.state, store.getState().captain.ownedCannons);
+    const expected = rollChestSettlement(canonicalDuelSeed(state), store.getState().captain.ownedCannons);
     const outcome = settleDuelRewards(store, duelInput(state));
     const receipt = store.getState().captain.rewardReceipts[duelReceiptKey(state.duelId)];
 
@@ -228,10 +226,11 @@ describe('A-032 chest settlement', () => {
     expect(replaceSpy).toHaveBeenCalledTimes(1);
 
     const afterFirst = structuredClone(store.getState().captain);
-    expect(afterFirst.coins).toBe(100 - price);
-    expect(afterFirst.nextPurchaseSequence).toBe(sequence + 1);
     const receipt = afterFirst.rewardReceipts[purchaseReceiptKey(sequence)];
     expect(receipt).toBeDefined();
+    const chestCoins = receipt?.grant.kind === 'coins' ? receipt.grant.amount : 0;
+    expect(afterFirst.coins).toBe(100 - price + chestCoins);
+    expect(afterFirst.nextPurchaseSequence).toBe(sequence + 1);
     expect(receipt?.source).toBe('purchase');
     expect(receipt?.seed).toBe(hashReceiptKey(purchaseReceiptKey(sequence)));
 

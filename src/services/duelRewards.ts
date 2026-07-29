@@ -1,21 +1,22 @@
 /**
  * What a finished duel is worth, applied to the captain exactly once.
  *
- * A-008 / A-039. Projection reads the canonical engine terminal; settlement remains a separate
- * ledgered apply step. This module prices nothing itself.
+ * A-008 / A-039 / A-032. Projection reads the canonical engine terminal; settlement persists
+ * durable chest receipts and applies purse, mastery, win/rank in one replaceCaptain.
  */
 import type { CannonId, IslandId, SkillId } from '@content/schemas';
 import type { DuelState as EngineDuelState } from '@engine/duel/types';
 
 import type { CaptainStore } from '../stores/player';
 import type { DuelState } from '../stores/duel';
+import { settleDuelRewards, canonicalDuelSeed } from './rewardSettlement';
 
 /** Everything the screen needs to announce, plus whether any of it actually happened. */
 export interface DuelRewardOutcome {
   /** False when this duel was already paid for, or has not finished yet. */
   readonly applied: boolean;
   readonly won: boolean;
-  /** Coins actually added to the captain; `0` when not applied. */
+  /** Purse coins actually added to the captain; `0` when not applied. Chest coins are separate. */
   readonly coins: number;
   /** Cannons newly granted BY THIS APPLICATION — a grant the player is never told about is a reward that did not happen. */
   readonly unlockedCannons: readonly CannonId[];
@@ -41,24 +42,6 @@ export type DuelSettlementView = {
   >;
 };
 
-/**
- * Which duels each captain has already been paid for.
- *
- * Scoped PER STORE, not module-global: the question this answers is "has THIS captain been paid
- * for this duel", and a single shared set would rob a second captain of a duel the first was paid
- * for — while quietly making any suite that touches it order-dependent. `WeakMap` so a discarded
- * store takes its ledger with it.
- */
-const settledDuels = new WeakMap<CaptainStore, Set<string>>();
-
-function ledgerFor(store: CaptainStore): Set<string> {
-  const existing = settledDuels.get(store);
-  if (existing !== undefined) return existing;
-  const fresh = new Set<string>();
-  settledDuels.set(store, fresh);
-  return fresh;
-}
-
 /** The outcome for a duel that pays nothing — unfinished, or already settled. */
 function noPayment(won: boolean, rankTier: number): DuelRewardOutcome {
   return {
@@ -70,12 +53,6 @@ function noPayment(won: boolean, rankTier: number): DuelRewardOutcome {
     rankTier,
     rankedUp: false,
   };
-}
-
-/** The ids present in `after` that were not in `before` — this application's own grants. */
-function granted<T>(before: readonly T[], after: readonly T[]): readonly T[] {
-  const already = new Set(before);
-  return after.filter((id) => !already.has(id));
 }
 
 /**
@@ -95,40 +72,30 @@ export function projectDuelRewards(terminal: EngineDuelState): DuelRewardProject
 }
 
 /**
- * Applies a finished duel to the captain: coins, per-skill mastery, the win, and whatever those
- * unlocked. Safe to call on any state at any time — an unfinished duel and an already-settled one
- * both return `applied: false` and change nothing.
+ * Applies a finished duel to the captain: coins, per-skill mastery, the win, and a victory chest
+ * when applicable. Safe to call on any state at any time — an unfinished duel and an
+ * already-settled one both return `applied: false` and change nothing.
  */
 export function applyDuelOutcome(store: CaptainStore, duel: DuelState): DuelRewardOutcome {
   const before = store.getState().captain;
   const won = duel.phase === 'victory';
   if (!won && duel.phase !== 'defeat') return noPayment(false, before.rankTier);
 
-  const ledger = ledgerFor(store);
-  if (ledger.has(duel.duelId)) return noPayment(won, before.rankTier);
-  ledger.add(duel.duelId);
-
-  const actions = store.getState();
-
-  // Mastery first, so the unlocks it triggers are already applied when the delta is read below.
-  for (const [skill, tally] of Object.entries(duel.skillTally)) {
-    if (tally === undefined) continue;
-    actions.recordDuelAnswers(skill as SkillId, tally);
-  }
-
-  // The purse the panel showed — never re-priced here.
-  actions.addCoins(duel.coins);
-
-  actions.recordDuelResult({ won });
-
-  const after = store.getState().captain;
-  return {
-    applied: true,
+  const outcome = settleDuelRewards(store, {
+    duelId: duel.duelId,
+    seed: canonicalDuelSeed(duel.duelId),
     won,
-    coins: after.coins - before.coins,
-    unlockedCannons: granted(before.ownedCannons, after.ownedCannons),
-    unlockedIslands: granted(before.unlockedIslands, after.unlockedIslands),
-    rankTier: after.rankTier,
-    rankedUp: after.rankTier > before.rankTier,
+    purseCoins: duel.coins,
+    skillTally: duel.skillTally,
+  });
+
+  return {
+    applied: outcome.applied,
+    won: outcome.won,
+    coins: outcome.coins,
+    unlockedCannons: outcome.unlockedCannons,
+    unlockedIslands: outcome.unlockedIslands,
+    rankTier: outcome.rankTier,
+    rankedUp: outcome.rankedUp,
   };
 }
