@@ -21,6 +21,22 @@ export default tseslint.config(
   js.configs.recommended,
   ...tseslint.configs.recommended,
 
+  // A leading underscore means "deliberately unused" — the universal convention, which this
+  // config had simply never been told. Without it, a signature that must MATCH an external
+  // shape it does not use cannot be written at all: A-004's frozen test declares
+  // `getAuth(_app)` purely so a wrong implementation reaching for it is detectable, and the
+  // parameter exists to model the real Firebase arity. `no-unused-vars` defaults to
+  // `args: 'after-used'`, so only the trailing one was flagged — which is why this surfaced on
+  // one line of one file rather than everywhere at once.
+  {
+    rules: {
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_', caughtErrorsIgnorePattern: '^_' },
+      ],
+    },
+  },
+
   // Swarm guard hooks are CommonJS Node scripts, not app source. They are still linted —
   // a broken hook fails OPEN and silently stops protecting frozen tests (LESSONS.md L-007) —
   // but they need Node globals and the CommonJS module system.
