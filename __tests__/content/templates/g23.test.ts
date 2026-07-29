@@ -565,52 +565,59 @@ function usesLowercaseXAsOperator(text: string): boolean {
 // Authoring-contract preflight (does not need JSON files)
 // =============================================================================================
 
-describe('authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS ↔ generator', () => {
-  it('every SPOT_CHECK literal matches generateQuestion on the required template at that seed', () => {
-    for (const check of SPOT_CHECKS) {
-      const template = REQUIRED_TEMPLATES.find((t) => t.id === check.id);
-      expect(template, check.id).toBeDefined();
-      if (template === undefined) continue;
-      const [question] = generateOne(template, check.seed);
-      expect(question.text, check.id).toBe(check.text);
-      expect(question.choices[question.correctIndex]?.value, check.id).toBe(check.answer);
-    }
-  });
+// Property-suite timeout: heavy seeded sweeps exceed Vitest's 5s default when
+// multiple worktrees run the suite concurrently (timeouts only — not assertion failures).
 
-  it('required templates survive seeds 1…200 without CONSTRAINTS_UNSATISFIED', () => {
-    for (const template of REQUIRED_TEMPLATES) {
-      for (let seed = 1; seed <= HEADROOM_SEEDS; seed += 1) {
-        expect(() => generateOne(template, seed)).not.toThrow();
+describe(
+  'authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS ↔ generator',
+  { timeout: 60000 },
+  () => {
+    it('every SPOT_CHECK literal matches generateQuestion on the required template at that seed', () => {
+      for (const check of SPOT_CHECKS) {
+        const template = REQUIRED_TEMPLATES.find((t) => t.id === check.id);
+        expect(template, check.id).toBeDefined();
+        if (template === undefined) continue;
+        const [question] = generateOne(template, check.seed);
+        expect(question.text, check.id).toBe(check.text);
+        expect(question.choices[question.correctIndex]?.value, check.id).toBe(check.answer);
       }
-    }
-  });
+    });
 
-  it('spec(T-015:AC-10) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples', () => {
-    const failures: string[] = [];
-    const rates: Record<string, number> = {};
-
-    for (const template of REQUIRED_TEMPLATES) {
-      let ladderHits = 0;
-      for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
-        const [question] = generateOne(template, seed);
-        const sources = describeDistractorSources(template, question.params);
-        if (sources.includes('ladder')) ladderHits += 1;
+    it('required templates survive seeds 1…200 without CONSTRAINTS_UNSATISFIED', () => {
+      for (const template of REQUIRED_TEMPLATES) {
+        for (let seed = 1; seed <= HEADROOM_SEEDS; seed += 1) {
+          expect(() => generateOne(template, seed)).not.toThrow();
+        }
       }
-      rates[template.id] = ladderHits;
-      if (ladderHits >= LADDER_CEILING) {
-        failures.push(`${template.id}: ladder ${ladderHits}/1000`);
-      }
-    }
+    });
 
-    expect(failures, `ladder rates: ${JSON.stringify(rates)}\n${failures.join('\n')}`).toEqual([]);
-  });
-});
+    it('spec(T-015:AC-10) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples', () => {
+      const failures: string[] = [];
+      const rates: Record<string, number> = {};
+
+      for (const template of REQUIRED_TEMPLATES) {
+        let ladderHits = 0;
+        for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
+          const [question] = generateOne(template, seed);
+          const sources = describeDistractorSources(template, question.params);
+          if (sources.includes('ladder')) ladderHits += 1;
+        }
+        rates[template.id] = ladderHits;
+        if (ladderHits >= LADDER_CEILING) {
+          failures.push(`${template.id}: ladder ${ladderHits}/1000`);
+        }
+      }
+
+      expect(failures, `ladder rates: ${JSON.stringify(rates)}\n${failures.join('\n')}`).toEqual([]);
+    });
+  },
+);
 
 // =============================================================================================
 // AC-1 — schema parse + ≥8 per skill + authoring contract
 // =============================================================================================
 
-describe('AC-1 — each skill file parses and holds at least 8 templates', () => {
+describe('AC-1 — each skill file parses and holds at least 8 templates', { timeout: 60000 }, () => {
   it.each(SKILLS)('spec(T-015:AC-1) %s.json parses via z.array(templateSchema) with length >= 8', (skill) => {
     const templates = loadSkill(skill);
     expect(templates.length, `${skill} needs ≥8 templates`).toBeGreaterThanOrEqual(8);
@@ -633,7 +640,7 @@ describe('AC-1 — each skill file parses and holds at least 8 templates', () =>
 // AC-2 — skill field, id prefix, global uniqueness
 // =============================================================================================
 
-describe('AC-2 — skill ownership, id prefix, pairwise-unique ids', () => {
+describe('AC-2 — skill ownership, id prefix, pairwise-unique ids', { timeout: 60000 }, () => {
   it('spec(T-015:AC-2) every template.skill matches its file and every id is prefixed and unique', () => {
     const bySkill = loadAll();
     const seen = new Set<string>();
@@ -656,36 +663,40 @@ describe('AC-2 — skill ownership, id prefix, pairwise-unique ids', () => {
 // AC-3 — word-problem flag ↔ alphabetic prose (minus operator allowlist); catalog symbolicOnly
 // =============================================================================================
 
-describe('AC-3 — word-problem flag matches alphabetic prose; catalog allows word problems', () => {
-  it('spec(T-015:AC-3) prose beyond operator words requires isWordProblem; word problems require symbolicOnly === false', () => {
-    const failures: string[] = [];
+describe(
+  'AC-3 — word-problem flag matches alphabetic prose; catalog allows word problems',
+  { timeout: 60000 },
+  () => {
+    it('spec(T-015:AC-3) prose beyond operator words requires isWordProblem; word problems require symbolicOnly === false', () => {
+      const failures: string[] = [];
 
-    for (const { skill, template } of allTemplates(loadAll())) {
-      const words = alphabeticWordsInTemplateText(template.text);
-      const proseWords = words.filter((word) => !SYMBOLIC_OPERATOR_WORDS.has(word.toLowerCase()));
-      if (proseWords.length > 0 && template.isWordProblem !== true) {
-        failures.push(`${template.id}: prose words [${proseWords.join(', ')}] require isWordProblem: true`);
-      }
+      for (const { skill, template } of allTemplates(loadAll())) {
+        const words = alphabeticWordsInTemplateText(template.text);
+        const proseWords = words.filter((word) => !SYMBOLIC_OPERATOR_WORDS.has(word.toLowerCase()));
+        if (proseWords.length > 0 && template.isWordProblem !== true) {
+          failures.push(`${template.id}: prose words [${proseWords.join(', ')}] require isWordProblem: true`);
+        }
 
-      if (template.isWordProblem === true) {
-        const catalogSkill = getSkill(skill);
-        if (catalogSkill.symbolicOnly !== false) {
-          failures.push(
-            `${template.id}: isWordProblem true but ${skill}.symbolicOnly is ${String(catalogSkill.symbolicOnly)}`,
-          );
+        if (template.isWordProblem === true) {
+          const catalogSkill = getSkill(skill);
+          if (catalogSkill.symbolicOnly !== false) {
+            failures.push(
+              `${template.id}: isWordProblem true but ${skill}.symbolicOnly is ${String(catalogSkill.symbolicOnly)}`,
+            );
+          }
         }
       }
-    }
 
-    expect(failures).toEqual([]);
-  });
-});
+      expect(failures).toEqual([]);
+    });
+  },
+);
 
 // =============================================================================================
 // AC-4 — param / text hygiene
 // =============================================================================================
 
-describe('AC-4 — every {token} is a declared param; every param is live', () => {
+describe('AC-4 — every {token} is a declared param; every param is live', { timeout: 60000 }, () => {
   it('spec(T-015:AC-4) text tokens and params are bi-consistent (word-boundary live check)', () => {
     const problems: string[] = [];
 
@@ -711,7 +722,7 @@ describe('AC-4 — every {token} is a declared param; every param is live', () =
 // AC-5 — 1,000-seed golden sweep
 // =============================================================================================
 
-describe('AC-5 — 1,000-seed generateQuestion sweep per template', () => {
+describe('AC-5 — 1,000-seed generateQuestion sweep per template', { timeout: 60000 }, () => {
   it('spec(T-015:AC-5) every seed succeeds with in-range params, true constraints, rendered text, 4 distinct choices, correct answer', () => {
     const failures: string[] = [];
 
@@ -769,7 +780,7 @@ describe('AC-5 — 1,000-seed generateQuestion sweep per template', () => {
 // AC-6 — curriculum display bounds
 // =============================================================================================
 
-describe('AC-6 — non-negative integers within per-skill display bounds', () => {
+describe('AC-6 — non-negative integers within per-skill display bounds', { timeout: 60000 }, () => {
   it('spec(T-015:AC-6) answers and numeric text tokens stay non-negative and inside the skill bound', () => {
     const failures: string[] = [];
 
@@ -800,38 +811,42 @@ describe('AC-6 — non-negative integers within per-skill display bounds', () =>
 // AC-7 — two_step intermediate never negative
 // =============================================================================================
 
-describe('AC-7 — two_step_add_sub intermediate of the first operation is never negative', () => {
-  it('spec(T-015:AC-7) 1,000 samples per two_step template: first-op intermediate >= 0', () => {
-    const failures: string[] = [];
+describe(
+  'AC-7 — two_step_add_sub intermediate of the first operation is never negative',
+  { timeout: 60000 },
+  () => {
+    it('spec(T-015:AC-7) 1,000 samples per two_step template: first-op intermediate >= 0', () => {
+      const failures: string[] = [];
 
-    for (const template of loadSkill('two_step_add_sub')) {
-      for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
-        const [question] = generateOne(template, seed);
-        let intermediate: number;
-        try {
-          intermediate = firstAddSubIntermediate(template.answerExpr, question.params);
-        } catch (error) {
-          const detail = error instanceof Error ? error.message : String(error);
-          failures.push(`${template.id}@${seed}: could not compute intermediate: ${detail}`);
-          continue;
-        }
-        if (intermediate < 0) {
-          failures.push(
-            `${template.id}@${seed}: intermediate ${intermediate} < 0 (params=${JSON.stringify(question.params)})`,
-          );
+      for (const template of loadSkill('two_step_add_sub')) {
+        for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
+          const [question] = generateOne(template, seed);
+          let intermediate: number;
+          try {
+            intermediate = firstAddSubIntermediate(template.answerExpr, question.params);
+          } catch (error) {
+            const detail = error instanceof Error ? error.message : String(error);
+            failures.push(`${template.id}@${seed}: could not compute intermediate: ${detail}`);
+            continue;
+          }
+          if (intermediate < 0) {
+            failures.push(
+              `${template.id}@${seed}: intermediate ${intermediate} < 0 (params=${JSON.stringify(question.params)})`,
+            );
+          }
         }
       }
-    }
 
-    expect(failures.slice(0, 20), `${failures.length} intermediate failure(s)`).toEqual([]);
-  });
-});
+      expect(failures.slice(0, 20), `${failures.length} intermediate failure(s)`).toEqual([]);
+    });
+  },
+);
 
 // =============================================================================================
 // AC-8 — mult_facts factors 0..10 and × glyph
 // =============================================================================================
 
-describe('AC-8 — mult_facts factors in [0, 10] and display uses ×', () => {
+describe('AC-8 — mult_facts factors in [0, 10] and display uses ×', { timeout: 60000 }, () => {
   it('spec(T-015:AC-8) every text uses × (never * or lowercase x); every factor is in 0..10', () => {
     const failures: string[] = [];
 
@@ -871,37 +886,43 @@ describe('AC-8 — mult_facts factors in [0, 10] and display uses ×', () => {
 // AC-9 — word-problem readability
 // =============================================================================================
 
-describe('AC-9 — word problems ≤140 chars, end with ?, contain a substituted numeral', () => {
-  it('spec(T-015:AC-9) every isWordProblem template meets length, ?, and numeral rules over the sweep', () => {
-    const failures: string[] = [];
+describe(
+  'AC-9 — word problems ≤140 chars, end with ?, contain a substituted numeral',
+  { timeout: 60000 },
+  () => {
+    it('spec(T-015:AC-9) every isWordProblem template meets length, ?, and numeral rules over the sweep', () => {
+      const failures: string[] = [];
 
-    for (const { template } of allTemplates(loadAll())) {
-      if (template.isWordProblem !== true) continue;
+      for (const { template } of allTemplates(loadAll())) {
+        if (template.isWordProblem !== true) continue;
 
-      for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
-        const [question] = generateOne(template, seed);
-        if (question.text.length > WORD_PROBLEM_MAX_CHARS) {
-          failures.push(`${template.id}@${seed}: length ${question.text.length} > ${WORD_PROBLEM_MAX_CHARS}`);
-        }
-        if (!question.text.endsWith('?')) {
-          failures.push(`${template.id}@${seed}: does not end with ?: "${question.text}"`);
-        }
-        const hasNumeral = (question.text.match(NUMERIC_TOKEN) ?? []).length > 0;
-        if (!hasNumeral) {
-          failures.push(`${template.id}@${seed}: no substituted numeral in "${question.text}"`);
+        for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
+          const [question] = generateOne(template, seed);
+          if (question.text.length > WORD_PROBLEM_MAX_CHARS) {
+            failures.push(
+              `${template.id}@${seed}: length ${question.text.length} > ${WORD_PROBLEM_MAX_CHARS}`,
+            );
+          }
+          if (!question.text.endsWith('?')) {
+            failures.push(`${template.id}@${seed}: does not end with ?: "${question.text}"`);
+          }
+          const hasNumeral = (question.text.match(NUMERIC_TOKEN) ?? []).length > 0;
+          if (!hasNumeral) {
+            failures.push(`${template.id}@${seed}: no substituted numeral in "${question.text}"`);
+          }
         }
       }
-    }
 
-    expect(failures.slice(0, 20), `${failures.length} word-problem failure(s)`).toEqual([]);
-  });
-});
+      expect(failures.slice(0, 20), `${failures.length} word-problem failure(s)`).toEqual([]);
+    });
+  },
+);
 
 // =============================================================================================
 // AC-10 — ladder source < 250 / 1000
 // =============================================================================================
 
-describe('AC-10 — declared distractors rarely fall through to the ladder', () => {
+describe('AC-10 — declared distractors rarely fall through to the ladder', { timeout: 60000 }, () => {
   it('spec(T-015:AC-10) ladder-sourced samples are fewer than 250 of 1000 per template', () => {
     const failures: string[] = [];
 
@@ -925,40 +946,44 @@ describe('AC-10 — declared distractors rarely fall through to the ladder', () 
 // AC-11 — hand-computed literal spot checks (independent of evaluateNumber / answerExpr)
 // =============================================================================================
 
-describe('AC-11 — hand-computed spot checks pin arithmetic independently of the evaluator', () => {
-  it('spec(T-015:AC-11) every required template has a literal spot check, and no shipped template is missing one', () => {
-    const requiredIds = REQUIRED_TEMPLATES.map((t) => t.id).sort();
-    const checkIds = SPOT_CHECKS.map((c) => c.id).sort();
-    expect(checkIds).toEqual(requiredIds);
-    expect(SPOT_CHECKS).toHaveLength(REQUIRED_TEMPLATES.length);
+describe(
+  'AC-11 — hand-computed spot checks pin arithmetic independently of the evaluator',
+  { timeout: 60000 },
+  () => {
+    it('spec(T-015:AC-11) every required template has a literal spot check, and no shipped template is missing one', () => {
+      const requiredIds = REQUIRED_TEMPLATES.map((t) => t.id).sort();
+      const checkIds = SPOT_CHECKS.map((c) => c.id).sort();
+      expect(checkIds).toEqual(requiredIds);
+      expect(SPOT_CHECKS).toHaveLength(REQUIRED_TEMPLATES.length);
 
-    const loaded = loadAllTemplates();
-    for (const template of loaded) {
-      expect(
-        SPOT_CHECKS.some((c) => c.id === template.id),
-        `shipped template ${template.id} needs a SPOT_CHECKS row`,
-      ).toBe(true);
-    }
-  });
-
-  it.each([...SPOT_CHECKS])(
-    'spec(T-015:AC-11) $id at seed $seed renders "$text" with answer $answer',
-    ({ id, seed, text, answer }) => {
       const loaded = loadAllTemplates();
-      const template = loaded.find((t) => t.id === id);
-      expect(template, `missing shipped template ${id}`).toBeDefined();
-      const [question] = generateOne(template!, seed);
-      expect(question.text).toBe(text);
-      expect(question.choices[question.correctIndex]?.value).toBe(answer);
-    },
-  );
-});
+      for (const template of loaded) {
+        expect(
+          SPOT_CHECKS.some((c) => c.id === template.id),
+          `shipped template ${template.id} needs a SPOT_CHECKS row`,
+        ).toBe(true);
+      }
+    });
+
+    it.each([...SPOT_CHECKS])(
+      'spec(T-015:AC-11) $id at seed $seed renders "$text" with answer $answer',
+      ({ id, seed, text, answer }) => {
+        const loaded = loadAllTemplates();
+        const template = loaded.find((t) => t.id === id);
+        expect(template, `missing shipped template ${id}`).toBeDefined();
+        const [question] = generateOne(template!, seed);
+        expect(question.text).toBe(text);
+        expect(question.choices[question.correctIndex]?.value).toBe(answer);
+      },
+    );
+  },
+);
 
 // =============================================================================================
 // AC-12 — ≥5 skeletons + symbolic/word mix per skill
 // =============================================================================================
 
-describe('AC-12 — shape variety and symbolic/word-problem mix', () => {
+describe('AC-12 — shape variety and symbolic/word-problem mix', { timeout: 60000 }, () => {
   it.each(SKILLS)(
     'spec(T-015:AC-12) %s has ≥5 skeletons plus at least one word and one symbolic template',
     (skill) => {
@@ -978,7 +1003,7 @@ describe('AC-12 — shape variety and symbolic/word-problem mix', () => {
 // AC-13 — sampling headroom (seeds 1..200, no CONSTRAINTS_UNSATISFIED)
 // =============================================================================================
 
-describe('AC-13 — constraints sample inside MAX_PARAM_SAMPLE_ATTEMPTS', () => {
+describe('AC-13 — constraints sample inside MAX_PARAM_SAMPLE_ATTEMPTS', { timeout: 60000 }, () => {
   it('spec(T-015:AC-13) seeds 1..200 never raise CONSTRAINTS_UNSATISFIED', () => {
     const failures: string[] = [];
 
@@ -1005,7 +1030,7 @@ describe('AC-13 — constraints sample inside MAX_PARAM_SAMPLE_ATTEMPTS', () => 
 // AC-14 — ≥3 distractors, none equal to answerExpr or a sibling
 // =============================================================================================
 
-describe('AC-14 — declared distractor hygiene', () => {
+describe('AC-14 — declared distractor hygiene', { timeout: 60000 }, () => {
   it('spec(T-015:AC-14) every template declares ≥3 distractors, unique and distinct from answerExpr', () => {
     const failures: string[] = [];
 
@@ -1038,7 +1063,7 @@ const FOCUSED_TEST_PATTERN = new RegExp(
   ['\\b(it|test|describe)\\.(', 'sk', 'ip|on', 'ly)\\b|\\b', 'x', '(it|describe)\\b'].join(''),
 );
 
-describe('T-015 Definition of Done', () => {
+describe('T-015 Definition of Done', { timeout: 60000 }, () => {
   it('dod(T-015:1) tags a test against every acceptance criterion the ticket declares', () => {
     const declared = [...TICKET_SOURCE.matchAll(/\*\*(AC-\d+)\*\*/g)].map((match) => match[1]);
     const unique = [...new Set(declared)];

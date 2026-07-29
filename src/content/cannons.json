@@ -10,7 +10,9 @@
     "timerMs": 20000,
     "minGrade": 0,
     "maxGrade": 1,
-    "unlock": { "kind": "starter" }
+    "unlock": {
+      "kind": "starter"
+    }
   },
   {
     "id": "culverin",
@@ -23,7 +25,26 @@
     "timerMs": 20000,
     "minGrade": 0,
     "maxGrade": 1,
-    "unlock": { "kind": "starter" }
+    "unlock": {
+      "kind": "starter"
+    }
+  },
+  {
+    "id": "saker",
+    "displayName": "Saker",
+    "skill": "add_within_10",
+    "damageMin": 9,
+    "damageMax": 13,
+    "temperament": "standard",
+    "recoilDamage": 0,
+    "timerMs": 20000,
+    "minGrade": 0,
+    "maxGrade": 1,
+    "unlock": {
+      "kind": "range",
+      "island": "port_sumwich",
+      "tier": 1
+    }
   },
   {
     "id": "six_pounder",
@@ -36,7 +57,11 @@
     "timerMs": 15000,
     "minGrade": 1,
     "maxGrade": 2,
-    "unlock": { "kind": "range", "island": "port_sumwich", "tier": 1 }
+    "unlock": {
+      "kind": "range",
+      "island": "port_sumwich",
+      "tier": 1
+    }
   },
   {
     "id": "chain_shot",
@@ -49,7 +74,11 @@
     "timerMs": 15000,
     "minGrade": 1,
     "maxGrade": 2,
-    "unlock": { "kind": "range", "island": "port_sumwich", "tier": 1 }
+    "unlock": {
+      "kind": "range",
+      "island": "port_sumwich",
+      "tier": 1
+    }
   },
   {
     "id": "nine_pounder",
@@ -62,7 +91,9 @@
     "timerMs": 15000,
     "minGrade": 2,
     "maxGrade": 2,
-    "unlock": { "kind": "chest" }
+    "unlock": {
+      "kind": "chest"
+    }
   },
   {
     "id": "twelve_pounder",
@@ -75,7 +106,11 @@
     "timerMs": 12000,
     "minGrade": 3,
     "maxGrade": 3,
-    "unlock": { "kind": "range", "island": "isla_products", "tier": 1 }
+    "unlock": {
+      "kind": "range",
+      "island": "isla_products",
+      "tier": 1
+    }
   },
   {
     "id": "mortar",
@@ -88,7 +123,11 @@
     "timerMs": 12000,
     "minGrade": 3,
     "maxGrade": 4,
-    "unlock": { "kind": "range", "island": "quotient_cove", "tier": 1 }
+    "unlock": {
+      "kind": "range",
+      "island": "quotient_cove",
+      "tier": 1
+    }
   },
   {
     "id": "double_broadside",
@@ -101,7 +140,11 @@
     "timerMs": 15000,
     "minGrade": 2,
     "maxGrade": 3,
-    "unlock": { "kind": "range", "island": "port_sumwich", "tier": 2 }
+    "unlock": {
+      "kind": "range",
+      "island": "port_sumwich",
+      "tier": 2
+    }
   },
   {
     "id": "powder_keg",
@@ -114,7 +157,11 @@
     "timerMs": 18000,
     "minGrade": 4,
     "maxGrade": 5,
-    "unlock": { "kind": "range", "island": "fraction_reef", "tier": 1 }
+    "unlock": {
+      "kind": "range",
+      "island": "fraction_reef",
+      "tier": 1
+    }
   },
   {
     "id": "long_nine",
@@ -127,6 +174,10 @@
     "timerMs": 20000,
     "minGrade": 5,
     "maxGrade": 5,
-    "unlock": { "kind": "range", "island": "grandline", "tier": 1 }
+    "unlock": {
+      "kind": "range",
+      "island": "grandline",
+      "tier": 1
+    }
   }
 ]

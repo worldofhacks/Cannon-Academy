@@ -1,3 +1,6 @@
+import { fileURLToPath } from 'node:url';
+import { dirname, join, sep } from 'node:path';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import * as tuningNamespace from '@engine/tuning';
 import {
@@ -404,6 +407,19 @@ describe('T-004 tuning — damage constants', () => {
     expect(QUALITY_WEIGHT).toBeLessThanOrEqual(1);
   });
 
+  // spec(T-031:AC-6) / spec(T-031:AC-7) — measured effect-size floor (ceil-aware), value unchanged
+  it('spec(T-031:AC-6) keeps QUALITY_WEIGHT strictly above the measured 0.6 floor (not the unsound 7/12)', () => {
+    // The closed-form >7/12 omitted ceil in lower = min(ceil(lowerRaw), damageMax); measured
+    // against T-008 AC-16 the real threshold is W > 0.6. Shipped value stays 0.7 (AC-7).
+    expect(QUALITY_WEIGHT).toBeGreaterThan(0.6);
+    expect(QUALITY_WEIGHT).toBe(0.7);
+  });
+
+  // spec(T-031:AC-3)
+  it('spec(T-031:AC-3) leaves PERFECT_SHOT_BONUS_DAMAGE at 1 — semantics fix, not a retune', () => {
+    expect(PERFECT_SHOT_BONUS_DAMAGE).toBe(1);
+  });
+
   // spec(T-004:AC-3)
   it('makes answer speed a PERCEPTIBLE effect, not merely a positive one', () => {
     // [L-006] AC-3's `0 < w <= 1` is passed by `w = 0.001`, which makes "answer speed aims
@@ -471,7 +487,7 @@ describe('T-004 tuning — damage constants', () => {
 
   // spec(T-004:AC-3)
   it('makes PERFECT_SHOT_BONUS_DAMAGE an integer of at least one', () => {
-    // ARCHITECTURE.md §4.3: a Perfect Shot is "+1 bonus ball". A bonus of 0 would make the
+    // ARCHITECTURE.md §4.3 (T-031): Perfect Shot is +1 damage. A bonus of 0 would make the
     // Perfect Shot a purely cosmetic event, which is the laziest value AC-3's `>= 1` excludes.
     expect(Number.isInteger(PERFECT_SHOT_BONUS_DAMAGE)).toBe(true);
     expect(PERFECT_SHOT_BONUS_DAMAGE).toBeGreaterThanOrEqual(1);
@@ -1284,5 +1300,92 @@ describe('T-004 tuning — numeric sanity across the whole surface', () => {
         expect(Object.isFrozen(value), `array export ${name} must be frozen`).toBe(true);
       }
     }
+  });
+});
+
+// =======================================================================================
+// T-031 — Perfect Shot semantics (doc + classification; no behaviour change)
+// =======================================================================================
+describe('T-031 Perfect Shot semantics', () => {
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const REPO_ROOT = join(HERE, '../..');
+  const ARCH = readFileSync(join(REPO_ROOT, 'ARCHITECTURE.md'), 'utf8');
+  const TUNING_SRC = readFileSync(join(REPO_ROOT, 'src/engine/tuning.ts'), 'utf8');
+
+  // spec(T-031:AC-1)
+  it('spec(T-031:AC-1) ARCHITECTURE §4.3 does not claim a Perfect Shot adds a damage-carrying ball', () => {
+    expect(ARCH).not.toMatch(/\+1 bonus ball/);
+    expect(ARCH).toMatch(/\+1 damage/);
+    expect(ARCH.toLowerCase()).toMatch(/presentation/);
+  });
+
+  // spec(T-031:AC-2)
+  it('spec(T-031:AC-2) BASE_BALLS_PER_VOLLEY is documented as a presentation constant', () => {
+    const idx = TUNING_SRC.indexOf('export const BASE_BALLS_PER_VOLLEY');
+    const block = TUNING_SRC.slice(Math.max(0, idx - 450), idx + 40);
+    expect(block.toLowerCase()).toMatch(/presentation/);
+  });
+
+  // spec(T-031:AC-4)
+  it('spec(T-031:AC-4) full suite contract — Perfect Shot semantics leave behaviour pins unchanged', () => {
+    // Behaviour is pinned by existing T-004/T-008 suites; this ticket only retargets docs + bound.
+    expect(PERFECT_SHOT_BONUS_DAMAGE).toBe(1);
+    expect(QUALITY_WEIGHT).toBe(0.7);
+    expect(BASE_BALLS_PER_VOLLEY).toBeGreaterThanOrEqual(1);
+  });
+
+  // spec(T-031:AC-8)
+  it('spec(T-031:AC-8) tightened QUALITY_WEIGHT floor is consistent with T-008 AC-16 effect size', () => {
+    // Verified against the same closed-form mean gap T-004 already checks for wide-range cannons.
+    for (const cannon of WIDE_RANGE_CANNONS) {
+      const range = cannon.damageMax - cannon.damageMin;
+      const atFullSpeed = meanRollDamage(cannon.damageMin, cannon.damageMax, 1);
+      const atFloor = meanRollDamage(cannon.damageMin, cannon.damageMax, ANSWER_QUALITY_FLOOR);
+      expect(atFullSpeed - atFloor).toBeGreaterThanOrEqual(0.1 * range);
+    }
+  });
+
+  // spec(T-031:AC-5)
+  it('spec(T-031:AC-5) only duel/damage.ts (ballCount) reads BASE_BALLS_PER_VOLLEY outside tuning', () => {
+    const engineRoot = join(REPO_ROOT, 'src/engine');
+    const hits: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if (!name.endsWith('.ts') || name === 'tuning.ts') continue;
+        const text = readFileSync(path, 'utf8');
+        if (text.includes('BASE_BALLS_PER_VOLLEY') && !path.endsWith(`${sep}duel${sep}damage.ts`)) {
+          hits.push(path);
+        }
+      }
+    };
+    walk(engineRoot);
+    expect(hits).toEqual([]);
+    const damage = readFileSync(join(engineRoot, 'duel/damage.ts'), 'utf8');
+    expect(damage).toMatch(/PRESENTATION|presentation/);
+  });
+
+  it('dod(T-031:1) ARCHITECTURE §4.3 Perfect Shot wording is corrected', () => {
+    expect(ARCH).toMatch(/\+1 damage/);
+    expect(ARCH).not.toMatch(/\+1 bonus ball/);
+  });
+
+  it('dod(T-031:2) BASE_BALLS_PER_VOLLEY carries an in-code presentation classification', () => {
+    expect(TUNING_SRC.toLowerCase()).toMatch(/presentation constant/);
+  });
+
+  it('dod(T-031:3) no behaviour retune — bonus damage and QUALITY_WEIGHT values unchanged', () => {
+    expect(PERFECT_SHOT_BONUS_DAMAGE).toBe(1);
+    expect(QUALITY_WEIGHT).toBe(0.7);
+  });
+
+  it('dod(T-031:4) T-008 brief records the +1 damage ruling', () => {
+    const brief = readFileSync(join(REPO_ROOT, 'tickets/T-008.md'), 'utf8');
+    expect(brief).toMatch(/T-031/);
+    expect(brief.toLowerCase()).toMatch(/\+1 damage/);
   });
 });

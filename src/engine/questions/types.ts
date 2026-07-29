@@ -3,10 +3,11 @@
  * generator), not authored — so there is no zod schema here, only the types and the runtime
  * guard (`assertQuestion`) that T-007 calls after building a candidate question.
  *
- * This file imports only types from `@content/schemas` (`import type`) so it never pulls zod
- * into the engine's own module graph, per the ticket's Definition of Done.
+ * Content imports stay `import type` from `@content/schemas` (no zod in the engine graph).
+ * `CHOICE_COUNT` is the single tuning export (T-028) — not a second local literal.
  */
 import type { SkillId } from '@content/schemas';
+import { CHOICE_COUNT } from '@engine/tuning';
 
 /** One of the four tappable answers rendered for a question. */
 export interface Choice {
@@ -39,9 +40,6 @@ export class QuestionGenerationError extends Error {
     this.code = code;
   }
 }
-
-/** Every generated question renders exactly this many choices. */
-const CHOICE_COUNT = 4;
 
 /**
  * Guards the invariants a `Question` must hold before it reaches the UI: exactly

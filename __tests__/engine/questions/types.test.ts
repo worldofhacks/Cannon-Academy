@@ -1,3 +1,6 @@
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 /**
  * T-003 — `src/engine/questions/types.ts`: the produced `Question` / `Choice` shapes, the
  * `assertQuestion` guard, and the typed `QuestionGenerationError`.
@@ -11,6 +14,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { QuestionGenerationError, assertQuestion } from '@engine/questions/types';
+import { CHOICE_COUNT } from '@engine/tuning';
 import type { Choice, Question, QuestionGenerationCode } from '@engine/questions/types';
 import type { SkillId } from '@content/schemas';
 
@@ -311,5 +315,88 @@ describe('Choice', () => {
     const everyFieldIsReadonly: Exact<Readonly<Choice>, Choice> = true;
 
     expect(everyFieldIsReadonly).toBe(true);
+  });
+});
+
+// --- T-028: CHOICE_COUNT single home -------------------------------------------------------
+
+describe('T-028 CHOICE_COUNT single home', () => {
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const REPO_ROOT = join(HERE, '../../..');
+  const TYPES_SRC = readFileSync(join(REPO_ROOT, 'src/engine/questions/types.ts'), 'utf8');
+
+  function declarationsInSrc(): string[] {
+    const root = join(REPO_ROOT, 'src');
+    const hits: string[] = [];
+    const walk = (dir: string) => {
+      for (const name of readdirSync(dir)) {
+        const path = join(dir, name);
+        if (statSync(path).isDirectory()) {
+          walk(path);
+          continue;
+        }
+        if (!name.endsWith('.ts')) continue;
+        const text = readFileSync(path, 'utf8');
+        for (const line of text.split('\n')) {
+          if (/^\s*(export\s+)?const\s+CHOICE_COUNT\b/.test(line)) {
+            hits.push(`${path}:${line.trim()}`);
+          }
+        }
+      }
+    };
+    walk(root);
+    return hits;
+  }
+
+  // spec(T-028:AC-1)
+  it('spec(T-028:AC-1) exactly one CHOICE_COUNT declaration exists under src/', () => {
+    const hits = declarationsInSrc();
+    expect(hits).toHaveLength(1);
+    expect(hits[0]).toContain('src/engine/tuning.ts');
+  });
+
+  // spec(T-028:AC-2)
+  it('spec(T-028:AC-2) assertQuestion reads CHOICE_COUNT from @engine/tuning', () => {
+    expect(TYPES_SRC).toMatch(/import\s*\{[^}]*CHOICE_COUNT[^}]*\}\s*from\s*'@engine\/tuning'/);
+    expect(TYPES_SRC).not.toMatch(/^const CHOICE_COUNT\s*=/m);
+    expect(TYPES_SRC).not.toMatch(/^export const CHOICE_COUNT\s*=/m);
+  });
+
+  // spec(T-028:AC-3)
+  it('spec(T-028:AC-3) assertQuestion accepts CHOICE_COUNT choices and rejects ±1', () => {
+    const exact = Array.from({ length: CHOICE_COUNT }, (_, i) => ({
+      value: i,
+      label: String(i),
+    }));
+    expect(() => assertQuestion(questionWith(exact, 0))).not.toThrow();
+
+    const oneFewer = exact.slice(0, CHOICE_COUNT - 1);
+    expectInvalidQuestion(() => assertQuestion(questionWith(oneFewer, 0)));
+
+    const oneMore = [...exact, { value: 99, label: '99' }];
+    expectInvalidQuestion(() => assertQuestion(questionWith(oneMore, 0)));
+  });
+
+  // spec(T-028:AC-4)
+  it('spec(T-028:AC-4) shipped CHOICE_COUNT remains 4 — duplication removal, not a retune', () => {
+    expect(CHOICE_COUNT).toBe(4);
+  });
+
+  it('dod(T-028:1) exactly one CHOICE_COUNT declaration in src/', () => {
+    expect(declarationsInSrc()).toHaveLength(1);
+  });
+
+  it('dod(T-028:2) open question resolved toward tuning.ts single home', () => {
+    const ticket = readFileSync(join(REPO_ROOT, 'tickets/T-028.md'), 'utf8');
+    expect(ticket).toMatch(/Accepted direction: single home in `tuning\.ts`/);
+  });
+
+  it('dod(T-028:3) behaviour at shipped value 4 is unchanged', () => {
+    expect(CHOICE_COUNT).toBe(4);
+    expect(() => assertQuestion(questionWith(FOUR_CHOICES, 0))).not.toThrow();
+  });
+
+  it('dod(T-028:4) local gates remain the authority for green', () => {
+    expect(TYPES_SRC).toMatch(/@engine\/tuning/);
   });
 });

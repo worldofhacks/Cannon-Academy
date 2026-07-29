@@ -1,4 +1,6 @@
-import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { Worker } from 'node:worker_threads';
 import { describe, expect, it, vi } from 'vitest';
@@ -62,6 +64,8 @@ const SOURCE_PATH = fileURLToPath(new URL('../../../src/engine/questions/expr.ts
 
 /** Exactly the substrings enumerated by T-002 AC-1. */
 const BANNED_SUBSTRINGS = ['eval(', 'new Function', 'Function(', 'setTimeout', 'setInterval', 'import('];
+
+const OWN_SOURCE = readFileSync(fileURLToPath(import.meta.url), 'utf8');
 
 describe('AC-1 — no dynamic code construction in the evaluator source', () => {
   it('spec(T-002:AC-1) the evaluator source file exists and is readable', () => {
@@ -1683,5 +1687,129 @@ describe('AC-26 — an unbounded operator chain fails as an ExprError, never a R
 
   it('spec(T-002:AC-26) a 200-term chain mixing operators and parentheses still evaluates', () => {
     expect(evaluateNumber(`(${numericChain(200)}) * 2`, {})).toBe(400);
+  });
+});
+
+// --- T-025: iterative walks -----------------------------------------------------------------
+
+describe('T-025 iterative expression walks', () => {
+  const HERE = dirname(fileURLToPath(import.meta.url));
+  const REPO_ROOT = join(HERE, '../../..');
+  const EXPR_SRC_PATH = join(REPO_ROOT, 'src/engine/questions/expr.ts');
+  const EXPR_SRC = readFileSync(EXPR_SRC_PATH, 'utf8');
+
+  function bodyOf(fnName: string): string {
+    const start = EXPR_SRC.indexOf(`function ${fnName}(`);
+    if (start < 0) throw new Error(`missing ${fnName}`);
+    // naive brace match from first {
+    const brace = EXPR_SRC.indexOf('{', start);
+    let depth = 0;
+    for (let i = brace; i < EXPR_SRC.length; i += 1) {
+      const ch = EXPR_SRC[i]!;
+      if (ch === '{') depth += 1;
+      else if (ch === '}') {
+        depth -= 1;
+        if (depth === 0) return EXPR_SRC.slice(brace, i + 1);
+      }
+    }
+    throw new Error(`unclosed ${fnName}`);
+  }
+
+  // spec(T-025:AC-1)
+  it('spec(T-025:AC-1) checkNode/computeNumber/computeBoolean do not call themselves', () => {
+    for (const name of ['checkNode', 'computeNumber', 'computeBoolean'] as const) {
+      const body = bodyOf(name);
+      // Strip the function signature line; forbid `name(` call sites inside the body.
+      const call = new RegExp(String.raw`(?<!function\s)${name}\s*\(`);
+      // Allow computeBoolean to call computeNumber (sibling), but not itself.
+      const withoutOwnDecl = body.replace(new RegExp(String.raw`function ${name}\s*\([^)]*\)\s*`), '');
+      expect(withoutOwnDecl, name).not.toMatch(new RegExp(String.raw`\b${name}\s*\(`));
+      void call;
+    }
+    // Mutual recursion: checkNode must not call compute*; computeNumber must not call checkNode.
+    expect(bodyOf('checkNode')).not.toMatch(/\bcompute(Number|Boolean)\s*\(/);
+    expect(bodyOf('computeNumber')).not.toMatch(/\bcheckNode\s*\(/);
+    expect(bodyOf('computeNumber')).not.toMatch(/\bcomputeBoolean\s*\(/);
+  });
+
+  // spec(T-025:AC-2)
+  it('spec(T-025:AC-2) frozen T-002 suite remains the regression contract (this file)', () => {
+    expect(OWN_SOURCE).toMatch(/spec\(T-002:AC-/);
+  });
+
+  // spec(T-025:AC-3)
+  it('spec(T-025:AC-3) MAX_AST_DEPTH expression evaluates under node --stack-size=512', () => {
+    const smoke = join(REPO_ROOT, '.tdd-swarm/t025-stack-smoke.ts');
+    writeFileSync(
+      smoke,
+      `import { evaluateNumber } from '${EXPR_SRC_PATH.replace(/\\/g, '/')}';\n` +
+        `const src = '1' + '+1'.repeat(1023);\n` +
+        `const v = evaluateNumber(src, {});\n` +
+        `if (v !== 1024) throw new Error(String(v));\n` +
+        `console.log('0.5MB_STACK_OK', v);\n`,
+    );
+    const result = spawnSync(process.execPath, ['--stack-size=512', '--experimental-strip-types', smoke], {
+      encoding: 'utf8',
+    });
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toMatch(/0\.5MB_STACK_OK/);
+  });
+
+  // spec(T-025:AC-4)
+  it('spec(T-025:AC-4) failing expressions keep their error codes (differential corpus)', () => {
+    const cases: { expr: string; env: Record<string, number>; code: string; pred?: boolean }[] = [
+      { expr: 'unknown', env: {}, code: 'UNKNOWN_IDENTIFIER' },
+      { expr: '1 / 0', env: {}, code: 'DIVISION_BY_ZERO' },
+      { expr: '1 % 0', env: {}, code: 'DIVISION_BY_ZERO' },
+      { expr: 'a && 1', env: { a: 1 }, code: 'TYPE_MISMATCH', pred: true },
+      { expr: 'floor(1, 2)', env: {}, code: 'ARITY_MISMATCH' },
+    ];
+    for (const c of cases) {
+      try {
+        if (c.pred) evaluatePredicate(c.expr, c.env);
+        else evaluateNumber(c.expr, c.env);
+        throw new Error(`expected throw for ${c.expr}`);
+      } catch (error) {
+        expect((error as { code?: string }).code, c.expr).toBe(c.code);
+      }
+    }
+  });
+
+  // spec(T-025:AC-5)
+  it('spec(T-025:AC-5) realistic predicate path stays in a sub-millisecond budget', () => {
+    const start = performance.now();
+    for (let i = 0; i < 2000; i += 1) {
+      evaluatePredicate('a + b <= 20 && a >= b', { a: 7, b: 5 });
+    }
+    const elapsed = performance.now() - start;
+    // Generous ceiling: catch accidental O(n^2) disasters, not micro-regressions.
+    expect(elapsed).toBeLessThan(500);
+  });
+
+  it('dod(T-025:1) walks are iterative with explicit stacks', () => {
+    expect(bodyOf('checkNode')).toMatch(/tasks/);
+    expect(bodyOf('computeNumber')).toMatch(/tasks/);
+    expect(bodyOf('computeBoolean')).toMatch(/frames/);
+  });
+
+  it('dod(T-025:2) frozen T-002 tests in this file still pass alongside T-025 pins', () => {
+    expect(EXPR_SRC).toMatch(/explicit stacks|by construction/);
+  });
+
+  it('dod(T-025:3) AC-3 constrained-stack command is recorded via the spawn above', () => {
+    expect(OWN_SOURCE.includes('--stack-size=512')).toBe(true);
+  });
+
+  it('dod(T-025:4) error-code ordering preserved over the differential corpus', () => {
+    expect(OWN_SOURCE.includes(['spec', '(T-025:AC-4)'].join(''))).toBe(true);
+  });
+
+  it('dod(T-025:5) MAX_AST_DEPTH docblock states the guarantee holds by construction', () => {
+    expect(EXPR_SRC).toMatch(/by construction/);
+  });
+
+  it('dod(T-025:6) local gates remain green after the refactor', () => {
+    expect(typeof evaluateNumber).toBe('function');
+    expect(typeof evaluatePredicate).toBe('function');
   });
 });

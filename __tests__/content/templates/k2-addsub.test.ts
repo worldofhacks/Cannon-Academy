@@ -362,68 +362,75 @@ function answerMaxFor(skill: SkillId): number {
 // Proves SPOT_CHECKS / REQUIRED_TEMPLATES are consistent with the real generator so an
 // implementer who copies the contract is not chasing a buggy expected literal.
 
-describe('authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS ↔ generator', () => {
-  it('every SPOT_CHECK literal matches generateQuestion on the required template at that seed', () => {
-    for (const check of SPOT_CHECKS) {
-      const template = REQUIRED_TEMPLATES.find((t) => t.id === check.id);
-      expect(template, check.id).toBeDefined();
-      if (template === undefined) continue;
-      const [question] = generateQuestion({
-        templates: [template],
-        recentTemplateIds: [],
-        rng: createRng(check.seed),
-      });
-      expect(question.text, check.id).toBe(check.text);
-      expect(question.choices[question.correctIndex]?.value, check.id).toBe(check.answer);
-    }
-  });
+// Property-suite timeout: heavy seeded sweeps exceed Vitest's 5s default when
+// multiple worktrees run the suite concurrently (timeouts only — not assertion failures).
 
-  it('required templates survive seeds 1…200 without CONSTRAINTS_UNSATISFIED', () => {
-    for (const template of REQUIRED_TEMPLATES) {
-      for (let seed = 1; seed <= 200; seed += 1) {
-        expect(() =>
-          generateQuestion({
-            templates: [template],
-            recentTemplateIds: [],
-            rng: createRng(seed),
-          }),
-        ).not.toThrow();
-      }
-    }
-  });
-
-  it('spec(T-014:AC-7) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples per template', () => {
-    // Freezes the authoring contract against the AC-7 collision class (e.g. near_doubles
-    // declaring both a+b-1 and a+a under b == a + 1) before JSON is ever copied.
-    const failures: string[] = [];
-    const rates: Record<string, number> = {};
-
-    for (const template of REQUIRED_TEMPLATES) {
-      let ladderHits = 0;
-      for (let seed = 1; seed <= 1000; seed += 1) {
+describe(
+  'authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS ↔ generator',
+  { timeout: 60000 },
+  () => {
+    it('every SPOT_CHECK literal matches generateQuestion on the required template at that seed', () => {
+      for (const check of SPOT_CHECKS) {
+        const template = REQUIRED_TEMPLATES.find((t) => t.id === check.id);
+        expect(template, check.id).toBeDefined();
+        if (template === undefined) continue;
         const [question] = generateQuestion({
           templates: [template],
           recentTemplateIds: [],
-          rng: createRng(seed),
+          rng: createRng(check.seed),
         });
-        const sources = describeDistractorSources(template, question.params);
-        if (sources.includes('ladder')) {
-          ladderHits += 1;
+        expect(question.text, check.id).toBe(check.text);
+        expect(question.choices[question.correctIndex]?.value, check.id).toBe(check.answer);
+      }
+    });
+
+    it('required templates survive seeds 1…200 without CONSTRAINTS_UNSATISFIED', () => {
+      for (const template of REQUIRED_TEMPLATES) {
+        for (let seed = 1; seed <= 200; seed += 1) {
+          expect(() =>
+            generateQuestion({
+              templates: [template],
+              recentTemplateIds: [],
+              rng: createRng(seed),
+            }),
+          ).not.toThrow();
         }
       }
-      rates[template.id] = ladderHits;
-      if (ladderHits >= 250) {
-        failures.push(`${template.id}: ladder ${ladderHits}/1000`);
-      }
-    }
+    });
 
-    expect(failures, `ladder rates: ${JSON.stringify(rates)}\n${failures.join('\n')}`).toEqual([]);
-  });
-});
+    it('spec(T-014:AC-7) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples per template', () => {
+      // Freezes the authoring contract against the AC-7 collision class (e.g. near_doubles
+      // declaring both a+b-1 and a+a under b == a + 1) before JSON is ever copied.
+      const failures: string[] = [];
+      const rates: Record<string, number> = {};
+
+      for (const template of REQUIRED_TEMPLATES) {
+        let ladderHits = 0;
+        for (let seed = 1; seed <= 1000; seed += 1) {
+          const [question] = generateQuestion({
+            templates: [template],
+            recentTemplateIds: [],
+            rng: createRng(seed),
+          });
+          const sources = describeDistractorSources(template, question.params);
+          if (sources.includes('ladder')) {
+            ladderHits += 1;
+          }
+        }
+        rates[template.id] = ladderHits;
+        if (ladderHits >= 250) {
+          failures.push(`${template.id}: ladder ${ladderHits}/1000`);
+        }
+      }
+
+      expect(failures, `ladder rates: ${JSON.stringify(rates)}\n${failures.join('\n')}`).toEqual([]);
+    });
+  },
+);
 
 // --- AC-1: files parse, ≥8 each --------------------------------------------------------------
 
-describe('AC-1 — each skill file parses and holds at least 8 templates', () => {
+describe('AC-1 — each skill file parses and holds at least 8 templates', { timeout: 60000 }, () => {
   it.each([...SKILL_FILES])(
     'spec(T-014:AC-1) dod(T-014:4) $file exists, parses with z.array(templateSchema), and has ≥8 entries',
     ({ file }) => {
@@ -447,7 +454,7 @@ describe('AC-1 — each skill file parses and holds at least 8 templates', () =>
 
 // --- AC-2: skill / id hygiene ----------------------------------------------------------------
 
-describe('AC-2 — skill matches file, ids are prefixed and globally unique', () => {
+describe('AC-2 — skill matches file, ids are prefixed and globally unique', { timeout: 60000 }, () => {
   it.each([...SKILL_FILES])(
     'spec(T-014:AC-2) every template in $file has skill === $skill and id starting with $skill_',
     ({ file, skill }) => {
@@ -466,28 +473,32 @@ describe('AC-2 — skill matches file, ids are prefixed and globally unique', ()
 
 // --- AC-3: symbolic only ---------------------------------------------------------------------
 
-describe('AC-3 — symbolic-only: no word problems, no read-aloud, no prose residue', () => {
-  it('spec(T-014:AC-3) dod(T-014:5) isWordProblem and readAloud are absent or false on every template', () => {
-    for (const template of loadAllTemplates()) {
-      expect(template.isWordProblem ?? false, `${template.id}.isWordProblem`).toBe(false);
-      expect(template.readAloud ?? false, `${template.id}.readAloud`).toBe(false);
-    }
-  });
+describe(
+  'AC-3 — symbolic-only: no word problems, no read-aloud, no prose residue',
+  { timeout: 60000 },
+  () => {
+    it('spec(T-014:AC-3) dod(T-014:5) isWordProblem and readAloud are absent or false on every template', () => {
+      for (const template of loadAllTemplates()) {
+        expect(template.isWordProblem ?? false, `${template.id}.isWordProblem`).toBe(false);
+        expect(template.readAloud ?? false, `${template.id}.readAloud`).toBe(false);
+      }
+    });
 
-  it('spec(T-014:AC-3) template text has no alphabetic prose outside {param} tokens', () => {
-    // Blocks "Tom has {a} apples" while still allowing `{a} + {b} = ?` and literal `?`.
-    for (const template of loadAllTemplates()) {
-      expect(
-        lettersOutsideParams(template.text),
-        `${template.id} text must be symbolic (no letters outside param tokens): "${template.text}"`,
-      ).toBe('');
-    }
-  });
-});
+    it('spec(T-014:AC-3) template text has no alphabetic prose outside {param} tokens', () => {
+      // Blocks "Tom has {a} apples" while still allowing `{a} + {b} = ?` and literal `?`.
+      for (const template of loadAllTemplates()) {
+        expect(
+          lettersOutsideParams(template.text),
+          `${template.id} text must be symbolic (no letters outside param tokens): "${template.text}"`,
+        ).toBe('');
+      }
+    });
+  },
+);
 
 // --- AC-4: param / text consistency ----------------------------------------------------------
 
-describe('AC-4 — every {name} is a declared param; no dead parameters', () => {
+describe('AC-4 — every {name} is a declared param; no dead parameters', { timeout: 60000 }, () => {
   it('spec(T-014:AC-4) every {name} token names a key in params', () => {
     for (const template of loadAllTemplates()) {
       const names = [...template.text.matchAll(PARAM_TOKEN)].map((m) => m[1]);
@@ -519,170 +530,178 @@ describe('AC-4 — every {name} is a declared param; no dead parameters', () => 
 
 // --- AC-5 / AC-6 / AC-7: 1,000-sample golden sweep -------------------------------------------
 
-describe('AC-5/6/7 — 1,000 seeded generations per template (ARCHITECTURE.md §9.1)', () => {
-  it('spec(T-014:AC-5) dod(T-014:6) every seed 1…1000 succeeds with in-range params, true constraints, rendered text, and 4 distinct choices matching evaluateNumber', () => {
-    const failures: string[] = [];
+describe(
+  'AC-5/6/7 — 1,000 seeded generations per template (ARCHITECTURE.md §9.1)',
+  { timeout: 60000 },
+  () => {
+    it('spec(T-014:AC-5) dod(T-014:6) every seed 1…1000 succeeds with in-range params, true constraints, rendered text, and 4 distinct choices matching evaluateNumber', () => {
+      const failures: string[] = [];
 
-    for (const template of loadAllTemplates()) {
-      for (let seed = 1; seed <= 1000; seed += 1) {
-        let question;
-        try {
-          [question] = generateQuestion({
+      for (const template of loadAllTemplates()) {
+        for (let seed = 1; seed <= 1000; seed += 1) {
+          let question;
+          try {
+            [question] = generateQuestion({
+              templates: [template],
+              recentTemplateIds: [],
+              rng: createRng(seed),
+            });
+          } catch (error) {
+            failures.push(`${template.id} seed=${seed}: threw ${String(error)}`);
+            continue;
+          }
+
+          for (const [name, range] of Object.entries(template.params)) {
+            const value = question.params[name];
+            if (value === undefined) {
+              failures.push(`${template.id} seed=${seed}: missing param '${name}'`);
+              continue;
+            }
+            const [lo, hi] = range;
+            if (value < lo || value > hi) {
+              failures.push(`${template.id} seed=${seed}: param '${name}'=${value} outside [${lo}, ${hi}]`);
+            }
+          }
+
+          for (const constraint of template.constraints ?? []) {
+            if (!evaluatePredicate(constraint, question.params)) {
+              failures.push(
+                `${template.id} seed=${seed}: constraint "${constraint}" is false for ${JSON.stringify(question.params)}`,
+              );
+            }
+          }
+
+          if (question.text.includes('{') || question.text.includes('}')) {
+            failures.push(`${template.id} seed=${seed}: rendered text still has braces: "${question.text}"`);
+          }
+
+          if (question.choices.length !== CHOICE_COUNT) {
+            failures.push(
+              `${template.id} seed=${seed}: choices.length=${question.choices.length}, want ${CHOICE_COUNT}`,
+            );
+          }
+
+          const values = question.choices.map((c) => c.value);
+          if (new Set(values).size !== values.length) {
+            failures.push(`${template.id} seed=${seed}: duplicate choices ${JSON.stringify(values)}`);
+          }
+
+          const expected = evaluateNumber(template.answerExpr, question.params);
+          const actual = question.choices[question.correctIndex]?.value;
+          if (actual !== expected) {
+            failures.push(
+              `${template.id} seed=${seed}: correct choice ${String(actual)} !== evaluateNumber(${template.answerExpr})=${expected}`,
+            );
+          }
+        }
+      }
+
+      expect(failures, failures.slice(0, 20).join('\n')).toEqual([]);
+    });
+
+    it('spec(T-014:AC-6) dod(T-014:5) every correct answer is a non-negative integer inside the skill bound; every numeric token in text is ≥0 and ≤20', () => {
+      const failures: string[] = [];
+
+      for (const template of loadAllTemplates()) {
+        const answerMax = answerMaxFor(template.skill);
+        for (let seed = 1; seed <= 1000; seed += 1) {
+          const [question] = generateQuestion({
             templates: [template],
             recentTemplateIds: [],
             rng: createRng(seed),
           });
-        } catch (error) {
-          failures.push(`${template.id} seed=${seed}: threw ${String(error)}`);
-          continue;
-        }
-
-        for (const [name, range] of Object.entries(template.params)) {
-          const value = question.params[name];
-          if (value === undefined) {
-            failures.push(`${template.id} seed=${seed}: missing param '${name}'`);
+          const answer = question.choices[question.correctIndex]?.value;
+          if (answer === undefined) {
+            failures.push(`${template.id} seed=${seed}: missing correct choice`);
             continue;
           }
-          const [lo, hi] = range;
-          if (value < lo || value > hi) {
-            failures.push(`${template.id} seed=${seed}: param '${name}'=${value} outside [${lo}, ${hi}]`);
-          }
-        }
-
-        for (const constraint of template.constraints ?? []) {
-          if (!evaluatePredicate(constraint, question.params)) {
+          if (!Number.isInteger(answer) || answer < 0 || answer > answerMax) {
             failures.push(
-              `${template.id} seed=${seed}: constraint "${constraint}" is false for ${JSON.stringify(question.params)}`,
+              `${template.id} seed=${seed}: answer ${answer} not in 0…${answerMax} for ${template.skill}`,
             );
           }
-        }
 
-        if (question.text.includes('{') || question.text.includes('}')) {
-          failures.push(`${template.id} seed=${seed}: rendered text still has braces: "${question.text}"`);
-        }
-
-        if (question.choices.length !== CHOICE_COUNT) {
-          failures.push(
-            `${template.id} seed=${seed}: choices.length=${question.choices.length}, want ${CHOICE_COUNT}`,
-          );
-        }
-
-        const values = question.choices.map((c) => c.value);
-        if (new Set(values).size !== values.length) {
-          failures.push(`${template.id} seed=${seed}: duplicate choices ${JSON.stringify(values)}`);
-        }
-
-        const expected = evaluateNumber(template.answerExpr, question.params);
-        const actual = question.choices[question.correctIndex]?.value;
-        if (actual !== expected) {
-          failures.push(
-            `${template.id} seed=${seed}: correct choice ${String(actual)} !== evaluateNumber(${template.answerExpr})=${expected}`,
-          );
-        }
-      }
-    }
-
-    expect(failures, failures.slice(0, 20).join('\n')).toEqual([]);
-  });
-
-  it('spec(T-014:AC-6) dod(T-014:5) every correct answer is a non-negative integer inside the skill bound; every numeric token in text is ≥0 and ≤20', () => {
-    const failures: string[] = [];
-
-    for (const template of loadAllTemplates()) {
-      const answerMax = answerMaxFor(template.skill);
-      for (let seed = 1; seed <= 1000; seed += 1) {
-        const [question] = generateQuestion({
-          templates: [template],
-          recentTemplateIds: [],
-          rng: createRng(seed),
-        });
-        const answer = question.choices[question.correctIndex]?.value;
-        if (answer === undefined) {
-          failures.push(`${template.id} seed=${seed}: missing correct choice`);
-          continue;
-        }
-        if (!Number.isInteger(answer) || answer < 0 || answer > answerMax) {
-          failures.push(
-            `${template.id} seed=${seed}: answer ${answer} not in 0…${answerMax} for ${template.skill}`,
-          );
-        }
-
-        const nums = question.text.match(NUMERIC_TOKEN) ?? [];
-        for (const token of nums) {
-          const n = Number(token);
-          if (!Number.isInteger(n) || n < 0 || n > 20) {
-            failures.push(
-              `${template.id} seed=${seed}: text token '${token}' not a non-negative integer ≤20 in "${question.text}"`,
-            );
+          const nums = question.text.match(NUMERIC_TOKEN) ?? [];
+          for (const token of nums) {
+            const n = Number(token);
+            if (!Number.isInteger(n) || n < 0 || n > 20) {
+              failures.push(
+                `${template.id} seed=${seed}: text token '${token}' not a non-negative integer ≤20 in "${question.text}"`,
+              );
+            }
           }
         }
       }
-    }
 
-    expect(failures, failures.slice(0, 20).join('\n')).toEqual([]);
-  });
+      expect(failures, failures.slice(0, 20).join('\n')).toEqual([]);
+    });
 
-  it("spec(T-014:AC-7) describeDistractorSources reports 'ladder' on fewer than 250 of 1000 samples per template", () => {
-    const failures: string[] = [];
+    it("spec(T-014:AC-7) describeDistractorSources reports 'ladder' on fewer than 250 of 1000 samples per template", () => {
+      const failures: string[] = [];
 
-    for (const template of loadAllTemplates()) {
-      let ladderHits = 0;
-      for (let seed = 1; seed <= 1000; seed += 1) {
-        const [question] = generateQuestion({
-          templates: [template],
-          recentTemplateIds: [],
-          rng: createRng(seed),
-        });
-        const sources = describeDistractorSources(template, question.params);
-        if (sources.includes('ladder')) {
-          ladderHits += 1;
+      for (const template of loadAllTemplates()) {
+        let ladderHits = 0;
+        for (let seed = 1; seed <= 1000; seed += 1) {
+          const [question] = generateQuestion({
+            templates: [template],
+            recentTemplateIds: [],
+            rng: createRng(seed),
+          });
+          const sources = describeDistractorSources(template, question.params);
+          if (sources.includes('ladder')) {
+            ladderHits += 1;
+          }
+        }
+        if (ladderHits >= 250) {
+          failures.push(
+            `${template.id}: ladder used on ${ladderHits}/1000 samples (declared distractors collide too often)`,
+          );
         }
       }
-      if (ladderHits >= 250) {
-        failures.push(
-          `${template.id}: ladder used on ${ladderHits}/1000 samples (declared distractors collide too often)`,
-        );
-      }
-    }
 
-    expect(failures, failures.join('\n')).toEqual([]);
-  });
-});
+      expect(failures, failures.join('\n')).toEqual([]);
+    });
+  },
+);
 
 // --- AC-8: hand-computed spot checks ---------------------------------------------------------
 
-describe('AC-8 — hand-computed spot checks pin arithmetic independently of the evaluator', () => {
-  it('spec(T-014:AC-8) every required template has a literal spot check, and no shipped template is missing one', () => {
-    const loadedIds = loadAllTemplates()
-      .map((t) => t.id)
-      .sort();
-    const checkIds = SPOT_CHECKS.map((c) => c.id).sort();
-    expect(loadedIds).toEqual(checkIds);
-    expect(SPOT_CHECKS).toHaveLength(REQUIRED_TEMPLATES.length);
-  });
+describe(
+  'AC-8 — hand-computed spot checks pin arithmetic independently of the evaluator',
+  { timeout: 60000 },
+  () => {
+    it('spec(T-014:AC-8) every required template has a literal spot check, and no shipped template is missing one', () => {
+      const loadedIds = loadAllTemplates()
+        .map((t) => t.id)
+        .sort();
+      const checkIds = SPOT_CHECKS.map((c) => c.id).sort();
+      expect(loadedIds).toEqual(checkIds);
+      expect(SPOT_CHECKS).toHaveLength(REQUIRED_TEMPLATES.length);
+    });
 
-  it.each([...SPOT_CHECKS])(
-    'spec(T-014:AC-8) $id at seed $seed renders "$text" with answer $answer',
-    ({ id, seed, text, answer }) => {
-      const template = loadAllTemplates().find((t) => t.id === id);
-      expect(template, `spot-check target '${id}' missing from content`).toBeDefined();
-      if (template === undefined) return;
+    it.each([...SPOT_CHECKS])(
+      'spec(T-014:AC-8) $id at seed $seed renders "$text" with answer $answer',
+      ({ id, seed, text, answer }) => {
+        const template = loadAllTemplates().find((t) => t.id === id);
+        expect(template, `spot-check target '${id}' missing from content`).toBeDefined();
+        if (template === undefined) return;
 
-      const [question] = generateQuestion({
-        templates: [template],
-        recentTemplateIds: [],
-        rng: createRng(seed),
-      });
+        const [question] = generateQuestion({
+          templates: [template],
+          recentTemplateIds: [],
+          rng: createRng(seed),
+        });
 
-      expect(question.text).toBe(text);
-      expect(question.choices[question.correctIndex]?.value).toBe(answer);
-    },
-  );
-});
+        expect(question.text).toBe(text);
+        expect(question.choices[question.correctIndex]?.value).toBe(answer);
+      },
+    );
+  },
+);
 
 // --- AC-9: shape variety ---------------------------------------------------------------------
 
-describe('AC-9 — ≥5 distinct text skeletons per skill', () => {
+describe('AC-9 — ≥5 distinct text skeletons per skill', { timeout: 60000 }, () => {
   it.each([...SKILL_FILES])(
     'spec(T-014:AC-9) dod(T-014:4) $skill has at least 5 distinct skeletons',
     ({ file, skill }) => {
@@ -697,33 +716,37 @@ describe('AC-9 — ≥5 distinct text skeletons per skill', () => {
 
 // --- AC-10: declared distractor hygiene ------------------------------------------------------
 
-describe('AC-10 — at least three distinct distractor expressions, none equal to answerExpr', () => {
-  it('spec(T-014:AC-10) every template declares ≥3 distractors, all textually distinct from answerExpr and each other', () => {
-    for (const template of loadAllTemplates()) {
-      expect(
-        template.distractors.length,
-        `${template.id} must declare at least 3 distractors`,
-      ).toBeGreaterThanOrEqual(3);
-
-      const unique = new Set(template.distractors);
-      expect(
-        unique.size,
-        `${template.id} has duplicate distractor expressions: ${JSON.stringify(template.distractors)}`,
-      ).toBe(template.distractors.length);
-
-      for (const distractor of template.distractors) {
+describe(
+  'AC-10 — at least three distinct distractor expressions, none equal to answerExpr',
+  { timeout: 60000 },
+  () => {
+    it('spec(T-014:AC-10) every template declares ≥3 distractors, all textually distinct from answerExpr and each other', () => {
+      for (const template of loadAllTemplates()) {
         expect(
-          distractor,
-          `${template.id}: distractor "${distractor}" is textually identical to answerExpr`,
-        ).not.toBe(template.answerExpr);
+          template.distractors.length,
+          `${template.id} must declare at least 3 distractors`,
+        ).toBeGreaterThanOrEqual(3);
+
+        const unique = new Set(template.distractors);
+        expect(
+          unique.size,
+          `${template.id} has duplicate distractor expressions: ${JSON.stringify(template.distractors)}`,
+        ).toBe(template.distractors.length);
+
+        for (const distractor of template.distractors) {
+          expect(
+            distractor,
+            `${template.id}: distractor "${distractor}" is textually identical to answerExpr`,
+          ).not.toBe(template.answerExpr);
+        }
       }
-    }
-  });
-});
+    });
+  },
+);
 
 // --- AC-11: sampling headroom ----------------------------------------------------------------
 
-describe('AC-11 — constraints are not so tight that rejection sampling exhausts', () => {
+describe('AC-11 — constraints are not so tight that rejection sampling exhausts', { timeout: 60000 }, () => {
   it('spec(T-014:AC-11) seeds 1…200 never raise CONSTRAINTS_UNSATISFIED (bound = MAX_PARAM_SAMPLE_ATTEMPTS)', () => {
     expect(MAX_PARAM_SAMPLE_ATTEMPTS).toBeGreaterThan(0);
     const failures: string[] = [];
@@ -754,7 +777,7 @@ describe('AC-11 — constraints are not so tight that rejection sampling exhaust
 // DoD-2/3/7 are orchestrator/process claims on a branch that cannot also edit tickets/ to mark
 // them `[process]` (write guard). These tests assert the nearest unit-visible reading.
 
-describe('Definition of Done — traceability and content floors', () => {
+describe('Definition of Done — traceability and content floors', { timeout: 60000 }, () => {
   it('dod(T-014:1) every acceptance criterion AC-1…AC-11 is cited by at least one spec tag in this file', () => {
     const source = readFileSync(fileURLToPath(import.meta.url), 'utf8');
     for (let n = 1; n <= 11; n += 1) {

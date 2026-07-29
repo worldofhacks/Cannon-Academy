@@ -37,13 +37,13 @@ function masteryMapFor(masteredSkills: readonly SkillId[]): Partial<Record<Skill
 
 const sorted = <T extends string>(xs: readonly T[]): T[] => [...xs].sort();
 
-/** Catalog-derived: every range-unlock cannon (today seven). */
+/** Catalog-derived: every range-unlock cannon (today eight — includes T-029 saker). */
 function allRangeCannonIds(): CannonId[] {
   return cannons.filter((c) => c.unlock.kind === 'range').map((c) => c.id);
 }
 
 describe('T-032 AC-5 — fully-mastered g4_5 earns every range gun through resolveUnlocks', () => {
-  it('spec(T-032:AC-5) dod(T-032:6) resolveUnlocks returns all seven range cannons from a starters-only placement', () => {
+  it('spec(T-032:AC-5) dod(T-032:6) resolveUnlocks returns all eight range cannons from a starters-only placement', () => {
     const P = resolvePlacement('g4_5');
 
     // Sanity: placement itself must not already own range guns (else the delta is empty — the bug).
@@ -59,7 +59,7 @@ describe('T-032 AC-5 — fully-mastered g4_5 earns every range gun through resol
     });
 
     const expected = allRangeCannonIds();
-    expect(expected.length, 'fixture sanity: catalog must have range cannons').toBe(7);
+    expect(expected.length, 'fixture sanity: catalog must have range cannons').toBe(8);
     expect(sorted(newlyUnlocked)).toEqual(sorted(expected));
   });
 

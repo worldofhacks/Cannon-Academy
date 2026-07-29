@@ -75,17 +75,23 @@ export const PERFECT_SHOT_TIMER_FRACTION = 0.4;
 
 /**
  * unspecified — the blend factor between the uniform roll and answer quality in T-008's damage
- * formula. Derived in closed form (AC-3 amendment / L-018) from T-008 AC-16: mean roll damage at
- * full speed must exceed the mean at the quality floor by >= 0.10 * range for every cannon with
- * `damageMax - damageMin >= 10` (the widest-range cannons, `culverin` / `double_broadside`).
- * That requires `QUALITY_WEIGHT > 7/12 ≈ 0.5833`; this value clears it with margin.
+ * formula. Bound against T-008 AC-16's measured effect size (not a closed-form derivation): the
+ * earlier `> 7/12` floor omitted `ceil` discretisation and was unsound. The real threshold is
+ * `QUALITY_WEIGHT > 0.6`; this value clears it with margin. See T-031.
  */
 export const QUALITY_WEIGHT = 0.7;
 
-/** unspecified — ARCHITECTURE §4.3: damage "renders as N cannonball arcs" (AC-3: integer >= 1). */
+/**
+ * Presentation constant — how many cannonball arcs the duel view draws for one volley.
+ * The engine's damage model does not read this for any damage field; only the view (and the
+ * `ballCount` display field on `ShotOutcome`) may use it. See T-031 / ARCHITECTURE §4.3.
+ */
 export const BASE_BALLS_PER_VOLLEY = 1;
 
-/** unspecified — ARCHITECTURE §4.3: a Perfect Shot is "+1 bonus ball" (AC-3: integer >= 1). */
+/**
+ * ARCHITECTURE §4.3 (T-031): a Perfect Shot adds +1 damage (not a damage-carrying projectile).
+ * The extra arc is presentation via `BASE_BALLS_PER_VOLLEY + 1` on `ballCount`.
+ */
 export const PERFECT_SHOT_BONUS_DAMAGE = 1;
 
 // ============================================================================================
@@ -240,3 +246,13 @@ export const MERCY_LOSS_STREAK_TRIGGER = 2;
 
 /** PLAN.md §Questions/opponents: "the next rival misfires twice". */
 export const MERCY_FORCED_MISFIRES = 2;
+
+// ============================================================================================
+// Loadout / tray
+// ============================================================================================
+
+/**
+ * PLAN.md §The armory — the duel tray shows a subset of owned cannons.
+ * Design / T-030 Context: tray capacity is 3 (gun deck board 4d; A-011).
+ */
+export const TRAY_CAPACITY = 3;

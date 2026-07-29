@@ -2019,3 +2019,40 @@ Awaiting code review before merge.
 Code APPROVE_WITH_NITS ([T-034 Code Review](d21a6d73-563c-4bc5-8094-0ef2d27a2663));
 security PASS_WITH_NOTES ([T-034 Security Review](c01e0f01-8662-4d9e-9155-323c0f111874)).
 Merged + pushed. Engine Wave 5 tickets (T-014…T-020, T-032, T-034) done. **T-029** still owner-blocked.
+
+### T-035 — done (merged) — unblocks A-011
+
+Split from T-030: `TRAY_CAPACITY = 3` in `tuning.ts`. Frozen `b994d1f714e4b150…`.
+App track may import `@engine/tuning` for gun-deck slot count. T-030 still owns loadout rules.
+
+### T-021 — done (merged) — banded bot + mercy
+
+`mercy.ts` + `bot.ts`. Frozen mercy `57ccb419d1fdd62a…`, bot `8965b4ce0319bf7e…`.
+Child-safety rival: accuracy tracks player − margin inside band; two losses arm two misfires.
+
+### T-031 — done (merged) — Perfect Shot semantics
+
+ARCHITECTURE §4.3 corrected: +1 damage + presentation arc. `BASE_BALLS_PER_VOLLEY` reclassified.
+`QUALITY_WEIGHT` bound tightened to >0.6 (value stays 0.7). Frozen `d9a938bbe96cf2af…`.
+
+### T-028 — done (merged) — CHOICE_COUNT single home
+
+`types.ts` imports from `@engine/tuning`. Frozen `76dafbc2a5ea4aa5…`.
+
+### T-027 — done (merged) — catalog set validation
+
+`validateCatalogs` detects dup ids, dangling refs, rank tier clashes, island cycles. Frozen `2e94841e5706c896…`.
+
+### T-025 — done (merged) — iterative expr walks
+
+Explicit-stack walks. Frozen `7ccb82a558204203…`. AC-3 under \`--stack-size=512\`.
+
+## T-029 / D-7 — K-1 practice lane (2026-07-29)
+
+Owner ruling D-7 implemented:
+
+- `add_within_10` on `port_sumwich.rangeSkills`
+- Invented range cannon `saker` (`skill: add_within_10`, unlock range/port_sumwich/tier 1)
+- **Fog decision named:** early Isla Products fog lift **accepted as harmless** — band-gating still governs served content; predecessor rule unchanged
+- Frozen T-003/T-006/T-008/T-032 pins amended (11 cannons, 8 range guns), not deleted
+- Original third-starter/`sub_within_10` idea deferred
