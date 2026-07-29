@@ -16,6 +16,7 @@ import { focusIndex, requirementIndex, stationState, type MapFrame } from '../sr
 import { chart } from '../src/components/chart/palette';
 import { ResponsiveFrame } from '../src/components/ResponsiveFrame';
 import { chartNodes, requirementText } from '../src/services/chart';
+import { chartHubControlLayout, executeDemoRouteEdge } from '../src/services/flow';
 import { captainActions, useCaptain } from '../src/stores/useCaptain';
 import { containWorldBoard } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
@@ -64,20 +65,31 @@ export default function Chart() {
     router.push('/duel');
   }, []);
 
-  const drill = useCallback((id: IslandId) => {
-    captainActions().setCurrentIsland(id);
-    router.push('/range');
-  }, []);
-
-  // `push`, never `replace`: both the range and the gun deck leave by unwinding the stack, and a
-  // replace would delete the entry they unwind to and strand a child on a screen with no way back.
-  const openGunDeck = useCallback(() => router.push('/gun-deck'), []);
-
   const live = focusIndex(nodes);
+  const focusIslandId = nodes[live]?.island.id;
+
+  const hubLayout = chartHubControlLayout({ width: L.width, height: L.height });
+
+  const onDemoRouteEdge = useCallback(
+    (edgeId: string) => {
+      if ((edgeId === 'chart-duel' || edgeId === 'chart-range') && focusIslandId !== undefined) {
+        captainActions().setCurrentIsland(focusIslandId);
+      }
+      executeDemoRouteEdge(edgeId, {
+        push: (href) => router.push(href as '/duel'),
+        replace: (href) => router.replace(href as '/chart'),
+        back: () => router.back(),
+        redirect: (href) => router.replace(href as '/chart'),
+      });
+    },
+    [focusIslandId],
+  );
+
   const focus = nodes[live];
   // After every hook, so the hook order cannot depend on it. An empty catalog is unrenderable and
   // should say so rather than draw an ocean with nothing in it.
   if (focus === undefined) throw new Error('chart: the island catalog is empty');
+
   const needsRequirement = requirementIndex(nodes, STATIONS);
 
   const board = containWorldBoard(box.w, box.h, MAP.width, MAP.height);
@@ -149,9 +161,8 @@ export default function Chart() {
           fogged={focus.fogged}
           insetBottom={insets.bottom}
           typeScale={L.type}
-          onFight={() => sail(focus.island.id)}
-          onRange={() => drill(focus.island.id)}
-          onGunDeck={openGunDeck}
+          controls={hubLayout.controls}
+          onDemoRouteEdge={onDemoRouteEdge}
         />
       </View>
     </ResponsiveFrame>
