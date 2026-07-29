@@ -39,8 +39,8 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 
 ## Current state at the time of writing
 
-- Engine: Wave 5 — **T-014…T-020 done** (templates + range drill; drill API published below).
-  Next: **T-034** last (**T-029** still owner-blocked). Owner ruling **D-6** on **T-032**. **T-029**
+- Engine: Wave 5 — **T-014…T-020 + T-034 done** (Wave 5 complete) (templates + range drill; drill API published below).
+  Wave 5 complete. **T-029** remains owner-blocked. Owner ruling **D-6** on **T-032**. **T-029**
   remains owner-blocked. Push `swarm/engine-core` after every ticket merge.
 - App track (`app/shell`): owns presentation; currently uses a placeholder question service that
   must not ship — real templates from T-014…T-016 replace it.
