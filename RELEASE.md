@@ -12,8 +12,8 @@ backend boundary (Auth/Firestore/Storage client + rules), not a web host. Railwa
 | URL                                           | Role                                            | Evidence                   |
 | --------------------------------------------- | ----------------------------------------------- | -------------------------- |
 | <https://cannon-academy.expo.app>             | Production alias                                | HTTP 200 probed 2026-07-29 |
-| <https://cannon-academy--wejre1bucz.expo.app> | Immutable deployment for code `28f4ccc` (A-042) | HTTP 200 probed 2026-07-29 |
-| <https://cannon-academy--2f4tf1erk3.expo.app> | Preceding immutable rollback target             | HTTP 200 probed 2026-07-29 |
+| <https://cannon-academy--waa9davmr9.expo.app> | Immutable deployment for code `5147e38` (A-042) | HTTP 200 probed 2026-07-29 |
+| <https://cannon-academy--wejre1bucz.expo.app> | Preceding immutable rollback target             | HTTP 200 probed 2026-07-29 |
 
 Deployments are immutable. Promote or roll back by reassigning the production alias.
 
@@ -28,7 +28,7 @@ eas deploy --prod
 eas deploy:alias --prod --id=<deploymentId>
 
 # roll production back to the previous immutable deployment
-eas deploy:alias --prod --id=2f4tf1erk3
+eas deploy:alias --prod --id=wejre1bucz
 ```
 
 Do not document Firebase Hosting or a second production web target. `firebase.json` ships

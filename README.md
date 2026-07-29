@@ -28,7 +28,7 @@ full mirror of the other: GitHub `main` and GitLab `main` intentionally differ, 
 [PR #2](https://github.com/worldofhacks/Cannon-Academy/pull/2) (`app/shell` → `main`) stays open for
 **owner review only** — do not merge it from an agent session.
 
-The production web bundle currently served at the alias was built from commit **`28f4ccc`**. Local
+The production web bundle currently served at the alias was built from commit **`5147e38`**. Local
 `app/shell` may be ahead with documentation and later tickets; that does not mean `app/shell` is on
 `main`.
 
@@ -86,8 +86,8 @@ is the A-044 reviewer baseline, not an evergreen claim.
 | URL                                           | Role                                                                   |
 | --------------------------------------------- | ---------------------------------------------------------------------- |
 | <https://cannon-academy.expo.app>             | Production alias                                                       |
-| <https://cannon-academy--wejre1bucz.expo.app> | Immutable A-042 deployment (`28f4ccc`) — probed HTTP 200 on 2026-07-29 |
-| <https://cannon-academy--2f4tf1erk3.expo.app> | Preceding immutable rollback target — probed HTTP 200 on 2026-07-29    |
+| <https://cannon-academy--waa9davmr9.expo.app> | Immutable A-042 deployment (`5147e38`) — probed HTTP 200 on 2026-07-29 |
+| <https://cannon-academy--wejre1bucz.expo.app> | Preceding immutable rollback target — probed HTTP 200 on 2026-07-29    |
 
 Firebase is **not** a second web host (`firebase.json` has rules only, no `hosting` block).
 Railway is not part of this architecture. Promote/rollback commands live in [`RELEASE.md`](RELEASE.md).
@@ -127,10 +127,10 @@ Development builds are required (App Store Expo Go is an older SDK).
 
 | Remote          | URL                                                           | `app/shell`           | `swarm/engine-core` | `main`    |
 | --------------- | ------------------------------------------------------------- | --------------------- | ------------------- | --------- |
-| GitHub `origin` | <https://github.com/worldofhacks/Cannon-Academy>              | `448f233` (inspected) | `7ffeb6e`           | `aea6fe2` |
-| GitLab `gitlab` | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy> | `448f233` (inspected) | `7ffeb6e`           | `aea6fe2` |
+| GitHub `origin` | <https://github.com/worldofhacks/Cannon-Academy>              | `5147e38` (inspected) | `7ffeb6e`           | `aea6fe2` |
+| GitLab `gitlab` | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy> | `5147e38` (inspected) | `7ffeb6e`           | `aea6fe2` |
 
-The deployed web bundle remains `28f4ccc` until a new EAS promote. Re-run `git ls-remote` after
+The deployed web bundle remains `5147e38` until a new EAS promote. Re-run `git ls-remote` after
 later pushes.
 
 ---

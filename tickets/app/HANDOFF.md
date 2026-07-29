@@ -16,10 +16,10 @@ Live ticket lifecycle: [`tickets/INDEX.md`](../INDEX.md) only. Do not treat wave
 | Integration branch       | `app/shell` (worktree `.worktrees/wt-app`)                                                   |
 | Engine branch            | `swarm/engine-core`                                                                          |
 | Described docs tip       | whatever `git rev-parse --short HEAD` prints in this worktree after the A-044 commit         |
-| Deployed web bundle      | **`28f4ccc`** (may lag docs HEAD)                                                            |
+| Deployed web bundle      | **`5147e38`** (may lag docs HEAD)                                                            |
 | Production alias         | <https://cannon-academy.expo.app>                                                            |
-| Immutable deploy (A-042) | <https://cannon-academy--wejre1bucz.expo.app>                                                |
-| Preceding rollback       | <https://cannon-academy--2f4tf1erk3.expo.app>                                                |
+| Immutable deploy (A-042) | <https://cannon-academy--waa9davmr9.expo.app>                                                |
+| Preceding rollback       | <https://cannon-academy--wejre1bucz.expo.app>                                                |
 | GitHub                   | <https://github.com/worldofhacks/Cannon-Academy>                                             |
 | GitLab                   | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy>                                |
 | Owner PR                 | <https://github.com/worldofhacks/Cannon-Academy/pull/2> (`app/shell` → `main`, do not merge) |
