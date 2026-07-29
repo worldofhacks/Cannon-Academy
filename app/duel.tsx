@@ -19,6 +19,7 @@ import {
 import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
 import { ResponsiveFrame, useResponsiveSurface } from '../src/components/ResponsiveFrame';
+import { duelReceiptKey } from '../src/contracts/rewards';
 import { applyDuelOutcome, type DuelRewardOutcome } from '../src/services/duelRewards';
 import { resolveDuelContext } from '../src/services/duelContext';
 import { resolveDestination } from '../src/services/flow';
@@ -29,7 +30,13 @@ import { cannonLook } from '../src/theme/cannonPresentation';
 import { seaStageHeight, worldArtScale, worldBoardWidth } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
 import { color, radius, space } from '../src/theme/tokens';
-import { duelReducer, initialDuelState, initialDuelStateWithContext, PHASE_DURATION_MS, type DuelPhase } from '../src/stores/duel';
+import {
+  duelReducer,
+  initialDuelState,
+  initialDuelStateWithContext,
+  PHASE_DURATION_MS,
+  type DuelPhase,
+} from '../src/stores/duel';
 
 /**
  * The duel screen.
@@ -200,6 +207,9 @@ function DuelBody() {
             perfects={state.perfects}
             rewards={victoryRewards(appliedReward)}
             chestOpen={state.chestOpen}
+            chestReceipt={
+              state.duelId !== null ? (captain.rewardReceipts[duelReceiptKey(state.duelId)] ?? null) : null
+            }
             onOpenChest={() => dispatch({ type: 'OPEN_CHEST' })}
             onLeave={leave}
           />
