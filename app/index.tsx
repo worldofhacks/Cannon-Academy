@@ -1,6 +1,9 @@
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { resolvePlacement } from '@engine/placement';
 
 import { color, radius, space, type } from '../src/theme/tokens';
 
@@ -12,6 +15,11 @@ import { color, radius, space, type } from '../src/theme/tokens';
  */
 export default function Title() {
   const insets = useSafeAreaInsets();
+
+  // Counted, not written down. This line said "Swivel Gun and Culverin aboard" while the tray one
+  // tap later showed four guns — a hardcoded claim the app itself contradicts. Deriving it means
+  // the copy cannot drift from placement, including when T-032 changes what placement grants.
+  const armed = useMemo(() => resolvePlacement('k_1').unlockedCannons.length, []);
 
   return (
     <View style={[s.screen, { paddingTop: insets.top + space[7], paddingBottom: insets.bottom + space[6] }]}>
@@ -37,7 +45,9 @@ export default function Title() {
       >
         <Text style={s.primaryText}>Sail into a duel</Text>
       </Pressable>
-      <Text style={s.foot}>Port Sumwich · Swivel Gun and Culverin aboard</Text>
+      <Text style={s.foot}>
+        Port Sumwich · {armed} cannon{armed === 1 ? '' : 's'} aboard
+      </Text>
     </View>
   );
 }
