@@ -351,7 +351,7 @@ function snapshotArrays(state: DuelState): {
   readonly rivalLoadout: readonly CannonId[];
   readonly recentTemplateIds: readonly string[];
   readonly actionLog: readonly ActionLogEntry[];
-  readonly choices: readonly Question['choices'] | undefined;
+  readonly choices: Question['choices'] | undefined;
 } {
   return {
     playerLoadout: state.playerLoadout,
@@ -1109,7 +1109,9 @@ describe('T-020 duelReducer — test-file structure', () => {
     expect(OWN_SOURCE).not.toMatch(/EXPECTED_PHASES\s*=\s*DUEL_PHASES/);
     expect(OWN_SOURCE).not.toMatch(/EXPECTED_PHASES\s*=\s*\[\s*\.\.\.DUEL_PHASES/);
     expect(OWN_SOURCE).not.toMatch(/EXPECTED_EVENT_TYPES\s*=\s*\[.*DuelEvent/);
-    expect(OWN_SOURCE.includes('DUEL_PHASES.map')).toBe(false);
+    // Split needle so this assertion does not poison OWN_SOURCE (same class as T-017 DoD-3).
+    const derivedMap = 'DUEL_PHASES' + '.map';
+    expect(OWN_SOURCE.includes(derivedMap)).toBe(false);
   });
 });
 
