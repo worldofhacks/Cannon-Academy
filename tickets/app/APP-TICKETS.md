@@ -14,11 +14,11 @@
 
 ## Wave A1
 
-| id    | title                                                     | status  | deps | model    |
-| ----- | --------------------------------------------------------- | ------- | ---- | -------- |
-| A-001 | Captain store — the single persisted player               | backlog | —    | standard |
-| A-002 | Persistence — rehydrate, migrate, and survive a bad write | backlog | —    | standard |
-| A-003 | Flow resolver — which screen a captain belongs on         | backlog | —    | standard |
+| id    | title                                                     | status        | deps | model    |
+| ----- | --------------------------------------------------------- | ------------- | ---- | -------- |
+| A-001 | Captain store — the single persisted player               | review-passed | —    | standard |
+| A-002 | Persistence — rehydrate, migrate, and survive a bad write | review-passed | —    | standard |
+| A-003 | Flow resolver — which screen a captain belongs on         | review-passed | —    | standard |
 
 ## Wave A2
 
