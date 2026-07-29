@@ -27,10 +27,7 @@ function main() {
 
   // Both hosts nest the command differently; accept either shape.
   const cmd =
-    payload?.tool_input?.command ??
-    payload?.toolInput?.command ??
-    payload?.arguments?.command ??
-    '';
+    payload?.tool_input?.command ?? payload?.toolInput?.command ?? payload?.arguments?.command ?? '';
   if (typeof cmd !== 'string' || !/\bgit\s+push\b/.test(cmd)) return;
 
   let root;
