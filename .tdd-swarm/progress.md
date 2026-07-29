@@ -1962,3 +1962,8 @@ Suite fix `bd8bc4d` re-frozen `80c4cdb1367a3915…` (33/33 with reducer). Implem
 
 `dod(T-013:9)` rejected `reducer.ts`. Added to permitted list (`test(T-013)` on T-020 branch).
 Implementer resumed for full gates.
+
+### T-020 impl green (`6ef7aaf`)
+
+[T-020 Implementer](8ce1a513-93c0-4562-9c8f-e6b596693975): 1707/1707; reducer 33/33; gates PASS.
+Code + security review dispatched.
