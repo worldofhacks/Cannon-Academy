@@ -48,3 +48,31 @@ teaches wrong math" and "a duel state machine that soft-locks a child mid-fight"
 `src/services/**` (Firebase), EAS builds, art pipeline. These cannot be gated in
 this environment (no Metro/simulator/EAS/live Firestore) and are verified by the
 owner's on-device playtest ritual per `ARCHITECTURE.md` §9.4.
+
+## Deferral — app-layer screen geometry (owner-approved 2026-07-28, conditional)
+
+**Deferred:** component-level frozen tests for `app/**` and `src/components/**`. The repo's vitest
+runs in a node environment and React Native's entry point is Flow-typed (`import typeof`), which
+the node parser cannot read — so any module importing `react-native` is untestable here without a
+new harness.
+
+**The owner approved this ON CONDITION that fidelity is held by other means.** It is, by three
+mechanisms, in descending order of strength:
+
+1. **Design fixtures as frozen tests** — `design/fixtures/*.json` holds geometry measured off the
+   rendered board (`getBoundingClientRect` + `getComputedStyle`), and
+   `__tests__/app/design-fidelity.test.ts` asserts the app's style constants against it. Runs in
+   node today, no harness. On its first run it caught three drifts that a visual review had already
+   passed: the glyph tile radius (14 vs 16), the sheet's top radius (20 vs 22), and a sea stage
+   ratio rounded to 0.26 that lands 3pt short of the board.
+2. **Pure-logic extraction** — anything that can be tested headless is moved out of components.
+   `responsive.ts` holds the rules and `useLayout.ts` is the thin RN binding, so the responsive
+   behaviour is frozen-tested even though the hook is not.
+3. **Screenshot evidence per ticket** — each screen ticket's DoD requires a side-by-side against
+   the named board at 375pt plus 360×640 / 390×844 / 430×932.
+
+**What this still does not catch:** composition. A card with the right radius in the wrong place
+passes (1) and is caught only by (3). The two are complements and neither is sufficient alone.
+
+**Revisit when:** a component harness is cheap (`jest-expo`), or a screen defect ships that (1) and
+(3) both missed.

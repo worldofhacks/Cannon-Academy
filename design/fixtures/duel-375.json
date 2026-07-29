@@ -1,0 +1,30 @@
+{
+  "_source": "Cannon Academy Duel.dc.html, rendered and measured via getBoundingClientRect at the 375x667 reference frame",
+  "_captured": "2026-07-28",
+  "_how": "design/extract-fixture.md documents the extraction. Re-run it when the board changes; a diff here is a design change and must be reviewed, never silently absorbed.",
+
+  "frame": { "width": 375, "height": 667 },
+
+  "seaStage": { "y": 167, "height": 176, "seaBandHeight": 58 },
+
+  "turnBar": { "x": 66, "y": 24, "width": 297, "height": 44, "radius": 14 },
+  "anchorButton": { "size": 44, "radius": 14 },
+
+  "hullCard": { "y": 76, "width": 171.5, "height": 83, "radius": 14, "gap": 8 },
+  "hullPips": { "count": 10, "height": 16, "radius": 3, "gap": 2 },
+
+  "sheet": { "y": 343, "radiusTop": 22 },
+
+  "cannonRow": { "x": 12, "width": 351, "height": 83.7, "radius": 18, "gap": 8, "padding": 10 },
+  "cannonGlyphTile": { "size": 64, "radius": 16 },
+  "cannonBandTrack": { "width": 203, "height": 14, "radius": 7, "segments": 10 },
+  "cannonTemperBadge": { "size": 40 },
+  "trayChevron": { "size": 26, "radius": 8 },
+
+  "type": {
+    "display": { "family": "Baloo 2", "weight": 800, "sizes": [32, 19, 17, 14, 13] },
+    "displaySemi": { "family": "Baloo 2", "weight": 700, "sizes": [16, 13] },
+    "body": { "family": "Nunito", "weight": 800, "sizes": [15, 13, 11, 10] },
+    "bodySemi": { "family": "Nunito", "weight": 700, "sizes": [10] }
+  }
+}

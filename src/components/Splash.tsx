@@ -21,7 +21,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { useLayout } from '../theme/responsive';
+import { useLayout } from '../theme/useLayout';
 import { color } from '../theme/tokens';
 import { Poly } from './Poly';
 

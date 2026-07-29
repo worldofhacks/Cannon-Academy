@@ -6,7 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GradeBand } from '@content/schemas';
 
 import { Poly } from '../src/components/Poly';
-import { useLayout } from '../src/theme/responsive';
+import { useLayout } from '../src/theme/useLayout';
 import { color, space, type } from '../src/theme/tokens';
 
 /**

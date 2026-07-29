@@ -24,8 +24,6 @@
  *   402×874  iPhone 17 Pro
  *   430×932  iPhone Pro Max
  */
-import { useWindowDimensions } from 'react-native';
-
 /** The frame the boards were drawn at. Ratios are measured against this, never against a device. */
 export const REFERENCE = { width: 375, height: 667 } as const;
 
@@ -66,9 +64,13 @@ export interface Layout {
   readonly t: (designPx: number) => number;
 }
 
-export function useLayout(): Layout {
-  const { width, height } = useWindowDimensions();
-
+/**
+ * The pure rule. Separated from the React hook ON PURPOSE: React Native's entry point is
+ * Flow-typed, so any module importing `react-native` cannot be parsed by the node test runner.
+ * Keeping the arithmetic here means the responsive rules are frozen-testable; `useLayout` in
+ * `useLayout.ts` is the thin binding that supplies real screen dimensions.
+ */
+export function computeLayout(width: number, height: number): Layout {
   const raw = width / REFERENCE.width;
   const type = clamp(raw, TYPE_SCALE_MIN, TYPE_SCALE_MAX);
   const art = clamp(raw, ART_SCALE_MIN, ART_SCALE_MAX);
@@ -95,7 +97,10 @@ export function useLayout(): Layout {
  * does not need it. But on a 640pt Android, 26% is 166pt and the cannon tray stops fitting, so the
  * proportion is floored rather than followed off a cliff.
  */
+/** The board's exact ratio, not a rounded 0.26 — which lands on 173 and misses the design by 3pt. */
+const SEA_STAGE_RATIO = 176 / 667;
+
 export function seaStageHeight(l: Layout): number {
-  const proportional = l.height * 0.26;
+  const proportional = l.height * SEA_STAGE_RATIO;
   return Math.round(clamp(proportional, 150, 250));
 }

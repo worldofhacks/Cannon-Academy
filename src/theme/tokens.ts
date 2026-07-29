@@ -137,10 +137,16 @@ export const radius = {
   board: 26,
   /** Panel inside a board. */
   panel: 20,
+  /** The duel's parchment sheet. Measured at 22 on the board; was 20. */
+  sheet: 22,
   /** Standard card. */
   card: 18,
   /** Card sitting inside a card. */
   cardInner: 14,
+  /** The cannon tray's glyph tile. Measured off the board at 16 — this was 14 until the design
+   *  fixture caught it, and a 2pt radius drift is exactly the kind of thing a visual review misses
+   *  per-screen while making the whole app feel subtly unlike the design. */
+  tileLarge: 16,
   /** Swatches and small square tiles. */
   tile: 11,
   /** Inner note blocks. */
@@ -170,6 +176,12 @@ export const font = {
 export const type = {
   /** Screen title. */
   display: { fontFamily: font.displayBold, fontSize: 30, lineHeight: 36 },
+  /**
+   * The cannon tray's operator glyph, and the largest single character in the game. Measured at
+   * 32 on the board. It existed only as a hardcoded `fontSize: 32` at the call site until the
+   * design fixture noticed there was no token within 1pt of it.
+   */
+  glyph: { fontFamily: font.displayBold, fontSize: 32, lineHeight: 34 },
   /** Card headline. */
   title: { fontFamily: font.displayBold, fontSize: 19, lineHeight: 24 },
   /** Sub-headline inside a card. */

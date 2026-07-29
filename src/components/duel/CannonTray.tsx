@@ -145,12 +145,12 @@ const s = StyleSheet.create({
   glyphTile: {
     width: 64,
     height: 64,
-    borderRadius: radius.cardInner,
+    borderRadius: radius.tileLarge,
     backgroundColor: '#F0E2C8',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  glyph: { ...type.display, fontSize: 32, lineHeight: 34, color: color.inkDark },
+  glyph: { ...type.glyph, color: color.inkDark },
   range: { ...type.chip, color: color.inkDarkMuted },
 
   body: { flex: 1, gap: 5 },

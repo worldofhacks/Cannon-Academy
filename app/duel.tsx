@@ -21,7 +21,8 @@ import {
 import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
 import { cannonLook } from '../src/theme/cannonPresentation';
-import { seaStageHeight, useLayout } from '../src/theme/responsive';
+import { seaStageHeight } from '../src/theme/responsive';
+import { useLayout } from '../src/theme/useLayout';
 import { color, radius, space } from '../src/theme/tokens';
 import { duelReducer, initialDuelState, PHASE_DURATION_MS, type DuelPhase } from '../src/stores/duel';
 
@@ -272,8 +273,8 @@ const s = StyleSheet.create({
   sheet: {
     flex: 1,
     backgroundColor: color.parchment,
-    borderTopLeftRadius: radius.panel,
-    borderTopRightRadius: radius.panel,
+    borderTopLeftRadius: radius.sheet,
+    borderTopRightRadius: radius.sheet,
     overflow: 'hidden',
   },
 });
