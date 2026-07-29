@@ -210,6 +210,12 @@ export const CHEST_COIN_RANGE_BY_RARITY: Readonly<
   Record<ChestRarity, { readonly min: number; readonly max: number }>
 > = deepFreeze(CHEST_COIN_RANGE_BY_RARITY_RAW);
 
+/**
+ * A-033 — Harbor game chest price. Above the maximum common chest coin drop and roughly one
+ * strong-win purse; the demo store sells one repeatable chest only.
+ */
+export const HARBOR_CHEST_PRICE = 50;
+
 // ============================================================================================
 // Opponents
 // ============================================================================================
