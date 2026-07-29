@@ -163,5 +163,9 @@ named `draw` / `disconnected` / `victoryLap` is added, and AC-1 goes red first.
 
 ## 8. Commit
 
-Suite + this report on `ticket/T-013-duel-types`. Hash above is the post-prettier final bytes the
-matrix was measured against.
+| | |
+| --- | --- |
+| Commit | `e70b1ad` (`e70b1adb02f3db65daf2f133f8f7159cac6e4e86`) on `ticket/T-013-duel-types` |
+| Suite SHA-256 | `c5e80f2b28bd58ade1ef1e32c780c402c326ff411c583c7b59150b84181c970c` |
+
+Matrix was measured against those final post-prettier bytes. Scratchpad deleted.
