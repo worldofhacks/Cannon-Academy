@@ -46,6 +46,10 @@
  * the reset comparison the rewritten criterion asks for, and AC-17 (both replay-critical
  * orderings), AC-18 (zero-parameter templates) and AC-19 (the identifier grammar) added.
  *
+ * Round 3 (2026-07-28): AC-20 wraps `ExprError` at every evaluated site; AC-5 gains its negative
+ * half (`NO_TEMPLATE` never fires on a usable non-empty pool); AC-21 pins earliest-step
+ * failure precedence. Do not spy on `assertQuestion` — output validity only (locked-decision).
+ *
  * API surface, taken verbatim from the ticket's Context section:
  *
  *     generateQuestion({ templates, recentTemplateIds, rng }) -> readonly [Question, Rng]
@@ -60,7 +64,7 @@ import type { SkillId, Template } from '@content/schemas';
 import { createRng, nextInt, pick, shuffle } from '@engine/rng';
 import type { Rng } from '@engine/rng';
 import { buildDistractors } from '@engine/questions/distractors';
-import { evaluateNumber, evaluatePredicate } from '@engine/questions/expr';
+import { evaluateNumber, evaluatePredicate, ExprError } from '@engine/questions/expr';
 import { QuestionGenerationError, assertQuestion } from '@engine/questions/types';
 import type { Choice, Question } from '@engine/questions/types';
 import { CHOICE_COUNT, MAX_PARAM_SAMPLE_ATTEMPTS, RECENT_TEMPLATE_WINDOW } from '@engine/tuning';
@@ -1008,6 +1012,44 @@ describe('generateQuestion — empty pool (AC-5)', () => {
         'NO_TEMPLATE',
       );
     }
+  });
+
+  it('spec(T-007:AC-5) never throws NO_TEMPLATE when the pool is non-empty', () => {
+    // Negative half (amended 2026-07-28). The positive half alone was satisfied by an
+    // implementation that threw NO_TEMPLATE whenever recency filtering emptied the eligible
+    // pool — a criterion that names only the failure case constrains nothing about the success
+    // case (LESSONS.md L-038). Step 1 falls back; NO_TEMPLATE is reserved for the empty pool.
+    const alone = makeTemplate({
+      id: 'ac5-alone',
+      text: '{a}',
+      params: { a: [1, 1] },
+      answerExpr: 'a',
+    });
+    const histories: readonly (readonly string[])[] = [
+      [],
+      [alone.id],
+      [alone.id, alone.id, alone.id, alone.id, alone.id],
+      POOL.map((template) => template.id),
+    ];
+    const wrong: string[] = [];
+    for (const recentTemplateIds of histories) {
+      for (const seed of SWEEP_SEEDS) {
+        let thrown: unknown;
+        try {
+          generateQuestion({ templates: [alone], recentTemplateIds, rng: createRng(seed) });
+        } catch (error) {
+          thrown = error;
+        }
+        if (thrown instanceof QuestionGenerationError && thrown.code === 'NO_TEMPLATE') {
+          wrong.push(`history=${JSON.stringify(recentTemplateIds)} seed=${seed}: NO_TEMPLATE`);
+        } else if (thrown !== undefined) {
+          const name = thrown instanceof Error ? thrown.constructor.name : typeof thrown;
+          const code = thrown instanceof QuestionGenerationError ? thrown.code : 'no-code';
+          wrong.push(`history=${JSON.stringify(recentTemplateIds)} seed=${seed}: ${name}/${code}`);
+        }
+      }
+    }
+    expect(wrong).toStrictEqual([]);
   });
 });
 
@@ -2334,14 +2376,262 @@ describe('generateQuestion — parameter keys are expression identifiers (AC-19)
 });
 
 // =============================================================================================
+// AC-20 — ExprError at any evaluated site becomes INVALID_QUESTION
+// =============================================================================================
+
+/** Schema-valid but unevaluable — the shape that passed every round-2 fixture (LESSONS.md L-038). */
+const MALFORMED_EXPR = 'a +';
+
+const AC20_CONSTRAINT_TEMPLATE = makeTemplate({
+  id: 'ac20-bad-constraint',
+  text: '{a}',
+  params: { a: [1, 1] },
+  constraints: [MALFORMED_EXPR],
+  answerExpr: 'a',
+});
+
+const AC20_ANSWER_TEMPLATE = makeTemplate({
+  id: 'ac20-bad-answer',
+  text: '{a}',
+  params: { a: [1, 1] },
+  answerExpr: MALFORMED_EXPR,
+  distractors: ['a + 1', 'a - 1', 'a + 2'],
+});
+
+const AC20_DISTRACTOR_TEMPLATE = makeTemplate({
+  id: 'ac20-bad-distractor',
+  text: '{a}',
+  params: { a: [1, 1] },
+  answerExpr: 'a',
+  distractors: [MALFORMED_EXPR, 'a + 1', 'a - 1'],
+});
+
+/** Asserts INVALID_QUESTION naming the template and carrying an ExprError as `cause`. */
+function expectInvalidQuestionFromExpr(call: () => unknown, templateId: string): QuestionGenerationError {
+  const error = expectGenerationError(call, 'INVALID_QUESTION');
+  expect(error.message).toContain(templateId);
+  expect(error.cause, 'ExprError must be attached as cause').toBeInstanceOf(ExprError);
+  return error;
+}
+
+describe('generateQuestion — malformed expressions become INVALID_QUESTION (AC-20)', () => {
+  it('spec(T-007:AC-20) the three fixtures are schema-valid and each site throws ExprError directly', () => {
+    // Reachability first (LESSONS.md L-014/L-015): `"a +"` is admitted by `templateSchema`
+    // (`answerExpr`/`constraints`/`distractors` are plain strings), and each frozen evaluator
+    // raises `ExprError` on it. Without both, the generator's translation is untestable.
+    expect(AC20_CONSTRAINT_TEMPLATE.constraints).toStrictEqual([MALFORMED_EXPR]);
+    expect(AC20_ANSWER_TEMPLATE.answerExpr).toBe(MALFORMED_EXPR);
+    expect(AC20_DISTRACTOR_TEMPLATE.distractors[0]).toBe(MALFORMED_EXPR);
+
+    expect(() => evaluatePredicate(MALFORMED_EXPR, { a: 1 })).toThrow(ExprError);
+    expect(() => evaluateNumber(MALFORMED_EXPR, { a: 1 })).toThrow(ExprError);
+    expect(() => buildDistractors(AC20_DISTRACTOR_TEMPLATE, { a: 1 })).toThrow(ExprError);
+  });
+
+  it('spec(T-007:AC-20) wraps a malformed constraints entry as INVALID_QUESTION with ExprError cause', () => {
+    expectInvalidQuestionFromExpr(
+      () =>
+        generateQuestion({
+          templates: [AC20_CONSTRAINT_TEMPLATE],
+          recentTemplateIds: [],
+          rng: createRng(7),
+        }),
+      AC20_CONSTRAINT_TEMPLATE.id,
+    );
+  });
+
+  it('spec(T-007:AC-20) wraps a malformed answerExpr as INVALID_QUESTION with ExprError cause', () => {
+    expectInvalidQuestionFromExpr(
+      () =>
+        generateQuestion({
+          templates: [AC20_ANSWER_TEMPLATE],
+          recentTemplateIds: [],
+          rng: createRng(7),
+        }),
+      AC20_ANSWER_TEMPLATE.id,
+    );
+  });
+
+  it('spec(T-007:AC-20) wraps a malformed declared distractor as INVALID_QUESTION with ExprError cause', () => {
+    // `buildDistractors` documents `@throws {ExprError} unchanged` and is frozen outside this
+    // ticket's file_scopes. The translation is the generator's job at its own boundary.
+    expectInvalidQuestionFromExpr(
+      () =>
+        generateQuestion({
+          templates: [AC20_DISTRACTOR_TEMPLATE],
+          recentTemplateIds: [],
+          rng: createRng(7),
+        }),
+      AC20_DISTRACTOR_TEMPLATE.id,
+    );
+  });
+
+  it('spec(T-007:AC-20) never lets ExprError escape from any of the three sites, at every seed', () => {
+    const sites: readonly (readonly [string, Template])[] = [
+      ['constraints', AC20_CONSTRAINT_TEMPLATE],
+      ['answerExpr', AC20_ANSWER_TEMPLATE],
+      ['distractors', AC20_DISTRACTOR_TEMPLATE],
+    ];
+    const wrong: string[] = [];
+    for (const [site, template] of sites) {
+      for (const seed of ERROR_SWEEP_SEEDS) {
+        let thrown: unknown;
+        let returned = false;
+        try {
+          generateQuestion({ templates: [template], recentTemplateIds: [], rng: createRng(seed) });
+          returned = true;
+        } catch (error) {
+          thrown = error;
+        }
+        if (returned) {
+          wrong.push(`${site}@${seed}: returned normally`);
+          continue;
+        }
+        if (thrown instanceof ExprError) {
+          wrong.push(`${site}@${seed}: ExprError escaped (${thrown.code})`);
+          continue;
+        }
+        if (!(thrown instanceof QuestionGenerationError)) {
+          const name = thrown instanceof Error ? thrown.constructor.name : typeof thrown;
+          wrong.push(`${site}@${seed}: ${name}`);
+          continue;
+        }
+        if (thrown.code !== 'INVALID_QUESTION') {
+          wrong.push(`${site}@${seed}: code ${thrown.code}`);
+        }
+        if (!thrown.message.includes(template.id)) {
+          wrong.push(`${site}@${seed}: message omits template id`);
+        }
+        if (!(thrown.cause instanceof ExprError)) {
+          wrong.push(`${site}@${seed}: cause is not ExprError`);
+        }
+      }
+    }
+    expect(wrong).toStrictEqual([]);
+  });
+});
+
+// =============================================================================================
+// AC-21 — earliest-step failure wins when a template fails at two steps
+// =============================================================================================
+
+describe('generateQuestion — earliest-step failure precedence (AC-21)', () => {
+  /**
+   * Step 3 fails (unsatisfiable constraint) AND step 4 would fail (malformed answerExpr).
+   * The documented order reports CONSTRAINTS_UNSATISFIED — never the answerExpr diagnosis.
+   */
+  const STEP3_BEFORE_4 = makeTemplate({
+    id: 'ac21-step3-before-4',
+    text: '{a}',
+    params: { a: [1, 2] },
+    constraints: ['a > 100'],
+    answerExpr: MALFORMED_EXPR,
+    distractors: ['1', '2', '3'],
+  });
+
+  /**
+   * Step 5 fails (malformed distractor → ExprError) AND step 6 would fail (undeclared token).
+   * Both surface as INVALID_QUESTION; the step-5 diagnosis carries an ExprError cause, the
+   * step-6 render diagnosis does not.
+   */
+  const STEP5_BEFORE_6 = makeTemplate({
+    id: 'ac21-step5-before-6',
+    text: '{a} + {z}',
+    params: { a: [1, 1] },
+    answerExpr: 'a',
+    distractors: [MALFORMED_EXPR, 'a + 1', 'a - 1'],
+  });
+
+  it('spec(T-007:AC-21) the dual-failure fixtures really fail at both named steps', () => {
+    // Premises measured independently (LESSONS.md L-014): without both failures live, an
+    // "earliest wins" assertion cannot discriminate an out-of-order implementation.
+    expect(evaluatePredicate('a > 100', { a: 1 })).toBe(false);
+    expect(evaluatePredicate('a > 100', { a: 2 })).toBe(false);
+    expect(() => evaluateNumber(STEP3_BEFORE_4.answerExpr, { a: 1 })).toThrow(ExprError);
+
+    expect(() => buildDistractors(STEP5_BEFORE_6, { a: 1 })).toThrow(ExprError);
+    // The render failure is what AC-11 already pins: undeclared `{z}` leaves a brace behind.
+    expect(STEP5_BEFORE_6.text).toContain('{z}');
+    expect(Object.keys(STEP5_BEFORE_6.params)).toStrictEqual(['a']);
+  });
+
+  it('spec(T-007:AC-21) unsatisfiable constraints beat a malformed answerExpr', () => {
+    const wrong: string[] = [];
+    for (const seed of ERROR_SWEEP_SEEDS) {
+      let thrown: unknown;
+      try {
+        generateQuestion({
+          templates: [STEP3_BEFORE_4],
+          recentTemplateIds: [],
+          rng: createRng(seed),
+        });
+        wrong.push(`${seed}: returned normally`);
+        continue;
+      } catch (error) {
+        thrown = error;
+      }
+      if (!(thrown instanceof QuestionGenerationError)) {
+        const name = thrown instanceof Error ? thrown.constructor.name : typeof thrown;
+        wrong.push(`${seed}: ${name}`);
+        continue;
+      }
+      if (thrown.code !== 'CONSTRAINTS_UNSATISFIED') {
+        wrong.push(`${seed}: code ${thrown.code} (answerExpr diagnosis would be INVALID_QUESTION)`);
+      }
+      if (!thrown.message.includes(STEP3_BEFORE_4.id)) {
+        wrong.push(`${seed}: message omits template id`);
+      }
+    }
+    expect(wrong).toStrictEqual([]);
+  });
+
+  it('spec(T-007:AC-21) a malformed distractor beats an unrenderable text token', () => {
+    // Both failures carry INVALID_QUESTION, so the code alone cannot separate them — distinguish
+    // by `cause`: ExprError for step 5, absent for step 6.
+    const wrong: string[] = [];
+    for (const seed of ERROR_SWEEP_SEEDS) {
+      let thrown: unknown;
+      try {
+        generateQuestion({
+          templates: [STEP5_BEFORE_6],
+          recentTemplateIds: [],
+          rng: createRng(seed),
+        });
+        wrong.push(`${seed}: returned normally`);
+        continue;
+      } catch (error) {
+        thrown = error;
+      }
+      if (!(thrown instanceof QuestionGenerationError)) {
+        const name = thrown instanceof Error ? thrown.constructor.name : typeof thrown;
+        wrong.push(`${seed}: ${name}`);
+        continue;
+      }
+      if (thrown.code !== 'INVALID_QUESTION') {
+        wrong.push(`${seed}: code ${thrown.code}`);
+        continue;
+      }
+      if (!(thrown.cause instanceof ExprError)) {
+        wrong.push(
+          `${seed}: cause is ${thrown.cause === undefined ? 'absent' : typeof thrown.cause}` +
+            ' — render-first would omit ExprError cause',
+        );
+      }
+      if (!thrown.message.includes(STEP5_BEFORE_6.id)) {
+        wrong.push(`${seed}: message omits template id`);
+      }
+    }
+    expect(wrong).toStrictEqual([]);
+  });
+});
+
+// =============================================================================================
 // Definition of Done
 //
 // `spec-lint` harvests DoD checkboxes as well as criteria and numbers them in file order
 // (LESSONS.md L-036), so each behavioural item is carried by a test tagged `dod(T-007:n)`.
 // Items 1 and 3 are the traceability contract, 2 is the local gate script, 4 to 6 are
-// behavioural. Item 7 — "files changed are exactly those in `file_scopes`" — is a statement
-// about the repository's diff, not about the module, and is deliberately left uncovered; see
-// this ticket's test report.
+// behavioural. Item 7 is marked `[process]` and SKIP'd by the gate — leave it alone.
 // =============================================================================================
 
 const TICKET_PATH = fileURLToPath(new URL('../../../tickets/T-007.md', import.meta.url));
@@ -2453,6 +2743,9 @@ describe('generateQuestion — Definition of Done', () => {
     // "with the template id except for NO_TEMPLATE" — the carve-out this suite proposed and the
     // amendment accepted. It is asserted as a carve-out, not skipped: NO_TEMPLATE must still be
     // typed, still carry its code, and still say something.
+    //
+    // Round 3: the three ExprError translation sites (AC-20) are failure paths too. A generator
+    // that lets `ExprError` escape passed every earlier path check while breaking this DoD.
     const undeclared = makeTemplate({
       id: 'dod5-undeclared',
       text: '{a} + {z}',
@@ -2476,9 +2769,39 @@ describe('generateQuestion — Definition of Done', () => {
         UNSATISFIABLE_TEMPLATE.id,
       ],
       [
-        'INVALID_QUESTION',
+        'INVALID_QUESTION/render',
         () => generateQuestion({ templates: [undeclared], recentTemplateIds: [], rng: createRng(1) }),
         undeclared.id,
+      ],
+      [
+        'INVALID_QUESTION/bad-constraint',
+        () =>
+          generateQuestion({
+            templates: [AC20_CONSTRAINT_TEMPLATE],
+            recentTemplateIds: [],
+            rng: createRng(1),
+          }),
+        AC20_CONSTRAINT_TEMPLATE.id,
+      ],
+      [
+        'INVALID_QUESTION/bad-answerExpr',
+        () =>
+          generateQuestion({
+            templates: [AC20_ANSWER_TEMPLATE],
+            recentTemplateIds: [],
+            rng: createRng(1),
+          }),
+        AC20_ANSWER_TEMPLATE.id,
+      ],
+      [
+        'INVALID_QUESTION/bad-distractor',
+        () =>
+          generateQuestion({
+            templates: [AC20_DISTRACTOR_TEMPLATE],
+            recentTemplateIds: [],
+            rng: createRng(1),
+          }),
+        AC20_DISTRACTOR_TEMPLATE.id,
       ],
       [
         'DISTRACTOR_FAILURE',
@@ -2494,7 +2817,10 @@ describe('generateQuestion — Definition of Done', () => {
     expect(profile).toStrictEqual([
       'NO_TEMPLATE -> QuestionGenerationError/NO_TEMPLATE/no-id-required',
       'CONSTRAINTS_UNSATISFIED -> QuestionGenerationError/CONSTRAINTS_UNSATISFIED/names-id',
-      'INVALID_QUESTION -> QuestionGenerationError/INVALID_QUESTION/names-id',
+      'INVALID_QUESTION/render -> QuestionGenerationError/INVALID_QUESTION/names-id',
+      'INVALID_QUESTION/bad-constraint -> QuestionGenerationError/INVALID_QUESTION/names-id',
+      'INVALID_QUESTION/bad-answerExpr -> QuestionGenerationError/INVALID_QUESTION/names-id',
+      'INVALID_QUESTION/bad-distractor -> QuestionGenerationError/INVALID_QUESTION/names-id',
       'DISTRACTOR_FAILURE -> QuestionGenerationError/DISTRACTOR_FAILURE/names-id',
     ]);
   });
