@@ -126,7 +126,30 @@ function decideWrite({ repoRoot, absPath }) {
   if (!unit) return { allow: true, engaged: false };
 
   const phase = readControlFile(unit.unitRoot, 'phase');
-  if (!phase) return { allow: true, engaged: false };
+
+  if (!phase) {
+    // The root unit carries no phase file, so the orchestrator is unpoliced there — but a
+    // dispatched agent whose tooling lands it in the root rather than its worktree would be
+    // unpoliced too, which the T-007 Test Agent hit for real. While any wave is in flight the
+    // integration tree changes only by merge, so nobody hand-writes root src/ or __tests__/.
+    // Ledger, ticket and doc writes stay open, because amending a ticket in response to a test
+    // agent's findings is exactly the orchestrator's job mid-wave.
+    const rootUnit = unit.unitRoot === repoRoot;
+    const guardedDuringWave = unit.rel.startsWith('src/') || isTestPath(unit.rel);
+    if (rootUnit && guardedDuringWave && engagedPhases(repoRoot).size > 0) {
+      return {
+        allow: false,
+        engaged: true,
+        reason:
+          `BLOCKED: ${unit.rel} is in the integration tree, and a wave is in flight.\n` +
+          'While tickets are open, src/ and __tests__/ on the integration branch change only by ' +
+          'merge. If you are an agent, you are in the wrong directory — your work belongs in ' +
+          'your own worktree under .worktrees/, and a path that resolves here means your ' +
+          'tooling ignored your working directory. Verify with `git branch --show-current`.',
+      };
+    }
+    return { allow: true, engaged: false };
+  }
 
   const { rel } = unit;
 

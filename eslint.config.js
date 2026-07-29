@@ -6,7 +6,17 @@ export default tseslint.config(
     // .tdd-swarm/ is process documentation and shell scripts, but the guard policy that
     // lives there is executable code protecting the Iron Law — it gets linted like any
     // other hook (LESSONS.md L-007).
-    ignores: ['node_modules/**', 'coverage/**', 'dist/**', '.tdd-swarm/**', '!.tdd-swarm/**/*.cjs'],
+    // `.worktrees/**` holds other agents' live checkouts. Each worktree runs this same config on
+    // itself, so linting them from the root only re-lints copies whose paths no longer match the
+    // patterns below — and reports other agents' in-progress work as this unit's failure.
+    ignores: [
+      'node_modules/**',
+      'coverage/**',
+      'dist/**',
+      '.worktrees/**',
+      '.tdd-swarm/**',
+      '!.tdd-swarm/**/*.cjs',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

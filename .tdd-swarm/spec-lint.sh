@@ -16,6 +16,24 @@ ID=$(grep -m1 '^id:' "$TICKET" | awk '{print $2}')
 ACS=$(grep -oE '\*\*AC-[0-9]+\*\*' "$TICKET" | tr -d '*' | sort -u)
 [ -n "$ACS" ] || { echo "spec-lint: $ID declares no acceptance criteria"; exit 1; }
 
+# Definition-of-Done items. A DoD checkbox is a requirement the ticket makes but does
+# not number, so it was invisible to this gate until now (LESSONS.md L-032): 14 assertions
+# in T-013 cited dod(...) and could have been deleted without the gate noticing.
+# Every DoD line must be cited by >=1 test tagged dod(<id>:<n>), numbered in file order.
+DOD_COUNT=$(sed -n '/^## Definition of Done/,/^## /p' "$TICKET" | grep -cE '^- \[ \]|^- \[x\]')
+
+# Tickets merged before DoD coverage was enforced. They are WARN-only so the baseline stays
+# green (LESSONS.md L-002 — an ambiguously red gate teaches everyone to ignore it); every
+# other ticket FAILS on an uncovered DoD item. The list only ever shrinks: retagging a merged
+# ticket's tests means deleting its id from here. New tickets are enforced by default, which is
+# the safe direction for a gate whose whole failure mode was reporting green while enforcing
+# nothing.
+DOD_GRANDFATHERED='T-001 T-002 T-003 T-004 T-005 T-006 T-008 T-009 T-010 T-011 T-012 T-026'
+case " $DOD_GRANDFATHERED " in
+*" $ID "*) DOD_ENFORCED=0 ;;
+*) DOD_ENFORCED=1 ;;
+esac
+
 FAIL=0
 echo "== spec-lint $ID =="
 
@@ -29,10 +47,27 @@ for ac in $ACS; do
   fi
 done
 
+# Definition-of-Done coverage. Same bidirectional contract as the ACs.
+if [ "${DOD_COUNT:-0}" -gt 0 ]; then
+  i=1
+  while [ "$i" -le "$DOD_COUNT" ]; do
+    if grep -rqF "dod($ID:$i)" __tests__ 2>/dev/null; then
+      n=$(grep -roF "dod($ID:$i)" __tests__ 2>/dev/null | wc -l | tr -d ' ')
+      printf '  PASS  DoD-%s -> %s test(s)\n' "$i" "$n"
+    elif [ "$DOD_ENFORCED" -eq 1 ]; then
+      printf '  FAIL  DoD-%s has no test tagged dod(%s:%s)\n' "$i" "$ID" "$i"
+      FAIL=1
+    else
+      printf '  WARN  DoD-%s has no test tagged dod(%s:%s) [grandfathered]\n' "$i" "$ID" "$i"
+    fi
+    i=$((i + 1))
+  done
+fi
+
 # Reverse direction: a test file with no criterion citation at all.
 while IFS= read -r f; do
   [ "$f" = "$EXEMPT" ] && continue
-  if ! grep -qE 'spec\(T-[0-9]+:AC-[0-9]+\)' "$f"; then
+  if ! grep -qE 'spec\(T-[0-9]+:AC-[0-9]+\)|dod\(T-[0-9]+:[0-9]+\)' "$f"; then
     printf '  FAIL  %s cites no acceptance criterion\n' "$f"
     FAIL=1
   fi

@@ -54,3 +54,19 @@ another ticket's test file.
 **Every agent must work in a per-ticket subdirectory**, e.g. `scratchpad/t008-probe/`, and must
 delete it before committing. A mutation matrix with a uniform result (all killed or all survived)
 is a harness fault until proven otherwise.
+
+## DoD coverage in spec-lint (added 2026-07-28, closing L-032)
+
+`spec-lint` originally harvested only numbered `**AC-n**` criteria, so **Definition of Done
+checkboxes were invisible to the coverage gate** — 14 assertions in T-013 cited `dod(...)` and could
+have been deleted without the gate noticing. The gate measured what a ticket _numbered_, not what it
+_required_.
+
+It now harvests DoD checkboxes as well, numbered in file order, and expects tests tagged
+`dod(<ticket-id>:<n>)`. The reverse direction accepts a `dod(...)` citation as well as a `spec(...)`
+one, so a test file that covers only DoD items is no longer flagged as citing nothing.
+
+**Calibrated as WARN, not FAIL.** Every already-merged ticket predates the convention, so failing on
+an uncited DoD line would turn the whole history red for a rule none of it was written against.
+WARN makes the gap visible on every run while letting Wave 5 onward adopt `dod()` tagging. Promote
+to FAIL once a full wave has been authored under the convention.
