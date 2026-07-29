@@ -4,6 +4,7 @@
 **Branch:** `ticket/T-017-range-drill`
 **Phase:** `implement`
 **Active ticket:** `T-017`
+**Commit:** `2572fbda13144da3f71e169d0119b12a4efa7b03` — `feat(T-017): range drill session (full-rate mastery)`
 **Files changed:** `src/engine/drill.ts` (added) — exactly `file_scopes`, plus this report.
 
 ## Unit assertion
