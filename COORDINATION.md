@@ -40,7 +40,7 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 ## Current state at the time of writing
 
 - Engine: Wave 5 — **T-014…T-020 + T-034 done** (Wave 5 complete) (templates + range drill; drill API published below).
-  Wave 5 complete. **T-029** remains owner-blocked. Owner ruling **D-6** on **T-032**. **T-029**
+  Wave 5 complete. **T-035** shipped — A-011 unblocked on the engine side. **T-029** remains owner-blocked. Owner ruling **D-6** on **T-032**. **T-029**
   remains owner-blocked. Push `swarm/engine-core` after every ticket merge.
 - App track (`app/shell`): owns presentation; currently uses a placeholder question service that
   must not ship — real templates from T-014…T-016 replace it.
@@ -160,3 +160,8 @@ Notes for Track B:
 - Drive the scripted/banded opponent via `Opponent` (T-018); feed `RIVAL_ACTION` with its volley.
 - Mastery: apply `result.tally.bySkill` at half rate through T-010 after the duel ends (store).
 - Terminal order: `enemyHull <= 0` → victory, else `playerHull <= 0` → defeat.
+
+### T-035 — Tray capacity ()
+
+exports . App gun deck (A-011) must import this — no UI literal.
+Loadout _selection_ rules remain T-030 (, still backlog).

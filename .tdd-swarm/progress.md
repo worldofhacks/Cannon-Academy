@@ -2019,3 +2019,8 @@ Awaiting code review before merge.
 Code APPROVE_WITH_NITS ([T-034 Code Review](d21a6d73-563c-4bc5-8094-0ef2d27a2663));
 security PASS_WITH_NOTES ([T-034 Security Review](c01e0f01-8662-4d9e-9155-323c0f111874)).
 Merged + pushed. Engine Wave 5 tickets (T-014…T-020, T-032, T-034) done. **T-029** still owner-blocked.
+
+### T-035 — done (merged) — unblocks A-011
+
+Split from T-030: in . Frozen .
+App track may import for gun-deck slot count. T-030 still owns loadout rules.

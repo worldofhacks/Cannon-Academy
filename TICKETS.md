@@ -114,6 +114,7 @@ Cross-ticket probe green (T-007 × T-013). Evidence: `.tdd-swarm/reports/wave4-i
 | T-020 | Duel reducer — the pure turn-based state machine                               | done   | T-004, T-006, T-007, T-008, T-013        | `ticket/T-020-duel-reducer`             | capable  | frozen `80c4cdb1…`; impl `6ef7aaf`; merge landed; security PASS_WITH_NOTES          |
 | T-032 | Placement grants starter cannons only (D-6)                                    | done   | T-010, T-011                             | `ticket/T-032-placement-unlock-overlap` | standard | D-6; impl `ff66b32`; merge landed; security PASS                                    |
 | T-034 | Narrow template param keys to the expression-identifier grammar                | done   | T-003                                    | `ticket/T-034-param-key-grammar`        | standard | frozen `fcf0e43f…`; impl `9947577`; merge landed; security PASS_WITH_NOTES          |
+| T-035 | Export duel tray capacity (`TRAY_CAPACITY`) in tuning                          | done   | T-004                                    | `ticket/T-035-tray-capacity`            | standard | frozen `b994d1f714e4b150…`; unblocks A-011; T-030 consumes constant                 |
 
 ## Wave 6 — golden gate, mercy bot, machine extension
 

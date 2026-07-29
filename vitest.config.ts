@@ -11,6 +11,8 @@ export default defineConfig({
   test: {
     include: ['__tests__/**/*.test.ts'],
     environment: 'node',
+    // Heavy seeded sweeps (economy / templates) can exceed 5s under parallel load.
+    testTimeout: 20_000,
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
