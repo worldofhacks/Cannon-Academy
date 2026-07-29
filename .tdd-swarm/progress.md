@@ -2001,5 +2001,5 @@ Phase → implement. Implementer dispatched.
 
 ### T-034 unblocked — prettier style on frozen suite
 
-Orchestrator new hash . Feat already green (1721/1721).
-Implementer resumed for final gates / reviews.
+Orchestrator `style(T-034)` `9e0bd39`; new hash `fcf0e43f560bc63a…`. Feat `9947577` green; gates ALL PASS.
+Implementer resumed.
