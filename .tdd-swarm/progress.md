@@ -1779,8 +1779,8 @@ Phase reopened to `tests`; Test Agent fixing contract + adding AC-7 preflight (r
 - **T-014:** implementer BLOCKED confirmed; Test Agent amending near_doubles + AC-7 preflight (uncommitted).
 
 
-### T-032 FROZEN ( / ) — ACCEPT_WITH_NITS
+### T-032 FROZEN (`b07759c1b3a850e7…` / `f90cc07904d61d40…`) — ACCEPT_WITH_NITS
 
 [T-032 test-design review](08ef7c4b-d2da-41a7-ba08-26b11084ef5b): no Critical/Important.
-Suites encode D-6 starters-only + mastery composition; correctly RED (29 fail). Phase → .
-Frozen hashes: placement , mastery . Implementer dispatched.
+Suites encode D-6 starters-only + mastery composition; correctly RED (29 fail). Phase → `implement`.
+Frozen hashes: placement `b07759c1b3a850e7989dc8950e04a426c46af0260125285cbca79cf52a4d66fa`, mastery `f90cc07904d61d40cefe5c2ce11e054213b46dd983fde74a889bc56466122f8f`. Implementer dispatched.
