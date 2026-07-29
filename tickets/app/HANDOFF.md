@@ -1,4 +1,4 @@
-# App track — handoff, 2026-07-29 10:25
+# App track — handoff, 2026-07-29 10:35
 
 **Submission target: today, ~12:00.** Read this file, then `git log --oneline -15`, before anything.
 Supersedes `STATE.md` (which is now stale — it predates the chart rebuild, D-8, A-016 and A-017).
@@ -9,7 +9,7 @@ Supersedes `STATE.md` (which is now stale — it predates the chart rebuild, D-8
 
 |                    |                                                                                                                                                                         |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Integration branch | **`app/shell`**, worktree `.worktrees/wt-app`, tip **`81ccba9`**, pushed, clean                                                                                         |
+| Integration branch | **`app/shell`**, worktree `.worktrees/wt-app`, pushed and clean. Last code commit **`81ccba9`**; docs commits follow it — trust `git log`, not this cell                |
 | Tests              | **2,014 passing across 40 files**                                                                                                                                       |
 | Gates              | prettier, eslint, `tsc --noEmit` — all clean                                                                                                                            |
 | iOS worktree       | `/Users/quietguy/Documents/Dev/Gauntlet/cannon-academy-ios` (space-free path; the main repo path contains a space and iOS build scripts break on it — see `RELEASE.md`) |
@@ -22,7 +22,7 @@ if you need a second server.
 
 ---
 
-## 2. What happened in the last 90 minutes
+## 2. What landed this morning
 
 Five agents were running. **All four subagents died simultaneously on a session-usage limit**
 (resets 1pm America/Chicago). Their work was salvaged from the worktrees and is all committed —
@@ -47,6 +47,14 @@ Landed since the last handoff:
   Retrospective by design: 295 lines of shipped reducer under the MVP's largest checklist item that
   no ticket had ever specified.
 - **`51b2cdd` + `81ccba9` — A-017 and ruling D-8.**
+
+Then three docs commits carrying no code: `b92b97d` (this handoff), `cd5f8ca` (the hosting section
+below, written after actually building and running the web bundle), `63a0fbc` (punch list re-ranked
+around the noon hosting deadline).
+
+**Work already done that you should NOT repeat:** the web bundle has been built and smoke-tested in
+a browser — see §5A for exactly what was proven and what was not. Re-running the export is cheap and
+fine; re-litigating whether web works is not a good use of the remaining window.
 
 ---
 
