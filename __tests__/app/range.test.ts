@@ -141,7 +141,6 @@ type AnswerPlan = (question: Question, index: number) => number | null;
 
 const allCorrect: AnswerPlan = (q) => q.correctIndex;
 const allWrong: AnswerPlan = (q) => (q.correctIndex + 1) % CHOICE_COUNT;
-const allTimedOut: AnswerPlan = () => null;
 const firstNCorrect =
   (n: number): AnswerPlan =>
   (q, i) =>
@@ -173,6 +172,8 @@ function open(captain: Captain, length: number, over: { islandId?: IslandId; ski
 function atIsland(over: Partial<Captain> = {}): Captain {
   return {
     ...emptyCaptain(),
+    // A-027: openDrill refuses null/corrupt gradeBand. Isla Products' mult_facts needs ≤ band max 3.
+    gradeBand: 'g2_3',
     unlockedIslands: ['port_sumwich', ISLAND],
     currentIsland: ISLAND,
     ...over,
@@ -200,9 +201,11 @@ describe('A-009 gunnery range — what is drillable', () => {
   });
 
   it('spec(A-009:AC-1) every drillable skill on every island opens a real question of that skill', () => {
+    // A-027 ceilings openDrill by gradeBand; use the top band so every catalog skill is eligible.
+    const captain = { ...emptyCaptain(), gradeBand: 'g4_5' as const };
     for (const island of islands) {
       for (const skill of island.rangeSkills) {
-        const session = open(emptyCaptain(), 3, { islandId: island.id, skillId: skill });
+        const session = open(captain, 3, { islandId: island.id, skillId: skill });
         expect(session.skillId, `${island.id}/${skill}`).toBe(skill);
         // A skill listed as drillable whose template pool cannot be reached throws NO_TEMPLATE out
         // of T-007 on open — a range screen with nothing to ask. This is the loader's frozen test.
@@ -495,20 +498,31 @@ describe('A-009 gunnery range — practice costs nothing', () => {
     expect(m.attempts).toBe(NEEDED);
   });
 
-  it('spec(A-009:AC-5) a timed-out answer is no more expensive than a wrong one', () => {
+  it('spec(A-009:AC-5) a timed-out answer is free under D-8 / T-036 (does not complete the drill)', () => {
     const store = createCaptainStore(wealthy());
     const before = store.getState().captain;
+    let session = open(before, SHORT);
+    const questionBefore = session.current;
 
-    const session = runDrill(open(before, SHORT), allTimedOut);
-    commitDrill(store, session);
+    // Timeouts no longer advance `answered`, so runDrill(allTimedOut) would loop forever.
+    for (let i = 0; i < SHORT; i += 1) {
+      session = answerDrill(session, null, ELAPSED_MS);
+    }
+
+    expect(session.complete).toBe(false);
+    expect(session.answered).toBe(0);
+    expect(session.correct).toBe(0);
+    expect(session.current).toEqual(questionBefore);
+
+    const outcome = commitDrill(store, session);
+    expect(outcome.applied).toBe(false);
 
     const after = store.getState().captain;
     expect(after.coins).toBe(before.coins);
     expect(after.wins).toBe(before.wins);
     expect(after.rankTier).toBe(before.rankTier);
-    expect(changedFields(before, after)).toEqual(['mastery']);
-    expect(after.mastery[SKILL]!.attempts).toBe(SHORT);
-    expect(after.mastery[SKILL]!.weightedCorrect).toBe(0);
+    expect(changedFields(before, after)).toEqual([]);
+    expect(after.mastery[SKILL]).toEqual(before.mastery[SKILL]);
   });
 
   it('spec(A-009:AC-5) wrong answers mixed into a good drill subtract nothing from what was earned', () => {
