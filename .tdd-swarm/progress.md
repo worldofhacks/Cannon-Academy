@@ -2046,3 +2046,13 @@ ARCHITECTURE §4.3 corrected: +1 damage + presentation arc. `BASE_BALLS_PER_VOLL
 ### T-025 — done (merged) — iterative expr walks
 
 Explicit-stack walks. Frozen `7ccb82a558204203…`. AC-3 under \`--stack-size=512\`.
+
+## T-029 / D-7 — K-1 practice lane (2026-07-29)
+
+Owner ruling D-7 implemented:
+
+- `add_within_10` on `port_sumwich.rangeSkills`
+- Invented range cannon `saker` (`skill: add_within_10`, unlock range/port_sumwich/tier 1)
+- **Fog decision named:** early Isla Products fog lift **accepted as harmless** — band-gating still governs served content; predecessor rule unchanged
+- Frozen T-003/T-006/T-008/T-032 pins amended (11 cannons, 8 range guns), not deleted
+- Original third-starter/`sub_within_10` idea deferred

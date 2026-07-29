@@ -40,7 +40,7 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 ## Current state at the time of writing
 
 - Engine: Wave 5 — **T-014…T-020 + T-034 done** (Wave 5 complete) (templates + range drill; drill API published below).
-  **T-035** shipped `TRAY_CAPACITY` — A-011 unblocked on the engine side. **T-029** remains owner-blocked. Owner ruling **D-6** on **T-032**.
+  **T-035** shipped `TRAY_CAPACITY` — A-011 unblocked. **T-029 / D-7** shipped (`add_within_10` on Port Sumwich + `saker` range payoff; early Isla Products fog accepted). Owner ruling **D-6** on **T-032**.
   Push `swarm/engine-core` after every ticket merge.
 - App track (`app/shell`): owns presentation; currently uses a placeholder question service that
   must not ship — real templates from T-014…T-016 replace it.

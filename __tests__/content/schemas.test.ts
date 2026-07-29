@@ -153,10 +153,11 @@ describe('id unions', () => {
     expect(unionMatchesArray).toBe(true);
   });
 
-  it('spec(T-003:AC-1) CANNON_IDS lists the ten cannon ids in ticket order with no duplicates', () => {
+  it('spec(T-003:AC-1) CANNON_IDS lists the eleven cannon ids in ticket order with no duplicates', () => {
     expect(CANNON_IDS).toEqual([
       'swivel_gun',
       'culverin',
+      'saker', // T-029 / D-7 — invented range payoff for add_within_10
       'six_pounder',
       'chain_shot',
       'nine_pounder',
