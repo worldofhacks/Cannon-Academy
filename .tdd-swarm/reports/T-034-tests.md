@@ -2,12 +2,13 @@
 
 | | |
 | --- | --- |
-| Status | `DONE` (RED) |
+| Status | `DONE` (RED) — test-design I-1…I-3 closed |
 | Worktree | `.worktrees/wt-T-034` |
 | Branch | `ticket/T-034-param-key-grammar` |
 | Phase | `tests` |
 | Test file | `__tests__/content/schemas.test.ts` (T-034 block appended) |
 | `src/` touched | **no** |
+| Review | `.tdd-swarm/reports/T-034-test-design-review.md` (`ACCEPT_WITH_NITS`) |
 
 ---
 
@@ -26,6 +27,16 @@ DoD-5 fail for that reason. Frozen T-003 / T-026 cases above the divider stay gr
 
 ---
 
+## 1b. Test-design nits closed (Important)
+
+| # | Fix |
+| --- | --- |
+| **I-1** | `isT002Ident` no longer uses `evaluateNumber(key, env) === 7` alone (misclassified `"7"` as IDENT). Empty-env success ⇒ not IDENT (NUMBER literals); bound-env sentinel success ⇒ IDENT. Corpus adds `"7"` and `"0"`. |
+| **I-2** | DoD-5 comment: `file_scopes` includes `expr.ts` for pure IDENT export (orchestrator adjudication). |
+| **I-3** | DoD-5 export regex documents preferred `IDENT_PATTERN` / `isIdent` / `isIdentifier` (symbol must contain Ident/IDENT/Identifier). |
+
+---
+
 ## 2. Deliverable
 
 | Path | Role |
@@ -33,7 +44,9 @@ DoD-5 fail for that reason. Frozen T-003 / T-026 cases above the divider stay gr
 | `__tests__/content/schemas.test.ts` | Appended T-034 suite under a marked divider; T-003/T-026 untouched |
 | `.tdd-swarm/reports/T-034-tests.md` | This report |
 
-Commit message: `test(T-034): failing tests for param key identifier grammar`
+Commits:
+- `51c37df` — `test(T-034): failing tests for param key identifier grammar`
+- (this) — `test(T-034): fix AC-4 IDENT oracle; digit-only corpus; DoD-5 comments`
 
 ---
 
@@ -48,8 +61,8 @@ npx vitest run __tests__/content/schemas.test.ts
 | Failure | Why (current schema) |
 | --- | --- |
 | AC-2 × 5 (`a-b`, `2x`, `""`, `a b`, `a.b`) | `safeParse` succeeds; expect fail + issue naming the key |
-| AC-4 drift corpus | schema accepts 11 non-IDENT keys that `evaluateNumber` rejects as idents |
-| DoD-5 | `schemas.ts` does not import from `@engine/questions/expr`; no shared export |
+| AC-4 drift corpus | schema accepts 13 non-IDENT keys (incl. `"7"` / `"0"`) that the IDENT oracle rejects |
+| DoD-5 | `schemas.ts` does not import from `@engine/questions/expr`; no Ident/IDENT export yet |
 
 Still green (and must stay green after implementer lands):
 
@@ -68,33 +81,21 @@ Still green (and must stay green after implementer lands):
 | AC-1 | Legal keys `_x`, `Total`, `a1`, `A_1b2`, `z_`, `a`, `n` parse; keys preserved |
 | AC-2 | Enumerated reject set; each failure must name the key (path segment or message) |
 | AC-3 | Every `src/content/templates/*.json` entry parses; every key is T-002 IDENT |
-| AC-4 | Shared corpus: `templateSchema` acceptance ≡ `evaluateNumber(key, env) === 7` |
+| AC-4 | Shared corpus (incl. digit-only `"7"`/`"0"`): schema acceptance ≡ `isT002Ident` (empty-env rejects NUMBER literals) |
 | DoD-1…4 | Spec/DoD tag hygiene + local-gates wiring (no skip/only) |
-| DoD-5 | schemas imports IDENT helper from `@engine/questions/expr`; no duplicated `[A-Za-z_][A-Za-z0-9_]*` literal; expr exports an Ident/IDENT symbol |
+| DoD-5 | schemas imports from `@engine/questions/expr`; no duplicated char-class literal; expr exports Ident/IDENT/Identifier-named symbol (e.g. `IDENT_PATTERN`) |
 | DoD-6 | Narrowing lives in `src/content/schemas.ts`; no new `param*`/`ident*` content module |
 
 ---
 
 ## 5. Implementer target
 
-In `src/content/schemas.ts`, narrow `params` keys to T-002 `IDENT := [A-Za-z_][A-Za-z0-9_]*`
-so illegal keys fail with an issue that names them. Prefer importing a shared
-predicate/pattern exported from `@engine/questions/expr` (DoD-5 / locked decision)
-rather than pasting a second regex literal into the schema file.
+1. Export `IDENT_PATTERN` (or `isIdent` / `isIdentifier`) from `src/engine/questions/expr.ts` — pure surface; no evaluation semantics change (`file_scopes` includes this file).
+2. In `src/content/schemas.ts`, import that export and narrow `params` keys so illegal keys fail with an issue that names them. Do not paste a second `[A-Za-z_][A-Za-z0-9_]*` literal into schemas.
 
 ---
 
-## 6. Ambiguities for orchestrator adjudication
+## 6. Adjudications (resolved)
 
-1. **file_scopes vs shared import** — Ticket `file_scopes` is only
-   `src/content/schemas.ts`, and Out of Scope says “no change to T-002's evaluator”,
-   but the locked decision + DoD-5 require importing the IDENT definition from
-   `@engine/questions/expr` (which today does not export one). Confirm whether a
-   one-line `export` of an existing helper/`IDENT_PATTERN` in `expr.ts` is allowed
-   as a dependency touch, or whether schemas may define a single named pattern and
-   rely on AC-4's behavioural drift check alone.
-2. **Error shape for naming the key** — AC-2 accepts either a Zod `path` segment equal
-   to the key or a `message` containing it (empty key: path only). Pin a preferred
-   shape if implementer review wants one API.
-3. **Ticket status file** — Worktree still has a dirty `tickets/T-034.md`
-   (`status: in-progress`) matching the ledger tip; left unstaged (tests phase).
+1. **file_scopes vs shared import** — Resolved in `a178ba6`: `expr.ts` is in scope for a pure IDENT export.
+2. **AC-2 error shape** — Path segment **or** message naming the key is accepted.

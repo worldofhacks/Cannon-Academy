@@ -957,13 +957,16 @@ const ILLEGAL_PARAM_KEYS = ['a-b', '2x', '', 'a b', 'a.b'] as const;
 
 /**
  * Shared drift corpus for AC-4: legal + illegal + a few near-misses so neither side can
- * quietly widen or narrow without the other noticing.
+ * quietly widen or narrow without the other noticing. Digit-only strings (`"7"`, `"0"`) are
+ * NUMBER literals in T-002 — not IDENT — and must be rejected by both sides (I-1).
  */
 const IDENT_DRIFT_CORPUS: readonly string[] = [
   ...LEGAL_PARAM_KEYS,
   ...ILLEGAL_PARAM_KEYS,
   'x-y',
   '1a',
+  '7',
+  '0',
   'a/b',
   'a+b',
   'foo.bar',
@@ -1000,11 +1003,25 @@ function issuesNameKey(
 }
 
 /**
- * T-002 IDENT membership measured through the evaluator: a string is an identifier iff it
- * tokenises as a single IDENT and resolves from the environment. Uses a null-prototype env so
+ * T-002 IDENT membership via the live evaluator — without mistaking NUMBER literals for idents.
+ *
+ * A pure digit string like `"7"` evaluates successfully with an empty env (NUMBER token). An
+ * IDENT never does: it needs a binding. So: empty-env success ⇒ not IDENT; empty-env failure +
+ * bound-env success returning the sentinel ⇒ single IDENT that resolves. Null-prototype env so
  * `__proto__` / `constructor` probe the grammar, not Object.prototype.
+ *
+ * Once DoD-5 lands, prefer the shared `IDENT_PATTERN` / Ident helper export from expr.
  */
 function isT002Ident(key: string): boolean {
+  const emptyEnv = Object.create(null) as Record<string, number>;
+  try {
+    evaluateNumber(key, emptyEnv);
+    // Env-free success ⇒ NUMBER (or other non-IDENT primary), not an identifier.
+    return false;
+  } catch {
+    // fall through — candidates must fail without a binding
+  }
+
   const env = Object.create(null) as Record<string, number>;
   env[key] = 7;
   try {
@@ -1151,9 +1168,12 @@ describe('T-034 Definition of Done', () => {
     expect(schemasSrc).toMatch(/from\s+['"]@engine\/questions\/expr['"]/);
     expect(schemasSrc).not.toMatch(/\[A-Za-z_\]\[A-Za-z0-9_\]\*/);
 
-    // Expr must export a reusable identifier predicate/pattern for the schema to import.
-    // (file_scopes lists only schemas.ts — see report ambiguity if this export is disputed.)
-    expect(exprSrc).toMatch(/export\s+(?:const|function)\s+\w*(?:Ident|IDENT|Identifier)\w*/);
+    // file_scopes includes expr.ts for a pure IDENT export (orchestrator adjudication).
+    // Preferred names: IDENT_PATTERN, isIdent, isIdentifier — symbol must contain
+    // Ident / IDENT / Identifier (PARAM_KEY_PATTERN alone is not enough).
+    expect(exprSrc).toMatch(
+      /export\s+(?:const|function)\s+[A-Za-z0-9_]*?(?:Ident|IDENT|Identifier)[A-Za-z0-9_]*/,
+    );
   });
 
   it('dod(T-034:6) production scope for the narrowing is src/content/schemas.ts', () => {
