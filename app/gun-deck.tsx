@@ -1,5 +1,5 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -114,25 +114,6 @@ export default function GunDeck() {
   const [pending, setPending] = useState<Extract<SelectResult, { kind: 'full' }> | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  /**
-   * Which guns wore the badge when the deck opened — captured, then marked seen.
-   *
-   * Rendering `slot.isNew` straight would be self-erasing: `markCannonsSeen` writes to the store,
-   * the store re-renders this screen, and the badge vanishes on the same frame the child arrived to
-   * look at it. AC-5 says "new until seen", and seen means seen by a person.
-   */
-  const [newAtOpen] = useState<ReadonlySet<CannonId>>(() => {
-    const at = captainStore.getState().captain;
-    const seen = new Set(at.seenCannons);
-    return new Set(at.ownedCannons.filter((id) => !seen.has(id)));
-  });
-
-  useEffect(() => {
-    // Once, on open. `seenCannons` is a set union in the store, so a gun that drops into the hold
-    // while this screen is up stays unseen and will still be badged the next time the deck opens.
-    captainStore.getState().markCannonsSeen(captainStore.getState().captain.ownedCannons);
-  }, []);
-
   const slots = useMemo(() => deckSlots(captain, draft), [captain, draft]);
   const byId = useMemo(() => new Map(slots.map((s) => [s.cannon.id, s])), [slots]);
 
@@ -149,7 +130,7 @@ export default function GunDeck() {
   const inHold = useMemo(() => slots.filter((s) => !s.equipped), [slots]);
 
   const emptySlots = Math.max(0, TRAY_CAPACITY - onDeck.length);
-  const newCount = inHold.filter((s) => s.isNew || newAtOpen.has(s.cannon.id)).length;
+  const newCount = inHold.filter((s) => s.isNew).length;
 
   const ownedGlyphs = useMemo(
     () => new Set(captain.ownedCannons.map((id) => cannonLook[id].glyph)),
@@ -185,6 +166,15 @@ export default function GunDeck() {
    * Leaving IS committing — the board gives this screen one exit and no separate confirm button.
    * A refused commit does not navigate, which is what keeps AC-4 from being a dead end: the child
    * stays on the deck with the message rather than landing on a duel with no gun on it.
+   *
+   * Marking seen happens HERE, on the way out, and deliberately not on the way in. Marking on open
+   * is self-erasing in two different ways: `markCannonsSeen` re-renders this screen, and — the one
+   * that actually shipped — the screen re-mounts (StrictMode in development, a router redirect in
+   * production), so a "capture the badge before marking" guard reads a store that the *previous*
+   * mount already marked. The badge then never renders at all, while every unit test still passes,
+   * because the suite exercises `deckSlots` and `markCannonsSeen` and cannot see a mount cycle.
+   * Marking on exit is remount-proof and it is also the truer reading of AC-5: seen means a child
+   * looked at the deck and left it, not that a component happened to mount.
    */
   const leave = () => {
     const result = commitLoadout(captain, draft);
@@ -193,7 +183,9 @@ export default function GunDeck() {
       setRefusal(refusalText(result.refusal));
       return;
     }
-    captainStore.getState().equipCannons(result.loadout);
+    const store = captainStore.getState();
+    store.equipCannons(result.loadout);
+    store.markCannonsSeen(store.captain.ownedCannons);
     router.replace(`/${resolveDestination(captainStore.getState().captain)}`);
   };
 
@@ -354,7 +346,7 @@ export default function GunDeck() {
             <HoldCard
               key={slot.cannon.id}
               slot={slot}
-              isNew={slot.isNew || newAtOpen.has(slot.cannon.id)}
+              isNew={slot.isNew}
               width={cardWidth}
               tx={tx}
               ax={ax}
