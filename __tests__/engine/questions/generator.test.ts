@@ -50,6 +50,12 @@
  * half (`NO_TEMPLATE` never fires on a usable non-empty pool); AC-21 pins earliest-step
  * failure precedence. Do not spy on `assertQuestion` — output validity only (locked-decision).
  *
+ * Round 4 (2026-07-28): AC-11 requires `cause === undefined` on every render-failure seed;
+ * AC-20 requires the attached cause's `code` and `message` match the frozen site evaluator
+ * (not merely `instanceof ExprError`); AC-21's step-5 diagnosis uses that identity rule, and
+ * step-6 absence rides on AC-11 rather than being implied only by the dual-failure fixture.
+ * A render-first mutant attaching a fabricated `ExprError` cause passed all 81 round-3 tests.
+ *
  * API surface, taken verbatim from the ticket's Context section:
  *
  *     generateQuestion({ templates, recentTemplateIds, rng }) -> readonly [Question, Rng]
@@ -1512,6 +1518,8 @@ describe('generateQuestion — unrendered tokens (AC-11)', () => {
     // Definition of Done: "Every failure path throws a typed QuestionGenerationError with a
     // code and the template id."
     expect(error.message).toContain(template.id);
+    // Render failures are not expression failures — `cause` must be absent (round-4 amendment).
+    expect(error.cause, 'render INVALID_QUESTION must not carry a cause').toBeUndefined();
   });
 
   it('spec(T-007:AC-11) throws INVALID_QUESTION for a stray brace of either kind', () => {
@@ -1528,6 +1536,7 @@ describe('generateQuestion — unrendered tokens (AC-11)', () => {
         'INVALID_QUESTION',
       );
       expect(error.message, id).toContain(id);
+      expect(error.cause, `${id}: render failure must not carry a cause`).toBeUndefined();
     }
   });
 
@@ -1536,6 +1545,8 @@ describe('generateQuestion — unrendered tokens (AC-11)', () => {
     // just at one fixture." Same correction as AC-7's sweep and for the same reason — the first
     // draft caught bare here too, and the cross-model review's second live mutant was exactly
     // this one wearing a different code (LESSONS.md L-034).
+    // Round 4: absent `cause` is part of that per-seed contract — a fabricated ExprError cause
+    // on a render-first reorder defeated AC-21's instanceof check while AC-11 never looked.
     const template = makeTemplate({
       id: 'undeclared-every-seed',
       text: '{a} + {z} = ?',
@@ -1551,6 +1562,29 @@ describe('generateQuestion — unrendered tokens (AC-11)', () => {
       (seed) => `${seed}: QuestionGenerationError/INVALID_QUESTION/names-id`,
     );
     expect(classified).toStrictEqual(expected);
+
+    const causeProfile = ERROR_SWEEP_SEEDS.map((seed) => {
+      try {
+        generateQuestion({ templates: [template], recentTemplateIds: [], rng: createRng(seed) });
+        return `${seed}: returned normally`;
+      } catch (error) {
+        if (!(error instanceof QuestionGenerationError)) {
+          const name = error instanceof Error ? error.constructor.name : typeof error;
+          return `${seed}: ${name}`;
+        }
+        if (error.cause !== undefined) {
+          const detail =
+            error.cause instanceof ExprError
+              ? `ExprError/${error.cause.code}`
+              : error.cause instanceof Error
+                ? error.cause.constructor.name
+                : typeof error.cause;
+          return `${seed}: cause=${detail}`;
+        }
+        return `${seed}: cause=absent`;
+      }
+    });
+    expect(causeProfile).toStrictEqual(ERROR_SWEEP_SEEDS.map((seed) => `${seed}: cause=absent`));
   });
 
   it('spec(T-007:AC-11) does not reject a text whose every token is declared', () => {
@@ -2406,11 +2440,36 @@ const AC20_DISTRACTOR_TEMPLATE = makeTemplate({
   distractors: [MALFORMED_EXPR, 'a + 1', 'a - 1'],
 });
 
-/** Asserts INVALID_QUESTION naming the template and carrying an ExprError as `cause`. */
-function expectInvalidQuestionFromExpr(call: () => unknown, templateId: string): QuestionGenerationError {
+/**
+ * The ExprError a frozen site evaluator throws for `call`. Used as the AC-20 identity baseline:
+ * a fabricated `instanceof ExprError` with a different `code`/`message` must not pass.
+ */
+function captureExprError(call: () => unknown): ExprError {
+  let thrown: unknown;
+  try {
+    call();
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown, 'expected the frozen evaluator to throw ExprError').toBeInstanceOf(ExprError);
+  return thrown as ExprError;
+}
+
+/**
+ * Asserts INVALID_QUESTION naming the template and carrying a cause whose `code` and `message`
+ * match the independently measured frozen-evaluator ExprError (AC-20 identity rule).
+ */
+function expectInvalidQuestionFromExpr(
+  call: () => unknown,
+  templateId: string,
+  expectedCause: ExprError,
+): QuestionGenerationError {
   const error = expectGenerationError(call, 'INVALID_QUESTION');
   expect(error.message).toContain(templateId);
   expect(error.cause, 'ExprError must be attached as cause').toBeInstanceOf(ExprError);
+  const cause = error.cause as ExprError;
+  expect(cause.code, 'cause.code must match the frozen evaluator').toBe(expectedCause.code);
+  expect(cause.message, 'cause.message must match the frozen evaluator').toBe(expectedCause.message);
   return error;
 }
 
@@ -2429,6 +2488,8 @@ describe('generateQuestion — malformed expressions become INVALID_QUESTION (AC
   });
 
   it('spec(T-007:AC-20) wraps a malformed constraints entry as INVALID_QUESTION with ExprError cause', () => {
+    // Params are fixed at `{ a: 1 }` by the fixture ranges — measure the frozen diagnosis once.
+    const expectedCause = captureExprError(() => evaluatePredicate(MALFORMED_EXPR, { a: 1 }));
     expectInvalidQuestionFromExpr(
       () =>
         generateQuestion({
@@ -2437,10 +2498,12 @@ describe('generateQuestion — malformed expressions become INVALID_QUESTION (AC
           rng: createRng(7),
         }),
       AC20_CONSTRAINT_TEMPLATE.id,
+      expectedCause,
     );
   });
 
   it('spec(T-007:AC-20) wraps a malformed answerExpr as INVALID_QUESTION with ExprError cause', () => {
+    const expectedCause = captureExprError(() => evaluateNumber(MALFORMED_EXPR, { a: 1 }));
     expectInvalidQuestionFromExpr(
       () =>
         generateQuestion({
@@ -2449,12 +2512,14 @@ describe('generateQuestion — malformed expressions become INVALID_QUESTION (AC
           rng: createRng(7),
         }),
       AC20_ANSWER_TEMPLATE.id,
+      expectedCause,
     );
   });
 
   it('spec(T-007:AC-20) wraps a malformed declared distractor as INVALID_QUESTION with ExprError cause', () => {
     // `buildDistractors` documents `@throws {ExprError} unchanged` and is frozen outside this
     // ticket's file_scopes. The translation is the generator's job at its own boundary.
+    const expectedCause = captureExprError(() => buildDistractors(AC20_DISTRACTOR_TEMPLATE, { a: 1 }));
     expectInvalidQuestionFromExpr(
       () =>
         generateQuestion({
@@ -2463,10 +2528,18 @@ describe('generateQuestion — malformed expressions become INVALID_QUESTION (AC
           rng: createRng(7),
         }),
       AC20_DISTRACTOR_TEMPLATE.id,
+      expectedCause,
     );
   });
 
   it('spec(T-007:AC-20) never lets ExprError escape from any of the three sites, at every seed', () => {
+    // Identity baselines measured independently via the frozen modules (round-4 amendment).
+    // Fixtures pin every param to 1, so one capture per site covers the whole seed sweep.
+    const expectedBySite: Readonly<Record<string, ExprError>> = {
+      constraints: captureExprError(() => evaluatePredicate(MALFORMED_EXPR, { a: 1 })),
+      answerExpr: captureExprError(() => evaluateNumber(MALFORMED_EXPR, { a: 1 })),
+      distractors: captureExprError(() => buildDistractors(AC20_DISTRACTOR_TEMPLATE, { a: 1 })),
+    };
     const sites: readonly (readonly [string, Template])[] = [
       ['constraints', AC20_CONSTRAINT_TEMPLATE],
       ['answerExpr', AC20_ANSWER_TEMPLATE],
@@ -2474,6 +2547,11 @@ describe('generateQuestion — malformed expressions become INVALID_QUESTION (AC
     ];
     const wrong: string[] = [];
     for (const [site, template] of sites) {
+      const expectedCause = expectedBySite[site];
+      if (expectedCause === undefined) {
+        wrong.push(`${site}: missing identity baseline`);
+        continue;
+      }
       for (const seed of ERROR_SWEEP_SEEDS) {
         let thrown: unknown;
         let returned = false;
@@ -2504,6 +2582,13 @@ describe('generateQuestion — malformed expressions become INVALID_QUESTION (AC
         }
         if (!(thrown.cause instanceof ExprError)) {
           wrong.push(`${site}@${seed}: cause is not ExprError`);
+          continue;
+        }
+        if (thrown.cause.code !== expectedCause.code || thrown.cause.message !== expectedCause.message) {
+          wrong.push(
+            `${site}@${seed}: cause ${thrown.cause.code}/${JSON.stringify(thrown.cause.message)}` +
+              ` ≠ frozen ${expectedCause.code}/${JSON.stringify(expectedCause.message)}`,
+          );
         }
       }
     }
@@ -2531,8 +2616,8 @@ describe('generateQuestion — earliest-step failure precedence (AC-21)', () => 
 
   /**
    * Step 5 fails (malformed distractor → ExprError) AND step 6 would fail (undeclared token).
-   * Both surface as INVALID_QUESTION; the step-5 diagnosis carries an ExprError cause, the
-   * step-6 render diagnosis does not.
+   * Both surface as INVALID_QUESTION; the step-5 diagnosis carries an ExprError cause matching
+   * AC-20's identity rule, and the step-6 render diagnosis has `cause` absent (AC-11).
    */
   const STEP5_BEFORE_6 = makeTemplate({
     id: 'ac21-step5-before-6',
@@ -2550,7 +2635,8 @@ describe('generateQuestion — earliest-step failure precedence (AC-21)', () => 
     expect(() => evaluateNumber(STEP3_BEFORE_4.answerExpr, { a: 1 })).toThrow(ExprError);
 
     expect(() => buildDistractors(STEP5_BEFORE_6, { a: 1 })).toThrow(ExprError);
-    // The render failure is what AC-11 already pins: undeclared `{z}` leaves a brace behind.
+    // The render failure is what AC-11 already pins (including absent cause on every seed):
+    // undeclared `{z}` leaves a brace behind. Step-6 absence is not implied only here.
     expect(STEP5_BEFORE_6.text).toContain('{z}');
     expect(Object.keys(STEP5_BEFORE_6.params)).toStrictEqual(['a']);
   });
@@ -2587,7 +2673,10 @@ describe('generateQuestion — earliest-step failure precedence (AC-21)', () => 
 
   it('spec(T-007:AC-21) a malformed distractor beats an unrenderable text token', () => {
     // Both failures carry INVALID_QUESTION, so the code alone cannot separate them — distinguish
-    // by `cause`: ExprError for step 5, absent for step 6.
+    // by `cause`: step 5 matches AC-20's frozen `buildDistractors` identity (code+message), not
+    // merely `instanceof ExprError`; step 6's absent cause is asserted by AC-11 on a pure-render
+    // fixture. A render-first cheat that fabricates any ExprError cause dies here on identity.
+    const expectedCause = captureExprError(() => buildDistractors(STEP5_BEFORE_6, { a: 1 }));
     const wrong: string[] = [];
     for (const seed of ERROR_SWEEP_SEEDS) {
       let thrown: unknown;
@@ -2615,6 +2704,12 @@ describe('generateQuestion — earliest-step failure precedence (AC-21)', () => 
         wrong.push(
           `${seed}: cause is ${thrown.cause === undefined ? 'absent' : typeof thrown.cause}` +
             ' — render-first would omit ExprError cause',
+        );
+      } else if (thrown.cause.code !== expectedCause.code || thrown.cause.message !== expectedCause.message) {
+        wrong.push(
+          `${seed}: cause ${thrown.cause.code}/${JSON.stringify(thrown.cause.message)}` +
+            ` ≠ frozen buildDistractors ${expectedCause.code}/${JSON.stringify(expectedCause.message)}` +
+            ' — fabricated ExprError would pass instanceof alone',
         );
       }
       if (!thrown.message.includes(STEP5_BEFORE_6.id)) {
