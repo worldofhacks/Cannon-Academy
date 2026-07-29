@@ -1911,3 +1911,7 @@ Test-design review dispatched.
 ### T-018 FROZEN (`812e15106b8c08b2…`) — ACCEPT_WITH_NITS
 
 [T-018 test-design](ad6ea5b7-a15c-4c9b-8fc6-68bd059feab8): no Critical/Important. Phase → implement.
+
+### T-018 TEST_DISPUTE closed — DoD-3 header self-poison
+
+Same class as T-017. Suite fix re-frozen . Implementer resumed ([T-018 Implementer](49df958f-6ce0-4b10-b8be-6dd7882f3119)).
