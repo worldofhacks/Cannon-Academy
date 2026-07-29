@@ -38,3 +38,10 @@ Integration branch: `app/shell` @ `22bb3ef` (start)
 ## Wave 3+
 
 A-015 → A-010 → A-012 → A-033 → A-031 → A-034 → A-038 → A-013
+
+## Wave 4 (parallel)
+
+| Ticket | Status |
+| --- | --- |
+| A-031 enemy variety | **merged** |
+| A-034 cannon identity | agent c71bdd0e |
