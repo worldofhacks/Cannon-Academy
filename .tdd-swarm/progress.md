@@ -2042,3 +2042,7 @@ ARCHITECTURE §4.3 corrected: +1 damage + presentation arc. `BASE_BALLS_PER_VOLL
 ### T-027 — done (merged) — catalog set validation
 
 `validateCatalogs` detects dup ids, dangling refs, rank tier clashes, island cycles. Frozen `2e94841e5706c896…`.
+
+### T-025 — done (merged) — iterative expr walks
+
+Explicit-stack walks. Frozen `7ccb82a558204203…`. AC-3 under \`--stack-size=512\`.
