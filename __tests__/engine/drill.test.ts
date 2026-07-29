@@ -255,24 +255,34 @@ describe('AC-4 — wrong answer increments attempts only', () => {
   });
 });
 
-describe('AC-5 — timeout (choiceIndex null) is an incorrect attempt', () => {
-  it('spec(T-017:AC-5) records null choice, correct false, attempts +1, weightedCorrect unchanged', () => {
+describe('AC-5 / T-036 — timeout (choiceIndex null) charges nothing (D-8)', () => {
+  it('spec(T-017:AC-5) spec(T-036:AC-1,AC-2,AC-3) timeout: mastery/answered unchanged; same question; log only', () => {
     const prior: SkillMastery = { weightedCorrect: 1, correct: 1, attempts: 1 };
     const session = start({ mastery: prior, length: 3 });
-    const templateId = requireCurrent(session).templateId;
+    const before = requireCurrent(session);
     const next = answerDrill(session, null, 2_500);
 
-    expect(next.answered).toBe(1);
+    // D-8: neither asked nor correct — applyAnswer is not called.
+    expect(next.mastery).toStrictEqual(prior);
+    expect(next.answered).toBe(0);
     expect(next.correct).toBe(0);
-    expect(next.mastery.weightedCorrect).toBe(prior.weightedCorrect);
-    expect(next.mastery.attempts).toBe(prior.attempts + 1);
-    expect(next.mastery).toStrictEqual(applyAnswer(prior, 'range', false));
+    expect(next.complete).toBe(false);
+    expect(requireCurrent(next).templateId).toBe(before.templateId);
+    expect(requireCurrent(next).correctIndex).toBe(before.correctIndex);
     expect(next.log[0]).toStrictEqual({
-      templateId,
+      templateId: before.templateId,
       choiceIndex: null,
       correct: false,
       elapsedMs: 2_500,
     } satisfies DrillAnswer);
+  });
+
+  it('spec(T-036:AC-4) a real wrong choice still charges attempts (D-8 does not soften misses)', () => {
+    const prior: SkillMastery = { weightedCorrect: 4, correct: 4, attempts: 5 };
+    const session = start({ mastery: prior, length: 3 });
+    const next = answerWrong(session);
+    expect(next.mastery.attempts).toBe(prior.attempts + 1);
+    expect(next.answered).toBe(1);
   });
 });
 
