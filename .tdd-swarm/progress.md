@@ -1331,6 +1331,56 @@ flattened mapped type while `A & B` is not. Written that way, AC-14 would have b
 **Round 3 is two tests wide:** cover AC-16, add the reference clause to AC-3. Everything else is
 frozen-ready.
 
+## T-007 round-2 re-review — REJECTED, and it was worth the round
+
+Cross-model re-review (different family) rejected the suite on **one live mutant**, verified by me
+rather than accepted: an ordinary generator that calls `evaluateNumber` / `evaluatePredicate` /
+`buildDistractors` without translating their `ExprError`s **passes all 72 tests and typechecks
+clean**, while breaking DoD-5's promise that every failure path throws a typed
+`QuestionGenerationError`. I confirmed both halves of its reachability argument: `answerExpr` is
+`z.string()` in `src/content/schemas.ts`, so `"a +"` is schema-valid; and `distractors.ts` really does
+document `@throws {ExprError} unchanged`. Its harness was proven live first (a sentinel produced 60
+failures), so the 72-pass result means what it says.
+
+That is a second rejection of a suite that had already killed 53 of 53 mutants — and the reason is
+[[L-038]]: **no fixture in the suite carried a malformed expression**, so the whole failure class was
+invisible to the suite and to its own mutation matrix. This is the clearest evidence yet for
+cross-model review: one family wrote the suite and its mutants, so the blind spot was shared.
+
+### Rulings
+
+- **AC-20 (new) — the generator wraps, `distractors.ts` does not change.** `ExprError` from any of the
+  three evaluated sites surfaces as `QuestionGenerationError` code `INVALID_QUESTION`, naming the
+  template id, with the original as `cause`. This resolves the apparent spec conflict instead of
+  choosing a side: the frozen module keeps propagating unchanged, and translation happens at the
+  generator's boundary because that is what the app and T-020 call, and DoD-5's whole value is one
+  error type per caller. `Error.cause` is assignable at ES2022 — verified — so no change to the frozen
+  `types.ts` is needed.
+- **AC-5 gains its negative half.** `NO_TEMPLATE` is now forbidden whenever a usable template exists,
+  including when recency filtering empties the eligible pool. The criterion had bounded only when it
+  _must_ fire.
+- **AC-21 (new) — failure precedence is the documented step order.** Two implementations could report
+  different codes for one template and both be defensible. Where two failures share
+  `INVALID_QUESTION`, the test separates them by `cause`.
+- **`assertQuestion` — locked as output validity, not an observable call.** The review was right that
+  `types.ts` claims T-007 calls it while the ticket never required that. A spy test would freeze an
+  implementation detail and buy nothing, since the guard's checks are a subset of what the criteria
+  already assert on the output.
+- **DoD-7 reworded in both tickets — it was unsatisfiable.** "Files changed are exactly those in
+  `file_scopes`" cannot hold for any branch, which also changes its test file and its report. I had
+  been verifying the sensible reading and reporting the literal checkbox green ([[L-039]]).
+
+### One gate defect the review found that my own baseline could not
+
+`run-local-gates.sh` matched a bare `(TODO|FIXME|HACK)`, so the suite's phrase "no-TODO markers"
+**failed the gate on its own description**. It passed for me at the root only because the file
+containing that phrase exists solely in the worktree — my green described a tree without the code in
+it. Fixed to require the canonical `TODO:` / `FIXME(owner):` form; verified it still catches all three
+real markers, ignores the prose, and that `no-todos` now PASSes in `wt-T-007`, leaving only the
+expected RED-state typecheck and unit failures.
+
+Count verified 19 → **21**, gate red on AC-20 and AC-21 only ([[L-026]]).
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
