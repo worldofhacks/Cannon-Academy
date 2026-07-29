@@ -1761,3 +1761,11 @@ clean RED); baseline 1438 green. Test-design review dispatched (Composer).
 (exact-24 deep-freeze beyond ≥8 wording; AC-8 preflight uses generator; no AC-7 preflight on
 REQUIRED_TEMPLATES) — accepted for content-as-data ticket (T-006 precedent). Phase → `implement`.
 Frozen suite sha256 `66e68a23fc4570a7a65156f965ada4a8817d4ffd3bb562c68d21f9f9b9fe5745`. Implementer dispatched.
+
+
+### T-014 unfrozen — BLOCKED(TEST_DISPUTE) on AC-1 vs AC-7
+
+Implementer copied `REQUIRED_TEMPLATES` faithfully (`31cb5ba`) then hit AC-7: 
+`add_within_{10,20}_near_doubles` use distractors `a + a` and `a + b - 1` under constraint
+`b == a + 1` → algebraic identity → 1000/1000 ladder. Deep-equals AC-1 forbids content fix.
+Phase reopened to `tests`; Test Agent fixing contract + adding AC-7 preflight (review I-3).
