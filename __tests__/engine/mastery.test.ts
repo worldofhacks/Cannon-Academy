@@ -62,6 +62,7 @@ import {
 } from '@engine/tuning';
 import type { CannonId, IslandId, SkillId } from '@content/schemas';
 import { cannons, islands, getIsland } from '@content/index';
+import { createCaptainStore, emptyCaptain } from '../../src/stores/player';
 
 // --- Shared fixtures & helpers ---------------------------------------------------------------
 
@@ -411,6 +412,43 @@ describe('isMastered', () => {
 // ============================================================================================
 
 describe('resolveUnlocks', () => {
+  it('spec(A-027:AC-3) K-1 mastery of add_within_10 earns its cannon without opening Isla Products', () => {
+    const resolveBandUnlocks = resolveUnlocks as unknown as (input: {
+      readonly gradeBand: 'k_1';
+      readonly mastery: Partial<Record<SkillId, SkillMastery>>;
+      readonly unlockedCannons: readonly CannonId[];
+      readonly unlockedIslands: readonly IslandId[];
+    }) => { readonly cannons: readonly CannonId[]; readonly islands: readonly IslandId[] };
+
+    const result = resolveBandUnlocks({
+      gradeBand: 'k_1',
+      mastery: masteryMapFor(['add_within_10']),
+      unlockedCannons: [],
+      unlockedIslands: ['port_sumwich'],
+    });
+
+    expect(result.cannons).toContain('saker');
+    expect(result.islands).not.toContain('isla_products');
+  });
+
+  it('spec(A-027:AC-4) a mastered eligible predecessor opens its next eligible island without revoking a prior higher-band placement unlock', () => {
+    const priorHigherBandIsland: IslandId = 'fraction_reef';
+    const store = createCaptainStore({
+      ...emptyCaptain(),
+      gradeBand: 'g2_3',
+      unlockedIslands: ['port_sumwich', priorHigherBandIsland],
+    });
+
+    store.getState().recordRangeAnswers('add_within_20', {
+      correct: MASTERY_THRESHOLD_CORRECT,
+      asked: MASTERY_THRESHOLD_CORRECT,
+    });
+
+    expect(store.getState().captain.unlockedIslands).toEqual(
+      expect.arrayContaining([priorHigherBandIsland, 'isla_products']),
+    );
+  });
+
   it('spec(T-010:AC-13) returns empty cannons and islands for an empty mastery map, and never throws', () => {
     expect(() => resolveUnlocks({ mastery: {}, unlockedCannons: [], unlockedIslands: [] })).not.toThrow();
 
