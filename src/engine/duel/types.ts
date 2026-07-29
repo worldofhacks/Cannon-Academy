@@ -142,7 +142,7 @@ function validateConfig(config: DuelConfig): void {
   }
   assertLoadout(config.playerLoadout, 'playerLoadout');
   assertLoadout(config.rivalLoadout, 'rivalLoadout');
-  if (!(config.islandId in ENEMY_HULL_BY_ISLAND)) {
+  if (!Object.hasOwn(ENEMY_HULL_BY_ISLAND, config.islandId)) {
     throw new Error(`createDuelState: islandId '${config.islandId}' has no enemy hull entry`);
   }
 }
