@@ -763,6 +763,20 @@ describe('createDuelState — determinism', () => {
     }
   });
 
+  /**
+   * Deep equality alone admits a memoising constructor that returns one cached object for a
+   * repeated config. Every field is readonly, so that is confusion rather than corruption — and
+   * it is still wrong: two constructions are two states. The clause was added 2026-07-28.
+   */
+  it('spec(T-013:AC-3) returns distinct object references for the same config, twice', () => {
+    const config = configFor('isla_products', 4242);
+    const first = createDuelState(config);
+    const second = createDuelState(config);
+
+    expect(first).toStrictEqual(second);
+    expect(first).not.toBe(second);
+  });
+
   it('spec(T-013:AC-3) produces an rng deeply equal across two constructions', () => {
     const config = configFor('port_sumwich', 90210);
 
@@ -2040,6 +2054,69 @@ describe('DuelState readonly-ness', () => {
     mutable.rng = createRng(1);
 
     expect([mutable.seed, mutable.turnToken, mutable.islandId]).toEqual([99, 99, 'grandline']);
+  });
+});
+
+// ============================================================================================
+// AC-16 — construction copies array inputs; it does not alias them
+//
+// Runtime, not type-level: `readonly` on the config and on the state cannot stop a caller who
+// still holds a mutable `CannonId[]` from pushing into it after construction. That rewrite then
+// silently lands inside a duel already in progress, and — because the state is the replay input —
+// makes the recorded duel unreproducible from its own seed. Cover every array the config carries,
+// and the nested arrays under `templatesBySkill`: copying one level and aliasing another is the
+// plausible half-fix.
+// ============================================================================================
+
+describe('createDuelState — input aliasing', () => {
+  it('spec(T-013:AC-16) copies playerLoadout so a later caller mutation cannot rewrite the state', () => {
+    const playerLoadout: CannonId[] = ['swivel_gun', 'culverin'];
+    const config: DuelConfig = { ...configFor('port_sumwich', 7), playerLoadout };
+    const state = createDuelState(config);
+
+    expect(state.playerLoadout).not.toBe(playerLoadout);
+    expect(state.playerLoadout).toEqual(['swivel_gun', 'culverin']);
+
+    playerLoadout.push('mortar');
+    playerLoadout[0] = 'long_nine';
+
+    expect(state.playerLoadout).toEqual(['swivel_gun', 'culverin']);
+  });
+
+  it('spec(T-013:AC-16) copies rivalLoadout so a later caller mutation cannot rewrite the state', () => {
+    const rivalLoadout: CannonId[] = ['mortar', 'powder_keg'];
+    const config: DuelConfig = { ...configFor('port_sumwich', 7), rivalLoadout };
+    const state = createDuelState(config);
+
+    expect(state.rivalLoadout).not.toBe(rivalLoadout);
+    expect(state.rivalLoadout).toEqual(['mortar', 'powder_keg']);
+
+    rivalLoadout.push('culverin');
+    rivalLoadout[0] = 'swivel_gun';
+
+    expect(state.rivalLoadout).toEqual(['mortar', 'powder_keg']);
+  });
+
+  /**
+   * `templatesBySkill` is not itself an array, but every value it holds is. An implementation that
+   * only spreads `{ ...config.templatesBySkill }` leaves each skill's `Template[]` as a live
+   * caller reference — the half-fix a test written only against the outer object misses.
+   */
+  it('spec(T-013:AC-16) copies templatesBySkill and every nested Template array', () => {
+    const templates: Template[] = [...(FIXTURE_TEMPLATES.add_within_10 as readonly Template[])];
+    const templatesBySkill: Partial<Record<SkillId, Template[]>> = { add_within_10: templates };
+    const config: DuelConfig = { ...configFor('port_sumwich', 7), templatesBySkill };
+    const state = createDuelState(config);
+
+    expect(state.templatesBySkill).not.toBe(templatesBySkill);
+    expect(state.templatesBySkill.add_within_10).not.toBe(templates);
+    expect(state.templatesBySkill.add_within_10).toHaveLength(2);
+
+    templates.pop();
+    templatesBySkill.add_within_10 = [];
+
+    expect(state.templatesBySkill.add_within_10).toHaveLength(2);
+    expect(state.templatesBySkill).not.toBe(templatesBySkill);
   });
 });
 
