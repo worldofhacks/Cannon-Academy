@@ -2,7 +2,7 @@
 
 **Status: BLOCKED (format gate — frozen suite prettier debt)**
 
-**Commit:** (this feat commit — see SHA below after commit)
+**Commit:** `ab41906f92efde07ee5861bd8a3b5ba5b75b8af1` — `feat(T-014): refresh K-2 templates after near_doubles AC-7 fix`
 
 Files refreshed (file_scopes only):
 
