@@ -66,8 +66,8 @@ Everything here must be green. Nothing here may slip. Grey-box art passes; sound
 
 ## Pre-flight (before writing code)
 
-1. **Pay the Apple Developer $99** — enrollment is created but unpaid; activation takes 24–48h and TestFlight is blocked until it clears. Android + web remain the committed path either way.
-2. **Kick off the EAS dev-client build for Android** — 90-minute timebox. Expo Go is _not_ the dev loop for this project (see below). Simulator/emulator is the fallback and blocks no JS work.
+1. ~~**Pay the Apple Developer $99**~~ — paid and enrolled 2026-07-28; awaiting activation (24–48h). TestFlight stays blocked until App Store Connect shows the team. See `RELEASE.md` for the three paths to a phone and which one is safe for a Saturday demo. Android + web remain the committed path either way.
+2. **Kick off the EAS dev-client build for Android** — 90-minute timebox. Expo Go is _not_ the dev loop for this project (see below). Simulator/emulator is the fallback and blocks no JS work. iOS Simulator is already building and running locally.
 3. **Create the Firebase project** — anonymous auth enabled; grab the web config.
 4. **Download the art packs** (free, CC0, no account needed): [Quaternius Pirate Kit](https://quaternius.com/packs/piratekit.html), [Kenney Pirate Kit](https://kenney.nl/assets/pirate-kit), [Kenney Pirate Pack 2D](https://kenney.nl/assets/pirate-pack) (the parachute).
 5. Confirm `npm`, Node LTS, Blender 5.1, and an EAS account are ready.
