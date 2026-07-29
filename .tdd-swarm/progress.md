@@ -1565,6 +1565,14 @@ required. Security review dispatched next. T-013 code review still in flight.
 `getCannon` catch may mislabel errors; optional `enemyMaxHull` accepts any number. No fixes
 required. Security review dispatched. T-007 security still in flight.
 
+## T-007 — review-passed
+
+Code: APPROVE_WITH_NITS. Security: **PASS_WITH_NOTES**
+([T-007 Security Review](91061579-ab2b-40f0-ac4a-325a78f9fc55)). No Critical/Important. Minor
+content-trust notes around `__proto__` / `renderText` membership recorded in
+`.tdd-swarm/reports/T-007-security-review.md` — T-034 / catalog validation are the right homes;
+no code change for merge. Waiting on T-013 security before wave-4 integration.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
