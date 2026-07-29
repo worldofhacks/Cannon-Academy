@@ -844,6 +844,55 @@ imagination.
 
 ---
 
+## L-037 — A git operation that reports failure has often already half-run (Wave 4, resumption)
+
+**Pattern:** To refresh the two wave-4 worktrees with the amended tickets, I ran
+`git rebase swarm/engine-core` in each. Both printed:
+
+```
+error: unable to unlink old '.claude/settings.json': Operation not permitted
+error: could not detach HEAD
+```
+
+The sandbox forbids writing those paths. "Could not detach HEAD" reads like _nothing happened_ — but
+by the time the rebase reached the two protected files it had **already rewritten the rest of the
+working tree**. `git status` in each worktree then showed thirteen modified files, nine untracked
+ones, and, most of all:
+
+```
+ D __tests__/engine/questions/generator.test.ts
+ D __tests__/engine/duel/types.test.ts
+```
+
+**Both frozen test suites deleted from the working tree** — the artefacts the entire wave exists to
+produce, and which two Test Agents and two reviewers had spent hours proving. HEAD was untouched, so
+`git cat-file -p HEAD:<path>` recovered both at exactly their recorded SHA-256s, and nothing was
+lost. But the recovery was only obvious because those hashes had been written down.
+
+**Why:** a rebase is not atomic with respect to the working tree. It checks out the target tree
+first and rewrites files as it goes, so a permission error partway through leaves a **half-applied**
+state whose error message describes only the step that failed. Add the sandbox and the failure mode
+is worse than a plain permission denial: the operation is _selectively_ blocked, so it stops
+somewhere arbitrary rather than at a boundary anyone designed.
+
+**What to do instead:**
+
+- **Prefer `merge` to `rebase` for refreshing a worktree.** A merge touches only files that actually
+  differ; a rebase rewrites the tree wholesale, so its blast radius under a partial failure is every
+  file in the repository. The merge succeeded here after the wreckage was cleaned up.
+- **After any git command that errors, run `git status` before doing anything else.** Treat the
+  error text as a description of where it stopped, never as evidence it did not start.
+- **Record the hash of every frozen artefact before touching the worktree that holds it.** That is
+  what turned this from an incident into a footnote: the recovery could be _verified_ rather than
+  hoped for. [[L-030]] argued evidence must outlive its worktree; this is the same argument one step
+  earlier — a hash written down is what lets you prove a restore was exact.
+- **`git clean -fd` only after reading `git clean -nd`.** Every untracked file here was integration
+  content the aborted rebase had deposited, and each was confirmed to exist on the integration branch
+  before removal. Deleting untracked files you have not enumerated is [[L-030]]'s mistake with a
+  faster trigger.
+
+---
+
 ## L-036 — A gate closed at severity WARN is a gate that has not been closed (Wave 4, resumption)
 
 **Pattern:** L-032 recorded that `spec-lint` measured only numbered ACs, so Definition-of-Done
