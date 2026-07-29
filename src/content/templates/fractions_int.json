@@ -1,0 +1,104 @@
+[
+  {
+    "id": "fractions_int_how_many_ths",
+    "skill": "fractions_int",
+    "text": "How many {d}ths make {n} wholes?",
+    "params": {
+      "d": [2, 10],
+      "n": [1, 10]
+    },
+    "constraints": ["d != 0"],
+    "answerExpr": "n * d",
+    "distractors": ["(n * d) + 1", "(n * d) - 1", "(n * d) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "fractions_int_missing_numerator",
+    "skill": "fractions_int",
+    "text": "{a}/{b} = ?/{d}",
+    "params": {
+      "a": [1, 10],
+      "b": [1, 10],
+      "d": [1, 20]
+    },
+    "constraints": ["b != 0", "d % b == 0"],
+    "answerExpr": "a * (d / b)",
+    "distractors": ["(a * (d / b)) + 1", "(a * (d / b)) - 1", "(a * (d / b)) + 2"]
+  },
+  {
+    "id": "fractions_int_of_set",
+    "skill": "fractions_int",
+    "text": "{a}/{b} of {c} = ?",
+    "params": {
+      "a": [1, 10],
+      "b": [1, 10],
+      "c": [1, 100]
+    },
+    "constraints": ["b != 0", "c % b == 0"],
+    "answerExpr": "c / b * a",
+    "distractors": ["(c / b * a) + 1", "(c / b * a) - 1", "(c / b * a) + 2"]
+  },
+  {
+    "id": "fractions_int_add_like",
+    "skill": "fractions_int",
+    "text": "{a}/{b} + {c}/{b} = ? wholes",
+    "params": {
+      "a": [1, 20],
+      "b": [2, 10],
+      "c": [1, 20]
+    },
+    "constraints": ["b != 0", "(a + c) % b == 0"],
+    "answerExpr": "(a + c) / b",
+    "distractors": ["((a + c) / b) + 1", "((a + c) / b) - 1", "((a + c) / b) + 2"]
+  },
+  {
+    "id": "fractions_int_simplify",
+    "skill": "fractions_int",
+    "text": "{a}/{b} = ?",
+    "params": {
+      "a": [1, 100],
+      "b": [2, 10]
+    },
+    "constraints": ["b != 0", "a % b == 0"],
+    "answerExpr": "a / b",
+    "distractors": ["(a / b) + 1", "(a / b) - 1", "(a / b) + 2"]
+  },
+  {
+    "id": "fractions_int_of_set_rev",
+    "skill": "fractions_int",
+    "text": "? = {a}/{b} of {c}",
+    "params": {
+      "a": [1, 10],
+      "b": [1, 10],
+      "c": [1, 100]
+    },
+    "constraints": ["b != 0", "c % b == 0"],
+    "answerExpr": "c / b * a",
+    "distractors": ["(c / b * a) + 1", "(c / b * a) - 1", "(c / b * a) + 2"]
+  },
+  {
+    "id": "fractions_int_unit_parts",
+    "skill": "fractions_int",
+    "text": "How many {d}ths make 1 whole?",
+    "params": {
+      "d": [2, 12]
+    },
+    "constraints": ["d != 0"],
+    "answerExpr": "d",
+    "distractors": ["(d) + 1", "(d) - 1", "(d) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "fractions_int_add_like_qfirst",
+    "skill": "fractions_int",
+    "text": "? wholes = {a}/{b} + {c}/{b}",
+    "params": {
+      "a": [1, 20],
+      "b": [2, 10],
+      "c": [1, 20]
+    },
+    "constraints": ["b != 0", "(a + c) % b == 0"],
+    "answerExpr": "(a + c) / b",
+    "distractors": ["((a + c) / b) + 1", "((a + c) / b) - 1", "((a + c) / b) + 2"]
+  }
+]

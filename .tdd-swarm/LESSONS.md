@@ -844,6 +844,110 @@ imagination.
 
 ---
 
+## L-037 — A git operation that reports failure has often already half-run (Wave 4, resumption)
+
+**Pattern:** To refresh the two wave-4 worktrees with the amended tickets, I ran
+`git rebase swarm/engine-core` in each. Both printed:
+
+```
+error: unable to unlink old '.claude/settings.json': Operation not permitted
+error: could not detach HEAD
+```
+
+The sandbox forbids writing those paths. "Could not detach HEAD" reads like _nothing happened_ — but
+by the time the rebase reached the two protected files it had **already rewritten the rest of the
+working tree**. `git status` in each worktree then showed thirteen modified files, nine untracked
+ones, and, most of all:
+
+```
+ D __tests__/engine/questions/generator.test.ts
+ D __tests__/engine/duel/types.test.ts
+```
+
+**Both frozen test suites deleted from the working tree** — the artefacts the entire wave exists to
+produce, and which two Test Agents and two reviewers had spent hours proving. HEAD was untouched, so
+`git cat-file -p HEAD:<path>` recovered both at exactly their recorded SHA-256s, and nothing was
+lost. But the recovery was only obvious because those hashes had been written down.
+
+**Why:** a rebase is not atomic with respect to the working tree. It checks out the target tree
+first and rewrites files as it goes, so a permission error partway through leaves a **half-applied**
+state whose error message describes only the step that failed. Add the sandbox and the failure mode
+is worse than a plain permission denial: the operation is _selectively_ blocked, so it stops
+somewhere arbitrary rather than at a boundary anyone designed.
+
+**What to do instead:**
+
+- **Prefer `merge` to `rebase` for refreshing a worktree.** A merge touches only files that actually
+  differ; a rebase rewrites the tree wholesale, so its blast radius under a partial failure is every
+  file in the repository. The merge succeeded here after the wreckage was cleaned up.
+- **After any git command that errors, run `git status` before doing anything else.** Treat the
+  error text as a description of where it stopped, never as evidence it did not start.
+- **Record the hash of every frozen artefact before touching the worktree that holds it.** That is
+  what turned this from an incident into a footnote: the recovery could be _verified_ rather than
+  hoped for. [[L-030]] argued evidence must outlive its worktree; this is the same argument one step
+  earlier — a hash written down is what lets you prove a restore was exact.
+- **`git clean -fd` only after reading `git clean -nd`.** Every untracked file here was integration
+  content the aborted rebase had deposited, and each was confirmed to exist on the integration branch
+  before removal. Deleting untracked files you have not enumerated is [[L-030]]'s mistake with a
+  faster trigger.
+
+---
+
+## L-036 — A gate closed at severity WARN is a gate that has not been closed (Wave 4, resumption)
+
+**Pattern:** L-032 recorded that `spec-lint` measured only numbered ACs, so Definition-of-Done
+items were unenforced. The fix landed: the gate now harvests DoD checkboxes and looks for tests
+tagged `dod(<id>:<n>)`. On resuming, I ran it against T-013 — the very ticket the lesson was
+written about — and it printed:
+
+```
+  WARN  DoD-1 has no test tagged dod(T-013:1)
+  … nine of nine uncovered …
+== SPEC-LINT PASS ==
+```
+
+**Two independent defects, either one sufficient to make the fix inert.** First, a DoD miss was
+`WARN`, which does not set `FAIL`, so the gate reported PASS with every item uncovered. Second,
+the fourteen assertions already written for T-013 tag by **name** — `dod(T-013:events)`,
+`dod(T-013:rival-shapes)` — while the gate numbers items in file order and looks for
+`dod(T-013:1)`. The two vocabularies could not match, and nothing said so.
+
+**Why:** the fix was verified as _present_ rather than as _effective_ — the same distinction that
+[[L-029]] drew between a guard being in the repo and a guard running. `WARN` is the natural
+severity to reach for when you fear reddening a green baseline, and it converts a gate into a
+comment. The vocabulary mismatch compounds it: even at `FAIL`, tag names the gate cannot parse are
+[[L-026]] again, where a requirement the parser cannot see is not a requirement.
+
+**What to do instead:**
+
+- **Observe the new gate failing on the case that motivated it**, before believing it closed
+  anything. DoD misses now `FAIL`, proven both directions: T-013 exits 1, a grandfathered ticket
+  exits 0.
+- **When a green baseline is the obstacle, grandfather explicitly rather than lowering severity.**
+  Twelve merged tickets are named in `DOD_GRANDFATHERED` and warn only; everything else fails.
+  The list can only shrink, and new tickets are enforced by default — the safe direction.
+- **Check exit codes without a pipe.** My first reading showed `exit=0` for a run that printed
+  `SPEC-LINT RED`, because `cmd | tail` reports `tail`'s status. I nearly recorded a working gate
+  as broken. [[L-027]] in miniature: the measurement described the pipeline, not the thing measured.
+
+**Then enforcement immediately found the other half of the problem.** A Definition-of-Done list
+mixes requirements on the **module** with requirements on the **process**, and only the first kind
+can be honestly asserted from a unit test. T-007's DoD-7 is "files changed are exactly those in
+`file_scopes`" — a claim about a branch diff. The Test Agent refused to tag it, and was right to:
+the nearest thing a test can see (that a directory contains no unexpected module) would have
+reported the item covered while enforcing something much narrower. It chose a red gate over a green
+whose label overstated it, which is the judgment this lesson asks for, applied against the gate I
+had just tightened.
+
+The fix is for the gate to know the difference rather than for anyone to fake a test. A DoD item
+marked `[process]` now reports `SKIP` and is verified by the orchestrator's own diff against the
+merge base. **The marker is required, not inferred** — an unmarked item is still enforced — so
+forgetting it fails loudly instead of silently exempting a real requirement. Numbering is taken
+over all DoD lines including skipped ones, so item numbers stay stable and existing `dod(id:n)`
+tags do not shift.
+
+---
+
 ## L-035 — Documentation drifts silently, so it needs a regression suite (Phase 5)
 
 **Pattern:** Across this run, documentation drifted six distinguishable ways, and **not one of them
@@ -871,3 +975,72 @@ it is written and false forever after. Second, **scheduled is not orphaned**: th
 flagged three event names absent from `src/` on its first run, all owned by a ticket in a paused
 wave. Docs legitimately run ahead of code mid-build; docs that outlive a deleted symbol do not. A
 drift detector that cannot tell those apart gets muted, and a muted gate is worse than none.
+
+## L-038
+
+**A suite tests the failure paths its fixtures can reach, and every fixture here was valid.**
+
+T-007's round-2 suite was 72 tests over 21 criteria, 53 of 53 mutants killed, cross-model reviewed
+once already. It was rejected for a mutant a competent engineer writes by default: a generator that
+calls `evaluateNumber` / `evaluatePredicate` / `buildDistractors` and does not translate their
+`ExprError`s. It **passed all 72 tests and typechecked clean**, while breaking the ticket's own DoD-5
+promise that every failure path throws a typed `QuestionGenerationError` with a `code`.
+
+**Why:** the contract said "every failure path", and the suite exercised the failure paths it had
+fixtures for — an unsatisfiable constraint, an unrenderable token, an empty pool. Not one fixture
+carried a malformed _expression_, so the entire class was invisible, and no amount of mutation
+scoring found it, because a mutation matrix scores mutants against the fixtures that exist
+([[L-034]]). The reachability came from a schema gap of exactly [[L-009]]'s shape: `answerExpr` is
+`z.string()`, so `"a +"` is schema-valid and arrives at the generator unchallenged.
+
+Two adjacent holes surfaced in the same review, both the same error in different clothes. AC-5
+required `NO_TEMPLATE` when the pool is empty but never forbade it otherwise, so throwing it eagerly
+satisfied the criterion — **a criterion that names only the failure case constrains nothing about the
+success case**. And failure _precedence_ was unpinned, so two implementations could report different
+codes for one template and both be defensible.
+
+**What to do instead:** for any contract quantified over "every failure path", enumerate the paths
+from the **module's inputs** — every field an implementation evaluates, parses, or indexes — rather
+than from the criteria already written. Then ask of each one: what is the malformed value here, and
+which fixture carries it? Where a contract is a prohibition, write the negative half explicitly.
+Cross-model review earned its cost twice here: the same authoring model wrote both the suite and its
+mutants, so the blind spot was shared, and only a reader working from the _inputs_ rather than the
+suite could see it.
+
+## L-039
+
+**A requirement nobody can satisfy is a requirement everybody quietly reinterprets.**
+
+Two of these landed in one review. T-007's DoD said "files changed are exactly those in
+`file_scopes`" — **unsatisfiable as written**, since every branch necessarily also changes its test
+file and its report, neither of which is in `file_scopes`. I had been verifying the sensible reading
+(implementation ⊆ `file_scopes`, tests ⊆ `test_scopes`, report exempt) and reporting the checkbox
+green, without noticing the checkbox said something else. Separately, `run-local-gates.sh` matched a
+bare `(TODO|FIXME|HACK)`, so a test asserting the suite carries "no-TODO markers" **failed the gate
+on its own description**.
+
+**Why:** both were invisible from where I was standing. The gate's false positive could not appear at
+the repo root, because the file containing the phrase only exists in a worktree — I ran the gate at
+the root, saw green, and carried that green forward as if it described the worktrees ([[L-027]] again,
+the measurement described the tree it was taken in). And an unsatisfiable requirement produces no
+error, only a quiet drift between what a check says and what its verifier does, which is [[L-002]]'s
+failure mode with the roles reversed: not a gate people ignore, but a gate whose keeper has silently
+substituted a better rule.
+
+**What to do instead:** when you verify a `[process]` item by hand, verify it **against its literal
+wording**, and if the literal wording is not what you checked, fix the wording rather than your
+habit. For pattern-matching gates, require the marker to look like a marker (`TODO:`, `FIXME(owner):`)
+so prose _about_ markers cannot trip it, and accept the narrower miss — an ambiguous red costs more
+than an un-punctuated `// TODO fix this` slipping past. And run every gate in a tree where the files
+under test actually exist.
+
+## L-040 — An integration-branch tip compared to itself is a vacuous gate (Wave 5)
+
+**Pattern:** `frozen-tests-unmodified` used `swarm/engine-core..HEAD`. On ticket branches that
+range is meaningful. On the integration branch itself it is **empty**, so the gate printed PASS
+while never inspecting the commits that actually landed test files via merge. Separately, the
+allowed subject prefix list lagged the swarm's real vocabulary (`spec(`, `freeze(`).
+
+**What to do instead:** when `HEAD == swarm/engine-core`, compare `main..HEAD` with
+`--no-merges`, and accept `test|style|spec|freeze`. Same class as L-033 — pick a range that
+cannot be trivially empty for the unit under test.

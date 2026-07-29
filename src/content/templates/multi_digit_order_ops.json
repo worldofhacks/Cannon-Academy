@@ -1,0 +1,102 @@
+[
+  {
+    "id": "multi_digit_order_ops_no_paren",
+    "skill": "multi_digit_order_ops",
+    "text": "{a} + {b} × {c} = ?",
+    "params": {
+      "a": [1, 12],
+      "b": [2, 12],
+      "c": [2, 6]
+    },
+    "constraints": ["a + b * c <= 1000", "b >= a"],
+    "answerExpr": "a + b * c",
+    "distractors": ["(a + b) * c", "b * c", "(a + b * c) + 2"]
+  },
+  {
+    "id": "multi_digit_order_ops_paren",
+    "skill": "multi_digit_order_ops",
+    "text": "({a} + {b}) × {c} = ?",
+    "params": {
+      "a": [1, 15],
+      "b": [1, 15],
+      "c": [2, 4]
+    },
+    "constraints": ["(a + b) * c <= 1000"],
+    "answerExpr": "(a + b) * c",
+    "distractors": ["a + b * c", "((a + b) * c) + 1", "((a + b) * c) - 1"]
+  },
+  {
+    "id": "multi_digit_order_ops_add",
+    "skill": "multi_digit_order_ops",
+    "text": "{a} + {b} = ?",
+    "params": {
+      "a": [10, 500],
+      "b": [10, 500]
+    },
+    "constraints": ["a + b <= 1000"],
+    "answerExpr": "a + b",
+    "distractors": ["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"]
+  },
+  {
+    "id": "multi_digit_order_ops_sub",
+    "skill": "multi_digit_order_ops",
+    "text": "{a} - {b} = ?",
+    "params": {
+      "a": [10, 999],
+      "b": [1, 500]
+    },
+    "constraints": ["a >= b", "a - b <= 1000"],
+    "answerExpr": "a - b",
+    "distractors": ["(a - b) + 1", "(a - b) - 1", "(a - b) + 2"]
+  },
+  {
+    "id": "multi_digit_order_ops_two_by_one",
+    "skill": "multi_digit_order_ops",
+    "text": "{a} × {b} = ?",
+    "params": {
+      "a": [10, 99],
+      "b": [2, 9]
+    },
+    "constraints": ["a * b <= 1000"],
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"]
+  },
+  {
+    "id": "multi_digit_order_ops_times_minus",
+    "skill": "multi_digit_order_ops",
+    "text": "{a} × {b} - {c} = ?",
+    "params": {
+      "a": [2, 20],
+      "b": [2, 20],
+      "c": [1, 50]
+    },
+    "constraints": ["a * b >= c", "a * b - c <= 1000"],
+    "answerExpr": "a * b - c",
+    "distractors": ["a * b", "(a * b - c) + 1", "(a * b - c) - 1"]
+  },
+  {
+    "id": "multi_digit_order_ops_word_sum",
+    "skill": "multi_digit_order_ops",
+    "text": "What is {a} plus {b}?",
+    "params": {
+      "a": [10, 400],
+      "b": [10, 400]
+    },
+    "constraints": ["a + b <= 1000"],
+    "answerExpr": "a + b",
+    "distractors": ["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "multi_digit_order_ops_diff_first",
+    "skill": "multi_digit_order_ops",
+    "text": "? = {a} - {b}",
+    "params": {
+      "a": [10, 999],
+      "b": [1, 500]
+    },
+    "constraints": ["a >= b"],
+    "answerExpr": "a - b",
+    "distractors": ["(a - b) + 1", "(a - b) - 1", "(a - b) + 2"]
+  }
+]

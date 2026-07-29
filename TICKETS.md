@@ -93,21 +93,26 @@ blocks the merge; both should close before wave 4 dispatches.
 
 ## Wave 4 — generator and duel vocabulary
 
-| id    | title                                                                            | status        | deps                              | branch                            | model    | issue                                                                                  |
-| ----- | -------------------------------------------------------------------------------- | ------------- | --------------------------------- | --------------------------------- | -------- | -------------------------------------------------------------------------------------- |
-| T-007 | Question generator — selection, rejection sampling, render, four-choice assembly | tests-written | T-001, T-002, T-003, T-004, T-005 | `ticket/T-007-question-generator` | capable  | tests **not frozen** — design review REJECT, 3 live mutants; see progress.md HANDOFF   |
-| T-013 | Duel state, events, action log, and initial-state construction                   | tests-written | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | tests **not frozen** — design review REJECT, 2 contract holes; see progress.md HANDOFF |
+**Merged into `swarm/engine-core` (`b5b666f..c0b11ca`) — integration PASS.** Two clean merges,
+all repo gates green, **1,438/1,438 tests**, `npm audit` clean, manifests byte-identical.
+Cross-ticket probe green (T-007 × T-013). Evidence: `.tdd-swarm/reports/wave4-integration.md`.
+
+| id    | title                                                                            | status | deps                              | branch                            | model    | issue                                               |
+| ----- | -------------------------------------------------------------------------------- | ------ | --------------------------------- | --------------------------------- | -------- | --------------------------------------------------- |
+| T-007 | Question generator — selection, rejection sampling, render, four-choice assembly | done   | T-001, T-002, T-003, T-004, T-005 | `ticket/T-007-question-generator` | capable  | frozen `1a586570…`; impl `a358270`; merge `63a4388` |
+| T-013 | Duel state, events, action log, and initial-state construction                   | done   | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | frozen `767fc8da…`; impl `f99b25f`; merge `c0b11ca` |
 
 ## Wave 5 — template content, drill, opponents, the duel machine
 
-| id    | title                                                                          | status  | deps                                     | branch                             | model    | issue |
-| ----- | ------------------------------------------------------------------------------ | ------- | ---------------------------------------- | ---------------------------------- | -------- | ----- |
-| T-014 | Question templates — K–2 addition and subtraction (symbolic only)              | backlog | T-001, T-003, T-004, T-005, T-007        | `ticket/T-014-templates-k2-addsub` | standard | —     |
-| T-015 | Question templates — grade 2–3 place value, two-step add/sub, mult facts       | backlog | T-001, T-003, T-004, T-005, T-006, T-007 | `ticket/T-015-templates-g23`       | standard | —     |
-| T-016 | Question templates — grade 3–5 division, fractions, multi-digit / order of ops | backlog | T-001, T-003, T-004, T-005, T-007        | `ticket/T-016-templates-g35`       | capable  | —     |
-| T-017 | Gunnery-range drill session — full-rate mastery practice loop                  | backlog | T-001, T-003, T-004, T-007, T-010        | `ticket/T-017-range-drill`         | standard | —     |
-| T-018 | Opponent interface and scripted onboarding rival                               | backlog | T-003, T-004, T-006, T-013               | `ticket/T-018-opponent-interface`  | standard | —     |
-| T-020 | Duel reducer — the pure turn-based state machine                               | backlog | T-004, T-006, T-007, T-008, T-013        | `ticket/T-020-duel-reducer`        | capable  | —     |
+| id    | title                                                                          | status      | deps                                     | branch                                  | model    | issue                                                                               |
+| ----- | ------------------------------------------------------------------------------ | ----------- | ---------------------------------------- | --------------------------------------- | -------- | ----------------------------------------------------------------------------------- |
+| T-014 | Question templates — K–2 addition and subtraction (symbolic only)              | done        | T-001, T-003, T-004, T-005, T-007        | `ticket/T-014-templates-k2-addsub`      | standard | frozen `9c239b355136e2b3…`; merge landed; security PASS                             |
+| T-015 | Question templates — grade 2–3 place value, two-step add/sub, mult facts       | done        | T-001, T-003, T-004, T-005, T-006, T-007 | `ticket/T-015-templates-g23`            | standard | frozen `a987150c86df4bc8…` DoD-7 sibling fix; merge landed; security PASS           |
+| T-016 | Question templates — grade 3–5 division, fractions, multi-digit / order of ops | done        | T-001, T-003, T-004, T-005, T-007        | `ticket/T-016-templates-g35`            | capable  | frozen `e50a87a3e9cc7bf3…` DoD-7 sibling fix `8d01118`; merge landed; security PASS |
+| T-017 | Gunnery-range drill session — full-rate mastery practice loop                  | in-progress | T-001, T-003, T-004, T-007, T-010        | `ticket/T-017-range-drill`              | standard | RED `6451010`; most-recent-first adjudicated; test-design review go                 |
+| T-018 | Opponent interface and scripted onboarding rival                               | backlog     | T-003, T-004, T-006, T-013               | `ticket/T-018-opponent-interface`       | standard | —                                                                                   |
+| T-020 | Duel reducer — the pure turn-based state machine                               | backlog     | T-004, T-006, T-007, T-008, T-013        | `ticket/T-020-duel-reducer`             | capable  | —                                                                                   |
+| T-032 | Placement grants starter cannons only (D-6)                                    | done        | T-010, T-011                             | `ticket/T-032-placement-unlock-overlap` | standard | D-6; impl `ff66b32`; merge landed; security PASS                                    |
 
 ## Wave 6 — golden gate, mercy bot, machine extension
 
@@ -313,7 +318,7 @@ waves and both deliberate:
 | T-030 | Loadout selection — which three cannons sail with you                            | backlog | T-006, T-010 | design review — 5 cannons available after island 1, tray fits 3, nothing decides                                                         |
 | T-031 | Resolve the Perfect Shot "bonus ball" contradiction                              | backlog | T-004        | design review + T-004 code review — ARCHITECTURE says "+1 ball", code says "+1 damage"                                                   |
 | T-028 | CHOICE_COUNT must have one home, not two                                         | backlog | T-003, T-004 | wave-2 integration drift — the merge created a duplicate the dev-screen slider would arm                                                 |
-| T-032 | Placement pre-grants the range guns mastery is supposed to award                 | backlog | T-010, T-011 | wave-3 integration probe — at `g4_5` all 7 range guns and 5 islands are pre-granted, so mastery awards nothing, ever                     |
 | T-033 | The frozen-tests-unmodified gate is unreachable code and has never run           | backlog | —            | wave-3 integration — the gate sits after `exit`, calls an undefined `report`, and keys off a `.tdd-swarm/phase` file that does not exist |
 | T-027 | validateCatalogs must detect set-level catalog corruption                        | backlog | T-006        | T-006 code review M-1 — the function is weaker than its signature implies                                                                |
 | T-025 | Replace the expression evaluator's recursive walks with explicit-stack iteration | backlog | T-002        | T-002 code review — `MAX_AST_DEPTH` is a measured margin (1.5× at a 0.5 MB stack), not a guarantee by construction                       |
+| T-034 | Narrow template param keys to the expression-identifier grammar                  | backlog | T-003        | T-007 test-design review — `params: z.record(...)` accepts keys T-002's grammar can never reference, so they render but never resolve    |
