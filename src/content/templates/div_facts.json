@@ -44,7 +44,7 @@
     },
     "constraints": ["a != 0", "a % a == 0"],
     "answerExpr": "a / a",
-    "distractors": ["0", "2", "a"]
+    "distractors": ["0", "2", "3"]
   },
   {
     "id": "div_facts_quotient_first",

@@ -4,22 +4,22 @@
     "skill": "multi_digit_order_ops",
     "text": "{a} + {b} × {c} = ?",
     "params": {
-      "a": [1, 20],
-      "b": [1, 12],
-      "c": [1, 12]
+      "a": [1, 12],
+      "b": [2, 12],
+      "c": [2, 6]
     },
-    "constraints": ["a + b * c <= 1000"],
+    "constraints": ["a + b * c <= 1000", "b >= a"],
     "answerExpr": "a + b * c",
-    "distractors": ["(a + b) * c", "(a + b * c) + 1", "(a + b * c) - 1"]
+    "distractors": ["(a + b) * c", "b * c", "(a + b * c) + 2"]
   },
   {
     "id": "multi_digit_order_ops_paren",
     "skill": "multi_digit_order_ops",
     "text": "({a} + {b}) × {c} = ?",
     "params": {
-      "a": [1, 20],
-      "b": [1, 20],
-      "c": [1, 12]
+      "a": [1, 15],
+      "b": [1, 15],
+      "c": [2, 4]
     },
     "constraints": ["(a + b) * c <= 1000"],
     "answerExpr": "(a + b) * c",
@@ -72,7 +72,7 @@
     },
     "constraints": ["a * b >= c", "a * b - c <= 1000"],
     "answerExpr": "a * b - c",
-    "distractors": ["a * (b - c)", "(a * b - c) + 1", "(a * b - c) - 1"]
+    "distractors": ["a * b", "(a * b - c) + 1", "(a * b - c) - 1"]
   },
   {
     "id": "multi_digit_order_ops_word_sum",
