@@ -43,15 +43,19 @@ const PIRATE_SHIP: ShipCosmetics = {
   tattered: true,
 };
 
-/** Board 7b: "Bone-white re-tint of the same figure… reads as silly, not scary." */
+/**
+ * Board 7b: "Bone-white re-tint of the same figure… reads as silly, not scary." Its roster chip is
+ * `#F0E2C8` — the `surface-sunk` token — so the bone palette is built from the artifact's own
+ * parchment ramp. A-046 replaced seven invented greys that appeared nowhere in either board.
+ */
 const SKELETON_SHIP: ShipCosmetics = {
-  hull: '#D8D0C4',
-  hullDeep: '#A89E90',
-  sail: '#F5F2EA',
-  trim: '#8A8070',
-  pennant: '#E8E4DC',
-  mast: '#B8AEA0',
-  deck: '#CFC6BA',
+  hull: '#F0E2C8',
+  hullDeep: '#C9AE7E',
+  sail: '#FFF6E4',
+  trim: '#D8CBB2',
+  pennant: '#F0E2C8',
+  mast: '#C9AE7E',
+  deck: '#D8CBB2',
   tattered: true,
 };
 
@@ -67,15 +71,19 @@ const GHOST_SHIP: ShipCosmetics = {
   tattered: true,
 };
 
-/** Board 7b: the shark-man crew, "grey and blue". */
+/**
+ * Board 7b: the shark-man crew, "grey and blue", chip `#7FCDEC`; the great white's chip is
+ * `#BFD8E8`. Both are artifact colours, and the rest of the skiff is drawn off the sea ramp — A-046
+ * replaced an invented grey-blue set that appeared nowhere in either board.
+ */
 const SHARK_SKIFF: ShipCosmetics = {
-  hull: '#5A7080',
-  hullDeep: '#3A5060',
-  sail: '#C8D8E4',
-  trim: '#8098A8',
-  pennant: '#607888',
-  mast: '#4A6070',
-  deck: '#6A8494',
+  hull: '#1584B8',
+  hullDeep: '#0C5E86',
+  sail: '#C9D6E4',
+  trim: '#43B4E0',
+  pennant: '#7FCDEC',
+  mast: '#4C637A',
+  deck: '#BFD8E8',
   tattered: true,
 };
 
@@ -96,7 +104,7 @@ export function enemyPresentationFor(enemy: Enemy): RivalPresentation {
         textChannel: `${enemy.displayName} · ${enemy.faction}`,
         shapeChannel: 'ship-crossbones-flag',
         cosmetics: PIRATE_SHIP,
-        accent: '#1A1410',
+        accent: '#6C4BD6',
       };
     case 'skeleton':
       return {
@@ -107,7 +115,7 @@ export function enemyPresentationFor(enemy: Enemy): RivalPresentation {
         textChannel: `${enemy.displayName} · rattling bones`,
         shapeChannel: 'ship-skull-sails',
         cosmetics: SKELETON_SHIP,
-        accent: '#8A8070',
+        accent: '#C9AE7E',
       };
     case 'ghost':
       return {
@@ -131,7 +139,7 @@ export function enemyPresentationFor(enemy: Enemy): RivalPresentation {
         textChannel: `${enemy.displayName} · circling fin`,
         shapeChannel: 'fin-and-skiff',
         cosmetics: SHARK_SKIFF,
-        accent: '#607888',
+        accent: '#7FCDEC',
       };
     case 'kraken':
       return {

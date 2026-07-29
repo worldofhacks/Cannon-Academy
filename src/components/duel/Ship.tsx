@@ -579,7 +579,7 @@ function SharkFin({ scale: s }: { scale: number }) {
       points="50,0 100,100 0,100"
       width={34 * s}
       height={22 * s}
-      fill="#607888"
+      fill="#4C637A"
       style={{ position: 'absolute', left: 8 * s, bottom: 52 * s }}
     />
   );
