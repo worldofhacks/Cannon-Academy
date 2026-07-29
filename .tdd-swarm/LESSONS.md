@@ -677,6 +677,13 @@ same lesson one layer out — observed blocking _on the host actually in use_.
   prefix is a documented bypass, and an agent that reads the policy can read that too. The guard is
   the first layer; the `frozen-tests-unmodified` outcome gate and the orchestrator's own commit-level
   diff remain the backstop. Defence in depth, not a wall.
+- **The bypass must be the command's first token, and getting that wrong looks exactly like a
+  violation.** `SWARM_ORCHESTRATOR=1 printf … > …/phase` is honoured; `cd "$repo" &&
+SWARM_ORCHESTRATOR=1 printf …` is refused, because the regex is anchored at the start of the
+  command string. Anchoring is deliberate — an unanchored match would let any agent smuggle the
+  token into the middle of a pipeline — but the orchestrator, who needs a `cd` first, hits the
+  refusal and cannot tell it from a genuine policy hit. Put the assignment first, or set the phase
+  with a tool write from the repo root, where no phase is in force.
 
 ---
 
@@ -698,3 +705,208 @@ it is most likely to be deleted is the routine cleanup nobody reviews.
 report, so it merges with the wave. Before any `worktree remove`, diff the untracked set and ask
 what is being destroyed — `--force` on a directory you have not read is a decision made blind. The
 five reports were preserved into `.tdd-swarm/reports/` before teardown proceeded.
+
+---
+
+## L-031 — An agent must assert which unit it is in before trusting any measurement (Wave 4, tests)
+
+**Pattern:** The T-007 Test Agent's shell tool **silently ignored its `working_directory`
+parameter**. Every command ran in the repo root while the agent believed it was in
+`.worktrees/wt-T-007`: `pwd` reported the root and `git branch --show-current` reported
+`swarm/engine-core`, not its ticket branch. Its first baseline measurement was therefore taken in
+the wrong unit. It caught this itself, by noticing `.tdd-swarm/phase` was absent where its brief
+said a phase was set, and re-ran everything behind an explicit `cd`.
+
+The root has no phase file — deliberately, so the orchestrator is not policed there — which means
+**the guard was inert in exactly the place the misdirected agent had landed.** Had it written
+instead of measured, it would have written `src/` on the integration branch, unguarded, while
+believing itself confined to a worktree. Nothing in the system would have objected.
+
+**Why:** the guard's engagement model assumes an agent's writes resolve inside its own worktree.
+That assumption is carried entirely by tooling the agent does not control, and when it broke it
+broke silently in the fail-open direction. This is [[L-007]] again from a new angle: the guard was
+installed, correct, and proven — and still absent from the one location that mattered, because
+engagement is a property of the path, not of the agent's intent.
+
+**What to do instead:**
+
+- **Agents assert their unit before their first measurement.** Check `git branch --show-current`
+  against the ticket branch and confirm `.tdd-swarm/active-ticket` matches the ticket id. A number
+  measured in an unverified unit is a number about an unknown state ([[L-027]]).
+- **The integration tree is now off limits to everyone while a wave is in flight.** `decideWrite`
+  refuses `src/**` and `__tests__/**` at the repo root whenever any unit is engaged: during a wave
+  the integration branch changes only by merge, so no hand write there is legitimate, and the block
+  message tells a misdirected agent exactly what has happened. Ledger, ticket and doc writes stay
+  open, because amending a ticket in response to a test agent's findings is the orchestrator's job
+  mid-wave. Proof extended to **37 directions**.
+- **Corollary for briefs:** state the absolute worktree path _and_ require the agent to echo back
+  the branch it verified. "Work in this directory" is an instruction; "prove you are in it" is a
+  gate.
+
+**The same confusion of units broke a gate, in the opposite direction.** Putting worktrees inside
+the repo (L-029) silently widened every root gate to cover them: the root `lint` gate began linting
+`.worktrees/*/`, reporting **82 errors** in _copies_ of the guard whose paths no longer matched
+`.cursor/hooks/**/*.cjs`, so the CommonJS config never applied to them. The gate was reporting
+another agent's checkout as this unit's failure, and would have failed on any in-progress work in
+any worktree. `.worktrees/**` is now ignored at the root; each worktree runs the same config on
+itself. **When you move a directory into a repo, enumerate every tool that globs from the root** —
+`.gitignore` was fixed for this at the time, and the linter was missed because nothing had yet run
+it against an occupied worktree.
+
+---
+
+## L-032 — The coverage gate measures what the ticket _numbers_, not what it _requires_ (Wave 4, tests)
+
+**Pattern:** `spec-lint.sh` harvests criteria with `grep -oE '\*\*AC-[0-9]+\*\*'`. It therefore
+measures coverage of **numbered** acceptance criteria only. The T-013 Test Agent found that the
+`DuelEvent` union — the most-imported shape in its ticket — appears solely in prose, in `traces_to`,
+and in a Definition-of-Done checkbox, and **has no AC at all**. So `spec-lint` would report T-013
+fully covered while enforcing nothing whatsoever about it. The agent wrote thirteen tests for the
+union anyway and tagged them `dod(T-013:…)`, which the gate does not read: the tests exist, but
+nothing requires them and nothing would notice their deletion.
+
+**Why:** the gate was built to answer "is every criterion tested?", and we then let requirements
+accumulate in prose and DoD checkboxes as though those were criteria too. A requirement that is not
+numbered is not measured — and because the gate goes green, its silence reads as coverage. This is
+[[L-001]] pointed at a gate rather than a guard: it is worth only what it has been observed
+enforcing, and it has never been observed enforcing an unnumbered requirement, because it cannot.
+
+**What to do instead:** every requirement an implementer must satisfy gets a numbered AC. When a
+Test Agent reports that it had to invent a `dod(...)` tag, that is the gate telling you the ticket is
+under-specified — treat it as a spec defect, not as a tagging convention. T-013's proposed AC-13…
+AC-16 for the union are the fix for this instance; the systemic choice, deferred until the wave
+lands rather than changed under two running agents, is whether to number DoD items or teach the gate
+to harvest `dod(...)` as well.
+
+---
+
+## L-033 — Verify an agent's diff against the merge base, never the branch tip (Wave 4, tests)
+
+**Pattern:** T-013's first territory check, `git diff --stat swarm/engine-core..HEAD`, showed the
+agent **deleting 169 lines** across `guard-policy.cjs`, `LESSONS.md`, `prove-guard.sh`, `.gitignore`,
+`eslint.config.js` and `TICKETS.md` — every one a control-surface file it is forbidden to touch. It
+looked like a serious territory violation by an agent that had reported touching nothing.
+
+It had touched nothing. The integration branch had moved on _while the agent worked_ — my own guard
+commits landed after its branch point — so a tip-relative diff renders "commits the branch does not
+have yet" as deletions by the branch. Against the real merge base the diff was exactly two files.
+
+**Why:** `A..B` is not "what B changed", it is "what B has that A lacks". The two coincide only while
+A has not moved, which is precisely what stops being true during a wave with a long-running agent.
+
+**What to do instead:** `BASE=$(git merge-base <integration> HEAD)` and diff `$BASE..HEAD`. The
+verification of a territory claim is worthless if its baseline drifted mid-run, and the failure mode
+is the expensive direction — it accuses a clean agent, and doing that once teaches you to discount
+the check.
+
+---
+
+## L-034 — A mutation matrix scores the mutants you thought of (Wave 4, test-design review)
+
+**Pattern:** Both Wave 4 Test Agents did the mutation work properly and reported perfect scores —
+T-007 **38 of 38** killed, T-013 **29 of 29** — and both went further than asked: each proved its
+harness live before trusting a verdict, and each caught a _coincidental_ survivor in its own fixtures
+(a hull literal that matched `PLAYER_HULL`, a palindromic boolean sequence, an already-sorted pool).
+By every internal measure the suites had teeth.
+
+An independent reviewer on a **different model family** then found **five live mutants between them**,
+each passing the entire frozen suite:
+
+- T-007: an implementation throwing `RangeError` instead of `QuestionGenerationError` for every
+  input but the one directly-tested seed (AC-7), the same trick for `INVALID_QUESTION` (AC-11), and
+  rejecting schema-legal `params: {}`.
+- T-013: a **mutable** `DuelCore.seed`, and an extra optional payload field on one `DuelEvent`
+  variant — both contrary to the ticket's own text, both green at 100/100.
+
+**Why:** an author's mutant set is drawn from the same reading of the spec that produced its tests,
+so a blind spot is shared between the test and the mutant designed to probe it. A perfect score
+measures the intersection of what the author tested and what the author thought to attack — it
+cannot measure what never occurred to them. This is [[L-001]] in its sharpest form: the suite is
+worth what it has been observed rejecting, and a self-designed matrix observes only the author's
+imagination.
+
+**What to do instead:**
+
+- **Cross-model test-design review is a required gate, not polish.** It is the only step in this
+  process that has ever found a hole an author's own matrix missed, and it has now done so on every
+  ticket where it ran. Budget it, and give the reviewer a different family from the author.
+- **Two concrete shapes to check by hand every time, because both recurred here:**
+  - A sweep asserting "throws for **every** seed" with a bare `catch {}` proves only that something
+    threw. Both T-007 survivors live in exactly that gap: the error _type and code_ were checked at a
+    single direct fixture while the broad sweep accepted any throw. Assert the type and code **inside
+    the sweep**.
+  - An indexed access such as `Exact<DuelState['seed'], number>` **discards property modifiers**, so
+    it cannot see `readonly` ([[L-012]]). Assert `Exact<Readonly<T>, T>` over the whole interface, and
+    `Exact<Extract<Union, {type: T}>, {...}>` per variant, or "readonly throughout" is untested.
+- **Reviewers also correct the author's arithmetic.** The T-013 report's "30 `@ts-expect-error`
+  directives" was 25 active ones plus five in prose, and its "exactly 8 edit sites" for a new phase
+  and event was too low. Counts in a report are claims; treat them as such.
+
+---
+
+## L-036 — A gate closed at severity WARN is a gate that has not been closed (Wave 4, resumption)
+
+**Pattern:** L-032 recorded that `spec-lint` measured only numbered ACs, so Definition-of-Done
+items were unenforced. The fix landed: the gate now harvests DoD checkboxes and looks for tests
+tagged `dod(<id>:<n>)`. On resuming, I ran it against T-013 — the very ticket the lesson was
+written about — and it printed:
+
+```
+  WARN  DoD-1 has no test tagged dod(T-013:1)
+  … nine of nine uncovered …
+== SPEC-LINT PASS ==
+```
+
+**Two independent defects, either one sufficient to make the fix inert.** First, a DoD miss was
+`WARN`, which does not set `FAIL`, so the gate reported PASS with every item uncovered. Second,
+the fourteen assertions already written for T-013 tag by **name** — `dod(T-013:events)`,
+`dod(T-013:rival-shapes)` — while the gate numbers items in file order and looks for
+`dod(T-013:1)`. The two vocabularies could not match, and nothing said so.
+
+**Why:** the fix was verified as _present_ rather than as _effective_ — the same distinction that
+[[L-029]] drew between a guard being in the repo and a guard running. `WARN` is the natural
+severity to reach for when you fear reddening a green baseline, and it converts a gate into a
+comment. The vocabulary mismatch compounds it: even at `FAIL`, tag names the gate cannot parse are
+[[L-026]] again, where a requirement the parser cannot see is not a requirement.
+
+**What to do instead:**
+
+- **Observe the new gate failing on the case that motivated it**, before believing it closed
+  anything. DoD misses now `FAIL`, proven both directions: T-013 exits 1, a grandfathered ticket
+  exits 0.
+- **When a green baseline is the obstacle, grandfather explicitly rather than lowering severity.**
+  Twelve merged tickets are named in `DOD_GRANDFATHERED` and warn only; everything else fails.
+  The list can only shrink, and new tickets are enforced by default — the safe direction.
+- **Check exit codes without a pipe.** My first reading showed `exit=0` for a run that printed
+  `SPEC-LINT RED`, because `cmd | tail` reports `tail`'s status. I nearly recorded a working gate
+  as broken. [[L-027]] in miniature: the measurement described the pipeline, not the thing measured.
+
+---
+
+## L-035 — Documentation drifts silently, so it needs a regression suite (Phase 5)
+
+**Pattern:** Across this run, documentation drifted six distinguishable ways, and **not one of them
+failed anything**. `README` claimed "Repo scaffold: Not started" at 776 passing tests, then
+"waves 1–2 merged" after wave 3 merged. `TICKETS.md` accumulated five status cells disagreeing with
+their own ticket files. `ARCHITECTURE` §4.4 listed the content catalogs but omitted `skills.json`,
+which ships and which §4.1 requires. `PLAN` asserted "15–25 templates per skill" in one section and a
+"≥8 floor" in another. `progress.md`, the resume point after compaction, fell two full rounds behind.
+Every one was found by a human asking "are the docs current?", never by a gate.
+
+**Why:** code that goes stale stops compiling; prose that goes stale keeps reading fine. There is no
+failing signal, so the only detection is a re-read — and nobody re-reads a document that looks
+finished. The drift is also **asymmetric**: it accrues fastest exactly where the same fact is stored
+twice, because updating one copy feels complete.
+
+**What to do instead:** treat documentation claims as testable assertions and give them a gate.
+`.tdd-swarm/doc-align.sh` checks the six classes above mechanically; the `doc-align` skill carries
+the judgment a script cannot — separating a **stale** doc from one **blocked on a decision**
+(`.tdd-swarm/known-stale.md`, where each entry names the ticket that unblocks it and the gate flags
+the entry once that ticket closes).
+
+Two design points that made it work. First, **prefer claims the repo can verify** — a file list, a
+test count, an exported symbol — over claims only a human can check; "you are here" is true the day
+it is written and false forever after. Second, **scheduled is not orphaned**: the symbol check
+flagged three event names absent from `src/` on its first run, all owned by a ticket in a paused
+wave. Docs legitimately run ahead of code mid-build; docs that outlive a deleted symbol do not. A
+drift detector that cannot tell those apart gets muted, and a muted gate is worse than none.

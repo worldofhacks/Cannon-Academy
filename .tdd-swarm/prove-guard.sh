@@ -108,6 +108,16 @@ check "grepping the ticket"            allow "$CURSOR_ADAPTER" "$(shell_payload 
 check "orchestrator phase write"       allow "$CURSOR_ADAPTER" "$(shell_payload 'SWARM_ORCHESTRATOR=1 echo tests > .worktrees/prove-T-007/.tdd-swarm/phase')"
 
 echo
+echo "-- a wave is in flight: the integration tree is off limits to everyone --"
+# The fixture unit above supplies the engagement, so these cases hold regardless of whether a
+# real wave happens to be running. Paths here are at the repo root, not in a worktree — this is
+# where a misdirected agent lands when its tooling ignores the working directory.
+check "integration tree src"            block "$CURSOR_ADAPTER" "$(write_payload "src/engine/questions/generator.ts")"
+check "integration tree test"           block "$CURSOR_ADAPTER" "$(write_payload "__tests__/engine/rng.test.ts")"
+check "orchestrator ledger mid-wave"    allow "$CURSOR_ADAPTER" "$(write_payload ".tdd-swarm/progress.md")"
+check "orchestrator amends a ticket"    allow "$CURSOR_ADAPTER" "$(write_payload "tickets/T-007.md")"
+
+echo
 echo "-- engaged, phase=tests --"
 set_phase tests
 check "production code"                block "$CURSOR_ADAPTER" "$(write_payload "$UNIT/src/engine/questions/generator.ts")"

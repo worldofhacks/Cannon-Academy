@@ -93,10 +93,10 @@ blocks the merge; both should close before wave 4 dispatches.
 
 ## Wave 4 — generator and duel vocabulary
 
-| id    | title                                                                            | status  | deps                              | branch                            | model    | issue |
-| ----- | -------------------------------------------------------------------------------- | ------- | --------------------------------- | --------------------------------- | -------- | ----- |
-| T-007 | Question generator — selection, rejection sampling, render, four-choice assembly | backlog | T-001, T-002, T-003, T-004, T-005 | `ticket/T-007-question-generator` | capable  | —     |
-| T-013 | Duel state, events, action log, and initial-state construction                   | backlog | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | —     |
+| id    | title                                                                            | status        | deps                              | branch                            | model    | issue                                                                                  |
+| ----- | -------------------------------------------------------------------------------- | ------------- | --------------------------------- | --------------------------------- | -------- | -------------------------------------------------------------------------------------- |
+| T-007 | Question generator — selection, rejection sampling, render, four-choice assembly | tests-written | T-001, T-002, T-003, T-004, T-005 | `ticket/T-007-question-generator` | capable  | tests **not frozen** — design review REJECT, 3 live mutants; see progress.md HANDOFF   |
+| T-013 | Duel state, events, action log, and initial-state construction                   | tests-written | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | tests **not frozen** — design review REJECT, 2 contract holes; see progress.md HANDOFF |
 
 ## Wave 5 — template content, drill, opponents, the duel machine
 
@@ -317,3 +317,4 @@ waves and both deliberate:
 | T-033 | The frozen-tests-unmodified gate is unreachable code and has never run           | backlog | —            | wave-3 integration — the gate sits after `exit`, calls an undefined `report`, and keys off a `.tdd-swarm/phase` file that does not exist |
 | T-027 | validateCatalogs must detect set-level catalog corruption                        | backlog | T-006        | T-006 code review M-1 — the function is weaker than its signature implies                                                                |
 | T-025 | Replace the expression evaluator's recursive walks with explicit-stack iteration | backlog | T-002        | T-002 code review — `MAX_AST_DEPTH` is a measured margin (1.5× at a 0.5 MB stack), not a guarantee by construction                       |
+| T-034 | Narrow template param keys to the expression-identifier grammar                  | backlog | T-003        | T-007 test-design review — `params: z.record(...)` accepts keys T-002's grammar can never reference, so they render but never resolve    |
