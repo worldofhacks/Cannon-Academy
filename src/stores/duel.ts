@@ -4,17 +4,15 @@
  * Gameplay values are projected from `core`; this module owns beat timing and screen-facing
  * action names only.
  */
-import { getCannon, cannons, getIsland } from '@content/index';
-import type { Cannon, IslandId, SkillId } from '@content/schemas';
-import {
-  applyDefaultRivalAction,
-  drawNextDuelSeed,
-  duelReducer as coreDuelReducer,
-} from '@engine/duel/reducer';
+import { getCannon, cannons, getIsland, islands } from '@content/index';
+import type { Cannon, GradeBand, IslandId, SkillId } from '@content/schemas';
+import { drawNextDuelSeed, duelReducer as coreDuelReducer } from '@engine/duel/reducer';
 import {
   createDuelState,
   type DuelConfig,
+  type DuelEvent,
   type DuelState as CoreDuelState,
+  type RivalVolley,
 } from '@engine/duel/types';
 
 import {
@@ -24,7 +22,10 @@ import {
   type AdapterState,
 } from '../services/duelAdapter';
 import type { ValidDuelContext } from '../services/duelContext';
+import { deriveRivalLoadout } from '../services/rivalLoadout';
+import { planRivalVolleySync } from '../services/rivalDriver';
 import { TEMPLATE_POOLS } from '../services/templatePools';
+import { emptyCaptain, type Captain } from './player';
 
 export type DuelPhase =
   | 'select'
@@ -81,6 +82,7 @@ export interface DuelState {
   readonly duelId: string;
   readonly islandId: IslandId;
   readonly islandName: string;
+  readonly turnToken: number;
   readonly rng: CoreDuelState['rng'];
   readonly cannon: Cannon | null;
   readonly question: StoreAppState['question'];
@@ -101,18 +103,23 @@ export interface DuelState {
   readonly chestOpen: boolean;
 }
 
-const legacyAdapters = new WeakMap<DuelState, AdapterState>();
+type LegacyBundle = {
+  readonly adapter: AdapterState;
+  readonly captain: Captain;
+};
 
-function legacyAdapter(state: DuelState): AdapterState | undefined {
-  return legacyAdapters.get(state);
+const legacyBundles = new WeakMap<DuelState, LegacyBundle>();
+
+function legacyBundle(state: DuelState): LegacyBundle | undefined {
+  return legacyBundles.get(state);
 }
 
-function requireLegacyAdapter(state: DuelState): AdapterState {
-  const adapter = legacyAdapters.get(state);
-  if (adapter === undefined) {
-    throw new Error('duel store: missing adapter for legacy state');
+function requireLegacyBundle(state: DuelState): LegacyBundle {
+  const bundle = legacyBundles.get(state);
+  if (bundle === undefined) {
+    throw new Error('duel store: missing legacy bundle');
   }
-  return adapter;
+  return bundle;
 }
 
 export type DuelAction =
@@ -120,6 +127,11 @@ export type DuelAction =
   | { readonly type: 'ANSWER'; readonly value: number; readonly elapsedMs: number }
   | { readonly type: 'TIMEOUT' }
   | { readonly type: 'ADVANCE' }
+  | {
+      readonly type: 'RIVAL_RESULT';
+      readonly turnToken: number;
+      readonly volley: RivalVolley;
+    }
   | { readonly type: 'OPEN_CHEST' }
   | { readonly type: 'RESET' };
 
@@ -134,13 +146,40 @@ export const PHASE_DURATION_MS: Partial<Record<DuelPhase, number>> = {
   rivalImpact: 1400,
 };
 
-function legacyConfig(seed: number, islandId: IslandId = 'port_sumwich'): DuelConfig {
+function defaultBandForIsland(islandId: IslandId): GradeBand {
+  const island = getIsland(islandId);
+  const needed = cannons
+    .filter((cannon) => island.rangeSkills.includes(cannon.skill))
+    .reduce((max, cannon) => Math.max(max, cannon.minGrade), 0);
+  if (needed >= 4) return 'g4_5';
+  if (needed >= 2) return 'g2_3';
+  return 'k_1';
+}
+
+function defaultLegacyCaptain(islandId: IslandId = 'port_sumwich'): Captain {
+  return {
+    ...emptyCaptain(),
+    gradeBand: defaultBandForIsland(islandId),
+    equippedCannons: cannons.map((cannon) => cannon.id),
+    ownedCannons: cannons.map((cannon) => cannon.id),
+    unlockedIslands: islands.map((island) => island.id),
+    currentIsland: islandId,
+    hasCompletedOnboarding: true,
+  };
+}
+
+function legacyConfig(seed: number, islandId: IslandId, captain: Captain): DuelConfig {
+  const playerLoadout =
+    captain.equippedCannons.length > 0
+      ? [...captain.equippedCannons]
+      : cannons.map((cannon) => cannon.id);
+
   return {
     seed,
     duelId: `duel-${(seed >>> 0).toString(36)}`,
     islandId,
-    playerLoadout: cannons.map((cannon) => cannon.id),
-    rivalLoadout: ['six_pounder'],
+    playerLoadout,
+    rivalLoadout: [...deriveRivalLoadout(captain, islandId)],
     templatesBySkill: TEMPLATE_POOLS,
   };
 }
@@ -225,6 +264,7 @@ function projectLegacy(adapter: AdapterState, previous?: DuelState): DuelState {
     duelId: core.duelId ?? '',
     islandId: core.islandId,
     islandName: getIsland(core.islandId).displayName,
+    turnToken: core.turnToken,
     rng: core.rng,
     cannon: cannonId === null ? null : getCannon(cannonId),
     question: app.question,
@@ -246,9 +286,9 @@ function projectLegacy(adapter: AdapterState, previous?: DuelState): DuelState {
   };
 }
 
-function attachLegacyState(adapter: AdapterState, previous?: DuelState): DuelState {
+function attachLegacyState(adapter: AdapterState, captain: Captain, previous?: DuelState): DuelState {
   const next = projectLegacy(adapter, previous);
-  legacyAdapters.set(next, adapter);
+  legacyBundles.set(next, { adapter, captain });
   return next;
 }
 
@@ -265,30 +305,64 @@ function findChoiceIndex(core: CoreDuelState, value: number): number | null {
   return index >= 0 ? index : null;
 }
 
-function advanceLegacyAdapter(adapter: AdapterState): AdapterState {
-  if (adapter.core.phase === 'rivalTurn' && adapter.phase === 'watch') {
-    return { ...adapter, phase: 'rivalFly', beatToken: adapter.beatToken + 1 };
+function applyRivalVolleyResult(
+  adapter: AdapterState,
+  turnToken: number,
+  volley: RivalVolley,
+): AdapterState {
+  if (adapter.core.phase !== 'rivalTurn' || adapter.core.turnToken !== turnToken) {
+    return adapter;
   }
-  if (adapter.core.phase === 'rivalTurn' && adapter.phase === 'rivalFly') {
-    const core = applyDefaultRivalAction(adapter.core);
+  const core = coreDuelReducer(adapter.core, {
+    type: 'RIVAL_ACTION',
+    volley,
+    turnToken,
+  } as DuelEvent);
+  if (core === adapter.core) return adapter;
+  return {
+    ...adapter,
+    core,
+    phase: 'rivalImpact',
+    beatToken: adapter.beatToken + 1,
+    beatIndex: 2,
+  };
+}
+
+function advanceLegacyAdapter(bundle: LegacyBundle): AdapterState {
+  const { adapter, captain } = bundle;
+
+  if (adapter.core.phase === 'resolveRival' && adapter.phase === 'rivalFly') {
     return {
-      ...createAdapterState(core),
+      ...adapter,
       phase: 'rivalImpact',
       beatToken: adapter.beatToken + 1,
       beatIndex: 2,
     };
   }
+  if (adapter.core.phase === 'rivalTurn' && adapter.phase === 'watch') {
+    return { ...adapter, phase: 'rivalFly', beatToken: adapter.beatToken + 1 };
+  }
+  if (adapter.core.phase === 'rivalTurn' && adapter.phase === 'rivalFly') {
+    const volley = planRivalVolleySync({
+      captain,
+      loadout: adapter.core.rivalLoadout,
+      core: adapter.core,
+    });
+    return applyRivalVolleyResult(adapter, adapter.core.turnToken, volley);
+  }
   return reduceAdapter(adapter, { type: 'ADVANCE', beatToken: adapter.beatToken }, coreDuelReducer);
 }
 
 function reduceLegacy(state: DuelState, action: DuelAction): DuelState {
-  let adapter = legacyAdapter(state);
+  let bundle = legacyBundle(state);
+  let adapter = bundle?.adapter;
 
   switch (action.type) {
     case 'PICK_CANNON': {
       if (
         (state.phase !== 'select' && state.phase !== 'question') ||
-        adapter === undefined
+        adapter === undefined ||
+        bundle === undefined
       ) {
         return state;
       }
@@ -303,7 +377,7 @@ function reduceLegacy(state: DuelState, action: DuelAction): DuelState {
       break;
     }
     case 'ANSWER': {
-      if (adapter === undefined) return state;
+      if (adapter === undefined || bundle === undefined) return state;
       const choiceIndex = findChoiceIndex(adapter.core, action.value);
       if (choiceIndex === null) return state;
       const core = coreDuelReducer(adapter.core, {
@@ -316,56 +390,84 @@ function reduceLegacy(state: DuelState, action: DuelAction): DuelState {
     }
     case 'TIMEOUT': {
       if (state.phase !== 'question' || state.cannon === null) return state;
-      if (adapter === undefined || adapter.core.phase !== 'reload') return state;
+      if (adapter === undefined || bundle === undefined || adapter.core.phase !== 'reload') {
+        return state;
+      }
       const core = coreDuelReducer(adapter.core, { type: 'TIMER_EXPIRED' });
       adapter = reduceAdapterCore(adapter, core);
       break;
     }
+    case 'RIVAL_RESULT': {
+      if (adapter === undefined || bundle === undefined) return state;
+      const nextAdapter = applyRivalVolleyResult(adapter, action.turnToken, action.volley);
+      if (nextAdapter === adapter) return state;
+      adapter = nextAdapter;
+      break;
+    }
     case 'ADVANCE': {
-      if (adapter === undefined) return state;
-      const next = advanceLegacyAdapter(adapter);
+      if (adapter === undefined || bundle === undefined) return state;
+      const next = advanceLegacyAdapter(bundle);
       if (next === adapter) return state;
       adapter = next;
       break;
     }
     case 'OPEN_CHEST': {
-      if (adapter === undefined) return state;
+      if (adapter === undefined || bundle === undefined) return state;
       const next = { ...state, chestOpen: true };
-      legacyAdapters.set(next, adapter);
+      legacyBundles.set(next, bundle);
       return next;
     }
     case 'RESET': {
-      const live = requireLegacyAdapter(state);
+      const live = requireLegacyBundle(state);
       const [seed, nextRng] = drawNextDuelSeed(state.rng);
-      adapter = bootAdapter(legacyConfig(seed, state.islandId));
+      adapter = bootAdapter(legacyConfig(seed, state.islandId, live.captain));
       adapter = { ...adapter, core: { ...adapter.core, rng: nextRng } };
+      bundle = { adapter, captain: live.captain };
       void live;
-      return attachLegacyState(adapter);
+      return attachLegacyState(adapter, bundle.captain);
     }
     default:
       return state;
   }
 
-  if (adapter === undefined) return state;
-  const next = attachLegacyState(adapter, state);
+  if (adapter === undefined || bundle === undefined) return state;
+  const next = attachLegacyState(adapter, bundle.captain, state);
   return next.phase === state.phase &&
     next.chestOpen === state.chestOpen &&
-    adapter === legacyAdapter(state)
+    next.playerHull === state.playerHull &&
+    next.rivalDamage === state.rivalDamage &&
+    adapter === bundle.adapter
     ? state
     : next;
 }
 
 export function initialDuelState(seed: number): DuelState {
-  return attachLegacyState(bootAdapter(legacyConfig(seed)));
+  const cap = defaultLegacyCaptain();
+  const adapter = bootAdapter(legacyConfig(seed, 'port_sumwich', cap));
+  return attachLegacyState(adapter, cap);
 }
 
-/** Island-aware initializer for the live duel screen (A-029). */
-export function initialDuelStateWithContext(context: ValidDuelContext, seed: number): DuelState {
-  return attachLegacyState(bootAdapter(legacyConfig(seed, context.islandId)));
+/** Island-aware initializer for the live duel screen (A-029 / A-030). */
+export function initialDuelStateWithContext(
+  context: ValidDuelContext,
+  seed: number,
+  captain: Captain = defaultLegacyCaptain(context.islandId),
+): DuelState {
+  const adapter = bootAdapter(legacyConfig(seed, context.islandId, captain));
+  return attachLegacyState(adapter, captain);
 }
 
 export function duelReducer(state: DuelState, action: DuelAction): DuelState {
   return reduceLegacy(state, action);
+}
+
+/** Live rival-turn core snapshot for the async screen driver (A-030). */
+export function legacyCoreForRival(
+  state: DuelState,
+): Extract<CoreDuelState, { phase: 'rivalTurn' }> | null {
+  const bundle = legacyBundles.get(state);
+  if (bundle === undefined || bundle.adapter.core.phase !== 'rivalTurn') return null;
+  return bundle.adapter.core;
 }
 
 export function createDuelStore(

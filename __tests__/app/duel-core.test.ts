@@ -118,6 +118,7 @@ const DUEL_ACTION_TYPES = everyMemberOf<DuelAction['type']>()([
   'ANSWER',
   'TIMEOUT',
   'ADVANCE',
+  'RIVAL_RESULT',
   'OPEN_CHEST',
   'RESET',
 ] as const);
@@ -313,6 +314,11 @@ function walkActions(state: DuelState): readonly DuelAction[] {
     ]),
     { type: 'TIMEOUT' },
     { type: 'ADVANCE' },
+    {
+      type: 'RIVAL_RESULT',
+      turnToken: state.turnToken,
+      volley: { cannonId: 'six_pounder', correct: false, elapsedMs: 0 },
+    },
     { type: 'OPEN_CHEST' },
     { type: 'RESET' },
   ];

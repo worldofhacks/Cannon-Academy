@@ -3,6 +3,10 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, router } from 'expo-router';
 
+import { recordDuelResult, recordPlayerAnswer, consumeForcedMisfire } from '@engine/opponents/mercy';
+
+import { deriveRivalLoadout } from '../src/services/rivalLoadout';
+import { createRivalBot, driveRivalTurn, resolveRivalVolley } from '../src/services/rivalDriver';
 import { captainStore, useCaptain } from '../src/stores/useCaptain';
 import { captainPoseForPhase } from '../src/components/duel/Captain';
 import { CannonTray } from '../src/components/duel/CannonTray';
@@ -34,6 +38,7 @@ import {
   duelReducer,
   initialDuelState,
   initialDuelStateWithContext,
+  legacyCoreForRival,
   PHASE_DURATION_MS,
   type DuelPhase,
 } from '../src/stores/duel';
@@ -71,10 +76,23 @@ function DuelBody() {
   const captain = useCaptain((s) => s.captain);
   const duelContext = useMemo(() => resolveDuelContext(captain), [captain]);
   const [state, dispatch] = useReducer(duelReducer, duelContext, (ctx) =>
-    ctx.ok ? initialDuelStateWithContext(ctx, freshSeed()) : initialDuelState(0),
+    ctx.ok ? initialDuelStateWithContext(ctx, freshSeed(), captain) : initialDuelState(0),
   );
   const [appliedReward, setAppliedReward] = useState<DuelRewardOutcome | null>(null);
   const askedAt = useRef(0);
+  const rivalCancel = useRef<(() => void) | null>(null);
+  const mounted = useRef(true);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      rivalCancel.current?.();
+      rivalCancel.current = null;
+    };
+  }, []);
 
   // The captain's OWN loadout, in catalog order — via trayCannons (A-011), never a grade-band lookup.
   const tray = useMemo(() => [...trayCannons(captain)], [captain]);
@@ -116,7 +134,54 @@ function DuelBody() {
     if (state.phase !== 'victory' && state.phase !== 'defeat') return;
     const observed = applyDuelOutcome(captainStore, state);
     setAppliedReward((current) => retainFirstApplied(current, observed));
+    const won = state.phase === 'victory';
+    const { captain: settled } = captainStore.getState();
+    captainStore.getState().replaceCaptain({
+      ...settled,
+      mercyState: recordDuelResult(settled.mercyState, won),
+    });
   }, [state.phase, state.duelId]);
+
+  useEffect(() => {
+    if (state.phase !== 'watch') {
+      rivalCancel.current?.();
+      rivalCancel.current = null;
+      return;
+    }
+
+    const cap = captainStore.getState().captain;
+    const loadout = deriveRivalLoadout(cap, state.islandId);
+    const core = legacyCoreForRival(state);
+    if (core === null) return;
+    const opponent = createRivalBot({ captain: cap, loadout, rng: core.rng });
+    const turnToken = core.turnToken;
+
+    rivalCancel.current?.();
+    rivalCancel.current = driveRivalTurn({
+      turnToken,
+      expectedTurnToken: turnToken,
+      alive: () => mounted.current,
+      resolve: () => resolveRivalVolley({ opponent, core }),
+      onResult: ({ turnToken: token, volley }) => {
+        if (!mounted.current) return;
+        dispatch({ type: 'RIVAL_RESULT', turnToken: token, volley });
+        if (!volley.correct) {
+          const after = captainStore.getState().captain;
+          if (after.mercyState.forcedMisfiresRemaining > 0) {
+            captainStore.getState().replaceCaptain({
+              ...after,
+              mercyState: consumeForcedMisfire(after.mercyState),
+            });
+          }
+        }
+      },
+    });
+
+    return () => {
+      rivalCancel.current?.();
+      rivalCancel.current = null;
+    };
+  }, [state.phase, state.turnToken, state.duelId, state.islandId, state.rng, state.turn]);
 
   // "Sail again" keeps this screen mounted, so its next duel needs its own retained settlement.
   useEffect(() => {
@@ -124,7 +189,15 @@ function DuelBody() {
   }, [state.duelId]);
 
   const onAnswer = useCallback((value: number) => {
+    const current = stateRef.current;
     dispatch({ type: 'ANSWER', value, elapsedMs: Date.now() - askedAt.current });
+    if (current.question !== null) {
+      const cap = captainStore.getState().captain;
+      captainStore.getState().replaceCaptain({
+        ...cap,
+        mercyState: recordPlayerAnswer(cap.mercyState, value === current.question.answer),
+      });
+    }
   }, []);
 
   const leave = useCallback(() => router.back(), []);
@@ -313,14 +386,22 @@ function resolveCopy(state: ReturnType<typeof initialDuelState>): ResolveCopy {
       };
 
     case 'rivalImpact':
-      return {
-        background: '#6C4BD6',
-        // U+FE0E — this icon renders white on purple in ResolvePanel; see Hud.tsx.
-        icon: '◀︎',
-        title: 'They landed one',
-        body: `−${state.rivalDamage} to your hull`,
-        hint: 'Planks, not lives. Your hull is always patched after a duel.',
-      };
+      return state.rivalDamage > 0
+        ? {
+            background: '#6C4BD6',
+            // U+FE0E — this icon renders white on purple in ResolvePanel; see Hud.tsx.
+            icon: '◀︎',
+            title: 'They landed one',
+            body: `−${state.rivalDamage} to your hull`,
+            hint: 'Planks, not lives. Your hull is always patched after a duel.',
+          }
+        : {
+            background: color.sea,
+            icon: '~',
+            title: 'Splash — they missed',
+            body: 'No harm done.',
+            hint: 'Even rivals misfire. Your deck stays whole.',
+          };
 
     default:
       return {

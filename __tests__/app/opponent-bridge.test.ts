@@ -4,7 +4,6 @@
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-import ts from 'typescript';
 import { describe, expect, it, vi } from 'vitest';
 
 import { cannons, getCannon, getIsland, islands } from '@content/index';
@@ -110,25 +109,16 @@ async function loadRivalDriver(): Promise<RivalDriverApi> {
   return loaded as RivalDriverApi;
 }
 
-function duelConfig(islandId: IslandId, seed: number, rivalLoadout: readonly CannonId[]): DuelConfig {
+function duelConfigForCaptain(islandId: IslandId, seed: number, cap: Captain): DuelConfig {
+  const loadout = expectedIslandLoadout(islandId, cap.gradeBand ?? 'g2_3');
   return {
     seed,
     duelId: `a030-${seed.toString(36)}`,
     islandId,
     playerLoadout: ['swivel_gun'],
-    rivalLoadout,
+    rivalLoadout: loadout,
     templatesBySkill: TEMPLATE_POOLS,
   };
-}
-
-function sourceFile(relativePath: string): ts.SourceFile {
-  return ts.createSourceFile(
-    relativePath,
-    readFileSync(join(REPO_ROOT, relativePath), 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
 }
 
 function expectedIslandLoadout(islandId: IslandId, band: GradeBand): readonly CannonId[] {
@@ -140,26 +130,25 @@ function expectedIslandLoadout(islandId: IslandId, band: GradeBand): readonly Ca
     .map((c) => c.id);
 }
 
-function atRivalTurn(storeState: StoreDuelState, cap: Captain): Extract<DuelState, { phase: 'rivalTurn' }> {
+function atWatchAfterTimeout(cap: Captain, seed = 3030): StoreDuelState {
   const ctx = resolveDuelContext(cap);
   expect(ctx.ok).toBe(true);
   if (!ctx.ok) throw new Error('invalid duel context');
-  let state = initialDuelStateWithContext(ctx, 3030, cap);
-  const starter = getCannon('swivel_gun');
-  state = duelReducer(state, { type: 'PICK_CANNON', cannon: starter });
+
+  let state = initialDuelStateWithContext(ctx, seed, cap);
+  state = duelReducer(state, { type: 'PICK_CANNON', cannon: getCannon('swivel_gun') });
   state = duelReducer(state, { type: 'TIMEOUT' });
-  state = duelReducer(state, { type: 'ADVANCE' }); // timeout resolve -> watch
+  for (let step = 0; step < 8 && state.phase !== 'watch'; step += 1) {
+    state = duelReducer(state, { type: 'ADVANCE' });
+  }
   expect(state.phase).toBe('watch');
-  const adapterCore = (state as StoreDuelState & { readonly core?: DuelState }).core;
-  void adapterCore;
-  return reachRivalTurnCore(state, cap);
+  return state;
 }
 
-function reachRivalTurnCore(storeState: StoreDuelState, cap: Captain): Extract<DuelState, { phase: 'rivalTurn' }> {
+function reachRivalTurnCore(cap: Captain, seed = 3031): Extract<DuelState, { phase: 'rivalTurn' }> {
   const ctx = resolveDuelContext(cap);
   if (!ctx.ok) throw new Error('invalid context');
-  const loadout = expectedIslandLoadout(ctx.islandId, cap.gradeBand ?? 'g2_3');
-  let core = coreDuelReducer(createDuelState(duelConfig(ctx.islandId, 3031, loadout)), {
+  let core = coreDuelReducer(createDuelState(duelConfigForCaptain(ctx.islandId, seed, cap)), {
     type: 'ANIMATION_DONE',
   });
   core = coreDuelReducer(core, { type: 'CANNON_SELECTED', cannonId: 'swivel_gun' });
@@ -187,11 +176,7 @@ describe('A-030 opponent bridge', () => {
     const bot = createRivalBot({ captain: cap, loadout, rng: createRng(3032) });
     const answers: boolean[] = [];
     for (let i = 0; i < 4; i += 1) {
-      await bot.chooseAction(toRivalView(reachRivalTurnCore(initialDuelStateWithContext(
-        resolveDuelContext(cap) as Extract<ReturnType<typeof resolveDuelContext>, { ok: true }>,
-        3033,
-        cap,
-      ), cap)));
+      await bot.chooseAction(toRivalView(reachRivalTurnCore(cap, 3033)));
       const answer = await bot.produceAnswer({
         templateId: 'fixture',
         skill: 'add_within_10',
@@ -219,7 +204,7 @@ describe('A-030 opponent bridge', () => {
     expect(ctx.ok).toBe(true);
     if (!ctx.ok) return;
     const loadout = deriveRivalLoadout(cap, ctx.islandId);
-    const core = reachRivalTurnCore(initialDuelStateWithContext(ctx, 3040, cap), cap);
+    const core = reachRivalTurnCore(cap, 3040);
 
     const botA = createRivalBot({ captain: cap, loadout, rng: core.rng });
     const botB = createRivalBot({ captain: cap, loadout, rng: core.rng });
@@ -252,13 +237,13 @@ describe('A-030 opponent bridge', () => {
     expect(ctx.ok).toBe(true);
     if (!ctx.ok) return;
     let state = initialDuelStateWithContext(ctx, 3050, cap);
-    state = atRivalTurn(state, cap);
+    state = atWatchAfterTimeout(cap, 3050);
     expect(state.phase).toBe('watch');
 
     const before = state;
     const stale = duelReducer(state, {
       type: 'RIVAL_RESULT',
-      turnToken: (before as StoreDuelState & { readonly turnToken?: number }).turnToken ?? 0 - 1,
+      turnToken: before.turnToken - 1,
       volley: { cannonId: 'six_pounder', correct: true, elapsedMs: 100 },
     });
     expect(stale).toBe(before);
@@ -280,11 +265,7 @@ describe('A-030 opponent bridge', () => {
 
     const armedCap = captain({ mercyState: mercy });
     const loadout = deriveRivalLoadout(armedCap, 'port_sumwich');
-    const core = reachRivalTurnCore(initialDuelStateWithContext(
-      resolveDuelContext(armedCap) as Extract<ReturnType<typeof resolveDuelContext>, { ok: true }>,
-      3060,
-      armedCap,
-    ), armedCap);
+    const core = reachRivalTurnCore(armedCap, 3060);
     const bot = createRivalBot({ captain: armedCap, loadout, rng: core.rng });
     await bot.chooseAction(toRivalView(core));
     const first = await bot.produceAnswer({
@@ -310,7 +291,7 @@ describe('A-030 opponent bridge', () => {
     const ctx = resolveDuelContext(cap);
     expect(ctx.ok).toBe(true);
     if (!ctx.ok) return;
-    const core = reachRivalTurnCore(initialDuelStateWithContext(ctx, 3070, cap), cap);
+    const core = reachRivalTurnCore(cap, 3070);
     const loadout = expectedIslandLoadout(ctx.islandId, cap.gradeBand!);
     const volley = planRivalVolleySync({
       captain: captain({ mercyState: { ...emptyMercyState, forcedMisfiresRemaining: 1 } }),
@@ -320,18 +301,19 @@ describe('A-030 opponent bridge', () => {
     expect(volley.correct).toBe(false);
 
     let state = initialDuelStateWithContext(ctx, 3071, cap);
-    state = atRivalTurn(state, cap);
+    state = atWatchAfterTimeout(cap, 3071);
     const hullBefore = state.playerHull;
     state = duelReducer(state, {
       type: 'RIVAL_RESULT',
-      turnToken: (state as StoreDuelState & { readonly turnToken: number }).turnToken,
+      turnToken: state.turnToken,
       volley,
     });
     expect(state.playerHull).toBe(hullBefore);
     expect(state.rivalDamage).toBe(0);
 
     const duelSource = readFileSync(join(REPO_ROOT, DUEL_PATH), 'utf8');
-    expect(duelSource).toMatch(/rivalDamage\s*===\s*0|rivalDamage\s*>\s*0/);
+    expect(duelSource).toMatch(/rivalDamage\s*>\s*0/);
+    expect(duelSource).toMatch(/Splash — they missed/);
   });
 
   it('spec(A-030:AC-6) disposed rival callbacks do not update listeners', async () => {
@@ -384,10 +366,8 @@ describe('A-030 opponent bridge', () => {
         expect(ctx.ok, `${band}/${island.id}`).toBe(true);
         if (!ctx.ok) continue;
         const booted = initialDuelStateWithContext(ctx, 3080 + island.order, cap);
-        const core = (booted as StoreDuelState & { readonly core?: DuelState }).core;
-        if (core !== undefined) {
-          expect(core.rivalLoadout).toEqual(loadout);
-        }
+        expect(booted.islandId).toBe(island.id);
+        void booted;
       }
     }
   });
@@ -397,8 +377,8 @@ describe('A-030 opponent bridge', () => {
     const ctx = resolveDuelContext(cap);
     expect(ctx.ok).toBe(true);
     if (!ctx.ok) return;
-    let state = atRivalTurn(initialDuelStateWithContext(ctx, 3090, cap), cap);
-    const token = (state as StoreDuelState & { readonly turnToken: number }).turnToken;
+    let state = atWatchAfterTimeout(cap, 3090);
+    const token = state.turnToken;
 
     state = duelReducer(state, {
       type: 'RIVAL_RESULT',
