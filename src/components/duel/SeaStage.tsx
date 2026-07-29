@@ -22,7 +22,7 @@ import { sprite } from '../../theme/sprites';
 import { color, motion, radius, type } from '../../theme/tokens';
 import type { DuelPhase } from '../../stores/duel';
 import type { CaptainPose } from './Captain';
-import { PLAYER_SHIP, RIVAL_SHIP, Ship } from './Ship';
+import { RIVAL_SHIP, Ship, type ShipCosmetics } from './Ship';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
@@ -37,6 +37,8 @@ const SEA_BAND_RATIO = 58 / 176;
 interface SeaStageProps {
   readonly phase: DuelPhase;
   readonly captainPose: CaptainPose;
+  /** The player's ship colours, with the onboarding flag as its pennant (board 5b). */
+  readonly playerShip: ShipCosmetics;
   /** Computed by `seaStageHeight()` from the real screen, not a constant. */
   readonly height: number;
   /** Illustration scale. Ships grow on a bigger phone; the HUD above them does not. */
@@ -51,6 +53,7 @@ interface SeaStageProps {
 export function SeaStage({
   phase,
   captainPose,
+  playerShip,
   height,
   art,
   look,
@@ -72,7 +75,7 @@ export function SeaStage({
 
       <View style={s.playerSlot}>
         <Ship
-          cosmetics={PLAYER_SHIP}
+          cosmetics={playerShip}
           facing="right"
           width={150 * art}
           burning={playerHullPct <= 0.3}

@@ -6,6 +6,7 @@ import { router } from 'expo-router';
 import { cannons as catalog, getCannon } from '@content/index';
 import { resolvePlacement } from '@engine/placement';
 
+import { useCaptain } from '../src/stores/useCaptain';
 import { captainPoseForPhase } from '../src/components/duel/Captain';
 import { CannonTray } from '../src/components/duel/CannonTray';
 import { HullCard, TurnBar } from '../src/components/duel/Hud';
@@ -22,6 +23,7 @@ import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
 import { applyDuelOutcome } from '../src/services/duelRewards';
 import { captainStore } from '../src/stores/useCaptain';
+import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
 import { seaStageHeight } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
@@ -44,6 +46,9 @@ import { duelReducer, initialDuelState, PHASE_DURATION_MS, type DuelPhase } from
 export default function DuelScreen() {
   const insets = useSafeAreaInsets();
   const L = useLayout();
+  // The flag chosen at onboarding IS the pennant (board 5b) — a child's ship is theirs before the
+  // first chest ever drops. Resolved here because the sea stage renders colours, not captains.
+  const playerShip = shipCosmeticsForCaptain(useCaptain((s) => s.captain));
   const [state, dispatch] = useReducer(duelReducer, 0, () => initialDuelState(freshSeed()));
   const askedAt = useRef(0);
 
@@ -115,6 +120,7 @@ export default function DuelScreen() {
         height={seaStageHeight(L)}
         art={L.art}
         phase={state.phase}
+        playerShip={playerShip}
         captainPose={captainPoseForPhase(state.phase, state.outcome?.perfectShot === true)}
         look={look}
         playerHullPct={state.playerHull / state.playerMax}

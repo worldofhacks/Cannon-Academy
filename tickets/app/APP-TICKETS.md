@@ -26,7 +26,7 @@
 | ----- | ----------------------------------------------------------------------------- | ------------- | ------------ | -------- |
 | A-004 | Anonymous identity that survives a cold start                                 | review-passed | A-002        | standard |
 | A-005 | Onboarding wired to placement, and the root layout wired to the flow resolver | review-passed | A-001, A-003 | standard |
-| A-006 | Name and flag — the ship becomes theirs before the first chest                | backlog       | A-001        | cheap    |
+| A-006 | Name and flag — the ship becomes theirs before the first chest                | review-passed | A-001        | cheap    |
 
 ## Wave A3
 
