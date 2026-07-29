@@ -18,6 +18,35 @@ import { describe, expect, it } from 'vitest';
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const CHART_ROOT = join(REPO_ROOT, 'src/components/chart');
 const REANIMATED_MODULE = 'react-native-reanimated';
+const WORKLET_SAFE_REANIMATED_CALLS = new Set([
+  'Easing.back',
+  'Easing.bezier',
+  'Easing.bezierFn',
+  'Easing.bounce',
+  'Easing.circle',
+  'Easing.cubic',
+  'Easing.ease',
+  'Easing.elastic',
+  'Easing.exp',
+  'Easing.in',
+  'Easing.inOut',
+  'Easing.linear',
+  'Easing.out',
+  'Easing.poly',
+  'Easing.quad',
+  'Easing.sin',
+  'Easing.steps',
+  'clamp',
+  'interpolate',
+  'interpolateColor',
+  'withClamp',
+  'withDecay',
+  'withDelay',
+  'withRepeat',
+  'withSequence',
+  'withSpring',
+  'withTiming',
+]);
 const WORKLET_SAFE_GLOBAL_FUNCTIONS = new Set(['isFinite', 'isNaN', 'parseFloat', 'parseInt']);
 const WORKLET_SAFE_GLOBAL_OBJECTS = new Set([
   'Array',
@@ -41,7 +70,7 @@ interface Binding {
 interface ReanimatedImports {
   readonly hookDeclarations: ReadonlySet<ts.Node>;
   readonly namespaceDeclarations: ReadonlySet<ts.Node>;
-  readonly valueDeclarations: ReadonlySet<ts.Node>;
+  readonly valueDeclarations: ReadonlyMap<ts.Node, string>;
 }
 
 interface SourceContext {
@@ -158,7 +187,7 @@ function collectBindings(sourceFile: ts.SourceFile): readonly Binding[] {
 function collectReanimatedImports(sourceFile: ts.SourceFile): ReanimatedImports {
   const hookDeclarations = new Set<ts.Node>();
   const namespaceDeclarations = new Set<ts.Node>();
-  const valueDeclarations = new Set<ts.Node>();
+  const valueDeclarations = new Map<ts.Node, string>();
 
   for (const statement of sourceFile.statements) {
     if (
@@ -184,7 +213,7 @@ function collectReanimatedImports(sourceFile: ts.SourceFile): ReanimatedImports 
 
     for (const element of namedBindings.elements) {
       const importedName = element.propertyName?.text ?? element.name.text;
-      valueDeclarations.add(element);
+      valueDeclarations.set(element, importedName);
       if (importedName === 'useAnimatedStyle') {
         hookDeclarations.add(element);
       }
@@ -221,16 +250,22 @@ function resolveBinding(identifier: ts.Identifier, context: SourceContext): Bind
   return candidates[0];
 }
 
-function memberName(expression: ts.Expression): string | undefined {
+function memberPath(expression: ts.Expression): readonly string[] | undefined {
   const unwrapped = unwrapExpression(expression);
-  if (ts.isPropertyAccessExpression(unwrapped)) return unwrapped.name.text;
+  if (ts.isIdentifier(unwrapped)) return [];
+  if (ts.isPropertyAccessExpression(unwrapped)) {
+    const base = memberPath(unwrapped.expression);
+    return base === undefined ? undefined : [...base, unwrapped.name.text];
+  }
   if (!ts.isElementAccessExpression(unwrapped)) return undefined;
 
   const argument = unwrapped.argumentExpression;
-  return argument !== undefined &&
-    (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument))
-    ? argument.text
-    : undefined;
+  const key =
+    argument !== undefined && (ts.isStringLiteral(argument) || ts.isNoSubstitutionTemplateLiteral(argument))
+      ? argument.text
+      : undefined;
+  const base = memberPath(unwrapped.expression);
+  return base === undefined || key === undefined ? undefined : [...base, key];
 }
 
 function memberRoot(expression: ts.Expression): ts.Identifier | undefined {
@@ -249,10 +284,12 @@ function isReanimatedHookCall(expression: ts.Expression, context: SourceContext)
   }
 
   const root = memberRoot(unwrapped);
+  const path = memberPath(unwrapped);
   return (
     root !== undefined &&
     context.imports.namespaceDeclarations.has(resolveBinding(root, context)?.declaration ?? root) &&
-    memberName(unwrapped) === 'useAnimatedStyle'
+    path?.length === 1 &&
+    path[0] === 'useAnimatedStyle'
   );
 }
 
@@ -260,17 +297,23 @@ function isReanimatedRuntimeCall(expression: ts.Expression, context: SourceConte
   const unwrapped = unwrapExpression(expression);
   if (ts.isIdentifier(unwrapped)) {
     const binding = resolveBinding(unwrapped, context);
-    return binding !== undefined && context.imports.valueDeclarations.has(binding.declaration);
+    const importedName =
+      binding === undefined ? undefined : context.imports.valueDeclarations.get(binding.declaration);
+    return importedName !== undefined && WORKLET_SAFE_REANIMATED_CALLS.has(importedName);
   }
 
   const root = memberRoot(unwrapped);
   if (root === undefined) return false;
   const declaration = resolveBinding(root, context)?.declaration;
-  return (
-    declaration !== undefined &&
-    (context.imports.namespaceDeclarations.has(declaration) ||
-      context.imports.valueDeclarations.has(declaration))
-  );
+  const path = memberPath(unwrapped);
+  if (declaration === undefined || path === undefined) return false;
+
+  if (context.imports.namespaceDeclarations.has(declaration)) {
+    return WORKLET_SAFE_REANIMATED_CALLS.has(path.join('.'));
+  }
+
+  const importedRoot = context.imports.valueDeclarations.get(declaration);
+  return importedRoot !== undefined && WORKLET_SAFE_REANIMATED_CALLS.has([importedRoot, ...path].join('.'));
 }
 
 function isUnshadowedWorkletIntrinsic(expression: ts.Expression, context: SourceContext): boolean {
@@ -436,6 +479,25 @@ const ALIASED_UNSAFE_FIXTURES = [
   },
 ] as const;
 
+const JS_THREAD_REANIMATED_FIXTURES = [
+  {
+    label: 'named useSharedValue import',
+    source: `
+      import { useAnimatedStyle, useSharedValue } from 'react-native-reanimated';
+      const style = useAnimatedStyle(() => ({ opacity: useSharedValue(1).value }));
+    `,
+  },
+  {
+    label: 'namespace-qualified useSharedValue',
+    source: `
+      import * as Reanimated from 'react-native-reanimated';
+      const style = Reanimated.useAnimatedStyle(
+        () => ({ opacity: Reanimated.useSharedValue(1).value }),
+      );
+    `,
+  },
+] as const;
+
 describe('A-018 — chart Reanimated worklet safety', () => {
   it('spec(A-018:AC-1) inventories exactly the four currently shipped chart useAnimatedStyle callbacks', () => {
     const inventory = WORKLETS.map((worklet) => `${worklet.relativePath}::${worklet.binding}`);
@@ -461,6 +523,20 @@ describe('A-018 — chart Reanimated worklet safety', () => {
         binding,
         inspectionError: undefined,
         unsafeCalls: [expect.stringContaining('jsLayout')],
+      });
+    },
+  );
+
+  it.each(JS_THREAD_REANIMATED_FIXTURES)(
+    'spec(A-018:AC-1) rejects the JS-thread Reanimated API in a $label callback',
+    ({ source }) => {
+      const found = workletsIn('synthetic-js-thread-reanimated.tsx', source);
+
+      expect(found).toHaveLength(1);
+      expect(found[0]).toMatchObject({
+        binding: 'style',
+        inspectionError: undefined,
+        unsafeCalls: [expect.stringContaining('useSharedValue')],
       });
     },
   );

@@ -21,9 +21,11 @@ currently shipped inventory remains pinned to these four independently executed 
 4. `src/components/chart/Station.tsx::riseStyle`
 
 Any added, removed, renamed, uninspectable, or unsafe-helper-calling worklet fails the suite. Calls
-whose provenance proves they are Reanimated UI-runtime primitives or unshadowed worklet-safe
-ECMAScript intrinsics are allowed, so the frozen test does not impose the ticket-unstated rule of
-“zero call expressions.”
+are allowed only when their provenance resolves to an explicit set of Reanimated functions whose
+installed implementations are worklet-marked (interpolation, easing, and animation builders), or
+to an unshadowed worklet-safe ECMAScript intrinsic. Merely importing a value from Reanimated does
+not make its call safe, so the frozen test avoids both “trust every export” and the ticket-unstated
+rule of “zero call expressions.”
 
 Adversarial in-memory sources prove all of these through the same collector used for production:
 
@@ -32,18 +34,21 @@ Adversarial in-memory sources prove all of these through the same collector used
 - a locally resolved extracted callback is inspected and its captured helper rejected;
 - an unresolvable callback fails closed instead of escaping inspection;
 - a local helper shadowing an imported Reanimated primitive is rejected by declaration provenance;
+- named and namespace-qualified `useSharedValue()` calls are rejected as JS-thread React hooks;
 - an extracted callback using `Math.max()` and Reanimated `interpolate()` is accepted.
 
 No source mutation or manufactured RED run was used.
 
 ## Test-design review resolution
 
-The two Important findings in `.tdd-swarm/reports/A-018-test-design-review.md` are addressed:
+All Important findings in `.tdd-swarm/reports/A-018-test-design-review.md` are addressed:
 
 1. Hook discovery now follows the actual Reanimated import declaration instead of matching the
    literal local name `useAnimatedStyle`.
 2. Callback analysis resolves local identifier bodies and classifies calls by provenance instead of
    requiring an inline callback with no calls.
+3. Reanimated call safety uses an explicit worklet-utility allowlist; React hooks such as
+   `useSharedValue()` remain unsafe even though they come from the same package.
 
 ## First-run posture
 
@@ -56,11 +61,11 @@ in the in-memory unsafe-fixture assertion; it never represented a production fai
 
 | Command | Result |
 | --- | --- |
-| `npx vitest run __tests__/app/chart-worklet-safety.test.ts` | PASS — 1 file, 12 tests |
+| `npx vitest run __tests__/app/chart-worklet-safety.test.ts` | PASS — 1 file, 14 tests |
 | `npx prettier --check __tests__/app/chart-worklet-safety.test.ts .tdd-swarm/reports/A-018-tests.md` | PASS |
 | `npx eslint __tests__/app/chart-worklet-safety.test.ts --max-warnings 0` | PASS |
 | `npx tsc --noEmit` | PASS |
-| `npx vitest run` | PASS — 41 files, 2,026 tests |
+| `npx vitest run` | PASS — 41 files, 2,028 tests |
 | `.tdd-swarm/spec-lint.sh tickets/app/A-018.md` | PASS — AC-1 covered; all six DoD items explicitly skipped as process evidence |
 | `.tdd-swarm/run-local-gates.sh <worktree>` | Formatting, lint, typecheck, unit, no-markers, no-focused-tests, and purity PASS; wrapper RED only on the pre-existing `frozen-tests-unmodified` history check |
 
