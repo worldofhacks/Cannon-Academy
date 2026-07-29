@@ -44,4 +44,6 @@ A-015 → A-010 → A-012 → A-033 → A-031 → A-034 → A-038 → A-013
 | Ticket | Status |
 | --- | --- |
 | A-031 enemy variety | **merged** |
-| A-034 cannon identity | agent c71bdd0e |
+| A-034 cannon identity | **merged** |
+
+| A-038 demo navigation | agent pending |
