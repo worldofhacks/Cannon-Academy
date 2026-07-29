@@ -1463,6 +1463,55 @@ not a reject.
   its nested `distractors` / `params` / `constraints`.
 - **AC-3** — independent state graphs, not just top-level reference inequality.
 
+## T-007 round 4 — accepted, pending re-review
+
+Cause-identity tightenings landed. Re-verified: hash `1a586570…`, merge-base diff = suite +
+report only, sole `TS2307`, baseline 1229, `spec-lint` 21/21 with DoD-7 SKIP. Suite now asserts
+`cause === undefined` on every AC-11 seed and matches frozen-evaluator `code`/`message` on AC-20/21.
+Agent reported m3 81/81 → 4 fails (AC-11 ×3 + AC-21 ×1); assertion shapes confirm that kill path.
+
+## T-013 round 4 — accepted, pending re-review
+
+Deep-copy / independent-graph tightenings landed. Re-verified: hash `737335df…`, 128 tests,
+merge-base diff = suite + report only, RED still 88 (3/51/34), baseline 1229, `spec-lint` 16/16
+with DoD-9 SKIP. New tests cover AC-3 graph independence (`playerLoadout.push` + nested
+`templatesBySkill[…][0].text`) and AC-16 deep-copy of `Template` plus nested `params` /
+`distractors` / `constraints` with `not.toBe` on those references.
+
+## T-007 FROZEN — Composer ACCEPT round 4
+
+Verdict **ACCEPT** from [T-007 Re-review](fc68fe03-f84a-4103-a0c1-84f8c572c51c). Independently confirmed
+before freeze: suite SHA `1a5865707201bc288bd21deb4865cf8c49d3e176e1f43ef537229460b57799e1`,
+`phase=implement` set in `wt-T-007`, write guard **blocks** the frozen suite (engaged, frozen-test
+reason). Merge-base diff remains suite + report; RED = sole `TS2307`; 21/21 spec-lint.
+
+Reviewer confirmed m3 dead (4 fails: AC-11 ×3 + AC-21 ×1). Two 81/81 survivors are **not** reject
+grounds: (1) copying `ExprError` code+message into a fresh cause — allowed by AC-20 as written;
+(2) calling `buildDistractors` before an explicit `evaluateNumber` — observably identical because
+frozen T-005 evaluates `answerExpr` internally. Residuals recorded, not blockers.
+
+**Do not dispatch the T-007 implementer until T-013 also freezes** — wave 4 is the critical-path
+narrowest point and both should enter GREEN together.
+
+## T-013 round-4 re-review — REJECTED (Composer 2.5)
+
+Round-3 mutants confirmed dead. Three new live mutants re-measured at **128/128**:
+
+1. Shared module-level `tally` / `actionLog` / `recentTemplateIds` while loadouts/templates copy
+2. Deep-copy `Template` but alias `params.b` (suite only probed `params.a`)
+3. Memoised `rng` object identity across two constructions (suite checks deep equality only)
+
+Control shared-core wrapper still dies (127/128). Same pattern: tests measured the last layer's
+exact failures; half-fixes lived one field over.
+
+### Rulings (count stays 16)
+
+- **AC-3** — independence covers every mutable interior: loadouts, templates, `actionLog`,
+  `recentTemplateIds`, `tally`/`bySkill`, and `rng` reference inequality.
+- **AC-16** — every `params` key's range array must be a new reference; mutate an unprobed key.
+
+T-007 remains frozen (`1a586570…`, `phase=implement`); implementer still held.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
