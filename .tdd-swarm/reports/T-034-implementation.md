@@ -2,7 +2,7 @@
 
 **Status: BLOCKED (format gate — frozen suite prettier debt)**
 
-**Commit:** _(filled after `feat(T-034)` lands — see Return block)_
+**Commit:** `9947577f98f58a394a4c3968dd8ff337d1f78989` — `feat(T-034): narrow template param keys to IDENT grammar`
 
 Files changed (file_scopes only):
 
