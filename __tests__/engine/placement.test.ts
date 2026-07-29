@@ -5,9 +5,11 @@
  * into a starting `Placement` — pre-unlocked cannons, pre-unlocked islands, and a starting bot
  * accuracy band. PLAN.md §Sea chart: "a 5th grader begins at multiplication, not 3+4."
  *
- * Owner ruling D-6 (2026-07-28): placement grants **starter cannons only**. Islands stay
- * band-scoped; every `range` / `chest` cannon is earned through its declared `unlock`. T-032
- * owns the suite rewrite for the amended T-011 AC-2 / AC-4 / AC-5 cannon rules.
+ * Owner ruling D-6 (2026-07-28): placement grants **starter cannons only**, amended by D-9
+ * (2026-07-29): grades 2–3 also receive Six-Pounder; grades 4–5 also receive Twelve-Pounder.
+ * Islands stay band-scoped; every other `range` / `chest` cannon is earned through its declared
+ * `unlock`. T-032 owns the suite rewrite for the amended T-011 AC-2 / AC-4 / AC-5 cannon rules;
+ * A-034 owns the D-9 placement exceptions in `resolvePlacement`.
  *
  * This module is asymmetric in its failure modes (ticket dispatch, and PLAN.md's mercy language):
  * placing a child too HIGH makes their first duel unwinnable — the exact "convince a six-year-old
@@ -53,18 +55,26 @@ import { BOT_ACCURACY_BAND_BY_GRADE } from '@engine/tuning';
 /** Ticket AC-1: the top grade of each band, verbatim. */
 const MAX_GRADE_BY_BAND: Record<GradeBand, number> = { k_1: 1, g2_3: 3, g4_5: 5 };
 
+/** D-9 — the only direct non-starter placement grants (OWNER-RULINGS / A-034). */
+const PLACEMENT_EXCEPTIONS: Readonly<Partial<Record<CannonId, readonly GradeBand[]>>> = {
+  six_pounder: ['g2_3', 'g4_5'],
+  twelve_pounder: ['g4_5'],
+};
+
 /**
- * D-6 / amended T-011 rule: every cannon whose unlock.kind is `starter` and
- * `minGrade <= maxGrade`. Range and chest cannons are never placement-eligible.
+ * D-6 + D-9 rule: starters reachable at this band, plus the two approved placement exceptions.
  */
-function isCannonEligible(cannon: Cannon, maxGrade: number): boolean {
-  return cannon.unlock.kind === 'starter' && cannon.minGrade <= maxGrade;
+function isCannonEligible(cannon: Cannon, maxGrade: number, band: GradeBand): boolean {
+  if (cannon.minGrade > maxGrade) return false;
+  if (cannon.unlock.kind === 'starter') return true;
+  return PLACEMENT_EXCEPTIONS[cannon.id]?.includes(band) === true;
 }
 
-/** The full catalog-derived expectation for a given maxGrade, sorted for order-independent compares. */
-function expectedCannonIds(maxGrade: number): CannonId[] {
+/** The full catalog-derived expectation for a given band, sorted for order-independent compares. */
+function expectedCannonIds(band: GradeBand): CannonId[] {
+  const maxGrade = MAX_GRADE_BY_BAND[band];
   return cannons
-    .filter((c) => isCannonEligible(c, maxGrade))
+    .filter((c) => isCannonEligible(c, maxGrade, band))
     .map((c) => c.id)
     .sort();
 }
@@ -84,11 +94,9 @@ function expectedIslandIds(maxGrade: number): IslandId[] {
 
 const sorted = <T extends string>(xs: readonly T[]): T[] => [...xs].sort();
 
-/** Range + chest ids the ticket names as never placement-granted (T-032 AC-3). */
-const NON_STARTER_RANGE_AND_CHEST: readonly CannonId[] = [
-  'six_pounder',
+/** Range + chest ids never placement-granted except the D-9 exceptions above. */
+const NON_PLACEMENT_RANGE_AND_CHEST: readonly CannonId[] = [
   'chain_shot',
-  'twelve_pounder',
   'mortar',
   'double_broadside',
   'powder_keg',
@@ -130,7 +138,7 @@ describe('AC-2 — k_1 unlocks exactly the two starter cannons (D-6)', () => {
     // Re-derives the same set from the rule rather than the literal, so the two cannot drift
     // apart the moment T-029 adds a new grade-0 starter.
     const placement = resolvePlacement('k_1');
-    expect(sorted(placement.unlockedCannons)).toEqual(expectedCannonIds(1));
+    expect(sorted(placement.unlockedCannons)).toEqual(expectedCannonIds('k_1'));
   });
 
   it('spec(T-011:AC-2) spec(T-032:AC-2) has no duplicate cannon ids', () => {
@@ -140,9 +148,13 @@ describe('AC-2 — k_1 unlocks exactly the two starter cannons (D-6)', () => {
 
   it('spec(T-011:AC-2) spec(T-032:AC-2) excludes every range and chest cannon at k_1', () => {
     const placement = resolvePlacement('k_1');
-    for (const id of NON_STARTER_RANGE_AND_CHEST) {
+    for (const id of NON_PLACEMENT_RANGE_AND_CHEST) {
       expect(placement.unlockedCannons, `k_1 must not pre-grant '${id}'`).not.toContain(id);
     }
+    expect(placement.unlockedCannons, 'k_1 must not pre-grant six_pounder').not.toContain('six_pounder');
+    expect(placement.unlockedCannons, 'k_1 must not pre-grant twelve_pounder').not.toContain(
+      'twelve_pounder',
+    );
   });
 });
 
@@ -165,20 +177,18 @@ describe('AC-3 — chest-drop cannons are never pre-unlocked, at every band', ()
 });
 
 // =================================================================================================
-describe('AC-4 — g4_5 unlocks every starter cannon and every island (D-6)', () => {
-  it('spec(T-011:AC-4) spec(T-032:AC-3) unlockedCannons equals every starter with minGrade <= 5', () => {
-    // Derived, not a literal count: the shape changes the instant T-029 lands a third starter.
-    // Range guns stay earnable via mastery — they must NOT appear here.
+describe('AC-4 — g4_5 unlocks starters plus D-9 exceptions and every island', () => {
+  it('spec(T-011:AC-4) spec(T-032:AC-3) unlockedCannons equals starters plus six_pounder and twelve_pounder', () => {
     const placement = resolvePlacement('g4_5');
-    const expected = cannons.filter((c) => c.unlock.kind === 'starter' && c.minGrade <= 5).map((c) => c.id);
-    expect(expected.length).toBeGreaterThan(0);
-    expect(sorted(placement.unlockedCannons)).toEqual(sorted(expected));
-    expect(sorted(placement.unlockedCannons)).toEqual(expectedCannonIds(5));
+    expect(sorted(placement.unlockedCannons)).toEqual(expectedCannonIds('g4_5'));
+    expect(sorted(placement.unlockedCannons)).toEqual(
+      sorted(['swivel_gun', 'culverin', 'six_pounder', 'twelve_pounder'] as CannonId[]),
+    );
   });
 
-  it('spec(T-011:AC-4) spec(T-032:AC-3) g4_5 excludes every named range and chest cannon', () => {
+  it('spec(T-011:AC-4) spec(T-032:AC-3) g4_5 excludes every other range and chest cannon', () => {
     const placement = resolvePlacement('g4_5');
-    for (const id of NON_STARTER_RANGE_AND_CHEST) {
+    for (const id of NON_PLACEMENT_RANGE_AND_CHEST) {
       expect(placement.unlockedCannons, `g4_5 must not pre-grant '${id}'`).not.toContain(id);
     }
   });
@@ -192,19 +202,23 @@ describe('AC-4 — g4_5 unlocks every starter cannon and every island (D-6)', ()
 });
 
 // =================================================================================================
-describe('AC-5 — g2_3 unlocks starters only; range and chest stay locked (D-6)', () => {
-  it('spec(T-011:AC-5) spec(T-032:AC-3) unlockedCannons equals the starter set for maxGrade 3', () => {
+describe('AC-5 — g2_3 unlocks starters plus six_pounder; other range and chest stay locked', () => {
+  it('spec(T-011:AC-5) spec(T-032:AC-3) unlockedCannons equals the D-9 set for maxGrade 3', () => {
     const placement = resolvePlacement('g2_3');
-    expect(sorted(placement.unlockedCannons)).toEqual(expectedCannonIds(3));
-    // Today that is the same two starters as k_1 — pinned so a silent range-grant fails loudly.
-    expect(sorted(placement.unlockedCannons)).toEqual(sorted(['swivel_gun', 'culverin'] as CannonId[]));
+    expect(sorted(placement.unlockedCannons)).toEqual(expectedCannonIds('g2_3'));
+    expect(sorted(placement.unlockedCannons)).toEqual(
+      sorted(['swivel_gun', 'culverin', 'six_pounder'] as CannonId[]),
+    );
   });
 
-  it('spec(T-011:AC-5) spec(T-032:AC-3) excludes every named range and chest cannon', () => {
+  it('spec(T-011:AC-5) spec(T-032:AC-3) excludes every other range and chest cannon', () => {
     const placement = resolvePlacement('g2_3');
-    for (const id of NON_STARTER_RANGE_AND_CHEST) {
+    for (const id of NON_PLACEMENT_RANGE_AND_CHEST) {
       expect(placement.unlockedCannons, `g2_3 must not pre-grant '${id}'`).not.toContain(id);
     }
+    expect(placement.unlockedCannons, 'g2_3 must not pre-grant twelve_pounder').not.toContain(
+      'twelve_pounder',
+    );
   });
 
   it('spec(T-011:AC-5) excludes twelve_pounder, mortar, double_broadside, powder_keg, and long_nine', () => {
@@ -367,19 +381,26 @@ describe('AC-11 — placement ids are real catalog ids, with no duplicates, at e
 // T-032 D-6 pins — starters-only across every band, plus AC-7 proof that old expectations are gone.
 // =================================================================================================
 
-describe('T-032 AC-1 — every unlocked cannon is unlock.kind === starter', () => {
+describe('T-032 AC-1 — every unlocked cannon is starter or a D-9 placement exception', () => {
   it.each([...GRADE_BANDS])(
-    'spec(T-032:AC-1) %s unlockedCannons are all starters; no range or chest id appears',
+    'spec(T-032:AC-1) %s unlockedCannons are starters or approved exceptions only',
     (band) => {
       const placement = resolvePlacement(band);
-      expect(placement.unlockedCannons.length, `${band}: soft-lock if zero starters`).toBeGreaterThan(0);
+      expect(placement.unlockedCannons.length, `${band}: soft-lock if zero cannons`).toBeGreaterThan(0);
       for (const id of placement.unlockedCannons) {
         const cannon = getCannon(id);
-        expect(cannon.unlock.kind, `${band}: '${id}' must be starter`).toBe('starter');
+        const isStarter = cannon.unlock.kind === 'starter';
+        const isException = PLACEMENT_EXCEPTIONS[id]?.includes(band) === true;
+        expect(isStarter || isException, `${band}: '${id}' must be starter or D-9 exception`).toBe(
+          true,
+        );
       }
-      const nonStarters = cannons.filter((c) => c.unlock.kind !== 'starter').map((c) => c.id);
-      for (const id of nonStarters) {
-        expect(placement.unlockedCannons, `${band} must exclude non-starter '${id}'`).not.toContain(id);
+      for (const cannon of cannons) {
+        if (cannon.minGrade > MAX_GRADE_BY_BAND[band]) continue;
+        const isStarter = cannon.unlock.kind === 'starter';
+        const isException = PLACEMENT_EXCEPTIONS[cannon.id]?.includes(band) === true;
+        const shouldGrant = isStarter || isException;
+        expect(placement.unlockedCannons.includes(cannon.id)).toBe(shouldGrant);
       }
     },
   );
@@ -417,7 +438,7 @@ describe('T-032 AC-7 — old four-cannon / nine-cannon / range-inclusion expecta
 // cites the AC(s) it strengthens, per spec-lint's reverse-direction check.
 // =================================================================================================
 
-describe('Dimension sweep — every cannon x every band agrees with the starters-only rule (L-017)', () => {
+describe('Dimension sweep — every cannon x every band agrees with the D-6 + D-9 rule (L-017)', () => {
   const CASES = GRADE_BANDS.flatMap((band) => CANNON_IDS.map((id) => [band, id] as const));
 
   it.each(CASES)(
@@ -426,7 +447,7 @@ describe('Dimension sweep — every cannon x every band agrees with the starters
       const placement = resolvePlacement(band);
       const cannon = getCannon(id);
       const maxGrade = MAX_GRADE_BY_BAND[band];
-      const shouldBeUnlocked = cannon.unlock.kind === 'starter' && cannon.minGrade <= maxGrade;
+      const shouldBeUnlocked = isCannonEligible(cannon, maxGrade, band);
       expect(placement.unlockedCannons.includes(id)).toBe(shouldBeUnlocked);
     },
   );

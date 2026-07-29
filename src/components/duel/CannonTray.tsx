@@ -11,8 +11,9 @@
  */
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
-import type { Cannon } from '@content/schemas';
+import type { Cannon, GradeBand } from '@content/schemas';
 
+import { cannonIdentityPresentation } from '../../services/cannonDifficulty';
 import {
   cannonLook,
   DAMAGE_BAND_SCALE,
@@ -24,10 +25,11 @@ import { TemperBadge } from './TemperBadge';
 
 interface CannonTrayProps {
   readonly cannons: readonly Cannon[];
+  readonly gradeBand: GradeBand;
   readonly onPick: (cannon: Cannon) => void;
 }
 
-export function CannonTray({ cannons, onPick }: CannonTrayProps) {
+export function CannonTray({ cannons, gradeBand, onPick }: CannonTrayProps) {
   return (
     <View style={s.wrap}>
       <View style={s.head}>
@@ -44,6 +46,7 @@ export function CannonTray({ cannons, onPick }: CannonTrayProps) {
         {cannons.map((cannon) => {
           const look = cannonLook[cannon.id];
           const temper = temperLook[cannon.temperament];
+          const identity = cannonIdentityPresentation({ cannon, gradeBand });
           const left = (cannon.damageMin / DAMAGE_BAND_SCALE) * 100;
           const width = Math.max(8, ((cannon.damageMax - cannon.damageMin) / DAMAGE_BAND_SCALE) * 100);
 
@@ -52,9 +55,7 @@ export function CannonTray({ cannons, onPick }: CannonTrayProps) {
               key={cannon.id}
               onPress={() => onPick(cannon)}
               accessibilityRole="button"
-              accessibilityLabel={`${cannon.displayName}, ${cannon.damageMin} to ${cannon.damageMax} damage, ${temper.word}${
-                cannon.recoilDamage > 0 ? `, kicks back ${cannon.recoilDamage}` : ''
-              }`}
+              accessibilityLabel={identity.accessibilityDescription}
               style={({ pressed }) => [s.row, pressed && s.rowPressed]}
             >
               <View style={s.glyphTile}>
@@ -84,11 +85,23 @@ export function CannonTray({ cannons, onPick }: CannonTrayProps) {
                 </View>
 
                 <View style={s.metaRow}>
+                  <Text style={s.skill} numberOfLines={1}>
+                    {identity.skillName}
+                  </Text>
+                  <View style={s.difficultyChip}>
+                    <Text style={s.difficultyText}>{identity.difficultyLabel}</Text>
+                  </View>
+                  <Text style={s.fuse}>{identity.fuseLabel}</Text>
                   <Text style={s.damage}>
                     {cannon.damageMin}–{cannon.damageMax}
                   </Text>
-                  <Text style={s.temperWord}>{temper.word}</Text>
-                  {look.spectacle !== null ? (
+                  <Text style={s.temperWord}>{identity.temperamentWord}</Text>
+                  {identity.weaponChipLabel !== null ? (
+                    <View style={[s.spectacleChip, !identity.weaponEnabled && s.weaponUnavailableChip]}>
+                      <Text style={s.spectacleText}>{identity.weaponChipLabel}</Text>
+                    </View>
+                  ) : null}
+                  {look.spectacle !== null && identity.weaponName === null ? (
                     <View style={s.spectacleChip}>
                       <Text style={s.spectacleText}>{look.spectacle} ★</Text>
                     </View>
@@ -161,6 +174,15 @@ const s = StyleSheet.create({
   bandFill: { position: 'absolute', top: 0, bottom: 0, borderRadius: 7 },
 
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap' },
+  skill: { ...type.chip, flexShrink: 1, color: color.inkDarkMuted },
+  difficultyChip: {
+    paddingVertical: 1,
+    paddingHorizontal: 6,
+    borderRadius: radius.pill,
+    backgroundColor: '#E8F4EC',
+  },
+  difficultyText: { ...type.chip, fontSize: 9, color: '#1E7F41' },
+  fuse: { ...type.chip, color: color.inkDarkMuted },
   damage: { ...type.body, fontFamily: type.subtitle.fontFamily, color: color.inkDark },
   temperWord: { ...type.chip, color: color.inkDarkMuted },
   spectacleChip: {
@@ -169,6 +191,7 @@ const s = StyleSheet.create({
     borderRadius: radius.pill,
     backgroundColor: color.inkDark,
   },
+  weaponUnavailableChip: { backgroundColor: '#D8D0C4' },
   spectacleText: { ...type.chip, fontSize: 9, color: color.gold },
   recoilChip: {
     paddingVertical: 1,

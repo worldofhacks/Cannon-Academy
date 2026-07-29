@@ -3,11 +3,12 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import type { CannonId } from '@content/schemas';
+import type { CannonId, GradeBand } from '@content/schemas';
 import { TRAY_CAPACITY } from '@engine/tuning';
 
 import { TemperBadge } from '../src/components/duel/TemperBadge';
 import { ResponsiveFrame, useResponsiveSurface } from '../src/components/ResponsiveFrame';
+import { cannonIdentityPresentation } from '../src/services/cannonDifficulty';
 import { resolveDestination } from '../src/services/flow';
 import {
   commitLoadout,
@@ -110,6 +111,7 @@ function GunDeckBody() {
   const ax = L.a;
 
   const captain = useCaptain((s) => s.captain);
+  const gradeBand: GradeBand = captain.gradeBand ?? 'k_1';
 
   /**
    * Filtered to what is actually owned, so the draft and the rendered deck cannot disagree: the
@@ -356,6 +358,7 @@ function GunDeckBody() {
             <HoldCard
               key={slot.cannon.id}
               slot={slot}
+              gradeBand={gradeBand}
               isNew={slot.isNew}
               width={cardWidth}
               tx={tx}
@@ -371,6 +374,7 @@ function GunDeckBody() {
 
 interface HoldCardProps {
   readonly slot: DeckSlot;
+  readonly gradeBand: GradeBand;
   readonly isNew: boolean;
   readonly width: number;
   readonly tx: (n: number) => number;
@@ -383,10 +387,11 @@ interface HoldCardProps {
  * 0–40 ruler lets a child compare two guns by where the bar sits rather than by reading two
  * numbers, which is the trade a volatile cannon is asking them to make.
  */
-function HoldCard({ slot, isNew, width, tx, ax, onPress }: HoldCardProps) {
+function HoldCard({ slot, gradeBand, isNew, width, tx, ax, onPress }: HoldCardProps) {
   const { cannon } = slot;
   const look = cannonLook[cannon.id];
   const temper = temperLook[cannon.temperament];
+  const identity = cannonIdentityPresentation({ cannon, gradeBand });
   const left = (cannon.damageMin / DAMAGE_BAND_SCALE) * 100;
   const span = ((cannon.damageMax - cannon.damageMin) / DAMAGE_BAND_SCALE) * 100;
 
@@ -395,7 +400,7 @@ function HoldCard({ slot, isNew, width, tx, ax, onPress }: HoldCardProps) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityState={{ selected: false }}
-      accessibilityLabel={`${cannon.displayName}${isNew ? ', new' : ''}, ${cannon.damageMin} to ${cannon.damageMax} damage, ${temper.word}. Put on the deck`}
+      accessibilityLabel={`${identity.accessibilityDescription}${isNew ? ', new' : ''}. Put on the deck`}
       style={({ pressed }) => [
         s.holdCard,
         {
@@ -419,6 +424,9 @@ function HoldCard({ slot, isNew, width, tx, ax, onPress }: HoldCardProps) {
             {cannon.displayName}
           </Text>
           <Text style={[s.holdRange, { fontSize: tx(10) }]}>{look.range}</Text>
+          <Text style={[s.holdSkill, { fontSize: tx(9) }]} numberOfLines={1}>
+            {identity.skillName}
+          </Text>
         </View>
 
         <TemperBadge temper={cannon.temperament} size={ax(24)} />
@@ -434,10 +442,15 @@ function HoldCard({ slot, isNew, width, tx, ax, onPress }: HoldCardProps) {
       </View>
 
       <View style={[s.holdMeta, { gap: tx(5) }]}>
+        <Text style={[s.holdDifficulty, { fontSize: tx(9) }]}>{identity.difficultyLabel}</Text>
+        <Text style={[s.holdFuse, { fontSize: tx(9) }]}>{identity.fuseLabel}</Text>
         <Text style={[s.holdDamage, { fontSize: tx(13) }]}>
           {cannon.damageMin}–{cannon.damageMax}
         </Text>
-        <Text style={[s.holdTemper, { fontSize: tx(10) }]}>{temper.word}</Text>
+        <Text style={[s.holdTemper, { fontSize: tx(10) }]}>{identity.temperamentWord}</Text>
+        {identity.weaponChipLabel !== null ? (
+          <Text style={[s.holdWeapon, { fontSize: tx(9) }]}>{identity.weaponChipLabel}</Text>
+        ) : null}
       </View>
 
       {isNew ? (
@@ -529,13 +542,17 @@ const s = StyleSheet.create({
   holdNameCol: { flex: 1, minWidth: 0 },
   holdName: { ...type.subtitle, color: color.inkDark },
   holdRange: { ...type.chip, letterSpacing: 0, color: color.inkDarkMuted },
+  holdSkill: { ...type.chip, letterSpacing: 0, color: color.inkDarkMuted },
 
   bandTrack: { backgroundColor: board.bandTrack, overflow: 'hidden' },
   bandFill: { position: 'absolute', top: 0, bottom: 0 },
 
-  holdMeta: { flexDirection: 'row', alignItems: 'center' },
+  holdMeta: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap' },
+  holdDifficulty: { ...type.chip, letterSpacing: 0, color: '#1E7F41' },
+  holdFuse: { ...type.chip, letterSpacing: 0, color: color.inkDarkMuted },
   holdDamage: { ...type.subtitle, color: color.inkDark },
   holdTemper: { ...type.chip, letterSpacing: 0, color: color.inkDarkMuted },
+  holdWeapon: { ...type.chip, letterSpacing: 0, color: color.inkDarkMuted },
 
   // Sits proud of the card's top-right corner, exactly as drawn.
   newChip: {

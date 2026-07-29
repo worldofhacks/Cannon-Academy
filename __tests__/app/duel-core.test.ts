@@ -400,7 +400,13 @@ describe('A-016 the duel itself', () => {
       // every band, not only the youngest one.
       expect(tray.length).toBeGreaterThanOrEqual(2);
       expect(new Set(tray.map((c) => c.id)).size).toBe(tray.length);
-      for (const gun of tray) expect(gun.unlock.kind).toBe('starter');
+      for (const gun of tray) {
+        const isStarter = gun.unlock.kind === 'starter';
+        const isException =
+          (gun.id === 'six_pounder' && (band === 'g2_3' || band === 'g4_5')) ||
+          (gun.id === 'twelve_pounder' && band === 'g4_5');
+        expect(isStarter || isException, `${gun.id}@${band} is not an approved tray gun`).toBe(true);
+      }
     }
   });
 

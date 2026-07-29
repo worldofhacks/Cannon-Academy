@@ -256,7 +256,9 @@ function DuelBody() {
           state.phase === 'perfect' ? { backgroundColor: color.gold } : null,
         ]}
       >
-        {state.phase === 'select' ? <CannonTray cannons={tray} onPick={pickCannon} /> : null}
+        {state.phase === 'select' ? (
+          <CannonTray cannons={tray} gradeBand={captain.gradeBand ?? 'k_1'} onPick={pickCannon} />
+        ) : null}
 
         {state.phase === 'question' && state.question !== null ? (
           <QuestionPanel
