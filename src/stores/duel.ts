@@ -4,8 +4,8 @@
  * Gameplay values are projected from `core`; this module owns beat timing and screen-facing
  * action names only.
  */
-import { getCannon, cannons } from '@content/index';
-import type { Cannon, SkillId } from '@content/schemas';
+import { getCannon, cannons, getIsland } from '@content/index';
+import type { Cannon, IslandId, SkillId } from '@content/schemas';
 import {
   applyDefaultRivalAction,
   drawNextDuelSeed,
@@ -23,6 +23,7 @@ import {
   reduceAdapterCore,
   type AdapterState,
 } from '../services/duelAdapter';
+import type { ValidDuelContext } from '../services/duelContext';
 import { TEMPLATE_POOLS } from '../services/templatePools';
 
 export type DuelPhase =
@@ -78,6 +79,8 @@ export type AppStore = {
 export interface DuelState {
   readonly phase: DuelPhase;
   readonly duelId: string;
+  readonly islandId: IslandId;
+  readonly islandName: string;
   readonly rng: CoreDuelState['rng'];
   readonly cannon: Cannon | null;
   readonly question: StoreAppState['question'];
@@ -131,11 +134,11 @@ export const PHASE_DURATION_MS: Partial<Record<DuelPhase, number>> = {
   rivalImpact: 1400,
 };
 
-function legacyConfig(seed: number): DuelConfig {
+function legacyConfig(seed: number, islandId: IslandId = 'port_sumwich'): DuelConfig {
   return {
     seed,
     duelId: `duel-${(seed >>> 0).toString(36)}`,
-    islandId: 'port_sumwich',
+    islandId,
     playerLoadout: cannons.map((cannon) => cannon.id),
     rivalLoadout: ['six_pounder'],
     templatesBySkill: TEMPLATE_POOLS,
@@ -220,6 +223,8 @@ function projectLegacy(adapter: AdapterState, previous?: DuelState): DuelState {
   return {
     phase: adapter.phase,
     duelId: core.duelId ?? '',
+    islandId: core.islandId,
+    islandName: getIsland(core.islandId).displayName,
     rng: core.rng,
     cannon: cannonId === null ? null : getCannon(cannonId),
     question: app.question,
@@ -332,7 +337,7 @@ function reduceLegacy(state: DuelState, action: DuelAction): DuelState {
     case 'RESET': {
       const live = requireLegacyAdapter(state);
       const [seed, nextRng] = drawNextDuelSeed(state.rng);
-      adapter = bootAdapter(legacyConfig(seed));
+      adapter = bootAdapter(legacyConfig(seed, state.islandId));
       adapter = { ...adapter, core: { ...adapter.core, rng: nextRng } };
       void live;
       return attachLegacyState(adapter);
@@ -352,6 +357,11 @@ function reduceLegacy(state: DuelState, action: DuelAction): DuelState {
 
 export function initialDuelState(seed: number): DuelState {
   return attachLegacyState(bootAdapter(legacyConfig(seed)));
+}
+
+/** Island-aware initializer for the live duel screen (A-029). */
+export function initialDuelStateWithContext(context: ValidDuelContext, seed: number): DuelState {
+  return attachLegacyState(bootAdapter(legacyConfig(seed, context.islandId)));
 }
 
 export function duelReducer(state: DuelState, action: DuelAction): DuelState {

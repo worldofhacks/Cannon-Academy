@@ -20,6 +20,7 @@ import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
 import { ResponsiveFrame, useResponsiveSurface } from '../src/components/ResponsiveFrame';
 import { applyDuelOutcome, type DuelRewardOutcome } from '../src/services/duelRewards';
+import { resolveDuelContext } from '../src/services/duelContext';
 import { resolveDestination } from '../src/services/flow';
 import { trayCannons } from '../src/services/loadout';
 import { retainFirstApplied, victoryRewards } from '../src/services/victoryRewards';
@@ -28,7 +29,7 @@ import { cannonLook } from '../src/theme/cannonPresentation';
 import { seaStageHeight, worldArtScale, worldBoardWidth } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
 import { color, radius, space } from '../src/theme/tokens';
-import { duelReducer, initialDuelState, PHASE_DURATION_MS, type DuelPhase } from '../src/stores/duel';
+import { duelReducer, initialDuelState, initialDuelStateWithContext, PHASE_DURATION_MS, type DuelPhase } from '../src/stores/duel';
 
 /**
  * The duel screen.
@@ -60,13 +61,18 @@ function DuelBody() {
   // The flag chosen at onboarding IS the pennant (board 5b) — a child's ship is theirs before the
   // first chest ever drops. Resolved here because the sea stage renders colours, not captains.
   const playerShip = shipCosmeticsForCaptain(useCaptain((s) => s.captain));
-  const [state, dispatch] = useReducer(duelReducer, 0, () => initialDuelState(freshSeed()));
+  const captain = useCaptain((s) => s.captain);
+  const duelContext = useMemo(() => resolveDuelContext(captain), [captain]);
+  const [state, dispatch] = useReducer(duelReducer, duelContext, (ctx) =>
+    ctx.ok ? initialDuelStateWithContext(ctx, freshSeed()) : initialDuelState(0),
+  );
   const [appliedReward, setAppliedReward] = useState<DuelRewardOutcome | null>(null);
   const askedAt = useRef(0);
 
   // The captain's OWN loadout, in catalog order — via trayCannons (A-011), never a grade-band lookup.
-  const captain = useCaptain((s) => s.captain);
   const tray = useMemo(() => [...trayCannons(captain)], [captain]);
+
+  if (!duelContext.ok) return <Redirect href="/chart" />;
 
   // An empty tray is unplayable, but it is NOT unrecoverable, so it must not throw. Placement
   // always equips at least one cannon, so the only way here is a legacy or corrupted save
@@ -124,14 +130,14 @@ function DuelBody() {
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={[s.hud, { paddingHorizontal: L.gutter }]}>
         <TurnBar
-          label={turnLabel(state.phase)}
+          label={turnLabel(state.phase, state.islandName)}
           turn={state.turn}
           playerActive={!isRivalTurn(state.phase)}
           onLeave={leave}
         />
         <View style={s.hullRow}>
           <HullCard name="You" flag={color.amber} hp={state.playerHull} max={state.playerMax} />
-          <HullCard name="Rival" flag="#6C4BD6" hp={state.rivalHull} max={state.rivalMax} />
+          <HullCard name={state.islandName} flag="#6C4BD6" hp={state.rivalHull} max={state.rivalMax} />
         </View>
       </View>
 
@@ -233,10 +239,10 @@ function freshSeed(): number {
 const isRivalTurn = (p: DuelPhase) => p === 'watch' || p === 'rivalFly' || p === 'rivalImpact';
 const isResolve = (p: DuelPhase) => p === 'impact' || p === 'miss' || p === 'timeout' || p === 'rivalImpact';
 
-function turnLabel(phase: DuelPhase): string {
+function turnLabel(phase: DuelPhase, islandName: string): string {
   switch (phase) {
     case 'select':
-      return 'Your turn';
+      return `${islandName} awaits`;
     case 'question':
       return 'Fire when ready';
     case 'timeout':
