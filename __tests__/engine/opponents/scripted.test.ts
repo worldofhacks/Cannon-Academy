@@ -9,8 +9,8 @@
  * Production modules are intentionally absent in the RED phase
  * (`src/engine/opponents/{types,scripted}.ts`).
  *
- * Traceability: behavioural tests use `spec(T-018:AC-n)`; Definition of Done uses
- * numbered `dod(T-018:n)` tags (seven items, file order).
+ * Traceability: behavioural tests use spec tags of the form T-018 AC-<number>;
+ * Definition of Done uses numbered dod tags for T-018 items 1 through 7 (see below).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
