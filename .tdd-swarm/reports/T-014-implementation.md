@@ -1,77 +1,52 @@
 # T-014 Implementation Report
 
-**Status: BLOCKED**
+**Status: BLOCKED (format gate — frozen suite prettier debt)**
 
-**Commit:** `31cb5bad7951d0628c0d2c4e04d6d3bb931cc3b6` — `feat(T-014): K-2 add/sub templates (≥8 per skill, symbolic only)`
+**Commit:** (this feat commit — see SHA below after commit)
 
-Files created (file_scopes only):
+Files refreshed (file_scopes only):
 
-- `src/content/templates/add_within_10.json` (8 templates)
-- `src/content/templates/add_within_20.json` (8 templates)
-- `src/content/templates/sub_within_20.json` (8 templates)
+- `src/content/templates/add_within_10.json` — `add_within_10_near_doubles` third distractor `a + a` → `a + b + 2`
+- `src/content/templates/add_within_20.json` — same near_doubles fix
+- `src/content/templates/sub_within_20.json` — unchanged (already matched `REQUIRED_TEMPLATES`)
 
-Did **not** create `src/content/templates/index.ts` (T-019).
+Did **not** create `src/content/templates/index.ts` (T-019). Did **not** edit `__tests__/**`.
 
-Frozen suite hash unchanged:
-`66e68a23fc4570a7a65156f965ada4a8817d4ffd3bb562c68d21f9f9b9fe5745`
-(commit `f509c7c`).
+Frozen suite hash (preserved):
+`63628812983a2e2b0414e4f5f1dfc65fd8f4afbf787e63a3517eeff1892a6864`
+(from `a0cbaeb` — recompute: `shasum -a 256 __tests__/content/templates/k2-addsub.test.ts`)
 
 ## What was done
 
-Copied `REQUIRED_TEMPLATES` from `__tests__/content/templates/k2-addsub.test.ts` into the three
-skill JSON arrays (filter by `skill`), expanding `nearMiss(expr)` to the three parenthesized
-strings the contract uses. Content matches the AC-1 deep-equals authoring contract exactly —
-per orchestrator instruction not to dispute that freeze (ACCEPT_WITH_NITS I-1).
-
-## Blocker: AC-1 vs AC-7 contradiction in the frozen contract
-
-`add_within_10_near_doubles` and `add_within_20_near_doubles` declare:
-
-```text
-constraints: ["b == a + 1", ...]
-distractors: ["a + b + 1", "a + b - 1", "a + a"]
-```
-
-Under `b == a + 1`, `a + a === a + b - 1` for every legal draw, so only **two** distinct declared
-distractor values exist. `describeDistractorSources` therefore always includes `'ladder'` to fill
-the third slot → **1000/1000** ladder hits (threshold is `< 250`).
-
-- Fixing the distractor strings (e.g. replace `a + a` with `(a + b) + 2`) would pass AC-7 but
-  **fail AC-1** deep-equals to `REQUIRED_TEMPLATES`.
-- Copying the contract verbatim (as instructed) passes AC-1 and fails AC-7.
-
-This is exactly the risk flagged as nit **I-3** in
-`.tdd-swarm/reports/T-014-test-design-review.md` (missing AC-7 preflight on
-`REQUIRED_TEMPLATES` before freeze). Implementer cannot edit `__tests__/**` in this phase.
-
-**Orchestrator action needed:** amend the frozen suite (test/style/spec commit) to change the
-near-doubles distractors in `REQUIRED_TEMPLATES` (and keep SPOT_CHECKS unchanged — they do not
-depend on distractors), then re-implement / re-verify. Suggested replacement for both
-near-doubles templates: `["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"]` (same shape as
-`nearMiss('a + b')`).
+After the TEST_DISPUTE fix in `a0cbaeb`, `REQUIRED_TEMPLATES` now declares near_doubles distractors as
+`['a + b + 1', 'a + b - 1', 'a + b + 2']` so the third expression no longer collides with
+`a + b - 1` under `b == a + 1`. The three skill JSON files were refreshed to match that contract
+exactly (AC-1 deep-equals). Only the two near_doubles rows needed a content change; all other
+templates already matched.
 
 ## Gate evidence
 
 | Gate | Result | Notes |
 | ---- | ------ | ----- |
-| `npx prettier --check .` | **FAIL** | Only `__tests__/content/templates/k2-addsub.test.ts` (frozen; cannot format). Three JSON files are prettier-clean. |
-| `npx eslint .` | **PASS** | exit 0 |
+| `npx prettier --check .` | **FAIL** | Only `__tests__/content/templates/k2-addsub.test.ts` (frozen; introduce in `a0cbaeb`). Diff is quote/wrap-only on the new AC-7 preflight `it(...)` and a few nearby lines. JSON files prettier-clean. |
+| `npx eslint .` | **PASS** | `--max-warnings 0`, exit 0 |
 | `npx tsc --noEmit` | **PASS** | exit 0 |
-| `npx vitest run` (full) | **FAIL** | 1491 pass / **1 fail** — AC-7 near-doubles |
-| Frozen suite alone | **FAIL** | 53 pass / 1 fail — same AC-7 |
-| `bash .tdd-swarm/run-local-gates.sh` | **RED** | format + unit fail |
-| `bash .tdd-swarm/spec-lint.sh tickets/T-014.md` | **PASS** | all AC-1…AC-11 + DoD-1…7 mapped |
+| `npx vitest run` | **PASS** | **1493 / 1493** (includes k2-addsub **55/55**) |
+| `bash .tdd-swarm/run-local-gates.sh` | **RED** | format only; lint/typecheck/unit/no-todos/no-skipped/engine-purity/frozen-tests-unmodified all PASS |
+| `bash .tdd-swarm/spec-lint.sh tickets/T-014.md` | **PASS** | AC-1…AC-11 + DoD-1…7 mapped |
 
-### AC-7 failure excerpt
+## Blocker: format vs frozen-hash
 
-```
-FAIL  … > spec(T-014:AC-7) describeDistractorSources reports 'ladder' on fewer than 250 of 1000…
-AssertionError: add_within_10_near_doubles: ladder used on 1000/1000 samples …
-add_within_20_near_doubles: ladder used on 1000/1000 samples …
-```
+Implement phase forbids editing `__tests__/**`. Formatting the frozen suite would also change the
+SHA-256 the orchestrator asked to preserve. Content and unit gates are green; format is red solely
+because `a0cbaeb` landed without `prettier --write` on `k2-addsub.test.ts`.
+
+**Orchestrator action:** one `style(T-014):` (or amend via test agent) commit running
+`npx prettier --write __tests__/content/templates/k2-addsub.test.ts`, recompute and publish the new
+frozen hash, then re-run `npx prettier --check .` / `run-local-gates.sh`. No JSON rework needed.
 
 ## Out of scope / untouched
 
 - No edits under `__tests__/**`
 - No `templates/index.ts`
-- Ticket status bump in `tickets/T-014.md` left unstaged (not file_scopes)
+- Ticket status in `tickets/T-014.md` left alone (not file_scopes)

@@ -56,7 +56,7 @@
     },
     "constraints": ["b == a + 1", "a + b <= 10"],
     "answerExpr": "a + b",
-    "distractors": ["a + b + 1", "a + b - 1", "a + a"]
+    "distractors": ["a + b + 1", "a + b - 1", "a + b + 2"]
   },
   {
     "id": "add_within_10_make_ten",
