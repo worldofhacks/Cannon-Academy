@@ -1,26 +1,43 @@
 import { router } from 'expo-router';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { chartNodes, requirementText, type ChartNode } from '../src/services/chart';
-import { useCaptain } from '../src/stores/useCaptain';
+import type { IslandId } from '@content/schemas';
+
+import { ChartDock } from '../src/components/chart/Dock';
+import { ChartShip } from '../src/components/chart/ChartShip';
+import { Fog } from '../src/components/chart/Fog';
+import { HeaderPill } from '../src/components/chart/HeaderPill';
+import { Route, Sea } from '../src/components/chart/Sea';
+import { IslandLand, StationMarker } from '../src/components/chart/Station';
+import { FRAME, HEADER, MAP, STATIONS } from '../src/components/chart/board';
+import { focusIndex, requirementIndex, stationState, type MapFrame } from '../src/components/chart/layout';
+import { chart } from '../src/components/chart/palette';
+import { chartNodes, requirementText } from '../src/services/chart';
+import { captainActions, useCaptain } from '../src/stores/useCaptain';
 import { useLayout } from '../src/theme/useLayout';
-import { color, radius, space, type } from '../src/theme/tokens';
 
 /**
- * The sea chart — the hub.
+ * The sea chart — the hub, drawn from the board.
  *
  * Every path runs through here: onboarding ends on it, duels start and end on it, the gunnery
- * range hangs off an island node. Before this screen the app had a duel you could replay; a loop
- * needs somewhere to return to.
+ * range hangs off an island. Before this screen the app had a duel you could replay; a loop needs
+ * somewhere to return to.
+ *
+ * Three bands, and each one lives in a different coordinate space, which is the single thing to
+ * keep straight while reading this file:
+ *
+ *   header — FRAME coords (measured from the top of the 375×667 board), scaled by TYPE
+ *   map    — MAP coords (measured from the map box's own top-left), positions proportional,
+ *            sizes scaled by ART
+ *   dock   — a fixed 126pt band whose four measured pieces sum to exactly 126, scaled by TYPE
+ *
+ * `theme/responsive.ts`'s rule is why the two scales differ: **art scales with the screen; type
+ * and touch targets do not.** The islands grow on a Pro Max; the captain's name does not.
  *
  * All fog and ordering decisions come from `services/chart.ts`, which is exhaustively tested. This
- * file renders that decision and owns nothing else.
- *
- * Fidelity note: board 4f's exact geometry has not been transcribed yet — this is built from the
- * design system (tokens, `Poly`, the ship silhouette) rather than measured off the board. A-013's
- * fixture pass covers the duel screen today; the chart needs the same treatment before it can be
- * called pixel-accurate, and saying so is cheaper than implying otherwise.
+ * file renders that decision, positions it, and owns nothing else.
  */
 export default function Chart() {
   const insets = useSafeAreaInsets();
@@ -28,138 +45,102 @@ export default function Chart() {
   const captain = useCaptain((s) => s.captain);
   const nodes = chartNodes(captain);
 
+  // The live map box. Measured rather than computed: it is whatever is left between the header and
+  // the dock on this device, and `board.ts`'s proportional mapping is defined against exactly that.
+  const [box, setBox] = useState({ width: 0, height: 0 });
+  const onMapLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width, height } = e.nativeEvent.layout;
+    setBox((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+  }, []);
+
+  const sail = useCallback((id: IslandId) => {
+    // Sailing IS setting the current island — the ship parks there next time this screen is seen,
+    // and the range reads the same field to know what it is drilling.
+    captainActions().setCurrentIsland(id);
+    router.push('/duel');
+  }, []);
+
+  const drill = useCallback((id: IslandId) => {
+    captainActions().setCurrentIsland(id);
+    router.push('/range');
+  }, []);
+
+  // `push`, never `replace`: both the range and the gun deck leave by unwinding the stack, and a
+  // replace would delete the entry they unwind to and strand a child on a screen with no way back.
+  const openGunDeck = useCallback(() => router.push('/gun-deck'), []);
+
+  const live = focusIndex(nodes);
+  const focus = nodes[live];
+  // After every hook, so the hook order cannot depend on it. An empty catalog is unrenderable and
+  // should say so rather than draw an ocean with nothing in it.
+  if (focus === undefined) throw new Error('chart: the island catalog is empty');
+  const needsRequirement = requirementIndex(nodes, STATIONS);
+
+  const frame: MapFrame = { width: box.width, height: box.height, art: L.art };
+  const anchor = STATIONS[live] ?? STATIONS[0];
+
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
-      <View style={[s.header, { paddingHorizontal: L.gutter }]}>
-        <View>
-          <Text style={s.kicker}>THE SEA CHART</Text>
-          <Text style={s.captainName}>{captain.name === '' ? 'Captain' : captain.name}</Text>
-        </View>
-        <View style={{ flex: 1 }} />
-        <View style={s.purse}>
-          <View style={s.coin} />
-          <Text style={s.purseCount}>{captain.coins}</Text>
-        </View>
+      <View style={{ height: (HEADER.top - FRAME.statusBar) * L.type }} />
+      <HeaderPill name={captain.name} flag={captain.flag} coins={captain.coins} typeScale={L.type} />
+
+      {/*
+        The board's map starts 8pt below the pill (`86 − 26 − 52`) and ends where the dock begins.
+        At the reference frame that leaves 667 − 20 − 6 − 52 − 8 − 126 = 455 — `MAP.height` exactly,
+        which is the arithmetic that makes the proportional mapping identity-true at 375×667.
+      */}
+      <View
+        style={[s.map, { marginTop: (MAP.top - HEADER.top - HEADER.height) * L.type }]}
+        onLayout={onMapLayout}
+      >
+        {box.width === 0 ? null : (
+          <>
+            <Sea frame={frame} />
+            <Route frame={frame} />
+            {STATIONS.map((station, i) => (
+              <IslandLand key={`land-${i}`} station={station} frame={frame} />
+            ))}
+            <Fog frame={frame} />
+            {nodes.map((node, i) => {
+              const station = STATIONS[i];
+              if (station === undefined) return null;
+              return (
+                <StationMarker
+                  key={node.island.id}
+                  index={i}
+                  node={node}
+                  state={stationState(node, station, i === live)}
+                  frame={frame}
+                  typeScale={L.type}
+                  requirement={i === needsRequirement ? requirementText(node) : null}
+                  onSail={sail}
+                />
+              );
+            })}
+            {anchor === undefined ? null : (
+              <ChartShip station={anchor} frame={frame} typeScale={L.type} showHere={!focus.fogged} />
+            )}
+          </>
+        )}
       </View>
 
-      <ScrollView
-        contentContainerStyle={[
-          s.list,
-          { paddingHorizontal: L.gutter, paddingBottom: insets.bottom + space[4] },
-        ]}
-        showsVerticalScrollIndicator={false}
-      >
-        {nodes.map((node) => (
-          <IslandCard key={node.island.id} node={node} art={L.art} />
-        ))}
-      </ScrollView>
+      <ChartDock
+        island={focus.island}
+        mastery={captain.mastery}
+        fogged={focus.fogged}
+        insetBottom={insets.bottom}
+        typeScale={L.type}
+        onFight={() => sail(focus.island.id)}
+        onRange={() => drill(focus.island.id)}
+        onGunDeck={openGunDeck}
+      />
     </View>
   );
 }
 
-function IslandCard({ node, art }: { node: ChartNode; art: number }) {
-  const { island, fogged, isCurrent } = node;
-  const requirement = requirementText(node);
-
-  return (
-    <Pressable
-      // A fogged island is still tappable — it has something to say. What it must not do is
-      // navigate. Silence on tap reads as a broken button to a child.
-      onPress={() => {
-        if (!fogged) router.push('/duel');
-      }}
-      accessibilityRole="button"
-      accessibilityState={{ disabled: fogged }}
-      accessibilityLabel={fogged ? `${island.displayName}, locked. ${requirement ?? ''}` : island.displayName}
-      style={({ pressed }) => [
-        s.card,
-        fogged && s.cardFogged,
-        isCurrent && s.cardCurrent,
-        pressed && !fogged && s.cardPressed,
-      ]}
-    >
-      <View style={[s.islandMark, { width: 56 * art, height: 56 * art }]}>
-        <Text style={[s.islandOrder, fogged && s.inkFogged]}>{island.order + 1}</Text>
-      </View>
-
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <View style={s.titleRow}>
-          <Text style={[s.islandName, fogged && s.inkFogged]} numberOfLines={1}>
-            {island.displayName}
-          </Text>
-          {isCurrent ? (
-            <View style={s.hereChip}>
-              <Text style={s.hereChipText}>YOU ARE HERE</Text>
-            </View>
-          ) : null}
-        </View>
-
-        {fogged ? (
-          <Text style={s.requirement}>{requirement}</Text>
-        ) : (
-          <Text style={s.skills}>{island.rangeSkills.length} skills to master</Text>
-        )}
-      </View>
-
-      <Text style={[s.chevron, fogged && s.inkFogged]}>{fogged ? '🔒' : '›'}</Text>
-    </Pressable>
-  );
-}
-
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.deepSea },
-  header: { flexDirection: 'row', alignItems: 'center', paddingVertical: space[3] },
-  kicker: { ...type.eyebrow, color: color.amber },
-  captainName: { ...type.title, color: color.parchment },
-  purse: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingVertical: 4,
-    paddingHorizontal: 10,
-    borderRadius: radius.pill,
-    backgroundColor: color.surfaceRaised,
-  },
-  coin: { width: 16, height: 16, borderRadius: 999, backgroundColor: color.amber },
-  purseCount: { ...type.subtitle, color: color.parchment },
-
-  list: { gap: space[2], paddingTop: space[1] },
-  card: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: space[3],
-    minHeight: 84,
-    padding: space[3],
-    borderRadius: radius.card,
-    backgroundColor: color.surfaceRaised,
-    borderBottomWidth: 4,
-    borderBottomColor: color.border,
-  },
-  // Fog dims, it does not hide. A five-island map rendering as one node tells a child the game is
-  // one island long; the fog is the promise that there is more.
-  cardFogged: { opacity: 0.55 },
-  cardCurrent: { borderBottomColor: color.amber },
-  cardPressed: { transform: [{ translateY: 3 }], borderBottomWidth: 1 },
-
-  islandMark: {
-    borderRadius: radius.cardInner,
-    backgroundColor: color.sea,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  islandOrder: { ...type.display, fontSize: 24, lineHeight: 28, color: color.parchment },
-  inkFogged: { color: color.inkSoft },
-
-  titleRow: { flexDirection: 'row', alignItems: 'center', gap: space[2] },
-  islandName: { ...type.subtitle, color: color.parchment, flexShrink: 1 },
-  hereChip: {
-    paddingVertical: 2,
-    paddingHorizontal: 7,
-    borderRadius: radius.pill,
-    backgroundColor: color.amber,
-  },
-  hereChipText: { ...type.chip, fontSize: 9, color: color.inkDark },
-  requirement: { ...type.caption, color: color.inkSoft, marginTop: 3 },
-  skills: { ...type.caption, color: color.inkMuted, marginTop: 3 },
-  chevron: { ...type.title, color: color.inkMuted },
+  screen: { flex: 1, backgroundColor: chart.frame },
+  // `overflow: hidden` so the grid paper and the fog stop at the map's edges rather than running
+  // under the header pill — the board's map is a window, not a background.
+  map: { flex: 1, backgroundColor: chart.gridSea, overflow: 'hidden' },
 });
