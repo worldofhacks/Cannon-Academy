@@ -1947,3 +1947,8 @@ Test-design review dispatched.
 
 [T-020 test-design](161af72b-ef67-401d-ac1c-91aabc414997): I-1 resolveRival→defeat; I-2 resolveShot oracles on AC-5/9; I-3 rival-miss hull.
 Test Agent amending suite.
+
+### T-020 FROZEN (`bcfd707f197df84c…`) — Important nits closed
+
+[T-020 Test Agent](36a816ca-f4ee-45bc-be6c-caf8ed762772) `357fa22`: resolveRival terminals, resolveShot oracles, rival-miss hull.
+Phase → implement. Implementer dispatched.
