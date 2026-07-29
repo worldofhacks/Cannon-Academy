@@ -1,5 +1,7 @@
+import { spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { inspect } from 'node:util';
 
 import type { Auth } from 'firebase/auth';
 import type { Firestore } from 'firebase/firestore';
@@ -30,7 +32,6 @@ type EnabledClient = {
 
 const ROOT = new URL('../..', import.meta.url);
 const ENV_EXAMPLE = fileURLToPath(new URL('.env.example', ROOT));
-const GITIGNORE = fileURLToPath(new URL('.gitignore', ROOT));
 const FIREBASE_RC = fileURLToPath(new URL('.firebaserc', ROOT));
 const FIREBASE_JSON = fileURLToPath(new URL('firebase.json', ROOT));
 const FIRESTORE_RULES = fileURLToPath(new URL('firestore.rules', ROOT));
@@ -48,6 +49,37 @@ const PUBLIC_KEYS = [
 const completeEnv = Object.fromEntries(
   PUBLIC_KEYS.map((key, index) => [key, `public-${index}`]),
 ) as Record<(typeof PUBLIC_KEYS)[number], string>;
+
+const FIRESTORE_ALREADY_INITIALIZED_MESSAGE =
+  'initializeFirestore() has already been called with different options. To avoid this error, ' +
+  'call initializeFirestore() with the same options as when it was originally called, or call ' +
+  'getFirestore() to return the already initialized instance.';
+
+const FIRESTORE_STARTED_ELSEWHERE_MESSAGE =
+  'Firestore has already been started and its settings can no longer be changed. You can only ' +
+  'modify settings before calling any other methods on a Firestore object.';
+
+type ConsoleMethod = 'debug' | 'info' | 'log' | 'warn' | 'error';
+
+function captureConsole(): Array<ReturnType<typeof vi.spyOn>> {
+  return (['debug', 'info', 'log', 'warn', 'error'] satisfies ConsoleMethod[]).map((method) =>
+    vi.spyOn(console, method).mockImplementation(() => undefined),
+  );
+}
+
+function expectNoIdentifierValues(
+  spies: ReturnType<typeof captureConsole>,
+  values: readonly string[] = Object.values(completeEnv),
+): void {
+  const rendered = spies
+    .flatMap((spy) => spy.mock.calls)
+    .flat()
+    .map((value) => inspect(value, { depth: null }))
+    .join('\n');
+  for (const value of values) {
+    expect(rendered).not.toContain(value);
+  }
+}
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -89,11 +121,19 @@ function enabledClient(value: unknown): EnabledClient {
   return value as EnabledClient;
 }
 
+type FirebaseLikeError = Error & { code?: string };
+type ErrorPlan = FirebaseLikeError | ((callNumber: number) => FirebaseLikeError | undefined);
+
 interface FakeSdkOptions {
   readonly existingApp?: boolean;
-  readonly initializeAppError?: Error & { code?: string };
-  readonly initializeAuthError?: Error & { code?: string };
-  readonly initializeFirestoreError?: Error & { code?: string };
+  readonly initializeAppError?: ErrorPlan;
+  readonly initializeAuthError?: ErrorPlan;
+  readonly getAuthError?: ErrorPlan;
+  readonly initializeFirestoreError?: ErrorPlan;
+}
+
+function plannedError(plan: ErrorPlan | undefined, callNumber: number): FirebaseLikeError | undefined {
+  return typeof plan === 'function' ? plan(callNumber) : plan;
 }
 
 /**
@@ -135,7 +175,8 @@ function fakeSdk(options: FakeSdkOptions = {}) {
     initializeApp(config: unknown): unknown {
       events.push('initializeApp');
       args.initializeApp.push(config);
-      if (options.initializeAppError !== undefined) throw options.initializeAppError;
+      const error = plannedError(options.initializeAppError, args.initializeApp.length);
+      if (error !== undefined) throw error;
       apps = [app];
       return app;
     },
@@ -152,20 +193,25 @@ function fakeSdk(options: FakeSdkOptions = {}) {
     initializeAuth(appArg: unknown, authOptions: unknown): unknown {
       events.push('initializeAuth');
       args.initializeAuth.push({ app: appArg, options: authOptions });
-      if (options.initializeAuthError !== undefined) throw options.initializeAuthError;
+      const error = plannedError(options.initializeAuthError, args.initializeAuth.length);
+      if (error !== undefined) throw error;
       return initializedAuth;
     },
     getAuth(appArg: unknown): unknown {
       events.push('getAuth');
       args.getAuth.push(appArg);
+      const error = plannedError(options.getAuthError, args.getAuth.length);
+      if (error !== undefined) throw error;
       return getterAuth;
     },
     initializeFirestore(appArg: unknown, settings: unknown): unknown {
       events.push('initializeFirestore');
       args.initializeFirestore.push({ app: appArg, settings });
-      if (options.initializeFirestoreError !== undefined) {
-        throw options.initializeFirestoreError;
-      }
+      const error = plannedError(
+        options.initializeFirestoreError,
+        args.initializeFirestore.length,
+      );
+      if (error !== undefined) throw error;
       return initializedDb;
     },
     getFirestore(appArg: unknown): unknown {
@@ -207,6 +253,50 @@ function createClient(
     asyncStorage,
     sdk: fake.sdk as never,
   });
+}
+
+function installPublicEnv(): () => void {
+  const prior = new Map(PUBLIC_KEYS.map((key) => [key, process.env[key]]));
+  for (const [key, value] of Object.entries(completeEnv)) process.env[key] = value;
+  return () => {
+    for (const [key, value] of prior) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  };
+}
+
+function mockAmbientSdk(
+  fake: ReturnType<typeof fakeSdk>,
+  platform: 'ios' | 'android' | 'web',
+  asyncStorage: unknown,
+): void {
+  vi.doMock('firebase/app', () => ({
+    getApps: fake.sdk.getApps,
+    getApp: fake.sdk.getApp,
+    initializeApp: fake.sdk.initializeApp,
+  }));
+  vi.doMock('firebase/auth', () => ({
+    getAuth: fake.sdk.getAuth,
+    getReactNativePersistence: fake.sdk.getReactNativePersistence,
+    initializeAuth: fake.sdk.initializeAuth,
+  }));
+  vi.doMock('firebase/auth/react-native', () => ({
+    getReactNativePersistence: fake.sdk.getReactNativePersistence,
+  }));
+  vi.doMock('firebase/firestore', () => ({
+    getFirestore: fake.sdk.getFirestore,
+    initializeFirestore: fake.sdk.initializeFirestore,
+  }));
+  vi.doMock('firebase/storage', () => ({
+    getStorage: fake.sdk.getStorage,
+  }));
+  vi.doMock('@react-native-async-storage/async-storage', () => ({
+    default: asyncStorage,
+  }));
+  vi.doMock('react-native', () => ({
+    Platform: { OS: platform },
+  }));
 }
 
 function uncommentedLines(text: string): string[] {
@@ -264,20 +354,29 @@ function expectDenyAllRules(
 afterEach(() => {
   vi.restoreAllMocks();
   vi.unstubAllEnvs();
+  for (const moduleId of [
+    'firebase/app',
+    'firebase/auth',
+    'firebase/auth/react-native',
+    'firebase/firestore',
+    'firebase/storage',
+    '@react-native-async-storage/async-storage',
+    'react-native',
+  ]) {
+    vi.doUnmock(moduleId);
+  }
   vi.resetModules();
 });
 
 describe('A-025 Firebase client boundary', () => {
   it('spec(A-025:AC-1) parses exactly six populated identifiers and rejects deleted, empty, and whitespace values without logging', async () => {
     const boundary = await firebaseBoundary();
-    const logs = [
-      vi.spyOn(console, 'log').mockImplementation(() => undefined),
-      vi.spyOn(console, 'warn').mockImplementation(() => undefined),
-      vi.spyOn(console, 'error').mockImplementation(() => undefined),
-    ];
+    const logs = captureConsole();
 
     const complete = boundary.parseFirebaseConfig(completeEnv);
+    expectTypeOf(complete).not.toBeAny();
     expectTypeOf(complete).toMatchTypeOf<FirebaseConfigResult>();
+    expectTypeOf<FirebaseConfigResult>().toMatchTypeOf<typeof complete>();
     expect(complete).toEqual({
       enabled: true,
       config: {
@@ -309,25 +408,21 @@ describe('A-025 Firebase client boundary', () => {
         EXPO_PUBLIC_FIREBASE_API_KEY: 42,
       } as never),
     ).toEqual({ enabled: false, reason: 'invalid-config' });
-    for (const log of logs) expect(log).not.toHaveBeenCalled();
+    expectNoIdentifierValues(logs);
   });
 
   it('spec(A-025:AC-1) missing ambient config cannot throw or log during module import', async () => {
     const prior = new Map(PUBLIC_KEYS.map((key) => [key, process.env[key]]));
     for (const key of PUBLIC_KEYS) delete process.env[key];
     vi.resetModules();
-    const logs = [
-      vi.spyOn(console, 'log').mockImplementation(() => undefined),
-      vi.spyOn(console, 'warn').mockImplementation(() => undefined),
-      vi.spyOn(console, 'error').mockImplementation(() => undefined),
-    ];
+    const logs = captureConsole();
 
     try {
       const boundary = await firebaseBoundary();
       expect(boundary.auth).toBeNull();
       expect(boundary.db).toBeNull();
       expect(boundary.storage).toBeNull();
-      for (const log of logs) expect(log).not.toHaveBeenCalled();
+      expectNoIdentifierValues(logs);
     } finally {
       for (const [key, value] of prior) {
         if (value === undefined) delete process.env[key];
@@ -337,23 +432,89 @@ describe('A-025 Firebase client boundary', () => {
     }
   });
 
-  it('spec(A-025:AC-1) invalid SDK config fails closed to an explicit disabled client before any data service starts', async () => {
-    const boundary = await firebaseBoundary();
-    const invalid = Object.assign(new Error('invalid api key'), { code: 'app/invalid-api-key' });
-    const fake = fakeSdk({ initializeAppError: invalid });
-    let result: unknown;
+  it.each(['ios', 'web'] as const)(
+    'spec(A-025:AC-1) an actual auth/invalid-api-key from %s Auth fails closed before Firestore or Storage',
+    async (platform) => {
+      const boundary = await firebaseBoundary();
+      const invalid = Object.assign(new Error('Firebase: Error (auth/invalid-api-key).'), {
+        code: 'auth/invalid-api-key',
+      });
+      const fake =
+        platform === 'web'
+          ? fakeSdk({ getAuthError: invalid })
+          : fakeSdk({ initializeAuthError: invalid });
+      let result: unknown;
 
-    expect(() => {
-      result = createClient(boundary, fake, 'web');
-    }).not.toThrow();
-    expect(result).toEqual({
-      enabled: false,
-      reason: 'invalid-config',
+      expect(() => {
+        result = createClient(boundary, fake, platform);
+      }).not.toThrow();
+      expect(result).toEqual({ enabled: false, reason: 'invalid-config' });
+      if (platform === 'web') {
+        expect(fake.args.getAuth).toEqual([fake.app]);
+        expect(fake.args.initializeAuth).toHaveLength(0);
+      } else {
+        expect(fake.args.initializeAuth).toHaveLength(1);
+        expect(fake.args.getAuth).toHaveLength(0);
+      }
+      expect(fake.args.initializeFirestore).toHaveLength(0);
+      expect(fake.args.getFirestore).toHaveLength(0);
+      expect(fake.args.getStorage).toHaveLength(0);
+    },
+  );
+
+  it.each(['ios', 'web'] as const)(
+    'spec(A-025:AC-1) ambient %s auth/invalid-api-key imports safely with null clients before data services',
+    async (platform) => {
+      vi.resetModules();
+      const restoreEnv = installPublicEnv();
+      const asyncStorage = { kind: 'ambient-invalid-key-store' };
+      const invalid = Object.assign(new Error('Firebase: Error (auth/invalid-api-key).'), {
+        code: 'auth/invalid-api-key',
+      });
+      const fake =
+        platform === 'web'
+          ? fakeSdk({ getAuthError: invalid })
+          : fakeSdk({ initializeAuthError: invalid });
+      mockAmbientSdk(fake, platform, asyncStorage);
+      const logs = captureConsole();
+
+      try {
+        const boundary = await firebaseBoundary();
+        expect(boundary.auth).toBeNull();
+        expect(boundary.db).toBeNull();
+        expect(boundary.storage).toBeNull();
+        expect(fake.args.initializeFirestore).toHaveLength(0);
+        expect(fake.args.getFirestore).toHaveLength(0);
+        expect(fake.args.getStorage).toHaveLength(0);
+        expectNoIdentifierValues(logs);
+      } finally {
+        restoreEnv();
+      }
+    },
+  );
+
+  it('dod(A-025:3) ambient SDK unavailability imports safely and exposes null clients', async () => {
+    vi.resetModules();
+    const restoreEnv = installPublicEnv();
+    const unavailable = Object.assign(new Error('Firestore service unavailable'), {
+      code: 'unavailable',
     });
-    expect(fake.args.initializeAuth).toHaveLength(0);
-    expect(fake.args.getAuth).toHaveLength(0);
-    expect(fake.args.initializeFirestore).toHaveLength(0);
-    expect(fake.args.getStorage).toHaveLength(0);
+    const fake = fakeSdk({ initializeFirestoreError: unavailable });
+    mockAmbientSdk(fake, 'web', { kind: 'ambient-unavailable-store' });
+    const logs = captureConsole();
+
+    try {
+      const boundary = await firebaseBoundary();
+      expect(boundary.auth).toBeNull();
+      expect(boundary.db).toBeNull();
+      expect(boundary.storage).toBeNull();
+      expect(fake.args.initializeFirestore).toHaveLength(1);
+      expect(fake.args.getFirestore).toHaveLength(0);
+      expect(fake.args.getStorage).toHaveLength(0);
+      expectNoIdentifierValues(logs);
+    } finally {
+      restoreEnv();
+    }
   });
 
   it.each(['ios', 'android'] as const)(
@@ -375,6 +536,50 @@ describe('A-025 Firebase client boundary', () => {
         (fake.args.initializeAuth[0]?.options as { persistence: unknown }).persistence,
       ).toBe(fake.persistence);
       expect(fake.args.getAuth).toHaveLength(0);
+    },
+  );
+
+  it.each(['ios', 'android'] as const)(
+    'spec(A-025:AC-2) spec(A-025:AC-3) %s module reload still attempts exact native persistence before the exact Auth fallback',
+    async (platform) => {
+      vi.resetModules();
+      const restoreEnv = installPublicEnv();
+      const asyncStorage = { kind: `${platform}-retained-async-storage` };
+      const authAlready = Object.assign(new Error('Auth already initialized'), {
+        code: 'auth/already-initialized',
+      });
+      const fake = fakeSdk({
+        initializeAuthError: (callNumber) => (callNumber === 2 ? authAlready : undefined),
+      });
+      mockAmbientSdk(fake, platform, asyncStorage);
+
+      try {
+        const first = await firebaseBoundary();
+        expect(first.auth).toBe(fake.initializedAuth);
+
+        vi.resetModules();
+        mockAmbientSdk(fake, platform, asyncStorage);
+        const reloaded = await firebaseBoundary();
+
+        expect(reloaded.auth).toBe(fake.getterAuth);
+        expect(reloaded.db).toBe(fake.initializedDb);
+        expect(reloaded.storage).toBe(fake.storage);
+        expect(fake.counts.getApps).toBe(2);
+        expect(fake.args.initializeApp).toHaveLength(1);
+        expect(fake.counts.getApp).toBe(1);
+        expect(fake.args.getReactNativePersistence).toEqual([asyncStorage, asyncStorage]);
+        expect(fake.args.initializeAuth).toHaveLength(2);
+        for (const call of fake.args.initializeAuth) {
+          expect(call.app).toBe(fake.app);
+          expect(call.options).toEqual({ persistence: fake.persistence });
+          expect((call.options as { persistence: unknown }).persistence).toBe(fake.persistence);
+        }
+        expect(fake.args.getAuth).toEqual([fake.app]);
+        expect(fake.args.initializeFirestore).toHaveLength(2);
+        expect(fake.args.getFirestore).toHaveLength(0);
+      } finally {
+        restoreEnv();
+      }
     },
   );
 
@@ -435,13 +640,29 @@ describe('A-025 Firebase client boundary', () => {
 
   it('spec(A-025:AC-3) falls back to getFirestore for the Firestore already-initialized condition', async () => {
     const boundary = await firebaseBoundary();
-    const firestoreAlready = Object.assign(new Error('Firestore has already been initialized'), {
+    const firestoreAlready = Object.assign(new Error(FIRESTORE_ALREADY_INITIALIZED_MESSAGE), {
       code: 'failed-precondition',
     });
     const firestoreFake = fakeSdk({ initializeFirestoreError: firestoreAlready });
     const firestoreClient = enabledClient(createClient(boundary, firestoreFake, 'web'));
     expect(firestoreClient.db).toBe(firestoreFake.getterDb);
     expect(firestoreFake.args.getFirestore).toEqual([firestoreFake.app]);
+  });
+
+  it('spec(A-025:AC-3) propagates the same Firestore code when the installed already-initialized message does not match', async () => {
+    const boundary = await firebaseBoundary();
+    const sameCodeDifferentCondition = Object.assign(
+      new Error(FIRESTORE_STARTED_ELSEWHERE_MESSAGE),
+      { code: 'failed-precondition' },
+    );
+    const brokenFirestore = fakeSdk({
+      initializeFirestoreError: sameCodeDifferentCondition,
+    });
+
+    expect(() => createClient(boundary, brokenFirestore, 'web')).toThrow(
+      sameCodeDifferentCondition,
+    );
+    expect(brokenFirestore.args.getFirestore).toHaveLength(0);
   });
 
   it('spec(A-025:AC-3) propagates unrelated Auth initialization errors without falling back to getAuth', async () => {
@@ -503,10 +724,15 @@ describe('A-025 Firebase client boundary', () => {
     expect([...assignments.keys()]).toEqual(PUBLIC_KEYS);
     expect([...assignments.values()]).toEqual(PUBLIC_KEYS.map(() => ''));
 
-    const ignoreLines = uncommentedLines(readFileSync(GITIGNORE, 'utf8'));
-    expect(ignoreLines).toContain('.env');
-    expect(ignoreLines).toContain('.env.*');
-    expect(ignoreLines).toContain('!.env.example');
+    const candidates = ['.env', '.env.local', '.env.preview', '.env.example'];
+    const ignored = spawnSync('git', ['check-ignore', '--no-index', '--stdin'], {
+      cwd: fileURLToPath(ROOT),
+      input: `${candidates.join('\n')}\n`,
+      encoding: 'utf8',
+    });
+    expect(ignored.stderr).toBe('');
+    expect(ignored.status).toBe(0);
+    expect(ignored.stdout.trim().split(/\r?\n/)).toEqual(candidates.slice(0, 3));
   });
 
   it('spec(A-025:AC-5) wires the selected project to complete Firestore and Storage deny-all rules', () => {
@@ -544,7 +770,7 @@ describe('A-025 Firebase client boundary', () => {
     // evidence and are intentionally outside a deterministic unit test.
   });
 
-  it('spec(A-025:AC-7) dod(A-025:3) keeps a config-free client local-only and the committed contract limited to public identifiers', async () => {
+  it('spec(A-025:AC-7) keeps a config-free client local-only and the committed contract limited to public identifiers', async () => {
     const boundary = await firebaseBoundary();
     expect(
       boundary.createFirebaseClient({
