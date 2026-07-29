@@ -39,12 +39,124 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 
 ## Current state at the time of writing
 
-- Engine: waves 1–4 merged on `swarm/engine-core`, **1,438 tests green**. Wave 5 in flight —
-  priority order from owner (2026-07-28): **T-014 → T-015 → T-016** (templates, ≥8/skill floor)
-  first, then **T-017** (range drill; publish session API here when it lands), **T-018**
-  (onboarding rival), **T-020** (duel reducer; publish state/event shape here — do **not** edit
-  `src/stores/duel.ts`), **T-034** last. Owner ruling **D-6** applied to **T-032** (starters-only placement). **T-029** remains owner-blocked.
-  Push `swarm/engine-core` after every ticket merge, not at wave end.
+- Engine: Wave 5 — **T-014…T-020 + T-034 done** (Wave 5 complete) (templates + range drill; drill API published below).
+  Wave 5 complete. **T-029** remains owner-blocked. Owner ruling **D-6** on **T-032**. **T-029**
+  remains owner-blocked. Push `swarm/engine-core` after every ticket merge.
 - App track (`app/shell`): owns presentation; currently uses a placeholder question service that
   must not ship — real templates from T-014…T-016 replace it.
 - iOS: Simulator + Expo web demo path; TestFlight gated on Apple Developer enrollment.
+
+## Published engine APIs (Track A → Track B)
+
+### T-017 — Gunnery-range drill (`@engine/drill`)
+
+Source: `src/engine/drill.ts` (merged on `swarm/engine-core`).
+
+```ts
+export interface DrillAnswer {
+  readonly templateId: string;
+  readonly choiceIndex: number | null; // null = timed out (counts as miss)
+  readonly correct: boolean;
+  readonly elapsedMs: number;
+}
+
+export interface DrillSession {
+  readonly skillId: SkillId;
+  readonly rng: Rng;
+  readonly length: number;
+  readonly answered: number;
+  readonly correct: number;
+  readonly recentTemplateIds: readonly string[]; // most-recent-first
+  readonly mastery: SkillMastery; // updated at full rate after each answer
+  readonly current: Question | null; // null once complete
+  readonly complete: boolean;
+  readonly log: readonly DrillAnswer[];
+  readonly templates: readonly Template[]; // retained for generate / restore
+}
+
+export function startDrill(input: {
+  readonly skillId: SkillId;
+  readonly templates: readonly Template[];
+  readonly mastery: SkillMastery;
+  readonly rng: Rng;
+  readonly length: number; // integer >= 1
+}): DrillSession;
+
+export function answerDrill(
+  session: DrillSession,
+  choiceIndex: number | null,
+  elapsedMs: number,
+): DrillSession;
+```
+
+Notes for Track B (`app/range.tsx`):
+
+- Mastery fills via `applyAnswer(..., 'range', ...)` at full rate; caller runs `resolveUnlocks`.
+- Timeout = `choiceIndex === null` (miss, not skip). No `Date` / `Math.random` in the engine.
+- Session is plain JSON (interrupt/restore safe). Post-complete `answerDrill` throws.
+- Inject a skill's template pool; do not edit `src/engine/**` from the app track.
+
+### T-018 — Opponent interface + scripted rival (`@engine/opponents`)
+
+Sources: `src/engine/opponents/types.ts`, `src/engine/opponents/scripted.ts`.
+
+```ts
+export interface Opponent {
+  readonly id: string;
+  chooseAction(view: RivalView): Promise<RivalAction>; // { cannonId }
+  produceAnswer(question: Question): Promise<OpponentAnswer>; // { correct, elapsedMs }
+}
+export interface OpponentAnswer {
+  readonly correct: boolean;
+  readonly elapsedMs: number;
+}
+export interface ScriptedStep {
+  readonly cannonId: CannonId;
+  readonly correct: boolean;
+  readonly elapsedMs: number;
+}
+export function createScriptedOpponent(input: {
+  readonly id: string;
+  readonly script: readonly ScriptedStep[]; // >= 1
+}): Opponent;
+```
+
+Notes for Track B: Promises resolve immediately (no wall-clock). Exhausted script repeats last step.
+Onboarding hull arithmetic uses `ONBOARDING_ENEMY_HULL` (T-004); assemble the duel in the app, not here.
+
+### T-020 — Duel reducer (`@engine/duel/reducer` + `@engine/duel/types`)
+
+Sources: `src/engine/duel/reducer.ts`, `src/engine/duel/types.ts` (T-013), `src/engine/duel/damage.ts` (T-008).
+
+**Do not edit `src/stores/duel.ts` from Track A** — the store is Track B; it must call the pure reducer.
+
+```ts
+export type DuelPhase =
+  | 'countdown'
+  | 'playerChoose'
+  | 'reload'
+  | 'resolvePlayer'
+  | 'rivalTurn'
+  | 'resolveRival'
+  | 'victory'
+  | 'defeat';
+
+export type DuelEvent =
+  | { readonly type: 'CANNON_SELECTED'; readonly cannonId: CannonId }
+  | { readonly type: 'ANSWER_CHOSEN'; readonly choiceIndex: number; readonly elapsedMs: number }
+  | { readonly type: 'TIMER_EXPIRED' }
+  | { readonly type: 'ANIMATION_DONE' }
+  | { readonly type: 'RIVAL_ACTION'; readonly volley: RivalVolley };
+
+export function createDuelState(config: DuelConfig): DuelState;
+export function duelReducer(state: DuelState, event: DuelEvent): DuelState;
+export function toRivalView(state: DuelState): RivalView;
+export function isTerminalPhase(phase: DuelPhase): boolean;
+```
+
+Notes for Track B:
+
+- Out-of-phase / invalid payloads return the **same state reference** (`===`) — skip re-render.
+- Drive the scripted/banded opponent via `Opponent` (T-018); feed `RIVAL_ACTION` with its volley.
+- Mastery: apply `result.tally.bySkill` at half rate through T-010 after the duel ends (store).
+- Terminal order: `enemyHull <= 0` → victory, else `playerHull <= 0` → defeat.

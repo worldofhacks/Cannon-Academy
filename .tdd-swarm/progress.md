@@ -1870,3 +1870,152 @@ Phase `tests`. Publish session API in COORDINATION.md after merge.
 [T-017 Test Agent](f0837bc4-dbeb-4184-aea3-7da24f170fe3): spec-lint PASS; drill suite RED (missing module); baseline 1620.
 **Adjudication:** `recentTemplateIds` = most-recent-first (T-007). Other ambiguities accepted as suite-pinned.
 Test-design review dispatched.
+
+### T-017 FROZEN (`34755b6a6e6d2c2e…`) — ACCEPT_WITH_NITS
+
+[T-017 test-design](5aa08818-6f0c-451a-82ca-4af9beaf2fe1): I-1 closed (`NEGATIVE_INFINITY` in AC-2).
+Phase → `implement`. Implementer dispatched.
+
+### T-017 TEST_DISPUTE closed — DoD-3 header self-poison
+
+[T-017 Implementer](1b4a4546-66b3-4300-8290-8d3895f1a617): 31/32; header placeholder matched DoD-3 scanner.
+Suite fix `6007ef6` re-frozen `7db026f67f89e6dc…`. Phase → implement; implementer resumed.
+
+### T-017 impl green (`2572fbd`)
+
+[T-017 Implementer](1b4a4546-66b3-4300-8290-8d3895f1a617): 1652/1652; drill 32/32; gates PASS.
+Code + security review dispatched.
+
+### T-017 security PASS_WITH_NOTES
+
+[T-017 Security Review](36aa48d2-6c7d-453e-80f9-11f79d5b8a1f): offline orchestrator clean; minor contract-immutability notes.
+Awaiting code review before merge.
+
+### T-017 — done (merged)
+
+Code APPROVE_WITH_NITS ([T-017 Code Review](a5eee8d1-26b4-4eaf-8e84-7720bde32663));
+security PASS_WITH_NOTES ([T-017 Security Review](36aa48d2-6c7d-453e-80f9-11f79d5b8a1f)).
+Session API published in COORDINATION.md. Merged + pushed.
+
+### T-018 started — onboarding rival
+
+Worktree `.worktrees/wt-T-018` from post-T-017 tip. Phase `tests`.
+
+### T-018 RED landed (`c88dc4b`)
+
+[T-018 Test Agent](8826bde0-6987-4103-b5f3-21d78fceaacc): spec-lint PASS; scripted suite RED; baseline 1652.
+**Adjudications:** `Opponent.id` required (ticket > ARCH snippet); AC-6 empty=RangeError / bad step=Error;
+AC-11 membership when scripted in loadout; AC-13 arithmetic-only. Branch name aligned to worktree.
+Test-design review dispatched.
+
+### T-018 FROZEN (`812e15106b8c08b2…`) — ACCEPT_WITH_NITS
+
+[T-018 test-design](ad6ea5b7-a15c-4c9b-8fc6-68bd059feab8): no Critical/Important. Phase → implement.
+
+### T-018 TEST_DISPUTE closed — DoD-3 header self-poison
+
+Same class as T-017. Suite fix `e6ec871` re-frozen `344d3091662158cd…` (22/22 with feat). Implementer resumed.
+
+### T-018 impl green (`702a804`)
+
+[T-018 Implementer](49df958f-6ce0-4b10-b8be-6dd7882f3119): 1674/1674; scripted 22/22; gates PASS.
+Code + security review dispatched.
+
+### T-018 security PASS_WITH_NOTES
+
+[T-018 Security Review](ca6e58f0-68e3-4d6c-b6a3-f51d6b3de0c9): clean opponent seam; minor caller-trust notes.
+Awaiting code review before merge.
+
+### T-018 — done (merged)
+
+Code APPROVE_WITH_NITS ([T-018 Code Review](29fccb36-b293-4be2-9b56-771a1a8a33f6));
+security PASS_WITH_NOTES ([T-018 Security Review](ca6e58f0-68e3-4d6c-b6a3-f51d6b3de0c9)).
+Opponent API published in COORDINATION.md. Merged + pushed.
+
+### T-020 started — duel reducer
+
+Worktree `.worktrees/wt-T-020` from post-T-018 tip. Phase `tests`.
+Do not edit `src/stores/duel.ts`. Publish state/event shape in COORDINATION.md on merge.
+
+### T-020 RED landed (`d43dfd7`)
+
+[T-020 Test Agent](36a816ca-f4ee-45bc-be6c-caf8ed762772): AC-1…24 suite; RED missing reducer; baseline 1674.
+Adjudications: bySkill required in impl; rival recoil symmetric; enemy-first tie-break.
+Test-design review dispatched.
+
+### T-020 ACCEPT_WITH_NITS — closing Important before freeze
+
+[T-020 test-design](161af72b-ef67-401d-ac1c-91aabc414997): I-1 resolveRival→defeat; I-2 resolveShot oracles on AC-5/9; I-3 rival-miss hull.
+Test Agent amending suite.
+
+### T-020 FROZEN (`bcfd707f197df84c…`) — Important nits closed
+
+[T-020 Test Agent](36a816ca-f4ee-45bc-be6c-caf8ed762772) `357fa22`: resolveRival terminals, resolveShot oracles, rival-miss hull.
+Phase → implement. Implementer dispatched.
+
+### T-020 TEST_DISPUTE closed — AC-24 self-poison + tsc choices type
+
+[T-020 Implementer](8ce1a513-93c0-4562-9c8f-e6b596693975): 32/33; feat `6ef7aaf` intact.
+Suite fix `bd8bc4d` re-frozen `80c4cdb1367a3915…` (33/33 with reducer). Implementer resumed.
+
+### T-020 TEST_DISPUTE closed — T-013 dod(9) allowlist
+
+`dod(T-013:9)` rejected `reducer.ts`. Added to permitted list (`test(T-013)` on T-020 branch).
+Implementer resumed for full gates.
+
+### T-020 impl green (`6ef7aaf`)
+
+[T-020 Implementer](8ce1a513-93c0-4562-9c8f-e6b596693975): 1707/1707; reducer 33/33; gates PASS.
+Code + security review dispatched.
+
+### T-020 security PASS_WITH_NOTES
+
+[T-020 Security Review](703a3952-83b2-477a-a831-561d5b827672): clean reducer; minor elapsedMs notes.
+Awaiting code review before merge.
+
+### T-020 — done (merged)
+
+Code APPROVE_WITH_NITS ([T-020 Code Review](03037fa6-b8b8-4740-91cb-33a022f558dc));
+security PASS_WITH_NOTES ([T-020 Security Review](703a3952-83b2-477a-a831-561d5b827672)).
+Reducer state/event API published in COORDINATION.md. Merged + pushed.
+
+### T-034 started — param key grammar
+
+Worktree `.worktrees/wt-T-034` from post-T-020 tip. Phase `tests`. T-029 still blocked.
+
+### T-034 RED landed (`51c37df`)
+
+[T-034 Test Agent](a9cbdabc-389e-4c96-8270-6414a4d3aae1): 7 fail / 102 pass in schemas suite; baseline 1612.
+**Adjudication:** file_scopes += `expr.ts` for pure IDENT export only; schemas must import it.
+Test-design review dispatched.
+
+### T-034 ACCEPT_WITH_NITS — closing Important before freeze
+
+[T-034 test-design](151af5b2-d671-4e90-9132-f60cc6332d95): I-1 AC-4 numeric-oracle; I-2/I-3 DoD-5 comments.
+Test Agent amending suite.
+
+### T-034 FROZEN (`66bfa2cb93fc93fb…`) — Important nits closed
+
+[T-034 Test Agent](a9cbdabc-389e-4c96-8270-6414a4d3aae1) `2240821`: AC-4 oracle + digit corpus; DoD-5 comments.
+Phase → implement. Implementer dispatched.
+
+### T-034 unblocked — prettier style on frozen suite
+
+Orchestrator `style(T-034)` `9e0bd39`; new hash `fcf0e43f560bc63a…`. Feat `9947577` green; gates ALL PASS.
+Implementer resumed.
+
+### T-034 impl green (`9947577`)
+
+[T-034 Implementer](155deb80-cbf6-4a03-b043-7974f53186c0): 1721/1721; schemas 109/109; gates PASS.
+Code + security review dispatched.
+
+### T-034 security PASS_WITH_NOTES
+
+[T-034 Security Review](c01e0f01-8662-4d9e-9155-323c0f111874): IDENT narrowing fail-closed; informational notes only.
+Awaiting code review before merge.
+
+### T-034 — done (merged) — Wave 5 complete
+
+Code APPROVE_WITH_NITS ([T-034 Code Review](d21a6d73-563c-4bc5-8094-0ef2d27a2663));
+security PASS_WITH_NOTES ([T-034 Security Review](c01e0f01-8662-4d9e-9155-323c0f111874)).
+Merged + pushed. Engine Wave 5 tickets (T-014…T-020, T-032, T-034) done. **T-029** still owner-blocked.

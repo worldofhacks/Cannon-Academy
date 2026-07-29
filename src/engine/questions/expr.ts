@@ -805,6 +805,20 @@ function computeBoolean(node: Node, env: Environment): boolean {
 // ---------------------------------------------------------------------------------------------
 
 /**
+ * Full-string form of the T-002 `IDENT` production: `[A-Za-z_][A-Za-z0-9_]*`.
+ *
+ * Shared with content schemas (T-034) so template `params` keys and the evaluator that consumes
+ * them cannot drift. This is a pure membership check — it does not change tokenisation or
+ * evaluation.
+ */
+export const IDENT_PATTERN = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/** True when `name` is a single T-002 identifier (see {@link IDENT_PATTERN}). */
+export function isIdent(name: string): boolean {
+  return IDENT_PATTERN.test(name);
+}
+
+/**
  * Evaluates an arithmetic expression (`answerExpr`, a distractor) against a parameter
  * environment. Throws `ExprError` for every failure; never returns `NaN` or `Infinity`.
  */

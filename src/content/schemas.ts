@@ -8,6 +8,7 @@
  * inside the nested `unlock` discriminated union — so a typo'd field in authored content fails
  * loudly instead of being silently stripped (see .tdd-swarm/LESSONS.md L-009).
  */
+import { IDENT_PATTERN } from '@engine/questions/expr';
 import { z } from 'zod';
 
 // --- Id unions, each with a companion `as const` array -------------------------------------
@@ -68,6 +69,14 @@ const gradeSchema = z.number().int().min(0).max(5);
 /** A template's inclusive integer sampling range, e.g. `[1, 5]`. */
 const paramRangeSchema = z.tuple([z.number().int(), z.number().int()]);
 
+/**
+ * Param keys must be T-002 identifiers so `{name}` / `answerExpr` / constraints can reference
+ * them. Pattern is imported from the evaluator grammar — not re-stated here (T-034 / L-009).
+ */
+const paramKeySchema = z.string().regex(IDENT_PATTERN, {
+  message: 'param key must be an expression identifier',
+});
+
 // --- templateSchema (AC-2 .. AC-6, AC-17) ---------------------------------------------------
 
 export const templateSchema = z
@@ -75,7 +84,7 @@ export const templateSchema = z
     id: z.string(),
     skill: z.enum(SKILL_IDS),
     text: z.string(),
-    params: z.record(paramRangeSchema),
+    params: z.record(paramKeySchema, paramRangeSchema),
     constraints: z.array(z.string()).optional(),
     answerExpr: z.string(),
     distractors: z.array(z.string()).length(3),
