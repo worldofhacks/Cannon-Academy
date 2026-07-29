@@ -80,7 +80,7 @@ interface CannonRow {
   readonly unlock: Cannon['unlock'];
 }
 
-/** `Record<CannonId, …>` — the type system, not a hand-count, proves all ten rows are present. */
+/** `Record<CannonId, …>` — the type system, not a hand-count, proves all eleven rows are present. */
 const CANNON_TABLE: Record<CannonId, CannonRow> = {
   swivel_gun: {
     skill: 'add_within_10',
@@ -101,6 +101,17 @@ const CANNON_TABLE: Record<CannonId, CannonRow> = {
     minGrade: 0,
     maxGrade: 1,
     unlock: { kind: 'starter' },
+  },
+  // T-029 / D-7 — invented (not in PLAN.md armory); range payoff for add_within_10
+  saker: {
+    skill: 'add_within_10',
+    damageMin: 9,
+    damageMax: 13,
+    temperament: 'standard',
+    timerMs: 20_000,
+    minGrade: 0,
+    maxGrade: 1,
+    unlock: { kind: 'range', island: 'port_sumwich', tier: 1 },
   },
   six_pounder: {
     skill: 'add_within_20',
@@ -192,6 +203,7 @@ const CANNON_TABLE: Record<CannonId, CannonRow> = {
 const RECOIL_TABLE: Record<CannonId, number> = {
   swivel_gun: 0,
   culverin: 0,
+  saker: 0, // T-029 / D-7 invented — standard, zero recoil
   six_pounder: 0,
   chain_shot: 0,
   nine_pounder: 0,
@@ -208,8 +220,9 @@ const ISLAND_TABLE: Record<
   { readonly rangeSkills: readonly SkillId[]; readonly unlocksCannons: readonly CannonId[] }
 > = {
   port_sumwich: {
-    rangeSkills: ['add_within_20', 'sub_within_20', 'two_step_add_sub'],
-    unlocksCannons: ['six_pounder', 'chain_shot', 'double_broadside'],
+    // T-029 / D-7 — add_within_10 joins the lane; saker is its paying range unlock
+    rangeSkills: ['add_within_10', 'add_within_20', 'sub_within_20', 'two_step_add_sub'],
+    unlocksCannons: ['saker', 'six_pounder', 'chain_shot', 'double_broadside'],
   },
   isla_products: { rangeSkills: ['mult_facts'], unlocksCannons: ['twelve_pounder'] },
   quotient_cove: { rangeSkills: ['div_facts'], unlocksCannons: ['mortar'] },
@@ -404,9 +417,9 @@ describe('AC-1 — the catalog module loads and every entry is schema-valid', ()
 // --- AC-2: cardinality and id uniqueness, per catalog ------------------------------------------
 
 describe('AC-2 — every catalog has exactly its ids, once each', () => {
-  it('spec(T-006:AC-2) cannons has exactly the 10 CannonId values with no duplicates', () => {
-    expect(cannons).toHaveLength(10);
-    expect(CANNON_IDS).toHaveLength(10);
+  it('spec(T-006:AC-2) cannons has exactly the 11 CannonId values with no duplicates', () => {
+    expect(cannons).toHaveLength(11);
+    expect(CANNON_IDS).toHaveLength(11);
     const ids = cannons.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(sorted(ids)).toEqual(sorted(CANNON_IDS));
@@ -449,7 +462,7 @@ describe('AC-2 — every catalog has exactly its ids, once each', () => {
   });
 });
 
-// --- AC-3: the armory transcription, all ten rows, all eight pinned fields ----------------------
+// --- AC-3: the armory transcription, all eleven rows, all eight pinned fields ---------------------
 
 describe('AC-3 — every cannon matches PLAN.md §The armory exactly', () => {
   it.each([...CANNON_IDS])('spec(T-006:AC-3) %s transcribes its armory row exactly', (id) => {
