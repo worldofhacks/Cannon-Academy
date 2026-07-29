@@ -1870,3 +1870,8 @@ Phase `tests`. Publish session API in COORDINATION.md after merge.
 [T-017 Test Agent](f0837bc4-dbeb-4184-aea3-7da24f170fe3): spec-lint PASS; drill suite RED (missing module); baseline 1620.
 **Adjudication:** `recentTemplateIds` = most-recent-first (T-007). Other ambiguities accepted as suite-pinned.
 Test-design review dispatched.
+
+### T-017 FROZEN () — ACCEPT_WITH_NITS
+
+[T-017 test-design](5aa08818-6f0c-451a-82ca-4af9beaf2fe1): I-1 closed ( in AC-2).
+Phase → . Implementer dispatched.
