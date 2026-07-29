@@ -304,53 +304,73 @@ function pressDispatchesEdge(
   control: string,
   dispatch: string,
 ): boolean {
-  let pressable = false;
-  let accessible = false;
-  let visibleLabel = false;
-  let onPressDispatch = false;
-  const visit = (node: ts.Node) => {
-    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(parsed) === 'Text') {
-      if (containsProperty(node, control, 'label')) visibleLabel = true;
-    }
-    if (
-      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
-      node.tagName.getText(parsed) === 'Pressable'
-    ) {
-      pressable = true;
-      const accessibility = node.attributes.properties.find(
-        (attribute): attribute is ts.JsxAttribute =>
-          ts.isJsxAttribute(attribute) && attribute.name.getText(parsed) === 'accessibilityLabel',
-      );
-      if (
-        accessibility?.initializer !== undefined &&
-        containsProperty(accessibility.initializer, control, 'accessibilityLabel')
-      ) {
-        accessible = true;
-      }
-      const onPress = node.attributes.properties.find(
-        (attribute): attribute is ts.JsxAttribute =>
-          ts.isJsxAttribute(attribute) && attribute.name.getText(parsed) === 'onPress',
-      );
-      if (onPress?.initializer !== undefined) {
-        const inspectCall = (child: ts.Node) => {
-          if (
-            ts.isCallExpression(child) &&
-            ts.isIdentifier(child.expression) &&
-            child.expression.text === dispatch &&
-            child.arguments.length === 1 &&
-            propertyOf(child.arguments[0] as ts.Node, control, 'edgeId')
-          ) {
-            onPressDispatch = true;
-          }
-          ts.forEachChild(child, inspectCall);
-        };
-        inspectCall(onPress.initializer);
-      }
-    }
-    ts.forEachChild(node, visit);
+  const unwrap = (expression: ts.Expression): ts.Expression =>
+    ts.isParenthesizedExpression(expression) ? unwrap(expression.expression) : expression;
+  const returnedRoots = (): readonly ts.JsxElement[] => {
+    const returned = ts.isBlock(callback.body)
+      ? callback.body.statements.flatMap((statement) =>
+          ts.isReturnStatement(statement) && statement.expression !== undefined
+            ? [unwrap(statement.expression)]
+            : [],
+        )
+      : [unwrap(callback.body)];
+    return returned.filter(ts.isJsxElement);
   };
-  visit(callback.body);
-  return pressable && accessible && visibleLabel && onPressDispatch;
+  const directPressables = (root: ts.JsxElement): readonly ts.JsxElement[] => {
+    const candidates = [root, ...root.children.filter(ts.isJsxElement)];
+    return candidates.filter((candidate) => candidate.openingElement.tagName.getText(parsed) === 'Pressable');
+  };
+  const hasVisibleLabel = (pressable: ts.JsxElement): boolean => {
+    let found = false;
+    const visit = (node: ts.Node) => {
+      if (ts.isJsxElement(node) && node.openingElement.tagName.getText(parsed) === 'Text') {
+        found ||= containsProperty(node, control, 'label');
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(pressable);
+    return found;
+  };
+  const hasAccessibilityLabel = (pressable: ts.JsxElement): boolean => {
+    const accessibility = pressable.openingElement.attributes.properties.find(
+      (attribute): attribute is ts.JsxAttribute =>
+        ts.isJsxAttribute(attribute) && attribute.name.getText(parsed) === 'accessibilityLabel',
+    );
+    return (
+      accessibility?.initializer !== undefined &&
+      containsProperty(accessibility.initializer, control, 'accessibilityLabel')
+    );
+  };
+  const dispatchesOwnEdge = (pressable: ts.JsxElement): boolean => {
+    const onPress = pressable.openingElement.attributes.properties.find(
+      (attribute): attribute is ts.JsxAttribute =>
+        ts.isJsxAttribute(attribute) && attribute.name.getText(parsed) === 'onPress',
+    );
+    if (onPress?.initializer === undefined) return false;
+
+    let found = false;
+    const visit = (node: ts.Node) => {
+      if (
+        ts.isCallExpression(node) &&
+        ts.isIdentifier(node.expression) &&
+        node.expression.text === dispatch &&
+        node.arguments.length === 1 &&
+        propertyOf(node.arguments[0] as ts.Node, control, 'edgeId')
+      ) {
+        found = true;
+      }
+      ts.forEachChild(node, visit);
+    };
+    visit(onPress.initializer);
+    return found;
+  };
+
+  return returnedRoots().some((root) =>
+    directPressables(root).some(
+      (pressable) =>
+        hasAccessibilityLabel(pressable) && hasVisibleLabel(pressable) && dispatchesOwnEdge(pressable),
+    ),
+  );
 }
 
 /**
