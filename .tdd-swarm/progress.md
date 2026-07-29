@@ -1978,3 +1978,7 @@ Awaiting code review before merge.
 Code APPROVE_WITH_NITS ([T-020 Code Review](03037fa6-b8b8-4740-91cb-33a022f558dc));
 security PASS_WITH_NOTES ([T-020 Security Review](703a3952-83b2-477a-a831-561d5b827672)).
 Reducer state/event API published in COORDINATION.md. Merged + pushed.
+
+### T-034 started — param key grammar
+
+Worktree `.worktrees/wt-T-034` from post-T-020 tip. Phase `tests`. T-029 still blocked.
