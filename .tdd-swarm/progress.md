@@ -1972,3 +1972,9 @@ Code + security review dispatched.
 
 [T-020 Security Review](703a3952-83b2-477a-a831-561d5b827672): clean reducer; minor elapsedMs notes.
 Awaiting code review before merge.
+
+### T-020 — done (merged)
+
+Code APPROVE_WITH_NITS ([T-020 Code Review](03037fa6-b8b8-4740-91cb-33a022f558dc));
+security PASS_WITH_NOTES ([T-020 Security Review](703a3952-83b2-477a-a831-561d5b827672)).
+Reducer state/event API published in COORDINATION.md. Merged + pushed.

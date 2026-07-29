@@ -39,9 +39,8 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 
 ## Current state at the time of writing
 
-- Engine: Wave 5 — **T-014…T-018 done** (templates + range drill; drill API published below).
-  Next: **T-020** (duel reducer; publish state/event shape here — do
-  **not** edit `src/stores/duel.ts`), **T-034** last. Owner ruling **D-6** on **T-032**. **T-029**
+- Engine: Wave 5 — **T-014…T-020 done** (templates + range drill; drill API published below).
+  Next: **T-034** last (**T-029** still owner-blocked). Owner ruling **D-6** on **T-032**. **T-029**
   remains owner-blocked. Push `swarm/engine-core` after every ticket merge.
 - App track (`app/shell`): owns presentation; currently uses a placeholder question service that
   must not ship — real templates from T-014…T-016 replace it.
@@ -124,3 +123,40 @@ export function createScriptedOpponent(input: {
 
 Notes for Track B: Promises resolve immediately (no wall-clock). Exhausted script repeats last step.
 Onboarding hull arithmetic uses `ONBOARDING_ENEMY_HULL` (T-004); assemble the duel in the app, not here.
+
+### T-020 — Duel reducer (`@engine/duel/reducer` + `@engine/duel/types`)
+
+Sources: `src/engine/duel/reducer.ts`, `src/engine/duel/types.ts` (T-013), `src/engine/duel/damage.ts` (T-008).
+
+**Do not edit `src/stores/duel.ts` from Track A** — the store is Track B; it must call the pure reducer.
+
+```ts
+export type DuelPhase =
+  | 'countdown'
+  | 'playerChoose'
+  | 'reload'
+  | 'resolvePlayer'
+  | 'rivalTurn'
+  | 'resolveRival'
+  | 'victory'
+  | 'defeat';
+
+export type DuelEvent =
+  | { readonly type: 'CANNON_SELECTED'; readonly cannonId: CannonId }
+  | { readonly type: 'ANSWER_CHOSEN'; readonly choiceIndex: number; readonly elapsedMs: number }
+  | { readonly type: 'TIMER_EXPIRED' }
+  | { readonly type: 'ANIMATION_DONE' }
+  | { readonly type: 'RIVAL_ACTION'; readonly volley: RivalVolley };
+
+export function createDuelState(config: DuelConfig): DuelState;
+export function duelReducer(state: DuelState, event: DuelEvent): DuelState;
+export function toRivalView(state: DuelState): RivalView;
+export function isTerminalPhase(phase: DuelPhase): boolean;
+```
+
+Notes for Track B:
+
+- Out-of-phase / invalid payloads return the **same state reference** (`===`) — skip re-render.
+- Drive the scripted/banded opponent via `Opponent` (T-018); feed `RIVAL_ACTION` with its volley.
+- Mastery: apply `result.tally.bySkill` at half rate through T-010 after the duel ends (store).
+- Terminal order: `enemyHull <= 0` → victory, else `playerHull <= 0` → defeat.
