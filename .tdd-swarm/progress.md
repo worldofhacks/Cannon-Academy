@@ -1907,3 +1907,7 @@ Worktree `.worktrees/wt-T-018` from post-T-017 tip. Phase `tests`.
 **Adjudications:** `Opponent.id` required (ticket > ARCH snippet); AC-6 empty=RangeError / bad step=Error;
 AC-11 membership when scripted in loadout; AC-13 arithmetic-only. Branch name aligned to worktree.
 Test-design review dispatched.
+
+### T-018 FROZEN () — ACCEPT_WITH_NITS
+
+[T-018 test-design](ad6ea5b7-a15c-4c9b-8fc6-68bd059feab8): no Critical/Important. Phase → implement.
