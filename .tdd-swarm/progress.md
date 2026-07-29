@@ -1925,3 +1925,9 @@ Code + security review dispatched.
 
 [T-018 Security Review](ca6e58f0-68e3-4d6c-b6a3-f51d6b3de0c9): clean opponent seam; minor caller-trust notes.
 Awaiting code review before merge.
+
+### T-018 — done (merged)
+
+Code APPROVE_WITH_NITS ([T-018 Code Review](29fccb36-b293-4be2-9b56-771a1a8a33f6));
+security PASS_WITH_NOTES ([T-018 Security Review](ca6e58f0-68e3-4d6c-b6a3-f51d6b3de0c9)).
+Opponent API published in COORDINATION.md. Merged + pushed.

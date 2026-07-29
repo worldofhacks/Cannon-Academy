@@ -39,8 +39,8 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 
 ## Current state at the time of writing
 
-- Engine: Wave 5 — **T-014…T-017 done** (templates + range drill; drill API published below).
-  Next: **T-018** (onboarding rival), **T-020** (duel reducer; publish state/event shape here — do
+- Engine: Wave 5 — **T-014…T-018 done** (templates + range drill; drill API published below).
+  Next: **T-020** (duel reducer; publish state/event shape here — do
   **not** edit `src/stores/duel.ts`), **T-034** last. Owner ruling **D-6** on **T-032**. **T-029**
   remains owner-blocked. Push `swarm/engine-core` after every ticket merge.
 - App track (`app/shell`): owns presentation; currently uses a placeholder question service that
@@ -96,3 +96,31 @@ Notes for Track B (`app/range.tsx`):
 - Timeout = `choiceIndex === null` (miss, not skip). No `Date` / `Math.random` in the engine.
 - Session is plain JSON (interrupt/restore safe). Post-complete `answerDrill` throws.
 - Inject a skill's template pool; do not edit `src/engine/**` from the app track.
+
+### T-018 — Opponent interface + scripted rival (`@engine/opponents`)
+
+Sources: `src/engine/opponents/types.ts`, `src/engine/opponents/scripted.ts`.
+
+```ts
+export interface Opponent {
+  readonly id: string;
+  chooseAction(view: RivalView): Promise<RivalAction>; // { cannonId }
+  produceAnswer(question: Question): Promise<OpponentAnswer>; // { correct, elapsedMs }
+}
+export interface OpponentAnswer {
+  readonly correct: boolean;
+  readonly elapsedMs: number;
+}
+export interface ScriptedStep {
+  readonly cannonId: CannonId;
+  readonly correct: boolean;
+  readonly elapsedMs: number;
+}
+export function createScriptedOpponent(input: {
+  readonly id: string;
+  readonly script: readonly ScriptedStep[]; // >= 1
+}): Opponent;
+```
+
+Notes for Track B: Promises resolve immediately (no wall-clock). Exhausted script repeats last step.
+Onboarding hull arithmetic uses `ONBOARDING_ENEMY_HULL` (T-004); assemble the duel in the app, not here.
