@@ -2008,3 +2008,8 @@ Implementer resumed.
 
 [T-034 Implementer](155deb80-cbf6-4a03-b043-7974f53186c0): 1721/1721; schemas 109/109; gates PASS.
 Code + security review dispatched.
+
+### T-034 security PASS_WITH_NOTES
+
+[T-034 Security Review](c01e0f01-8662-4d9e-9155-323c0f111874): IDENT narrowing fail-closed; informational notes only.
+Awaiting code review before merge.
