@@ -18,12 +18,23 @@
  * 3. **Constants are imported, never retyped.** Hulls come from `@engine/tuning`, cannons and
  *    islands from the catalogs, and `ShotOutcome` from the real `@engine/duel/damage`, so no
  *    number here can drift from the module that owns it.
+ * 4. **Whole-interface probes, not indexed ones, for modifiers and for closed shapes.** An
+ *    indexed access DISCARDS property modifiers (LESSONS.md L-012), so `Exact<DuelState['seed'],
+ *    number>` is blind to a mutable `seed` — verified: removing `readonly` from `DuelCore.seed`
+ *    typechecked clean and passed this suite 100/100 before AC-14 existed. Likewise, constraining
+ *    `DuelEvent['type']` and the keys of hand-written fixture values cannot see an extra
+ *    OPTIONAL field on one variant — verified the same way. The remedy in both cases is a probe
+ *    over the whole type: `IsFullyReadonly<T>` for AC-14, and
+ *    `Exact<Extract<DuelEvent, {type: …}>, {…}>` per variant for AC-13.
  *
  * A Perfect Shot is `+PERFECT_SHOT_BONUS_DAMAGE` **damage**; `ballCount` is presentation the
  * engine ignores. Nothing below reads `ballCount` as damage — the one `ShotOutcome` fixture is
  * produced by calling the frozen T-008 `resolveShot`, so this file cannot encode the stale
  * "+1 bonus ball" reading of ARCHITECTURE.md:202 at all (T-031 carries that correction).
  */
+import { readFileSync, readdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { getCannon } from '@content/index';
@@ -32,7 +43,12 @@ import type { CannonId, IslandId, SkillId, Template } from '@content/schemas';
 import { resolveShot, type ShotOutcome } from '@engine/duel/damage';
 import { assertQuestion, type Question } from '@engine/questions/types';
 import { createRng, type Rng } from '@engine/rng';
-import { BOT_ACCURACY_WINDOW, ENEMY_HULL_BY_ISLAND, PLAYER_HULL } from '@engine/tuning';
+import {
+  BOT_ACCURACY_WINDOW,
+  ENEMY_HULL_BY_ISLAND,
+  ONBOARDING_ENEMY_HULL,
+  PLAYER_HULL,
+} from '@engine/tuning';
 
 import { DUEL_PHASES, createDuelState, isTerminalPhase, toRivalView } from '@engine/duel/types';
 import type {
@@ -62,6 +78,22 @@ type Exact<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ?
  */
 const exactAcceptsAMatch: Exact<'player', 'player'> = true;
 const exactRejectsAWidening: Exact<'player', string> = false;
+
+/**
+ * Homomorphic identity. Preserves `readonly` and `?` exactly as declared, but FLATTENS an
+ * intersection into a single object type — which is why the readonly probe below is built on it
+ * rather than comparing `Readonly<T>` against a bare `T`.
+ *
+ * `DuelState`'s variants are intersections (`DuelCore & {phase: …}`), and `Readonly<A & B>` is a
+ * flattened mapped type while `A & B` is not. `Exact` is invariant, so it reports those two as
+ * DIFFERENT even when every property is already readonly — a false negative that would have made
+ * AC-14 unsatisfiable. Mapping both sides through the same homomorphism removes the difference in
+ * representation and leaves only the difference in modifiers, which is the thing being measured.
+ */
+type Flatten<T> = { [K in keyof T]: T[K] };
+
+/** `true` only when every property of `T` already carries `readonly`. AC-14's mechanism. */
+type IsFullyReadonly<T> = Exact<Flatten<T>, Readonly<T>>;
 
 // ============================================================================================
 // Literal enumerations — declared here, NOT derived from the module under test
@@ -251,6 +283,17 @@ function configFor(islandId: IslandId, seed: number): DuelConfig {
     rivalLoadout: FIXTURE_RIVAL_LOADOUT,
     templatesBySkill: FIXTURE_TEMPLATES,
   };
+}
+
+/**
+ * A config carrying AC-2's optional `enemyMaxHull` override. Kept as a separate builder rather
+ * than an optional parameter on `configFor` because `exactOptionalPropertyTypes` is on: spreading
+ * a `number | undefined` into the field is itself a type error, so the override must only ever be
+ * present or absent, never present-and-undefined. That is the same distinction AC-11 makes about
+ * optional action-log fields, enforced here on the config side.
+ */
+function configWithHullOverride(islandId: IslandId, seed: number, enemyMaxHull: number): DuelConfig {
+  return { ...configFor(islandId, seed), enemyMaxHull };
 }
 
 /**
@@ -480,6 +523,52 @@ describe('createDuelState — initial state', () => {
   });
 
   /**
+   * AC-2's `enemyMaxHull` override, added 2026-07-28. Swept across every island so the override
+   * is shown to BEAT the per-island value rather than merely agreeing with it somewhere: the
+   * probe value is `ENEMY_HULL_BY_ISLAND[island] + 13`, which is per-island distinct and never
+   * equal to the value it replaces, so an implementation that ignored the override would fail on
+   * all five islands rather than slipping through on the one where they coincide.
+   */
+  it('spec(T-013:AC-2) lets an enemyMaxHull override replace the per-island hull, per island', () => {
+    for (const islandId of ALL_ISLAND_IDS) {
+      const override = ENEMY_HULL_BY_ISLAND[islandId] + 13;
+      const state = createDuelState(configWithHullOverride(islandId, 11, override));
+
+      expect(state.enemyMaxHull, `enemyMaxHull on ${islandId}`).toBe(override);
+      expect(state.enemyHull, `enemyHull on ${islandId}`).toBe(override);
+      expect(state.enemyMaxHull, `override must beat the island default on ${islandId}`).not.toBe(
+        ENEMY_HULL_BY_ISLAND[islandId],
+      );
+    }
+  });
+
+  /**
+   * The reason the override exists, asserted against the frozen constant rather than the literal
+   * 28. `ONBOARDING_ENEMY_HULL` was dead code before this amendment: AC-2 otherwise pinned
+   * `port_sumwich` to 45, and PLAN.md's onboarding sloop "politely sinks in three volleys" is
+   * unreachable at 45 — `swivel_gun.damageMax + PERFECT_SHOT_BONUS_DAMAGE` is the most a volley
+   * can land, so 45 needs four volleys even played perfectly. This test fails if a future edit
+   * re-severs the constant from the constructor.
+   */
+  it('spec(T-013:AC-2) can construct the scripted onboarding duel at ONBOARDING_ENEMY_HULL', () => {
+    const state = createDuelState(configWithHullOverride('port_sumwich', 1, ONBOARDING_ENEMY_HULL));
+
+    expect(state.enemyHull).toBe(ONBOARDING_ENEMY_HULL);
+    expect(state.enemyMaxHull).toBe(ONBOARDING_ENEMY_HULL);
+    expect(state.enemyMaxHull).not.toBe(ENEMY_HULL_BY_ISLAND.port_sumwich);
+  });
+
+  // The override is OPTIONAL: omitting it must leave the per-island default untouched. Without
+  // this, an implementation defaulting to a constant would satisfy the override test above.
+  it('spec(T-013:AC-2) falls back to the per-island hull when no override is supplied', () => {
+    for (const islandId of ALL_ISLAND_IDS) {
+      const state = createDuelState(configFor(islandId, 11));
+
+      expect(state.enemyMaxHull, `default enemyMaxHull on ${islandId}`).toBe(ENEMY_HULL_BY_ISLAND[islandId]);
+    }
+  });
+
+  /**
    * The assertion above cannot tell `PLAYER_HULL` from the literal `100`, because they agree today
    * — the exact coincidence LESSONS.md L-020 is about, and a mutation run confirmed a hardcoded
    * `100` survived every other test in this file. The remedy L-020 prescribes is to perturb the
@@ -557,8 +646,8 @@ describe('createDuelState — initial state', () => {
     expect(Object.keys(configFor('port_sumwich', 1)).sort()).toEqual([...EXPECTED_DUEL_CONFIG_FIELDS].sort());
   });
 
-  // Pins DuelConfig FIELD TYPES without pinning `keyof DuelConfig`, so an optional field (an
-  // `enemyMaxHull` override for the scripted onboarding sloop, say) can still be added additively.
+  // Pins DuelConfig FIELD TYPES without pinning `keyof DuelConfig` — AC-2 and AC-11 both require
+  // that, so T-022 can still add optional fields additively in wave 6.
   it('spec(T-013:AC-2) types every DuelConfig field as the ticket specifies', () => {
     const seedIsNumber: Exact<DuelConfig['seed'], number> = true;
     const islandIsIslandId: Exact<DuelConfig['islandId'], IslandId> = true;
@@ -576,6 +665,23 @@ describe('createDuelState — initial state', () => {
       rivalLoadoutIsCannonIds,
       templatesArePartialBySkill,
     ]).toEqual([true, true, true, true, true]);
+  });
+
+  /**
+   * The override must be OPTIONAL, not required — that is what makes AC-2's amendment additive.
+   * Under `exactOptionalPropertyTypes` an optional `enemyMaxHull?: number` indexes to
+   * `number | undefined`, so the first probe pins the type and the second pins the optionality by
+   * requiring a config that omits the field to remain assignable. A required field fails the
+   * second; a field typed `number | undefined` but still required also fails it.
+   */
+  it('spec(T-013:AC-2) declares enemyMaxHull as an optional numeric override', () => {
+    const overrideIsOptionalNumber: Exact<DuelConfig['enemyMaxHull'], number | undefined> = true;
+    const omittingItStillTypechecks: DuelConfig = configFor('port_sumwich', 1);
+    const supplyingItStillTypechecks: DuelConfig = configWithHullOverride('port_sumwich', 1, 28);
+
+    expect(overrideIsOptionalNumber).toBe(true);
+    expect('enemyMaxHull' in omittingItStillTypechecks).toBe(false);
+    expect(supplyingItStillTypechecks.enemyMaxHull).toBe(28);
   });
 
   /**
@@ -690,13 +796,12 @@ describe('createDuelState — determinism', () => {
 
 describe('createDuelState — seed sensitivity', () => {
   /**
-   * Confined to `[0, 0xffffffff]` on purpose. `createRng` boxes `seed >>> 0`, which is the
-   * identity on that range but folds negatives onto it — so `-1` and `0xffffffff` are two
-   * DISTINCT legal seeds that produce the same `Rng`. AC-4 as written is universally quantified
-   * over "two configs differing only in seed" and is therefore false for that pair; the report
-   * carries the arithmetic and the proposed amendment. Nothing here encodes either reading.
+   * Every pair here is distinct MODULO 2³², which is the quantifier AC-4 carries after the
+   * 2026-07-28 amendment. `createRng` boxes `seed >>> 0`, so congruent seeds are indistinguishable
+   * by construction and the original universally-quantified wording was false; the companion test
+   * below pins that boundary from the other side.
    */
-  it('spec(T-013:AC-4) gives different rng values to different seeds', () => {
+  it('spec(T-013:AC-4) gives different rng values to seeds distinct modulo 2**32', () => {
     const pairs: readonly (readonly [number, number])[] = [
       [0, 1],
       [1, 2],
@@ -717,6 +822,30 @@ describe('createDuelState — seed sensitivity', () => {
     const states = seeds.map((seed) => JSON.stringify(createDuelState(configFor('grandline', seed)).rng));
 
     expect(new Set(states).size).toBe(seeds.length);
+  });
+
+  /**
+   * The other side of AC-4's quantifier, and the reason the amendment was needed. `-n` and
+   * `2³² − n` are two DISTINCT seeds both legal under `createRng`'s `[-0xffffffff, 0xffffffff]`
+   * range, and both box to the same `state` — so a duel replayed from either reconstructs
+   * identically. This is a property of the frozen T-001 code, not a defect this ticket may fix;
+   * pinning it here stops a later reader from "correcting" AC-4 back to the false universal
+   * form, and documents that `seed` is not a unique replay key over the signed domain.
+   */
+  it('spec(T-013:AC-4) gives congruent seeds the same rng, which is why AC-4 says modulo 2**32', () => {
+    const congruentPairs: readonly (readonly [number, number])[] = [
+      [-1, 0xffffffff],
+      [-2, 0xfffffffe],
+      [-0xffffffff, 1],
+    ];
+
+    for (const [negative, positive] of congruentPairs) {
+      expect(negative >>> 0 === positive, `${negative} and ${positive} must be congruent`).toBe(true);
+      expect(
+        createDuelState(configFor('port_sumwich', negative)).rng,
+        `seeds ${negative} and ${positive}`,
+      ).toStrictEqual(createDuelState(configFor('port_sumwich', positive)).rng);
+    }
   });
 });
 
@@ -796,17 +925,52 @@ describe('createDuelState — config validation', () => {
   });
 
   /**
-   * AC-5 does not mention the seed, and the report proposes an amendment for that. What is NOT
-   * open is that these must not be accepted silently: the ticket's own wave-1 contract note says
-   * `createRng` throws rather than truncating, precisely because `NaN`, `-0.5` and `2 ** 33` all
-   * mask to `0` under `>>> 0` and alias three seeds onto one stream in the module whose only job
-   * is replay-from-seed. This asserts only that SOMETHING throws — a `RangeError` straight
-   * out of `createRng` and a field-naming `Error` are both legal readings, and choosing between
-   * them is the orchestrator's call, not this file's.
+   * AC-5's seed clause, explicit since the 2026-07-28 amendment. `DuelConfig.seed` is a
+   * caller-supplied REPLAY KEY, so the wave-1 contract note's "mask with `>>> 0` before calling
+   * `createRng`" must not be applied to it: masking maps `NaN`, `-0.5` and `2 ** 33` all onto
+   * seed `0`, aliasing three rejected seeds onto one live stream in the one module whose entire
+   * purpose is replay-from-seed. Validate and throw; never mask.
+   *
+   * The message assertion is satisfied by both legal implementations — a `RangeError` raised by
+   * `createRng` itself carries "seed" in its text, and so does a field-naming `Error` thrown by
+   * `createDuelState` — so this pins the contract without choosing the mechanism.
    */
-  it('spec(T-013:AC-5) refuses to silently accept a seed createRng would reject', () => {
+  it('spec(T-013:AC-5) rejects a seed outside createRng range, naming that field and no other', () => {
     for (const seed of [Number.NaN, 0.5, -0.5, 2 ** 33, -(2 ** 33), Number.POSITIVE_INFINITY]) {
-      expect(() => createDuelState(configFor('port_sumwich', seed)), `seed ${seed}`).toThrow(Error);
+      const thrown = captureThrow(() => createDuelState(configFor('port_sumwich', seed)));
+
+      expect(thrown, `seed ${seed}`).toBeInstanceOf(Error);
+      expect((thrown as Error).message, `seed ${seed}`).toMatch(/seed/i);
+      expect((thrown as Error).message, `seed ${seed}`).not.toMatch(/Loadout|islandId/);
+    }
+  });
+
+  /**
+   * The masking cheat, caught behaviourally rather than by reading the implementation. Under
+   * `rawSeed >>> 0` every seed below collapses to `0`, which is a VALID seed — so a masking
+   * implementation returns a perfectly well-formed duel whose stream is indistinguishable from
+   * `seed: 0`'s. Asserting the throw above already kills that, but this states the consequence
+   * directly so the next reader sees why the clause exists rather than deleting it as redundant.
+   */
+  it('spec(T-013:AC-5) does not mask a rejected seed onto the legal seed 0', () => {
+    const fromZero = createDuelState(configFor('port_sumwich', 0));
+
+    for (const masked of [Number.NaN, 2 ** 33, -0.5]) {
+      expect(masked >>> 0, `${masked} masks to 0`).toBe(0);
+      expect(
+        () => createDuelState(configFor('port_sumwich', masked)),
+        `seed ${masked} must not become seed 0`,
+      ).toThrow(Error);
+    }
+
+    expect(fromZero.seed).toBe(0);
+  });
+
+  // The seed boundary from the accepting side. Without this, an implementation that rejected
+  // EVERY seed would satisfy every rejection test above.
+  it('spec(T-013:AC-5) accepts the extremes of the legal seed range', () => {
+    for (const seed of [0, 1, -1, 0xffffffff, -0xffffffff]) {
+      expect(() => createDuelState(configFor('port_sumwich', seed)), `seed ${seed}`).not.toThrow();
     }
   });
 });
@@ -835,7 +999,7 @@ describe('DuelState serialisation', () => {
     }
   });
 
-  it('spec(T-013:AC-6) holds no function, Map, Set, class instance or undefined-valued key', () => {
+  it('spec(T-013:AC-6) dod(T-013:5) holds no function, Map, Set, class instance or undefined-valued key', () => {
     for (const state of ALL_PHASE_STATES) {
       expectPlainJsonValue(state, `state(${state.phase})`);
     }
@@ -1320,7 +1484,7 @@ describe('ActionLogEntry', () => {
   });
 
   it('spec(T-013:AC-11) declares every field readonly', () => {
-    const everyFieldIsReadonly: Exact<Readonly<ActionLogEntry>, ActionLogEntry> = true;
+    const everyFieldIsReadonly: IsFullyReadonly<ActionLogEntry> = true;
 
     expect(everyFieldIsReadonly).toBe(true);
   });
@@ -1472,16 +1636,14 @@ describe('DuelState immutability', () => {
 });
 
 // ============================================================================================
-// The event union and the remaining rival shapes
+// AC-13 — the event union, per variant
 //
-// NO ACCEPTANCE CRITERION COVERS ANY OF THIS, which is a defect in the ticket rather than a
-// judgement about importance. The five-event union is a `traces_to` entry and a Definition-of-Done
-// line ("Exactly the five ARCHITECTURE.md §4.2 event types"), and `RivalAction`, `RivalVolley` and
-// `DuelResult` are specified in the ticket body only — so `spec-lint`, which reads `**AC-n**` and
-// nothing else, cannot see any of them, and without the tests below nothing would require them to
-// be covered at all. Five later tickets import these shapes and this file freezes today, so they
-// are tested here and tagged `dod(T-013:…)` rather than mis-cited against an unrelated `AC-n`.
-// `.tdd-swarm/reports/T-013-tests.md` proposes AC-13 … AC-16 so the gate can see them too.
+// Covered by a numbered criterion since the 2026-07-28 amendment. Before it, these assertions
+// carried a NAMED dod tag, which spec-lint cannot parse — it reads a bold AC id and a NUMBERED
+// dod tag and nothing else, so the ticket's most-imported shape was enforced by tests no gate
+// could see (LESSONS.md L-032, L-036). Tag ids are written only where they are meant to count;
+// prose in this file deliberately spells them out longhand instead, because a tag-shaped string
+// in a comment inflates every downstream count that greps for it.
 // ============================================================================================
 
 describe('DuelEvent', () => {
@@ -1498,7 +1660,7 @@ describe('DuelEvent', () => {
     rivalAction,
   ];
 
-  it('dod(T-013:events) is constructible for exactly the five ARCHITECTURE.md §4.2 event types', () => {
+  it('spec(T-013:AC-13) is constructible for exactly the five ARCHITECTURE.md §4.2 event types', () => {
     expect(events.map((event) => event.type)).toEqual([
       'CANNON_SELECTED',
       'ANSWER_CHOSEN',
@@ -1512,7 +1674,7 @@ describe('DuelEvent', () => {
   // T-022 adds `DOUBLE_SHOT_SELECTED` in wave 6 and this assertion is DESIGNED to go red when it
   // does — the ticket's DoD asks for exactly that, so the sixth event lands as a reviewed patch to
   // this line rather than silently widening what the frozen suite means.
-  it('dod(T-013:events) declares the event discriminant as exactly those five literals', () => {
+  it('spec(T-013:AC-13) dod(T-013:6) declares the event discriminant as exactly those five literals', () => {
     const eventTypesAreExact: Exact<
       DuelEvent['type'],
       'CANNON_SELECTED' | 'ANSWER_CHOSEN' | 'TIMER_EXPIRED' | 'ANIMATION_DONE' | 'RIVAL_ACTION'
@@ -1521,7 +1683,60 @@ describe('DuelEvent', () => {
     expect(eventTypesAreExact).toBe(true);
   });
 
-  it('dod(T-013:events) carries the payload each event type declares, and no other key', () => {
+  /**
+   * The assertion the first draft of this suite was missing, and the reason AC-13 exists.
+   *
+   * Constraining `DuelEvent['type']` (above) and the runtime keys of hand-written fixture values
+   * (below) are BOTH blind to an extra OPTIONAL field on a single variant: the discriminant is
+   * unchanged, and a fixture simply omits the optional key. Adding `readonly debug?: string` to
+   * the `CANNON_SELECTED` variant typechecked clean and passed this file 100/100 — independently
+   * reproduced here before this test was written.
+   *
+   * `Exact<Extract<DuelEvent, {type: …}>, {…}>` closes it, because `Exact` is invariant and an
+   * optional property makes the two sides structurally different. The negative control in the
+   * AC-13/AC-14 apparatus block proves this probe can still report `false`.
+   */
+  it('spec(T-013:AC-13) declares each variant with exactly its documented payload and no other', () => {
+    const cannonSelectedIsExact: Exact<
+      Extract<DuelEvent, { type: 'CANNON_SELECTED' }>,
+      { readonly type: 'CANNON_SELECTED'; readonly cannonId: CannonId }
+    > = true;
+    const answerChosenIsExact: Exact<
+      Extract<DuelEvent, { type: 'ANSWER_CHOSEN' }>,
+      { readonly type: 'ANSWER_CHOSEN'; readonly choiceIndex: number; readonly elapsedMs: number }
+    > = true;
+    const timerExpiredIsExact: Exact<
+      Extract<DuelEvent, { type: 'TIMER_EXPIRED' }>,
+      { readonly type: 'TIMER_EXPIRED' }
+    > = true;
+    const animationDoneIsExact: Exact<
+      Extract<DuelEvent, { type: 'ANIMATION_DONE' }>,
+      { readonly type: 'ANIMATION_DONE' }
+    > = true;
+    const rivalActionIsExact: Exact<
+      Extract<DuelEvent, { type: 'RIVAL_ACTION' }>,
+      { readonly type: 'RIVAL_ACTION'; readonly volley: RivalVolley }
+    > = true;
+
+    expect([
+      cannonSelectedIsExact,
+      answerChosenIsExact,
+      timerExpiredIsExact,
+      animationDoneIsExact,
+      rivalActionIsExact,
+    ]).toEqual([true, true, true, true, true]);
+  });
+
+  // Every variant is `readonly` throughout, not just present. Same L-012 gap as AC-14: the
+  // per-variant `Exact<>` above WOULD catch a mutable field, but only because the right-hand
+  // literals spell `readonly` — this states the property directly so it survives a future edit.
+  it('spec(T-013:AC-13) declares every event payload field readonly', () => {
+    const eventIsReadonly: IsFullyReadonly<DuelEvent> = true;
+
+    expect(eventIsReadonly).toBe(true);
+  });
+
+  it('spec(T-013:AC-13) carries the payload each event type declares, and no other key', () => {
     expect(Object.keys(cannonSelected).sort()).toEqual(['cannonId', 'type']);
     expect(Object.keys(answerChosen).sort()).toEqual(['choiceIndex', 'elapsedMs', 'type']);
     expect(Object.keys(timerExpired)).toEqual(['type']);
@@ -1529,14 +1744,14 @@ describe('DuelEvent', () => {
     expect(Object.keys(rivalAction).sort()).toEqual(['type', 'volley']);
   });
 
-  it('dod(T-013:events) round-trips every event through JSON as plain data', () => {
+  it('spec(T-013:AC-13) round-trips every event through JSON as plain data', () => {
     for (const event of events) {
       expectPlainJsonValue(event, `event(${event.type})`);
       expect(JSON.parse(JSON.stringify(event))).toStrictEqual(event);
     }
   });
 
-  it('dod(T-013:events) narrows RIVAL_ACTION to a RivalVolley payload', () => {
+  it('spec(T-013:AC-13) narrows RIVAL_ACTION to a RivalVolley payload', () => {
     let volley: RivalVolley | null = null;
 
     if (rivalAction.type === 'RIVAL_ACTION') {
@@ -1546,7 +1761,7 @@ describe('DuelEvent', () => {
     expect(volley).toStrictEqual(FIXTURE_VOLLEY);
   });
 
-  it('dod(T-013:events) narrows ANSWER_CHOSEN to a choiceIndex and an elapsedMs', () => {
+  it('spec(T-013:AC-13) narrows ANSWER_CHOSEN to a choiceIndex and an elapsedMs', () => {
     let payload: readonly [number, number] | null = null;
 
     if (answerChosen.type === 'ANSWER_CHOSEN') {
@@ -1556,7 +1771,7 @@ describe('DuelEvent', () => {
     expect(payload).toEqual([2, 1500]);
   });
 
-  it('dod(T-013:events) makes cannonId inaccessible on a TIMER_EXPIRED event', () => {
+  it('spec(T-013:AC-13) makes cannonId inaccessible on a TIMER_EXPIRED event', () => {
     let seen: unknown = 'unset';
 
     if (timerExpired.type === 'TIMER_EXPIRED') {
@@ -1569,7 +1784,7 @@ describe('DuelEvent', () => {
 
   // Uses a name no ticket will ever add, so this probe cannot turn into an unused directive the
   // day a real sixth event arrives.
-  it('dod(T-013:events) rejects an event type outside the union', () => {
+  it('spec(T-013:AC-13) rejects an event type outside the union', () => {
     // @ts-expect-error 'NOT_A_DUEL_EVENT' is not a DuelEvent type.
     const event: DuelEvent = { type: 'NOT_A_DUEL_EVENT' };
 
@@ -1577,8 +1792,43 @@ describe('DuelEvent', () => {
   });
 });
 
+// ============================================================================================
+// AC-15 — the closed rival and result shapes
+//
+// Unlike `ActionLogEntry`, which AC-11 deliberately leaves open for T-022's `doubleShot?`, these
+// three are CLOSED by design: whole-interface `Exact<>` here means a rival Double-Shot has to
+// arrive as a reviewed patch to this criterion. That is the intended fail-loud behaviour, upheld
+// on review, not an oversight.
+//
+// The AC-15 that shipped is the orchestrator's rewrite of a proposal this file's author drafted
+// wrongly: the draft required `RivalVolley`'s "actions" to be ordered, and `RivalVolley` has no
+// `actions` field — it is one volley (`{cannonId, correct, elapsedMs}`), not a collection. The
+// shipped wording is correct and is what these tests assert.
+// ============================================================================================
+
 describe('RivalAction, RivalVolley and DuelResult', () => {
-  it('dod(T-013:rival-shapes) declares RivalAction as a cannon choice and nothing more', () => {
+  /**
+   * Whole-interface exactness, which is what AC-15 asks for. The per-field and `keyof` probes
+   * below are kept because they localise a failure to the offending field, but they are not what
+   * closes the shape: `keyof` cannot see an added OPTIONAL property (it widens the key union, but
+   * a `keyof` assertion listing the old keys then simply fails for the right reason only by luck)
+   * and per-field probes cannot see an extra field at all. These three do.
+   */
+  it('spec(T-013:AC-15) declares all three shapes exactly, field for field, with no extras', () => {
+    const rivalActionIsExact: Exact<RivalAction, { readonly cannonId: CannonId }> = true;
+    const rivalVolleyIsExact: Exact<
+      RivalVolley,
+      { readonly cannonId: CannonId; readonly correct: boolean; readonly elapsedMs: number }
+    > = true;
+    const duelResultIsExact: Exact<
+      DuelResult,
+      { readonly won: boolean; readonly tally: DuelTally; readonly volleys: number }
+    > = true;
+
+    expect([rivalActionIsExact, rivalVolleyIsExact, duelResultIsExact]).toEqual([true, true, true]);
+  });
+
+  it('spec(T-013:AC-15) declares RivalAction as a cannon choice and nothing more', () => {
     const action: RivalAction = { cannonId: 'mortar' };
     const keysAreExact: Exact<keyof RivalAction, 'cannonId'> = true;
     const cannonIdIsCannonId: Exact<RivalAction['cannonId'], CannonId> = true;
@@ -1587,7 +1837,7 @@ describe('RivalAction, RivalVolley and DuelResult', () => {
     expect([keysAreExact, cannonIdIsCannonId]).toEqual([true, true]);
   });
 
-  it('dod(T-013:rival-shapes) does not let a RivalAction smuggle correctness or timing', () => {
+  it('spec(T-013:AC-15) does not let a RivalAction smuggle correctness or timing', () => {
     const action: RivalAction = {
       cannonId: 'mortar',
       // @ts-expect-error correctness comes from `produceAnswer`, never from `chooseAction`.
@@ -1597,7 +1847,7 @@ describe('RivalAction, RivalVolley and DuelResult', () => {
     expect(action.cannonId).toBe('mortar');
   });
 
-  it('dod(T-013:rival-shapes) declares RivalVolley as exactly the three RIVAL_ACTION fields', () => {
+  it('spec(T-013:AC-15) declares RivalVolley as exactly the three RIVAL_ACTION fields', () => {
     const keysAreExact: Exact<keyof RivalVolley, 'cannonId' | 'correct' | 'elapsedMs'> = true;
     const cannonIdIsCannonId: Exact<RivalVolley['cannonId'], CannonId> = true;
     const correctIsBoolean: Exact<RivalVolley['correct'], boolean> = true;
@@ -1612,7 +1862,7 @@ describe('RivalAction, RivalVolley and DuelResult', () => {
     ]);
   });
 
-  it('dod(T-013:rival-shapes) declares DuelResult as exactly won, tally and volleys', () => {
+  it('spec(T-013:AC-15) declares DuelResult as exactly won, tally and volleys', () => {
     const result: DuelResult = { won: true, tally: FIXTURE_TALLY, volleys: 4 };
     const keysAreExact: Exact<keyof DuelResult, 'won' | 'tally' | 'volleys'> = true;
     const wonIsBoolean: Exact<DuelResult['won'], boolean> = true;
@@ -1623,12 +1873,12 @@ describe('RivalAction, RivalVolley and DuelResult', () => {
     expect([keysAreExact, wonIsBoolean, tallyIsDuelTally, volleysIsNumber]).toEqual([true, true, true, true]);
   });
 
-  it('dod(T-013:rival-shapes) declares every rival and result field readonly', () => {
-    const actionIsReadonly: Exact<Readonly<RivalAction>, RivalAction> = true;
-    const volleyIsReadonly: Exact<Readonly<RivalVolley>, RivalVolley> = true;
-    const resultIsReadonly: Exact<Readonly<DuelResult>, DuelResult> = true;
-    const viewIsReadonly: Exact<Readonly<RivalView>, RivalView> = true;
-    const tallyIsReadonly: Exact<Readonly<DuelTally>, DuelTally> = true;
+  it('spec(T-013:AC-15) declares every rival and result field readonly', () => {
+    const actionIsReadonly: IsFullyReadonly<RivalAction> = true;
+    const volleyIsReadonly: IsFullyReadonly<RivalVolley> = true;
+    const resultIsReadonly: IsFullyReadonly<DuelResult> = true;
+    const viewIsReadonly: IsFullyReadonly<RivalView> = true;
+    const tallyIsReadonly: IsFullyReadonly<DuelTally> = true;
 
     expect([actionIsReadonly, volleyIsReadonly, resultIsReadonly, viewIsReadonly, tallyIsReadonly]).toEqual([
       true,
@@ -1637,5 +1887,315 @@ describe('RivalAction, RivalVolley and DuelResult', () => {
       true,
       true,
     ]);
+  });
+});
+
+// ============================================================================================
+// AC-14 — `readonly` throughout, on whole interfaces
+//
+// The hole this criterion closes: an indexed access DISCARDS property modifiers, so
+// `Exact<DuelState['seed'], number>` is `true` whether or not `seed` is readonly (LESSONS.md
+// L-012). AC-12's two array probes are real but cover only `actionLog` and `playerLoadout`, and
+// removing `readonly` from `DuelCore.seed` therefore typechecked clean and passed this file
+// 100/100 — independently reproduced before this block was written, and it contradicted the
+// ticket's own Definition of Done the whole time.
+//
+// `IsFullyReadonly<T>` is the probe that can see it: `Readonly<T>` is identical to `T` only
+// when every property already carries the modifier. It is SHALLOW, so nested object types get
+// their own line rather than being assumed covered by their parent.
+// ============================================================================================
+
+/** The mutable/readonly pair the AC-14 probes are calibrated against. */
+type ReadonlyProbeMutable = { a: number; readonly b: string };
+type ReadonlyProbeFrozen = { readonly a: number; readonly b: string };
+
+/** One per-phase readonly probe, spelled out so a failure names the offending variant. */
+type VariantIsReadonly<P extends (typeof EXPECTED_PHASES)[number]> = IsFullyReadonly<
+  Extract<DuelState, { phase: P }>
+>;
+
+describe('DuelState readonly-ness', () => {
+  /**
+   * The negative control for this whole block (LESSONS.md L-014). If `IsFullyReadonly<T>` ever
+   * degraded into true-for-everything, every assertion below would pass vacuously and the AC-14
+   * hole would silently reopen. The first line must report `false` for a type with ONE mutable
+   * property; the second must report `true` for its fully-readonly twin.
+   */
+  it('spec(T-013:AC-14) has a readonly probe that distinguishes mutable from readonly', () => {
+    const detectsAMutableProperty: IsFullyReadonly<ReadonlyProbeMutable> = false;
+    const acceptsAFullyReadonlyType: IsFullyReadonly<ReadonlyProbeFrozen> = true;
+
+    expect([detectsAMutableProperty, acceptsAFullyReadonlyType]).toEqual([false, true]);
+  });
+
+  /**
+   * Every one of the eight variants, which covers every `DuelCore` field transitively — the core
+   * is spread into all eight, so a single mutable core property fails all eight lines at once.
+   * `DuelCore` is not asserted by name because the ticket does not export it.
+   */
+  it('spec(T-013:AC-14) dod(T-013:4) declares every field of every phase variant readonly', () => {
+    const countdownIsReadonly: VariantIsReadonly<'countdown'> = true;
+    const playerChooseIsReadonly: VariantIsReadonly<'playerChoose'> = true;
+    const reloadIsReadonly: VariantIsReadonly<'reload'> = true;
+    const resolvePlayerIsReadonly: VariantIsReadonly<'resolvePlayer'> = true;
+    const rivalTurnIsReadonly: VariantIsReadonly<'rivalTurn'> = true;
+    const resolveRivalIsReadonly: VariantIsReadonly<'resolveRival'> = true;
+    const victoryIsReadonly: VariantIsReadonly<'victory'> = true;
+    const defeatIsReadonly: VariantIsReadonly<'defeat'> = true;
+
+    expect([
+      countdownIsReadonly,
+      playerChooseIsReadonly,
+      reloadIsReadonly,
+      resolvePlayerIsReadonly,
+      rivalTurnIsReadonly,
+      resolveRivalIsReadonly,
+      victoryIsReadonly,
+      defeatIsReadonly,
+    ]).toEqual(Array.from({ length: EXPECTED_PHASES.length }, () => true));
+  });
+
+  // The union as a whole. `Readonly<>` is homomorphic and so distributes, making this a single
+  // statement of the same property — kept because it is the form a reader checks first, and it
+  // stays correct without edit when T-022 adds a ninth variant.
+  it('spec(T-013:AC-14) declares the DuelState union readonly however it is narrowed', () => {
+    const unionIsReadonly: IsFullyReadonly<DuelState> = true;
+
+    expect(unionIsReadonly).toBe(true);
+  });
+
+  /**
+   * `Readonly<>` is shallow, so the nested shapes reached THROUGH the state need their own lines
+   * or a mutable `bySkill` counter would sail past the eight probes above. `ActionLogEntry` is
+   * included here rather than in AC-11 because this is a modifier claim, not a key-set claim —
+   * it stays true when T-022 adds an optional field, so it does not pre-break wave 6.
+   */
+  it('spec(T-013:AC-14) declares the shapes nested inside the state readonly too', () => {
+    const entryIsReadonly: IsFullyReadonly<ActionLogEntry> = true;
+    const tallyIsReadonly: IsFullyReadonly<DuelTally> = true;
+    const bySkillCounterIsReadonly: Exact<
+      NonNullable<DuelTally['bySkill'][SkillId]>,
+      { readonly correct: number; readonly attempts: number }
+    > = true;
+    const configIsReadonly: IsFullyReadonly<DuelConfig> = true;
+    const resultIsReadonly: IsFullyReadonly<DuelResult> = true;
+
+    expect([
+      entryIsReadonly,
+      tallyIsReadonly,
+      bySkillCounterIsReadonly,
+      configIsReadonly,
+      resultIsReadonly,
+    ]).toEqual([true, true, true, true, true]);
+  });
+
+  /**
+   * The behavioural half. AC-12 already refuses `push` and index assignment on the two arrays;
+   * these refuse whole-field reassignment on the SCALAR core fields, which is the shape of the
+   * mutation a reducer written in the wrong style would attempt. `seed` leads deliberately — it
+   * is the exact field the review found unprotected.
+   */
+  it('spec(T-013:AC-14) refuses to reassign the scalar core fields', () => {
+    const state = disposableState();
+
+    // @ts-expect-error `seed` is a readonly property.
+    state.seed = 99;
+    // @ts-expect-error `turnToken` is a readonly property.
+    state.turnToken = 99;
+    // @ts-expect-error `volleyNumber` is a readonly property.
+    state.volleyNumber = 99;
+    // @ts-expect-error `playerHull` is a readonly property.
+    state.playerHull = 99;
+    // @ts-expect-error `enemyHull` is a readonly property.
+    state.enemyHull = 99;
+    // @ts-expect-error `enemyMaxHull` is a readonly property.
+    state.enemyMaxHull = 99;
+    // @ts-expect-error `islandId` is a readonly property.
+    state.islandId = 'grandline';
+    // @ts-expect-error `rng` is a readonly property.
+    state.rng = createRng(1);
+    // @ts-expect-error `phase` is a readonly property.
+    state.phase = 'victory';
+
+    expect(state.seed).toBe(99);
+  });
+
+  /**
+   * The negative control for the nine directives above: a mutable copy carrying the SAME
+   * assignments must compile cleanly. Without it, each `@ts-expect-error` would also be satisfied
+   * by an unrelated error on its line — a wrong value type, say — and would stop being evidence
+   * about readonly-ness specifically.
+   */
+  it('spec(T-013:AC-14) allows those same assignments on a deliberately mutable copy', () => {
+    const mutable: { seed: number; turnToken: number; islandId: IslandId; rng: Rng } = {
+      seed: CORE.seed,
+      turnToken: CORE.turnToken,
+      islandId: CORE.islandId,
+      rng: CORE.rng,
+    };
+
+    mutable.seed = 99;
+    mutable.turnToken = 99;
+    mutable.islandId = 'grandline';
+    mutable.rng = createRng(1);
+
+    expect([mutable.seed, mutable.turnToken, mutable.islandId]).toEqual([99, 99, 'grandline']);
+  });
+});
+
+// ============================================================================================
+// Definition of Done — the ticket's nine unnumbered requirements
+//
+// spec-lint harvests DoD checkboxes and numbers them in ticket order, and an uncovered one is now
+// a FAIL rather than a silent pass (LESSONS.md L-036: the previous revision printed PASS with all
+// nine of this ticket's items uncovered). Four of the nine are claims about this repository and
+// this file rather than about `DuelState`, so they are asserted by reading the tree — a hollow
+// `expect(true).toBe(true)` under a tag would satisfy the gate while enforcing nothing, which is
+// the exact failure the gate was rebuilt to stop.
+//
+// Items 4, 5 and 6 are asserted where their real evidence already lives, so their tags sit on the
+// AC-14, AC-6 and AC-13 tests rather than being restated weakly here.
+//
+// Items 2 and 3 are only PARTLY assertable and say so in their test names: a test cannot report
+// that the gate suite is green, because vitest is one of the gates and spec-lint's subject is
+// this file. Each asserts the part that is real — that the gate still checks what it claims to,
+// and that this file's own tags parse — and the report states the residue plainly.
+// ============================================================================================
+
+const REPO_ROOT = fileURLToPath(new URL('../../../', import.meta.url));
+
+function repoText(relativePath: string): string {
+  return readFileSync(`${REPO_ROOT}${relativePath}`, 'utf8');
+}
+
+/** This file's own source, for the four DoD items that are claims about the test suite. */
+const OWN_SOURCE = repoText('__tests__/engine/duel/types.test.ts');
+const TICKET_SOURCE = repoText('tickets/T-013.md');
+
+/**
+ * Needles that `run-local-gates.sh` itself greps for across `__tests__`. They are assembled from
+ * fragments on purpose: writing `TO` + `DO` as one literal here would make this very file trip the
+ * gate it is checking. Same reason the focused-test pattern below is built rather than written.
+ */
+const DEFERRED_WORK_MARKERS = [['TO', 'DO'].join(''), ['FIX', 'ME'].join(''), ['HA', 'CK'].join('')];
+const FOCUSED_TEST_PATTERN = new RegExp(
+  ['\\b(it|test|describe)\\.(', 'sk', 'ip|on', 'ly)\\b|\\b', 'x', '(it|describe)\\b'].join(''),
+);
+
+describe('T-013 Definition of Done', () => {
+  it('dod(T-013:1) tags a test against every acceptance criterion the ticket declares', () => {
+    const declared = [...TICKET_SOURCE.matchAll(/\*\*(AC-\d+)\*\*/g)].map((match) => match[1]);
+    const unique = [...new Set(declared)];
+    const untagged = unique.filter((ac) => !OWN_SOURCE.includes(`spec(T-013:${ac})`));
+
+    expect(unique.length, 'the ticket must declare criteria at all').toBeGreaterThan(0);
+    expect(untagged, 'every declared AC needs at least one tagged test').toEqual([]);
+  });
+
+  /**
+   * Partial by construction — see this block's header. What IS assertable is that the gate script
+   * still runs every check the report claims it ran; a gate quietly reduced to three commands
+   * would otherwise keep printing PASS while enforcing less (LESSONS.md L-036).
+   */
+  it('dod(T-013:2) keeps every local gate wired up, and adds no marker or focused test that would break one', () => {
+    const gates = repoText('.tdd-swarm/run-local-gates.sh');
+
+    for (const command of ['prettier --check', 'eslint . --max-warnings 0', 'tsc --noEmit', 'vitest run']) {
+      expect(gates, `run-local-gates.sh must still run: ${command}`).toContain(command);
+    }
+    for (const marker of DEFERRED_WORK_MARKERS) {
+      expect(OWN_SOURCE.includes(marker), `this file must contain no ${marker} marker`).toBe(false);
+    }
+    expect(FOCUSED_TEST_PATTERN.test(OWN_SOURCE), 'this file must contain no focused or skipped test').toBe(
+      false,
+    );
+  });
+
+  /**
+   * Partial by construction — a test cannot report its own gate's exit code. What it CAN do is
+   * enforce the tag grammar that gate parses, which is the specific thing this suite got wrong:
+   * its dod tags were originally NAMED, and spec-lint silently matched none of them.
+   */
+  it('dod(T-013:3) numbers every dod tag in this file so spec-lint can parse it, covering all nine', () => {
+    const dodCount = (TICKET_SOURCE.match(/^- \[[ x]\] /gm) ?? []).length;
+    const tagged = [...OWN_SOURCE.matchAll(/dod\(T-013:([^)]*)\)/g)].map((match) => match[1] ?? '');
+    const unparseable = tagged.filter((id) => !/^\d+$/.test(id));
+    const covered = new Set(tagged.filter((id) => /^\d+$/.test(id)).map(Number));
+    const missing = Array.from({ length: dodCount }, (_, i) => i + 1).filter((n) => !covered.has(n));
+
+    expect(dodCount, 'the ticket must declare DoD items').toBeGreaterThan(0);
+    expect(unparseable, 'a named dod tag matches nothing in spec-lint').toEqual([]);
+    expect(missing, 'every DoD item needs a numbered tag').toEqual([]);
+    expect(OWN_SOURCE, 'the reverse spec-lint direction').toContain('spec(T-013:AC-');
+  });
+
+  /**
+   * The literal-enumeration rule, asserted against this file's SOURCE rather than its behaviour,
+   * because behaviour cannot tell a literal from a derivation. The declarations must be arrays of
+   * quoted strings: the moment someone "simplifies" one into a spread of `DUEL_PHASES` or a
+   * `keyof` of the event union, these tests would start agreeing with the implementation whatever
+   * it said, and T-022 would extend the union without anything going red.
+   */
+  it('dod(T-013:7) declares the phase and event enumerations as literal arrays, not derivations', () => {
+    const literalBlock = (name: string): readonly string[] => {
+      const match = new RegExp(`const ${name} = \\[([^\\]]*)\\] as const;`).exec(OWN_SOURCE);
+      expect(
+        match,
+        `${name} must be declared as an inline array literal ending in "as const"`,
+      ).not.toBeNull();
+      return (match?.[1] ?? '')
+        .split(',')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+    };
+
+    const phaseEntries = literalBlock('EXPECTED_PHASES');
+    const eventEntries = literalBlock('EXPECTED_EVENT_TYPES');
+
+    for (const entry of [...phaseEntries, ...eventEntries]) {
+      expect(entry, 'every enumeration entry must be a quoted string literal').toMatch(/^'[A-Za-z_]+'$/);
+    }
+    expect(phaseEntries.map((entry) => entry.slice(1, -1))).toEqual([...EXPECTED_PHASES]);
+    expect(eventEntries.map((entry) => entry.slice(1, -1))).toEqual([...EXPECTED_EVENT_TYPES]);
+  });
+
+  /**
+   * Behavioural, not lexical: the module under test does not exist yet, so its source cannot be
+   * scanned. Moving the system clock by decades between two constructions catches any `Date`
+   * reaching a state field, and repeating the construction catches `Math.random()`. The tuning
+   * half is the AC-2 mock test, which requires the constructor to follow a perturbed
+   * `PLAYER_HULL` rather than agreeing with today's value by coincidence.
+   */
+  it('dod(T-013:8) builds a state that no wall clock and no unseeded randomness can perturb', () => {
+    const reference = createDuelState(configFor('port_sumwich', 5));
+
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date('2031-06-01T00:00:00Z'));
+      expect(createDuelState(configFor('port_sumwich', 5))).toStrictEqual(reference);
+      vi.setSystemTime(new Date('1999-01-01T00:00:00Z'));
+      expect(createDuelState(configFor('port_sumwich', 5))).toStrictEqual(reference);
+    } finally {
+      vi.useRealTimers();
+    }
+
+    for (let attempt = 0; attempt < 25; attempt += 1) {
+      expect(createDuelState(configFor('port_sumwich', 5)), `attempt ${attempt}`).toStrictEqual(reference);
+    }
+  });
+
+  /**
+   * The file-scope rule, narrowed to the part a test can actually observe: T-013 declares exactly
+   * one production file, and `damage.ts` is T-008's frozen module. A third file appearing in this
+   * directory means the implementer spread the ticket across a scope it was not granted, which no
+   * other assertion in this suite would notice.
+   */
+  it('dod(T-013:9) keeps src/engine/duel to this ticket file scope plus the frozen T-008 module', () => {
+    const permitted = ['damage.ts', 'types.ts'];
+    const present = readdirSync(`${REPO_ROOT}src/engine/duel`).filter((name) => name.endsWith('.ts'));
+    const unexpected = present.filter((name) => !permitted.includes(name));
+
+    expect(unexpected, 'T-013 declares only src/engine/duel/types.ts in its file_scopes').toEqual([]);
+    expect(present, 'the frozen T-008 module must still be there').toContain('damage.ts');
   });
 });
