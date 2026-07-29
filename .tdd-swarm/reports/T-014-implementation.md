@@ -2,7 +2,7 @@
 
 **Status: BLOCKED**
 
-**Commit:** _(see SHA after commit)_ — `feat(T-014): K-2 add/sub templates (≥8 per skill, symbolic only)`
+**Commit:** `31cb5bad7951d0628c0d2c4e04d6d3bb931cc3b6` — `feat(T-014): K-2 add/sub templates (≥8 per skill, symbolic only)`
 
 Files created (file_scopes only):
 
@@ -57,10 +57,10 @@ near-doubles templates: `["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"]` (same sh
 | `npx prettier --check .` | **FAIL** | Only `__tests__/content/templates/k2-addsub.test.ts` (frozen; cannot format). Three JSON files are prettier-clean. |
 | `npx eslint .` | **PASS** | exit 0 |
 | `npx tsc --noEmit` | **PASS** | exit 0 |
-| `npx vitest run __tests__/content/templates/k2-addsub.test.ts` | **FAIL** | 53 pass / **1 fail** — AC-7 near-doubles ladder 1000/1000 |
-| Full `npx vitest run` | not green | blocked by AC-7 above |
+| `npx vitest run` (full) | **FAIL** | 1491 pass / **1 fail** — AC-7 near-doubles |
+| Frozen suite alone | **FAIL** | 53 pass / 1 fail — same AC-7 |
 | `bash .tdd-swarm/run-local-gates.sh` | **RED** | format + unit fail |
-| `bash .tdd-swarm/spec-lint.sh tickets/T-014.md` | _(run at commit time)_ | |
+| `bash .tdd-swarm/spec-lint.sh tickets/T-014.md` | **PASS** | all AC-1…AC-11 + DoD-1…7 mapped |
 
 ### AC-7 failure excerpt
 
