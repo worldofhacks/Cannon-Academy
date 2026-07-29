@@ -5,18 +5,33 @@ import {
   useFonts,
 } from '@expo-google-fonts/baloo-2';
 import { Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
-import { Stack } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Stack, router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { useEffect, useState } from 'react';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Splash } from '../src/components/Splash';
+import { resolveDestination, type Destination } from '../src/services/flow';
+import { hydrate, persist } from '../src/services/persistence';
+import { captainStore } from '../src/stores/useCaptain';
 
 /**
  * Root layout.
  *
  * ARCHITECTURE.md §8 calls for the hydration gate to live here: AsyncStorage rehydration is
  * async, and an ungated redirect fires against empty state (README "traps already identified").
- * The gate lands with the player store; until then there is nothing persisted to wait on.
+ * That gate is now real — the splash holds the first frame until the stored captain has been read,
+ * because a redirect decided before the read lands is a decision made against a blank captain, and
+ * to a child that looks exactly like their progress was erased.
+ *
+ * **Where the captain goes is not decided here.** This file reads storage and then asks
+ * `resolveDestination` (A-003), which is the single place that decides. A layout that inspected
+ * the captain's own fields would be a second decision sitting beside the resolver, and the second
+ * decision is the one that drifts out of step.
+ *
+ * Saving is also wired here, once, rather than in each screen: this is the app edge where the real
+ * AsyncStorage is supplied, which is the arrangement `persistence.ts` is built for.
  *
  * Fonts are the other async gate, and they land now. The six faces below are exactly the six
  * named in `src/theme/tokens.ts` — React Native will not synthesise a weight for a custom family,
@@ -34,9 +49,44 @@ export default function RootLayout() {
     Nunito_800ExtraBold,
   });
 
+  // `null` means "not read yet", which is what the splash waits on. It is deliberately not
+  // seeded with a default: a default would be a routing decision taken before the read.
+  const [destination, setDestination] = useState<Destination | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    let unsubscribe: (() => void) | undefined;
+
+    void (async () => {
+      // `hydrate` never throws and never hangs — a corrupt or absent payload still resolves to a
+      // playable captain (A-002), so there is no path here that leaves the splash up forever.
+      const { captain } = await hydrate(AsyncStorage);
+      if (!live) return;
+
+      captainStore.getState().replaceCaptain(captain);
+      // Subscribed AFTER the read, so the blank starting captain can never overwrite a real save.
+      unsubscribe = captainStore.subscribe((s) => {
+        void persist(AsyncStorage, s.captain);
+      });
+      setDestination(resolveDestination(captain));
+    })();
+
+    return () => {
+      live = false;
+      unsubscribe?.();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (destination === null) return;
+    // `replace`, not `push`: the entry route must not stay on the back stack, or the hardware
+    // back button walks a returning captain back to a screen they already finished with.
+    router.replace(`/${destination}`);
+  }, [destination]);
+
   // Board 4a: the hold is either a white rectangle or it is the splash. `useWindowDimensions`
   // rather than a constant, because the splash scales off the design's 375pt reference width.
-  if (!fontsLoaded) {
+  if (!fontsLoaded || destination === null) {
     return (
       <SafeAreaProvider>
         <StatusBar style="light" />

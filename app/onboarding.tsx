@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
-import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { GradeBand } from '@content/schemas';
 
 import { Poly } from '../src/components/Poly';
+import { commitGradeBand } from '../src/services/onboarding';
+import { captainStore, useCaptain } from '../src/stores/useCaptain';
 import { useLayout } from '../src/theme/useLayout';
 import { color, space, type } from '../src/theme/tokens';
 
@@ -60,7 +61,9 @@ export default function Onboarding() {
   const px = L.a;
   const tx = L.t;
 
-  const [chosen, setChosen] = useState<GradeBand | null>(null);
+  // Read from the store, not held here. A band in component state dies with the component, so
+  // nothing is ever placed and nothing is ever persisted — that was the defect this ticket closes.
+  const chosen = useCaptain((s) => s.captain.gradeBand);
 
   return (
     <View
@@ -81,8 +84,11 @@ export default function Onboarding() {
           <Pressable
             key={b.band}
             onPress={() => {
-              setChosen(b.band);
-              router.push('/duel');
+              // The commit writes the band through the store — which is what runs placement — and
+              // hands back the flow resolver's answer. This screen navigates to what it is given;
+              // it does not know, and must not decide, what comes after the picker.
+              const destination = commitGradeBand(captainStore, b.band);
+              router.replace(`/${destination}`);
             }}
             accessibilityRole="button"
             accessibilityLabel={`${b.problem}, ${b.label}`}
