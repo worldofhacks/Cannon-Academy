@@ -100,7 +100,10 @@ function rollMany(seed: number, count: number): readonly ChestDrop[] {
 }
 
 // =========================================================================================
-describe('T-009 economy — computeCoinPayout: bounds and purse guarantee', () => {
+// Property-suite timeout: heavy seeded sweeps exceed Vitest's 5s default when
+// multiple worktrees run the suite concurrently (timeouts only — not assertion failures).
+
+describe('T-009 economy — computeCoinPayout: bounds and purse guarantee', { timeout: 60000 }, () => {
   // spec(T-009:AC-1)
   it('pays every valid performance a finite positive integer, across every dimension', () => {
     for (const won of [true, false]) {
@@ -227,14 +230,14 @@ describe('T-009 economy — computeCoinPayout: bounds and purse guarantee', () =
 });
 
 // =========================================================================================
-describe('T-009 economy — rollChest: seeded rarity and coin roll', () => {
+describe('T-009 economy — rollChest: seeded rarity and coin roll', { timeout: 60000 }, () => {
   const SEED = 31337;
   const SAMPLE_SIZE = 100_000;
   let drops: readonly ChestDrop[];
 
   beforeAll(() => {
     drops = rollMany(SEED, SAMPLE_SIZE);
-  });
+  }, 60000);
 
   // spec(T-009:AC-8)
   it('matches the declared rarity weights within 0.01 absolute and reaches every tier', () => {
@@ -329,7 +332,7 @@ describe('T-009 economy — rollChest: seeded rarity and coin roll', () => {
 });
 
 // =========================================================================================
-describe('T-009 economy — CHEST_RARITY_ENTRIES: the record-to-array ordering', () => {
+describe('T-009 economy — CHEST_RARITY_ENTRIES: the record-to-array ordering', { timeout: 60000 }, () => {
   // spec(T-009:AC-13)
   it('has exactly one entry per ChestRarity, in common, uncommon, rare order, weights matching', () => {
     expect(CHEST_RARITY_ENTRIES).toHaveLength(CHEST_RARITIES.length);

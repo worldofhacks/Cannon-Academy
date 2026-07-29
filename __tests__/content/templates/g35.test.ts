@@ -506,75 +506,82 @@ function repoText(relative: string): string {
 // Authoring-contract preflight (does not need JSON files)
 // =============================================================================================
 
-describe('authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS ↔ generator', () => {
-  it('every SPOT_CHECK literal matches generateQuestion on the required template at that seed', () => {
-    for (const check of SPOT_CHECKS) {
-      const template = REQUIRED_TEMPLATES.find((row) => row.id === check.id);
-      expect(template, check.id).toBeDefined();
-      if (template === undefined) continue;
-      const [question] = generateOne(template, check.seed);
-      expect(question.text, check.id).toBe(check.text);
-      expect(question.choices[question.correctIndex]?.value, check.id).toBe(check.answer);
-    }
-  });
+// Property-suite timeout: heavy seeded sweeps exceed Vitest's 5s default when
+// multiple worktrees run the suite concurrently (timeouts only — not assertion failures).
 
-  it('required div_facts templates declare structural exact-divisibility constraints', () => {
-    for (const template of REQUIRED_TEMPLATES.filter((row) => row.skill === 'div_facts')) {
-      assertDeclaredDivConstraints(template);
-    }
-  });
+describe(
+  'authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS ↔ generator',
+  { timeout: 60000 },
+  () => {
+    it('every SPOT_CHECK literal matches generateQuestion on the required template at that seed', () => {
+      for (const check of SPOT_CHECKS) {
+        const template = REQUIRED_TEMPLATES.find((row) => row.id === check.id);
+        expect(template, check.id).toBeDefined();
+        if (template === undefined) continue;
+        const [question] = generateOne(template, check.seed);
+        expect(question.text, check.id).toBe(check.text);
+        expect(question.choices[question.correctIndex]?.value, check.id).toBe(check.answer);
+      }
+    });
 
-  it('required templates survive seeds 1…200 without CONSTRAINTS_UNSATISFIED', () => {
-    const failures: string[] = [];
-    for (const template of REQUIRED_TEMPLATES) {
-      for (let seed = 1; seed <= HEADROOM_SEEDS; seed += 1) {
-        try {
-          generateOne(template, seed);
-        } catch (error) {
-          const detail =
-            error instanceof QuestionGenerationError
-              ? `${error.code}: ${error.message}`
-              : error instanceof Error
-                ? error.message
-                : String(error);
-          failures.push(`${template.id}@${seed}: ${detail}`);
-          break;
+    it('required div_facts templates declare structural exact-divisibility constraints', () => {
+      for (const template of REQUIRED_TEMPLATES.filter((row) => row.skill === 'div_facts')) {
+        assertDeclaredDivConstraints(template);
+      }
+    });
+
+    it('required templates survive seeds 1…200 without CONSTRAINTS_UNSATISFIED', () => {
+      const failures: string[] = [];
+      for (const template of REQUIRED_TEMPLATES) {
+        for (let seed = 1; seed <= HEADROOM_SEEDS; seed += 1) {
+          try {
+            generateOne(template, seed);
+          } catch (error) {
+            const detail =
+              error instanceof QuestionGenerationError
+                ? `${error.code}: ${error.message}`
+                : error instanceof Error
+                  ? error.message
+                  : String(error);
+            failures.push(`${template.id}@${seed}: ${detail}`);
+            break;
+          }
         }
       }
-    }
-    expect(failures, failures.join('\n')).toEqual([]);
-  });
+      expect(failures, failures.join('\n')).toEqual([]);
+    });
 
-  it('spec(T-016:AC-11) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples per template', () => {
-    // Freezes the authoring contract against the AC-11 collision class before JSON is copied
-    // (same failure mode as T-014 near_doubles / this ticket's div_facts_same & order-ops rows).
-    const failures: string[] = [];
-    const rates: Record<string, number> = {};
+    it('spec(T-016:AC-11) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples per template', () => {
+      // Freezes the authoring contract against the AC-11 collision class before JSON is copied
+      // (same failure mode as T-014 near_doubles / this ticket's div_facts_same & order-ops rows).
+      const failures: string[] = [];
+      const rates: Record<string, number> = {};
 
-    for (const template of REQUIRED_TEMPLATES) {
-      let ladderHits = 0;
-      for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
-        const [question] = generateOne(template, seed);
-        const sources = describeDistractorSources(template, question.params);
-        if (sources.includes('ladder')) {
-          ladderHits += 1;
+      for (const template of REQUIRED_TEMPLATES) {
+        let ladderHits = 0;
+        for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
+          const [question] = generateOne(template, seed);
+          const sources = describeDistractorSources(template, question.params);
+          if (sources.includes('ladder')) {
+            ladderHits += 1;
+          }
+        }
+        rates[template.id] = ladderHits;
+        if (ladderHits >= LADDER_CEILING) {
+          failures.push(`${template.id}: ladder ${ladderHits}/1000`);
         }
       }
-      rates[template.id] = ladderHits;
-      if (ladderHits >= LADDER_CEILING) {
-        failures.push(`${template.id}: ladder ${ladderHits}/1000`);
-      }
-    }
 
-    expect(failures, `ladder rates: ${JSON.stringify(rates)}\n${failures.join('\n')}`).toEqual([]);
-  });
-});
+      expect(failures, `ladder rates: ${JSON.stringify(rates)}\n${failures.join('\n')}`).toEqual([]);
+    });
+  },
+);
 
 // =============================================================================================
 // AC-1 — schema parse + ≥8 per skill + authoring contract
 // =============================================================================================
 
-describe('AC-1 — each skill file parses and holds at least 8 templates', () => {
+describe('AC-1 — each skill file parses and holds at least 8 templates', { timeout: 60000 }, () => {
   it.each(SKILLS)('spec(T-016:AC-1) %s.json parses via z.array(templateSchema) with length >= 8', (skill) => {
     const templates = loadSkill(skill);
     expect(templates.length, `${skill} needs ≥8 templates`).toBeGreaterThanOrEqual(8);
@@ -592,7 +599,7 @@ describe('AC-1 — each skill file parses and holds at least 8 templates', () =>
 // AC-2 — skill field, id prefix, global uniqueness
 // =============================================================================================
 
-describe('AC-2 — skill ownership, id prefix, pairwise-unique ids', () => {
+describe('AC-2 — skill ownership, id prefix, pairwise-unique ids', { timeout: 60000 }, () => {
   it('spec(T-016:AC-2) every template.skill matches its file and every id is prefixed and unique', () => {
     const bySkill = loadAll();
     const seen = new Set<string>();
@@ -615,7 +622,7 @@ describe('AC-2 — skill ownership, id prefix, pairwise-unique ids', () => {
 // AC-3 — param / text hygiene (no dead params, no unknown tokens)
 // =============================================================================================
 
-describe('AC-3 — every {token} is a declared param; every param is live', () => {
+describe('AC-3 — every {token} is a declared param; every param is live', { timeout: 60000 }, () => {
   it('spec(T-016:AC-3) text tokens and params are bi-consistent', () => {
     const problems: string[] = [];
 
@@ -641,7 +648,7 @@ describe('AC-3 — every {token} is a declared param; every param is live', () =
 // AC-4 — 1,000-seed golden sweep
 // =============================================================================================
 
-describe('AC-4 — 1,000-seed generateQuestion sweep per template', () => {
+describe('AC-4 — 1,000-seed generateQuestion sweep per template', { timeout: 60000 }, () => {
   it('spec(T-016:AC-4) every seed succeeds with in-range params, true constraints, rendered text, 4 distinct choices, correct answer', () => {
     const failures: string[] = [];
 
@@ -699,7 +706,7 @@ describe('AC-4 — 1,000-seed generateQuestion sweep per template', () => {
 // AC-5 — div_facts exact division / no DIVISION_BY_ZERO + structural constraints
 // =============================================================================================
 
-describe('AC-5 — div_facts never divides by zero and always yields an integer', () => {
+describe('AC-5 — div_facts never divides by zero and always yields an integer', { timeout: 60000 }, () => {
   it('spec(T-016:AC-5) every div_facts template declares exact-divisibility and non-zero-divisor constraints', () => {
     for (const template of loadSkill('div_facts')) {
       assertDeclaredDivConstraints(template);
@@ -739,7 +746,7 @@ describe('AC-5 — div_facts never divides by zero and always yields an integer'
 // AC-6 — display bound ≤ 1000; fractions_int answers are integers
 // =============================================================================================
 
-describe('AC-6 — non-negative integers ≤ 1000 (answers and numeric text tokens)', () => {
+describe('AC-6 — non-negative integers ≤ 1000 (answers and numeric text tokens)', { timeout: 60000 }, () => {
   it('spec(T-016:AC-6) every answer and every numeric token in rendered text is a non-negative integer ≤ 1000', () => {
     const failures: string[] = [];
 
@@ -772,7 +779,7 @@ describe('AC-6 — non-negative integers ≤ 1000 (answers and numeric text toke
 // AC-7 — fractions_int: no decimal point in text or choice labels
 // =============================================================================================
 
-describe('AC-7 — fractions_int never shows a decimal point', () => {
+describe('AC-7 — fractions_int never shows a decimal point', { timeout: 60000 }, () => {
   it('spec(T-016:AC-7) no rendered text and no choice label contains "."', () => {
     const failures: string[] = [];
 
@@ -798,7 +805,7 @@ describe('AC-7 — fractions_int never shows a decimal point', () => {
 // AC-8 — order-of-ops variety (no-paren vs parenthesised addition)
 // =============================================================================================
 
-describe('AC-8 — multi_digit_order_ops precedence pair with distinct answers', () => {
+describe('AC-8 — multi_digit_order_ops precedence pair with distinct answers', { timeout: 60000 }, () => {
   it('spec(T-016:AC-8) has +× without parens and (+)× form; same a,b,c yield different answers', () => {
     const templates = loadSkill('multi_digit_order_ops');
     const noParen = templates.find((template) => isNoParenPlusTimes(template.text));
@@ -828,7 +835,7 @@ describe('AC-8 — multi_digit_order_ops precedence pair with distinct answers',
 // AC-9 — declared wrong-order distractor on a no-paren precedence template
 // =============================================================================================
 
-describe('AC-9 — wrong-order result is a declared distractor', () => {
+describe('AC-9 — wrong-order result is a declared distractor', { timeout: 60000 }, () => {
   it('spec(T-016:AC-9) at least one no-paren precedence template declares an (a+b)*c-style distractor', () => {
     const templates = loadSkill('multi_digit_order_ops');
     const candidates = templates.filter((template) => isNoParenPlusTimes(template.text));
@@ -849,7 +856,7 @@ describe('AC-9 — wrong-order result is a declared distractor', () => {
 // AC-10 — word-problem flagging and readability
 // =============================================================================================
 
-describe('AC-10 — word problems flagged, ≤160 chars, end with ?', () => {
+describe('AC-10 — word problems flagged, ≤160 chars, end with ?', { timeout: 60000 }, () => {
   it('spec(T-016:AC-10) isWordProblem templates stay short and end with ?; prose shapes are flagged', () => {
     const failures: string[] = [];
 
@@ -883,7 +890,7 @@ describe('AC-10 — word problems flagged, ≤160 chars, end with ?', () => {
 // AC-11 — ladder source < 250 / 1000
 // =============================================================================================
 
-describe('AC-11 — declared distractors rarely fall through to the ladder', () => {
+describe('AC-11 — declared distractors rarely fall through to the ladder', { timeout: 60000 }, () => {
   it('spec(T-016:AC-11) ladder-sourced samples are fewer than 250 of 1000 per template', () => {
     const failures: string[] = [];
 
@@ -907,42 +914,46 @@ describe('AC-11 — declared distractors rarely fall through to the ladder', () 
 // AC-12 — hand-computed spot checks (literals, not derived from answerExpr)
 // =============================================================================================
 
-describe('AC-12 — hand-computed spot checks pin arithmetic independently of the evaluator', () => {
-  it('spec(T-016:AC-12) every required template has a literal spot check, and every loaded id is covered', () => {
-    const loadedIds = loadAllTemplates()
-      .map((template) => template.id)
-      .sort();
-    const checkIds = SPOT_CHECKS.map((check) => check.id).sort();
-    const requiredIds = REQUIRED_TEMPLATES.map((template) => template.id).sort();
+describe(
+  'AC-12 — hand-computed spot checks pin arithmetic independently of the evaluator',
+  { timeout: 60000 },
+  () => {
+    it('spec(T-016:AC-12) every required template has a literal spot check, and every loaded id is covered', () => {
+      const loadedIds = loadAllTemplates()
+        .map((template) => template.id)
+        .sort();
+      const checkIds = SPOT_CHECKS.map((check) => check.id).sort();
+      const requiredIds = REQUIRED_TEMPLATES.map((template) => template.id).sort();
 
-    expect(checkIds).toEqual(requiredIds);
-    for (const id of requiredIds) {
-      expect(loadedIds, `missing required id ${id}`).toContain(id);
-    }
-    for (const id of loadedIds) {
-      expect(checkIds, `loaded template ${id} needs a SPOT_CHECK row`).toContain(id);
-    }
-  });
+      expect(checkIds).toEqual(requiredIds);
+      for (const id of requiredIds) {
+        expect(loadedIds, `missing required id ${id}`).toContain(id);
+      }
+      for (const id of loadedIds) {
+        expect(checkIds, `loaded template ${id} needs a SPOT_CHECK row`).toContain(id);
+      }
+    });
 
-  it.each([...SPOT_CHECKS])(
-    'spec(T-016:AC-12) $id at seed $seed renders "$text" with answer $answer',
-    ({ id, seed, text, answer }) => {
-      const template = loadAllTemplates().find((row) => row.id === id);
-      expect(template, `spot-check target '${id}' missing from content`).toBeDefined();
-      if (template === undefined) return;
+    it.each([...SPOT_CHECKS])(
+      'spec(T-016:AC-12) $id at seed $seed renders "$text" with answer $answer',
+      ({ id, seed, text, answer }) => {
+        const template = loadAllTemplates().find((row) => row.id === id);
+        expect(template, `spot-check target '${id}' missing from content`).toBeDefined();
+        if (template === undefined) return;
 
-      const [question] = generateOne(template, seed);
-      expect(question.text).toBe(text);
-      expect(question.choices[question.correctIndex]?.value).toBe(answer);
-    },
-  );
-});
+        const [question] = generateOne(template, seed);
+        expect(question.text).toBe(text);
+        expect(question.choices[question.correctIndex]?.value).toBe(answer);
+      },
+    );
+  },
+);
 
 // =============================================================================================
 // AC-13 — ≥5 distinct text skeletons per skill
 // =============================================================================================
 
-describe('AC-13 — shape variety: ≥5 distinct skeletons per skill', () => {
+describe('AC-13 — shape variety: ≥5 distinct skeletons per skill', { timeout: 60000 }, () => {
   it.each(SKILLS)('spec(T-016:AC-13) %s has at least 5 distinct text skeletons', (skill) => {
     const skeletons = new Set(loadSkill(skill).map((template) => skeletonOf(template.text)));
     expect(skeletons.size, `${skill} skeletons: ${[...skeletons].join(' | ')}`).toBeGreaterThanOrEqual(5);
@@ -953,7 +964,7 @@ describe('AC-13 — shape variety: ≥5 distinct skeletons per skill', () => {
 // AC-14 — sampling headroom (seeds 1..200, no CONSTRAINTS_UNSATISFIED)
 // =============================================================================================
 
-describe('AC-14 — constraints sample inside MAX_PARAM_SAMPLE_ATTEMPTS', () => {
+describe('AC-14 — constraints sample inside MAX_PARAM_SAMPLE_ATTEMPTS', { timeout: 60000 }, () => {
   it('spec(T-016:AC-14) seeds 1..200 never raise CONSTRAINTS_UNSATISFIED', () => {
     const failures: string[] = [];
 
@@ -980,7 +991,7 @@ describe('AC-14 — constraints sample inside MAX_PARAM_SAMPLE_ATTEMPTS', () => 
 // AC-15 — ≥3 distractors, none equal to answerExpr or a sibling
 // =============================================================================================
 
-describe('AC-15 — declared distractor hygiene', () => {
+describe('AC-15 — declared distractor hygiene', { timeout: 60000 }, () => {
   it('spec(T-016:AC-15) every template declares ≥3 distractors, unique and distinct from answerExpr', () => {
     const failures: string[] = [];
 
@@ -1013,7 +1024,7 @@ const FOCUSED_TEST_PATTERN = new RegExp(
   ['\\b(it|test|describe)\\.(', 'sk', 'ip|on', 'ly)\\b|\\b', 'x', '(it|describe)\\b'].join(''),
 );
 
-describe('T-016 Definition of Done', () => {
+describe('T-016 Definition of Done', { timeout: 60000 }, () => {
   it('dod(T-016:1) tags a test against every acceptance criterion the ticket declares', () => {
     const declared = [...TICKET_SOURCE.matchAll(/\*\*(AC-\d+)\*\*/g)].map((match) => match[1]);
     const unique = [...new Set(declared)];

@@ -186,7 +186,10 @@ const damageSource = (): string => readFileSync(DAMAGE_SOURCE_PATH, 'utf8');
 // AC-1 / AC-2 — the quality curve and its floor
 // ===========================================================================================
 
-describe('T-008 answerQuality — the curve, the floor, and the wrong-answer zero', () => {
+// Property-suite timeout: heavy seeded sweeps exceed Vitest's 5s default when
+// multiple worktrees run the suite concurrently (timeouts only — not assertion failures).
+
+describe('T-008 answerQuality — the curve, the floor, and the wrong-answer zero', { timeout: 60000 }, () => {
   // spec(T-008:AC-1)
   it('is 1 at zero elapsed, 0.5 at half the timer, exactly the floor at and past the timer', () => {
     expect(answerQuality(true, 0, 20_000)).toBe(1);
@@ -251,7 +254,7 @@ describe('T-008 answerQuality — the curve, the floor, and the wrong-answer zer
 // AC-3 — the Perfect Shot boundary (the off-by-one tripwire)
 // ===========================================================================================
 
-describe('T-008 isPerfectShot — the strict 40 % boundary', () => {
+describe('T-008 isPerfectShot — the strict 40 % boundary', { timeout: 60000 }, () => {
   // spec(T-008:AC-3)
   it('is true at 0ms and 7999ms and false at exactly 8000ms and 8001ms on a 20s timer', () => {
     expect(isPerfectShot(true, 0, 20_000)).toBe(true);
@@ -302,78 +305,82 @@ describe('T-008 isPerfectShot — the strict 40 % boundary', () => {
 // AC-4 / AC-15 — roll bounds, and the floor as an OUTCOME bound
 // ===========================================================================================
 
-describe('T-008 resolveShot — the roll stays inside the cannon, over every cannon shape', () => {
-  // spec(T-008:AC-4)
-  it('keeps rollDamage an integer within [damageMin, damageMax] over 5,000 seeded combinations', () => {
-    const violations: string[] = [];
-    let samples = 0;
-    for (const cannon of ALL_CANNONS) {
-      for (const elapsed of elapsedDimension(cannon.timerMs)) {
-        const shots = threadedShots(cannon, true, elapsed, 50, cannon.damageMin * 1_000 + elapsed);
-        for (const shot of shots) {
-          samples += 1;
-          if (!Number.isInteger(shot.rollDamage)) {
-            violations.push(`${cannon.id}@${elapsed}: rollDamage ${shot.rollDamage} not an integer`);
-          }
-          if (shot.rollDamage < cannon.damageMin || shot.rollDamage > cannon.damageMax) {
-            violations.push(
-              `${cannon.id}@${elapsed}: rollDamage ${shot.rollDamage} outside [${cannon.damageMin}, ${cannon.damageMax}]`,
-            );
-          }
-        }
-      }
-    }
-    expect(violations.slice(0, 5)).toEqual([]);
-    // L-017: a passing assertion over an unswept domain is no evidence at all.
-    expect(samples).toBe(5_000);
-    expect(ALL_CANNONS.length).toBe(10);
-  });
-
-  // spec(T-008:AC-15)
-  it('never rolls below damageMin + 0.35 * span — the floor binds the ROLL, not just quality', () => {
-    // ARCHITECTURE.md:206 as an assertion. This is the criterion that dies the moment anyone
-    // reverts to `u * (1 - W) + quality * W`, where `u -> 0` puts a correct answer at damageMin.
-    const violations: string[] = [];
-    let samples = 0;
-    for (const cannon of ALL_CANNONS) {
-      const guaranteed = cannon.damageMin + ANSWER_QUALITY_FLOOR * spanOf(cannon);
-      for (const elapsed of elapsedDimension(cannon.timerMs)) {
-        const shots = threadedShots(cannon, true, elapsed, 50, cannon.damageMax * 7_919 + elapsed);
-        for (const shot of shots) {
-          samples += 1;
-          if (shot.rollDamage < guaranteed) {
-            violations.push(
-              `${cannon.id}@${elapsed}: rollDamage ${shot.rollDamage} < guaranteed ${guaranteed}`,
-            );
+describe(
+  'T-008 resolveShot — the roll stays inside the cannon, over every cannon shape',
+  { timeout: 60000 },
+  () => {
+    // spec(T-008:AC-4)
+    it('keeps rollDamage an integer within [damageMin, damageMax] over 5,000 seeded combinations', () => {
+      const violations: string[] = [];
+      let samples = 0;
+      for (const cannon of ALL_CANNONS) {
+        for (const elapsed of elapsedDimension(cannon.timerMs)) {
+          const shots = threadedShots(cannon, true, elapsed, 50, cannon.damageMin * 1_000 + elapsed);
+          for (const shot of shots) {
+            samples += 1;
+            if (!Number.isInteger(shot.rollDamage)) {
+              violations.push(`${cannon.id}@${elapsed}: rollDamage ${shot.rollDamage} not an integer`);
+            }
+            if (shot.rollDamage < cannon.damageMin || shot.rollDamage > cannon.damageMax) {
+              violations.push(
+                `${cannon.id}@${elapsed}: rollDamage ${shot.rollDamage} outside [${cannon.damageMin}, ${cannon.damageMax}]`,
+              );
+            }
           }
         }
       }
-    }
-    expect(violations.slice(0, 5)).toEqual([]);
-    expect(samples).toBe(5_000);
-  });
+      expect(violations.slice(0, 5)).toEqual([]);
+      // L-017: a passing assertion over an unswept domain is no evidence at all.
+      expect(samples).toBe(5_000);
+      expect(ALL_CANNONS.length).toBe(10);
+    });
 
-  // spec(T-008:AC-15)
-  it('holds the floor at the SLOWEST correct answer for every cannon, measured as an outcome', () => {
-    // The floor's whole purpose is the worst case: `elapsed = timerMs`, quality pinned at 0.35.
-    // Asserting the observed MINIMUM (not a mean) is what makes this a bound on the outcome.
-    for (const cannon of ALL_CANNONS) {
-      const guaranteed = cannon.damageMin + ANSWER_QUALITY_FLOOR * spanOf(cannon);
-      const shots = threadedShots(cannon, true, cannon.timerMs, 2_000, 4_242 + cannon.damageMax);
-      expect(minRoll(shots)).toBeGreaterThanOrEqual(guaranteed);
-      // …and the roll must still be an integer at or above `ceil` of that bound.
-      expect(minRoll(shots)).toBeGreaterThanOrEqual(Math.ceil(guaranteed));
-      // Genuine spread survives the floor: the top of the range is still reachable.
-      expect(shots.some((s) => s.rollDamage === cannon.damageMax)).toBe(true);
-    }
-  });
-});
+    // spec(T-008:AC-15)
+    it('never rolls below damageMin + 0.35 * span — the floor binds the ROLL, not just quality', () => {
+      // ARCHITECTURE.md:206 as an assertion. This is the criterion that dies the moment anyone
+      // reverts to `u * (1 - W) + quality * W`, where `u -> 0` puts a correct answer at damageMin.
+      const violations: string[] = [];
+      let samples = 0;
+      for (const cannon of ALL_CANNONS) {
+        const guaranteed = cannon.damageMin + ANSWER_QUALITY_FLOOR * spanOf(cannon);
+        for (const elapsed of elapsedDimension(cannon.timerMs)) {
+          const shots = threadedShots(cannon, true, elapsed, 50, cannon.damageMax * 7_919 + elapsed);
+          for (const shot of shots) {
+            samples += 1;
+            if (shot.rollDamage < guaranteed) {
+              violations.push(
+                `${cannon.id}@${elapsed}: rollDamage ${shot.rollDamage} < guaranteed ${guaranteed}`,
+              );
+            }
+          }
+        }
+      }
+      expect(violations.slice(0, 5)).toEqual([]);
+      expect(samples).toBe(5_000);
+    });
+
+    // spec(T-008:AC-15)
+    it('holds the floor at the SLOWEST correct answer for every cannon, measured as an outcome', () => {
+      // The floor's whole purpose is the worst case: `elapsed = timerMs`, quality pinned at 0.35.
+      // Asserting the observed MINIMUM (not a mean) is what makes this a bound on the outcome.
+      for (const cannon of ALL_CANNONS) {
+        const guaranteed = cannon.damageMin + ANSWER_QUALITY_FLOOR * spanOf(cannon);
+        const shots = threadedShots(cannon, true, cannon.timerMs, 2_000, 4_242 + cannon.damageMax);
+        expect(minRoll(shots)).toBeGreaterThanOrEqual(guaranteed);
+        // …and the roll must still be an integer at or above `ceil` of that bound.
+        expect(minRoll(shots)).toBeGreaterThanOrEqual(Math.ceil(guaranteed));
+        // Genuine spread survives the floor: the top of the range is still reachable.
+        expect(shots.some((s) => s.rollDamage === cannon.damageMax)).toBe(true);
+      }
+    });
+  },
+);
 
 // ===========================================================================================
 // AC-5 — monotonicity in speed, and the sweep is not flat
 // ===========================================================================================
 
-describe('T-008 resolveShot — speed shifts the whole distribution upward', () => {
+describe('T-008 resolveShot — speed shifts the whole distribution upward', { timeout: 60000 }, () => {
   // spec(T-008:AC-5)
   it('never decreases damageToEnemy as the answer gets faster, for a fixed rng (20s sweep)', () => {
     const rng = createRng(31_337);
@@ -429,29 +436,33 @@ describe('T-008 resolveShot — speed shifts the whole distribution upward', () 
 // AC-6 — the pedagogical guarantee on the starter gun
 // ===========================================================================================
 
-describe('T-008 resolveShot — a slow-but-correct answer still lands a respectable volley', () => {
-  // spec(T-008:AC-6)
-  it('never rolls below 10 on the Swivel at the slowest correct answer, mean at least 10.5', () => {
-    // 10 = ceil(8 + 0.35 * 4). A five-year-old who answers correctly on the very last tick
-    // still lands in the TOP THIRD of the Swivel's 8–12 range. This is ARCHITECTURE.md:206.
-    expect(SWIVEL.damageMin).toBe(8);
-    expect(SWIVEL.damageMax).toBe(12);
-    expect(Math.ceil(SWIVEL.damageMin + ANSWER_QUALITY_FLOOR * spanOf(SWIVEL))).toBe(10);
+describe(
+  'T-008 resolveShot — a slow-but-correct answer still lands a respectable volley',
+  { timeout: 60000 },
+  () => {
+    // spec(T-008:AC-6)
+    it('never rolls below 10 on the Swivel at the slowest correct answer, mean at least 10.5', () => {
+      // 10 = ceil(8 + 0.35 * 4). A five-year-old who answers correctly on the very last tick
+      // still lands in the TOP THIRD of the Swivel's 8–12 range. This is ARCHITECTURE.md:206.
+      expect(SWIVEL.damageMin).toBe(8);
+      expect(SWIVEL.damageMax).toBe(12);
+      expect(Math.ceil(SWIVEL.damageMin + ANSWER_QUALITY_FLOOR * spanOf(SWIVEL))).toBe(10);
 
-    const shots = threadedShots(SWIVEL, true, SWIVEL.timerMs, 10_000, 20_250_728);
-    expect(shots.length).toBe(10_000);
-    expect(minRoll(shots)).toBeGreaterThanOrEqual(10);
-    expect(meanRoll(shots)).toBeGreaterThanOrEqual(10.5);
-    // Not a degenerate constant: the whole floored band is reachable.
-    expect(new Set(shots.map((s) => s.rollDamage))).toEqual(new Set([10, 11, 12]));
-  });
-});
+      const shots = threadedShots(SWIVEL, true, SWIVEL.timerMs, 10_000, 20_250_728);
+      expect(shots.length).toBe(10_000);
+      expect(minRoll(shots)).toBeGreaterThanOrEqual(10);
+      expect(meanRoll(shots)).toBeGreaterThanOrEqual(10.5);
+      // Not a degenerate constant: the whole floored band is reachable.
+      expect(new Set(shots.map((s) => s.rollDamage))).toEqual(new Set([10, 11, 12]));
+    });
+  },
+);
 
 // ===========================================================================================
 // AC-7 — Perfect Shot is +1 DAMAGE, and BASE_BALLS_PER_VOLLEY is presentation only
 // ===========================================================================================
 
-describe('T-008 resolveShot — the Perfect Shot bonus', () => {
+describe('T-008 resolveShot — the Perfect Shot bonus', { timeout: 60000 }, () => {
   // spec(T-008:AC-7)
   it('adds PERFECT_SHOT_BONUS_DAMAGE to the roll and one ball, on every cannon', () => {
     for (const cannon of ALL_CANNONS) {
@@ -544,132 +555,136 @@ describe('T-008 resolveShot — the Perfect Shot bonus', () => {
 // AC-8 / AC-9 — the wrong-answer matrix across all three temperaments
 // ===========================================================================================
 
-describe('T-008 resolveShot — a wrong answer deals no damage, and volatile guns bite back', () => {
-  // spec(T-008:AC-8)
-  it('misfires cleanly on the reliable starter gun', () => {
-    expect(SWIVEL.temperament).toBe('reliable');
-    for (const elapsed of elapsedDimension(SWIVEL.timerMs)) {
-      const [outcome] = resolveShot({
-        cannon: SWIVEL,
-        correct: false,
-        elapsedMs: elapsed,
-        rng: createRng(2_024),
-      });
-      expect(outcome.kind).toBe('misfire');
-      expect(outcome.damageToEnemy).toBe(0);
-      expect(outcome.damageToSelf).toBe(0);
-      expect(outcome.ballCount).toBe(0);
-      expect(outcome.perfectShot).toBe(false);
-      expect(outcome.answerQuality).toBe(0);
-      expect(outcome.rollDamage).toBe(0);
-      expect(outcome.bonusDamage).toBe(0);
-    }
-  });
+describe(
+  'T-008 resolveShot — a wrong answer deals no damage, and volatile guns bite back',
+  { timeout: 60000 },
+  () => {
+    // spec(T-008:AC-8)
+    it('misfires cleanly on the reliable starter gun', () => {
+      expect(SWIVEL.temperament).toBe('reliable');
+      for (const elapsed of elapsedDimension(SWIVEL.timerMs)) {
+        const [outcome] = resolveShot({
+          cannon: SWIVEL,
+          correct: false,
+          elapsedMs: elapsed,
+          rng: createRng(2_024),
+        });
+        expect(outcome.kind).toBe('misfire');
+        expect(outcome.damageToEnemy).toBe(0);
+        expect(outcome.damageToSelf).toBe(0);
+        expect(outcome.ballCount).toBe(0);
+        expect(outcome.perfectShot).toBe(false);
+        expect(outcome.answerQuality).toBe(0);
+        expect(outcome.rollDamage).toBe(0);
+        expect(outcome.bonusDamage).toBe(0);
+      }
+    });
 
-  // spec(T-008:AC-9)
-  it('deals exactly the catalog recoil on a volatile miss: 5 / 8 / 10', () => {
-    const expected: ReadonlyArray<readonly [string, number]> = [
-      ['double_broadside', 5],
-      ['powder_keg', 8],
-      ['long_nine', 10],
-    ];
-    for (const [id, recoil] of expected) {
-      const cannon = ALL_CANNONS.find((c) => c.id === id);
-      expect(cannon).toBeDefined();
-      if (cannon === undefined) continue;
-      expect(cannon.temperament).toBe('volatile');
-      expect(cannon.recoilDamage).toBe(recoil);
-      const [outcome] = resolveShot({
-        cannon,
+    // spec(T-008:AC-9)
+    it('deals exactly the catalog recoil on a volatile miss: 5 / 8 / 10', () => {
+      const expected: ReadonlyArray<readonly [string, number]> = [
+        ['double_broadside', 5],
+        ['powder_keg', 8],
+        ['long_nine', 10],
+      ];
+      for (const [id, recoil] of expected) {
+        const cannon = ALL_CANNONS.find((c) => c.id === id);
+        expect(cannon).toBeDefined();
+        if (cannon === undefined) continue;
+        expect(cannon.temperament).toBe('volatile');
+        expect(cannon.recoilDamage).toBe(recoil);
+        const [outcome] = resolveShot({
+          cannon,
+          correct: false,
+          elapsedMs: 0,
+          rng: createRng(1_009),
+        });
+        expect(outcome.damageToSelf).toBe(recoil);
+        expect(outcome.damageToEnemy).toBe(0);
+        expect(outcome.kind).toBe('misfire');
+      }
+    });
+
+    // spec(T-008:AC-9)
+    it('reads recoil from the cannon for EVERY volatile gun, including the zero-recoil Culverin', () => {
+      // The Culverin is `volatile` with `recoilDamage: 0` — it is the "swingy" starter, not a
+      // punishing one. A hard-coded recoil table would pass the 5/8/10 test above and fail here.
+      expect(CULVERIN.temperament).toBe('volatile');
+      expect(CULVERIN.recoilDamage).toBe(0);
+      const volatiles = ALL_CANNONS.filter((c) => c.temperament === 'volatile');
+      expect(volatiles.length).toBeGreaterThanOrEqual(4);
+      for (const cannon of volatiles) {
+        for (const elapsed of elapsedDimension(cannon.timerMs)) {
+          const [outcome] = resolveShot({ cannon, correct: false, elapsedMs: elapsed, rng: createRng(77) });
+          expect(outcome.damageToSelf).toBe(cannon.recoilDamage);
+        }
+      }
+    });
+
+    // spec(T-008:AC-9)
+    it('never recoils on a standard or reliable gun, and never on a CORRECT answer anywhere', () => {
+      // Owner ruling D-4: reliable and standard are identical at the damage layer — flavour only.
+      for (const cannon of ALL_CANNONS) {
+        for (const elapsed of elapsedDimension(cannon.timerMs)) {
+          const [wrong] = resolveShot({ cannon, correct: false, elapsedMs: elapsed, rng: createRng(53) });
+          if (cannon.temperament === 'standard' || cannon.temperament === 'reliable') {
+            expect(wrong.damageToSelf).toBe(0);
+          }
+          // A correct answer never recoils, on any temperament.
+          const [right] = resolveShot({ cannon, correct: true, elapsedMs: elapsed, rng: createRng(53) });
+          expect(right.damageToSelf).toBe(0);
+          expect(right.kind).toBe('volley');
+        }
+      }
+      expect(ALL_CANNONS.some((c) => c.temperament === 'standard')).toBe(true);
+      expect(ALL_CANNONS.some((c) => c.temperament === 'reliable')).toBe(true);
+    });
+
+    // spec(T-008:AC-9)
+    it('gates recoil on TEMPERAMENT, not on the recoilDamage field being non-zero', () => {
+      // L-012: the four assertions above certify a projection, not the mechanism. Every
+      // non-volatile gun in today's catalog already carries `recoilDamage: 0`, so
+      // `damageToSelf: cannon.recoilDamage` — with no temperament check at all — passes all of
+      // them. Measured: a mutant that drops the gate is indistinguishable on the real catalog.
+      //
+      // The ticket's formula is `temperament === 'volatile' ? recoilDamage : 0`, so the gate is
+      // the contract. Probing it needs the one schema-legal shape the catalog does not happen to
+      // contain: a `standard` gun carrying non-zero recoil. (`reliable` + non-zero recoil is
+      // rejected by T-003's cannonSchema, so `standard` is the only legal probe.)
+      const catalogStandard = ALL_CANNONS.find((c) => c.temperament === 'standard');
+      expect(catalogStandard).toBeDefined();
+      if (catalogStandard === undefined) return;
+      expect(catalogStandard.recoilDamage).toBe(0);
+
+      const standardWithRecoil: Cannon = { ...catalogStandard, recoilDamage: 6 };
+      for (const elapsed of elapsedDimension(standardWithRecoil.timerMs)) {
+        const [wrong] = resolveShot({
+          cannon: standardWithRecoil,
+          correct: false,
+          elapsedMs: elapsed,
+          rng: createRng(64),
+        });
+        expect(wrong.kind).toBe('misfire');
+        expect(wrong.damageToSelf).toBe(0);
+      }
+      // …while the same field on a volatile gun IS read.
+      const volatileWithRecoil: Cannon = { ...standardWithRecoil, temperament: 'volatile' };
+      const [volatileMiss] = resolveShot({
+        cannon: volatileWithRecoil,
         correct: false,
         elapsedMs: 0,
-        rng: createRng(1_009),
-      });
-      expect(outcome.damageToSelf).toBe(recoil);
-      expect(outcome.damageToEnemy).toBe(0);
-      expect(outcome.kind).toBe('misfire');
-    }
-  });
-
-  // spec(T-008:AC-9)
-  it('reads recoil from the cannon for EVERY volatile gun, including the zero-recoil Culverin', () => {
-    // The Culverin is `volatile` with `recoilDamage: 0` — it is the "swingy" starter, not a
-    // punishing one. A hard-coded recoil table would pass the 5/8/10 test above and fail here.
-    expect(CULVERIN.temperament).toBe('volatile');
-    expect(CULVERIN.recoilDamage).toBe(0);
-    const volatiles = ALL_CANNONS.filter((c) => c.temperament === 'volatile');
-    expect(volatiles.length).toBeGreaterThanOrEqual(4);
-    for (const cannon of volatiles) {
-      for (const elapsed of elapsedDimension(cannon.timerMs)) {
-        const [outcome] = resolveShot({ cannon, correct: false, elapsedMs: elapsed, rng: createRng(77) });
-        expect(outcome.damageToSelf).toBe(cannon.recoilDamage);
-      }
-    }
-  });
-
-  // spec(T-008:AC-9)
-  it('never recoils on a standard or reliable gun, and never on a CORRECT answer anywhere', () => {
-    // Owner ruling D-4: reliable and standard are identical at the damage layer — flavour only.
-    for (const cannon of ALL_CANNONS) {
-      for (const elapsed of elapsedDimension(cannon.timerMs)) {
-        const [wrong] = resolveShot({ cannon, correct: false, elapsedMs: elapsed, rng: createRng(53) });
-        if (cannon.temperament === 'standard' || cannon.temperament === 'reliable') {
-          expect(wrong.damageToSelf).toBe(0);
-        }
-        // A correct answer never recoils, on any temperament.
-        const [right] = resolveShot({ cannon, correct: true, elapsedMs: elapsed, rng: createRng(53) });
-        expect(right.damageToSelf).toBe(0);
-        expect(right.kind).toBe('volley');
-      }
-    }
-    expect(ALL_CANNONS.some((c) => c.temperament === 'standard')).toBe(true);
-    expect(ALL_CANNONS.some((c) => c.temperament === 'reliable')).toBe(true);
-  });
-
-  // spec(T-008:AC-9)
-  it('gates recoil on TEMPERAMENT, not on the recoilDamage field being non-zero', () => {
-    // L-012: the four assertions above certify a projection, not the mechanism. Every
-    // non-volatile gun in today's catalog already carries `recoilDamage: 0`, so
-    // `damageToSelf: cannon.recoilDamage` — with no temperament check at all — passes all of
-    // them. Measured: a mutant that drops the gate is indistinguishable on the real catalog.
-    //
-    // The ticket's formula is `temperament === 'volatile' ? recoilDamage : 0`, so the gate is
-    // the contract. Probing it needs the one schema-legal shape the catalog does not happen to
-    // contain: a `standard` gun carrying non-zero recoil. (`reliable` + non-zero recoil is
-    // rejected by T-003's cannonSchema, so `standard` is the only legal probe.)
-    const catalogStandard = ALL_CANNONS.find((c) => c.temperament === 'standard');
-    expect(catalogStandard).toBeDefined();
-    if (catalogStandard === undefined) return;
-    expect(catalogStandard.recoilDamage).toBe(0);
-
-    const standardWithRecoil: Cannon = { ...catalogStandard, recoilDamage: 6 };
-    for (const elapsed of elapsedDimension(standardWithRecoil.timerMs)) {
-      const [wrong] = resolveShot({
-        cannon: standardWithRecoil,
-        correct: false,
-        elapsedMs: elapsed,
         rng: createRng(64),
       });
-      expect(wrong.kind).toBe('misfire');
-      expect(wrong.damageToSelf).toBe(0);
-    }
-    // …while the same field on a volatile gun IS read.
-    const volatileWithRecoil: Cannon = { ...standardWithRecoil, temperament: 'volatile' };
-    const [volatileMiss] = resolveShot({
-      cannon: volatileWithRecoil,
-      correct: false,
-      elapsedMs: 0,
-      rng: createRng(64),
+      expect(volatileMiss.damageToSelf).toBe(6);
     });
-    expect(volatileMiss.damageToSelf).toBe(6);
-  });
-});
+  },
+);
 
 // ===========================================================================================
 // AC-10 / AC-11 — determinism and PRNG stream alignment
 // ===========================================================================================
 
-describe('T-008 resolveShot — determinism and the seeded stream', () => {
+describe('T-008 resolveShot — determinism and the seeded stream', { timeout: 60000 }, () => {
   // spec(T-008:AC-10)
   it('is a pure function: 100 identical calls give 100 identical outcomes and rngs', () => {
     // L-012: the statistical tests above certify a distribution. THIS certifies the mechanism —
@@ -753,7 +768,7 @@ describe('T-008 resolveShot — determinism and the seeded stream', () => {
 // AC-12 — argument validation
 // ===========================================================================================
 
-describe('T-008 resolveShot — illegal arguments throw RangeError', () => {
+describe('T-008 resolveShot — illegal arguments throw RangeError', { timeout: 60000 }, () => {
   // spec(T-008:AC-12)
   it('rejects a negative elapsedMs', () => {
     for (const elapsedMs of [-1, -0.0001, -20_000, -999_999]) {
@@ -808,7 +823,7 @@ describe('T-008 resolveShot — illegal arguments throw RangeError', () => {
 // AC-13 — the tuning relationship: duels resolve in 4–6 player volleys
 // ===========================================================================================
 
-describe('T-008 resolveShot — the first duel resolves in 4–6 volleys', () => {
+describe('T-008 resolveShot — the first duel resolves in 4–6 volleys', { timeout: 60000 }, () => {
   // spec(T-008:AC-13)
   it('sinks a Port Sumwich sloop in 4–6 Swivel volleys, every single observation', () => {
     // PLAN.md §The duel loop: "duels resolve in 4–6 player volleys"; "the very first duel never
@@ -851,72 +866,76 @@ describe('T-008 resolveShot — the first duel resolves in 4–6 volleys', () =>
 // AC-14 — output sanity across the whole input surface
 // ===========================================================================================
 
-describe('T-008 ShotOutcome — every field is finite, non-negative, and serialisable', () => {
-  // spec(T-008:AC-14)
-  it('holds the numeric invariants over every cannon, every quality, right and wrong', () => {
-    let samples = 0;
-    for (const cannon of ALL_CANNONS) {
-      const ceiling = cannon.damageMax + PERFECT_SHOT_BONUS_DAMAGE;
-      for (const correct of [true, false]) {
-        for (const elapsed of elapsedDimension(cannon.timerMs)) {
-          for (const shot of threadedShots(cannon, correct, elapsed, 25, 6_007 + elapsed)) {
-            samples += 1;
-            for (const field of [
-              shot.rollDamage,
-              shot.bonusDamage,
-              shot.damageToEnemy,
-              shot.damageToSelf,
-              shot.ballCount,
-            ]) {
-              expect(Number.isFinite(field)).toBe(true);
-              expect(Number.isInteger(field)).toBe(true);
-              expect(field).toBeGreaterThanOrEqual(0);
+describe(
+  'T-008 ShotOutcome — every field is finite, non-negative, and serialisable',
+  { timeout: 60000 },
+  () => {
+    // spec(T-008:AC-14)
+    it('holds the numeric invariants over every cannon, every quality, right and wrong', () => {
+      let samples = 0;
+      for (const cannon of ALL_CANNONS) {
+        const ceiling = cannon.damageMax + PERFECT_SHOT_BONUS_DAMAGE;
+        for (const correct of [true, false]) {
+          for (const elapsed of elapsedDimension(cannon.timerMs)) {
+            for (const shot of threadedShots(cannon, correct, elapsed, 25, 6_007 + elapsed)) {
+              samples += 1;
+              for (const field of [
+                shot.rollDamage,
+                shot.bonusDamage,
+                shot.damageToEnemy,
+                shot.damageToSelf,
+                shot.ballCount,
+              ]) {
+                expect(Number.isFinite(field)).toBe(true);
+                expect(Number.isInteger(field)).toBe(true);
+                expect(field).toBeGreaterThanOrEqual(0);
+              }
+              expect(Number.isFinite(shot.answerQuality)).toBe(true);
+              expect(shot.answerQuality).toBeGreaterThanOrEqual(0);
+              expect(shot.answerQuality).toBeLessThanOrEqual(1);
+              // Damage may exceed the cannon's advertised max ONLY by the Perfect Shot bonus.
+              expect(shot.damageToEnemy).toBeLessThanOrEqual(ceiling);
+              expect(shot.damageToSelf).toBeLessThanOrEqual(cannon.recoilDamage);
+              expect(shot.kind).toBe(correct ? 'volley' : 'misfire');
             }
-            expect(Number.isFinite(shot.answerQuality)).toBe(true);
-            expect(shot.answerQuality).toBeGreaterThanOrEqual(0);
-            expect(shot.answerQuality).toBeLessThanOrEqual(1);
-            // Damage may exceed the cannon's advertised max ONLY by the Perfect Shot bonus.
-            expect(shot.damageToEnemy).toBeLessThanOrEqual(ceiling);
-            expect(shot.damageToSelf).toBeLessThanOrEqual(cannon.recoilDamage);
-            expect(shot.kind).toBe(correct ? 'volley' : 'misfire');
           }
         }
       }
-    }
-    expect(samples).toBe(5_000);
-  });
-
-  // spec(T-008:AC-14)
-  it('is a plain serialisable object — it becomes part of DuelState in T-013', () => {
-    const [outcome] = resolveShot({
-      cannon: LONG_NINE,
-      correct: true,
-      elapsedMs: 0,
-      rng: createRng(8),
+      expect(samples).toBe(5_000);
     });
-    expect(JSON.parse(JSON.stringify(outcome))).toEqual(outcome);
-    expect(Object.getPrototypeOf(outcome)).toBe(Object.prototype);
-    expect(new Set(Object.keys(outcome))).toEqual(
-      new Set([
-        'kind',
-        'answerQuality',
-        'rollDamage',
-        'bonusDamage',
-        'damageToEnemy',
-        'damageToSelf',
-        'ballCount',
-        'perfectShot',
-      ]),
-    );
-    expect(outcome.damageToEnemy).toBe(outcome.rollDamage + outcome.bonusDamage);
-  });
-});
+
+    // spec(T-008:AC-14)
+    it('is a plain serialisable object — it becomes part of DuelState in T-013', () => {
+      const [outcome] = resolveShot({
+        cannon: LONG_NINE,
+        correct: true,
+        elapsedMs: 0,
+        rng: createRng(8),
+      });
+      expect(JSON.parse(JSON.stringify(outcome))).toEqual(outcome);
+      expect(Object.getPrototypeOf(outcome)).toBe(Object.prototype);
+      expect(new Set(Object.keys(outcome))).toEqual(
+        new Set([
+          'kind',
+          'answerQuality',
+          'rollDamage',
+          'bonusDamage',
+          'damageToEnemy',
+          'damageToSelf',
+          'ballCount',
+          'perfectShot',
+        ]),
+      );
+      expect(outcome.damageToEnemy).toBe(outcome.rollDamage + outcome.bonusDamage);
+    });
+  },
+);
 
 // ===========================================================================================
 // AC-16 — the effect size. Without this, the game's core mechanic can ship invisible.
 // ===========================================================================================
 
-describe('T-008 resolveShot — answer speed moves damage by a MEASURABLE amount', () => {
+describe('T-008 resolveShot — answer speed moves damage by a MEASURABLE amount', { timeout: 60000 }, () => {
   // spec(T-008:AC-16)
   it('lifts the mean roll by at least 0.10 * span from the floor to full speed', () => {
     // L-006 / L-018. `QUALITY_WEIGHT` froze in wave 2 against a bound derived from THIS formula
@@ -962,89 +981,93 @@ describe('T-008 resolveShot — answer speed moves damage by a MEASURABLE amount
 // AC-17 — non-finite `elapsedMs` is rejected, never propagated
 // ===========================================================================================
 
-describe('T-008 — a non-finite elapsedMs throws rather than leaking NaN downstream', () => {
-  // Measured on the implementation under review, before this criterion existed:
-  //   resolveShot({ correct: true, elapsedMs: NaN })       -> rollDamage NaN, damageToEnemy NaN
-  //   resolveShot({ correct: true, elapsedMs: Infinity })  -> no throw, quality 0.35, roll 11
-  //   answerQuality(true, -Infinity, 20000)                -> 1        (the BEST possible quality)
-  //   isPerfectShot(true, -Infinity, 20000)                -> true     (an impossible Perfect Shot)
-  // A NaN hull in T-020 is a duel that never ends and throws nothing to trace — the "state
-  // machine that soft-locks a child mid-fight" catastrophe class in posture.md. AC-14's
-  // finiteness invariant claims to cover this; AC-12's guards did not reach it.
-  const NON_FINITE = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY] as const;
+describe(
+  'T-008 — a non-finite elapsedMs throws rather than leaking NaN downstream',
+  { timeout: 60000 },
+  () => {
+    // Measured on the implementation under review, before this criterion existed:
+    //   resolveShot({ correct: true, elapsedMs: NaN })       -> rollDamage NaN, damageToEnemy NaN
+    //   resolveShot({ correct: true, elapsedMs: Infinity })  -> no throw, quality 0.35, roll 11
+    //   answerQuality(true, -Infinity, 20000)                -> 1        (the BEST possible quality)
+    //   isPerfectShot(true, -Infinity, 20000)                -> true     (an impossible Perfect Shot)
+    // A NaN hull in T-020 is a duel that never ends and throws nothing to trace — the "state
+    // machine that soft-locks a child mid-fight" catastrophe class in posture.md. AC-14's
+    // finiteness invariant claims to cover this; AC-12's guards did not reach it.
+    const NON_FINITE = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY] as const;
 
-  // spec(T-008:AC-17)
-  it('rejects NaN, Infinity and -Infinity from resolveShot, on every cannon and both answers', () => {
-    for (const cannon of ALL_CANNONS) {
-      for (const elapsedMs of NON_FINITE) {
-        for (const correct of [true, false]) {
-          expect(() => resolveShot({ cannon, correct, elapsedMs, rng: createRng(9) })).toThrow(RangeError);
-        }
-      }
-    }
-  });
-
-  // spec(T-008:AC-17)
-  it('never returns a non-finite ShotOutcome field — the invariant AC-14 claims, enforced', () => {
-    // L-012: "it throws" is the mechanism; THIS is the property that actually matters downstream.
-    // Written as an outcome assertion so it survives any future decision to clamp instead of throw.
-    for (const cannon of ALL_CANNONS) {
-      for (const elapsedMs of NON_FINITE) {
-        for (const correct of [true, false]) {
-          let outcome: ShotOutcome | undefined;
-          try {
-            [outcome] = resolveShot({ cannon, correct, elapsedMs, rng: createRng(9) });
-          } catch {
-            continue; // throwing is the specified behaviour; a thrown call leaks nothing
+    // spec(T-008:AC-17)
+    it('rejects NaN, Infinity and -Infinity from resolveShot, on every cannon and both answers', () => {
+      for (const cannon of ALL_CANNONS) {
+        for (const elapsedMs of NON_FINITE) {
+          for (const correct of [true, false]) {
+            expect(() => resolveShot({ cannon, correct, elapsedMs, rng: createRng(9) })).toThrow(RangeError);
           }
-          const leaked = [
-            outcome.rollDamage,
-            outcome.bonusDamage,
-            outcome.damageToEnemy,
-            outcome.damageToSelf,
-            outcome.ballCount,
-            outcome.answerQuality,
-          ].filter((field) => !Number.isFinite(field));
-          expect(leaked).toEqual([]);
         }
       }
-    }
-  });
+    });
 
-  // spec(T-008:AC-17)
-  it('guards the exported predicates too — T-013 and T-020 may call them directly', () => {
-    // `answerQuality` and `isPerfectShot` are part of the public surface, not private helpers.
-    // Only the `correct: true` branch is pinned: on `correct: false` both short-circuit to a
-    // constant (0 / false) before `elapsedMs` is read, and this ticket does not say whether the
-    // guard precedes that short-circuit. Nothing non-finite escapes either way.
-    for (const cannon of ALL_CANNONS) {
-      for (const elapsedMs of NON_FINITE) {
-        expect(() => answerQuality(true, elapsedMs, cannon.timerMs)).toThrow(RangeError);
-        expect(() => isPerfectShot(true, elapsedMs, cannon.timerMs)).toThrow(RangeError);
+    // spec(T-008:AC-17)
+    it('never returns a non-finite ShotOutcome field — the invariant AC-14 claims, enforced', () => {
+      // L-012: "it throws" is the mechanism; THIS is the property that actually matters downstream.
+      // Written as an outcome assertion so it survives any future decision to clamp instead of throw.
+      for (const cannon of ALL_CANNONS) {
+        for (const elapsedMs of NON_FINITE) {
+          for (const correct of [true, false]) {
+            let outcome: ShotOutcome | undefined;
+            try {
+              [outcome] = resolveShot({ cannon, correct, elapsedMs, rng: createRng(9) });
+            } catch {
+              continue; // throwing is the specified behaviour; a thrown call leaks nothing
+            }
+            const leaked = [
+              outcome.rollDamage,
+              outcome.bonusDamage,
+              outcome.damageToEnemy,
+              outcome.damageToSelf,
+              outcome.ballCount,
+              outcome.answerQuality,
+            ].filter((field) => !Number.isFinite(field));
+            expect(leaked).toEqual([]);
+          }
+        }
       }
-    }
-  });
+    });
 
-  // spec(T-008:AC-17)
-  it('still accepts every finite elapsed time — the guard rejects the class, not the input', () => {
-    // L-009: a criterion listing only reject cases is passed by a validator that rejects
-    // everything. `-Infinity` already threw before this criterion existed (it is `< 0`), so
-    // without this complement the whole AC could be "satisfied" by throwing unconditionally.
-    for (const cannon of ALL_CANNONS) {
-      for (const elapsedMs of elapsedDimension(cannon.timerMs)) {
-        expect(() => resolveShot({ cannon, correct: true, elapsedMs, rng: createRng(9) })).not.toThrow();
-        expect(answerQuality(true, elapsedMs, cannon.timerMs)).toBeGreaterThanOrEqual(ANSWER_QUALITY_FLOOR);
-        expect(typeof isPerfectShot(true, elapsedMs, cannon.timerMs)).toBe('boolean');
+    // spec(T-008:AC-17)
+    it('guards the exported predicates too — T-013 and T-020 may call them directly', () => {
+      // `answerQuality` and `isPerfectShot` are part of the public surface, not private helpers.
+      // Only the `correct: true` branch is pinned: on `correct: false` both short-circuit to a
+      // constant (0 / false) before `elapsedMs` is read, and this ticket does not say whether the
+      // guard precedes that short-circuit. Nothing non-finite escapes either way.
+      for (const cannon of ALL_CANNONS) {
+        for (const elapsedMs of NON_FINITE) {
+          expect(() => answerQuality(true, elapsedMs, cannon.timerMs)).toThrow(RangeError);
+          expect(() => isPerfectShot(true, elapsedMs, cannon.timerMs)).toThrow(RangeError);
+        }
       }
-    }
-  });
-});
+    });
+
+    // spec(T-008:AC-17)
+    it('still accepts every finite elapsed time — the guard rejects the class, not the input', () => {
+      // L-009: a criterion listing only reject cases is passed by a validator that rejects
+      // everything. `-Infinity` already threw before this criterion existed (it is `< 0`), so
+      // without this complement the whole AC could be "satisfied" by throwing unconditionally.
+      for (const cannon of ALL_CANNONS) {
+        for (const elapsedMs of elapsedDimension(cannon.timerMs)) {
+          expect(() => resolveShot({ cannon, correct: true, elapsedMs, rng: createRng(9) })).not.toThrow();
+          expect(answerQuality(true, elapsedMs, cannon.timerMs)).toBeGreaterThanOrEqual(ANSWER_QUALITY_FLOOR);
+          expect(typeof isPerfectShot(true, elapsedMs, cannon.timerMs)).toBe('boolean');
+        }
+      }
+    });
+  },
+);
 
 // ===========================================================================================
 // AC-18 — the dead zone: where speed stops mattering, and how wide it really is
 // ===========================================================================================
 
-describe('T-008 — the quality crossover, measured rather than asserted in prose', () => {
+describe('T-008 — the quality crossover, measured rather than asserted in prose', { timeout: 60000 }, () => {
   // spec(T-008:AC-18)
   it('reads the roll lower bound exactly — the instrument this criterion depends on', () => {
     // L-014: prove the instrument before trusting any verdict it produces. `LOW_U_SEED` is only
@@ -1167,205 +1190,213 @@ describe('T-008 — the quality crossover, measured rather than asserted in pros
 // AC-19 — the damageMax clamp: inert today, reachable via the dev slider
 // ===========================================================================================
 
-describe('T-008 — the damageMax clamp carries a committed measurement, not an argument', () => {
-  // spec(T-008:AC-19)
-  it('is inert at the shipped QUALITY_WEIGHT — the ceil never reaches damageMax', () => {
-    // The comment claims the `min(..., damageMax)` binds only when `QUALITY_WEIGHT > 1`. Half of
-    // that claim is "it does nothing today", asserted here across the full input surface rather
-    // than argued: the UNCLAMPED value is what the module actually returns everywhere.
-    expect(QUALITY_WEIGHT).toBeLessThanOrEqual(1);
-    for (const cannon of ALL_CANNONS) {
-      for (const elapsedMs of elapsedDimension(cannon.timerMs)) {
-        const quality = answerQuality(true, elapsedMs, cannon.timerMs);
-        const unclamped = Math.ceil(
-          cannon.damageMin + Math.max(quality * QUALITY_WEIGHT, ANSWER_QUALITY_FLOOR) * spanOf(cannon),
-        );
-        expect(unclamped).toBeLessThanOrEqual(cannon.damageMax);
-        expect(lowerBoundAt(cannon, elapsedMs)).toBe(unclamped);
+describe(
+  'T-008 — the damageMax clamp carries a committed measurement, not an argument',
+  { timeout: 60000 },
+  () => {
+    // spec(T-008:AC-19)
+    it('is inert at the shipped QUALITY_WEIGHT — the ceil never reaches damageMax', () => {
+      // The comment claims the `min(..., damageMax)` binds only when `QUALITY_WEIGHT > 1`. Half of
+      // that claim is "it does nothing today", asserted here across the full input surface rather
+      // than argued: the UNCLAMPED value is what the module actually returns everywhere.
+      expect(QUALITY_WEIGHT).toBeLessThanOrEqual(1);
+      for (const cannon of ALL_CANNONS) {
+        for (const elapsedMs of elapsedDimension(cannon.timerMs)) {
+          const quality = answerQuality(true, elapsedMs, cannon.timerMs);
+          const unclamped = Math.ceil(
+            cannon.damageMin + Math.max(quality * QUALITY_WEIGHT, ANSWER_QUALITY_FLOOR) * spanOf(cannon),
+          );
+          expect(unclamped).toBeLessThanOrEqual(cannon.damageMax);
+          expect(lowerBoundAt(cannon, elapsedMs)).toBe(unclamped);
+        }
       }
-    }
-  });
+    });
 
-  // spec(T-008:AC-19)
-  it('becomes active above 1 — the reachability probe, committed instead of scratchpadded', async () => {
-    // L-015: "unreachable" is a claim that needs a probe, and a probe that lives in a scratchpad
-    // is not evidence. `QUALITY_WEIGHT` is a live dev-screen slider, so `w > 1` is reachable by
-    // a designer moving it, not merely in principle.
-    const WEIGHT_ABOVE_ONE = 1.001;
-    vi.resetModules();
-    const actual = await vi.importActual<typeof import('@engine/tuning')>('@engine/tuning');
-    vi.doMock('@engine/tuning', () => ({ ...actual, QUALITY_WEIGHT: WEIGHT_ABOVE_ONE }));
-    const mod = await import('@engine/duel/damage');
+    // spec(T-008:AC-19)
+    it('becomes active above 1 — the reachability probe, committed instead of scratchpadded', async () => {
+      // L-015: "unreachable" is a claim that needs a probe, and a probe that lives in a scratchpad
+      // is not evidence. `QUALITY_WEIGHT` is a live dev-screen slider, so `w > 1` is reachable by
+      // a designer moving it, not merely in principle.
+      const WEIGHT_ABOVE_ONE = 1.001;
+      vi.resetModules();
+      const actual = await vi.importActual<typeof import('@engine/tuning')>('@engine/tuning');
+      vi.doMock('@engine/tuning', () => ({ ...actual, QUALITY_WEIGHT: WEIGHT_ABOVE_ONE }));
+      const mod = await import('@engine/duel/damage');
 
-    for (const cannon of ALL_CANNONS) {
-      // L-014: the mutation must be demonstrably live before its verdict means anything. Without
-      // the clamp the bound would be ceil(damageMin + 1.001 * span) = damageMax + 1, which is
-      // OUTSIDE the cannon — so this is also the case AC-4 depends on the clamp to prevent.
-      const unclamped = Math.ceil(cannon.damageMin + WEIGHT_ABOVE_ONE * spanOf(cannon));
-      expect(unclamped).toBeGreaterThan(cannon.damageMax);
+      for (const cannon of ALL_CANNONS) {
+        // L-014: the mutation must be demonstrably live before its verdict means anything. Without
+        // the clamp the bound would be ceil(damageMin + 1.001 * span) = damageMax + 1, which is
+        // OUTSIDE the cannon — so this is also the case AC-4 depends on the clamp to prevent.
+        const unclamped = Math.ceil(cannon.damageMin + WEIGHT_ABOVE_ONE * spanOf(cannon));
+        expect(unclamped).toBeGreaterThan(cannon.damageMax);
 
-      const [outcome] = mod.resolveShot({
-        cannon,
-        correct: true,
-        elapsedMs: 0,
-        rng: createRng(LOW_U_SEED),
-      });
-      expect(outcome.rollDamage).toBe(cannon.damageMax);
-      expect(outcome.rollDamage).toBeLessThanOrEqual(cannon.damageMax);
-    }
+        const [outcome] = mod.resolveShot({
+          cannon,
+          correct: true,
+          elapsedMs: 0,
+          rng: createRng(LOW_U_SEED),
+        });
+        expect(outcome.rollDamage).toBe(cannon.damageMax);
+        expect(outcome.rollDamage).toBeLessThanOrEqual(cannon.damageMax);
+      }
 
-    vi.doUnmock('@engine/tuning');
-    vi.resetModules();
-  });
+      vi.doUnmock('@engine/tuning');
+      vi.resetModules();
+    });
 
-  // spec(T-008:AC-19)
-  it('cites where that measurement lives, so the comment is evidence and not an argument', () => {
-    // ---- LITERAL SOURCE-TEXT CHECK (L-016) -------------------------------------------------
-    // Secondary to the two behavioural tests above. INTERPRETATION FLAGGED IN THE RETURN: the
-    // criterion says the comment "must carry its measurement" without saying in what form. In
-    // this repo a committed measurement is a `spec(T-008:AC-n)`-tagged test, so the comment
-    // carrying it means citing that criterion. If the coordinator wants a numeric probe written
-    // into the prose instead, this is a one-string change.
-    const src = damageSource();
-    expect(
-      /AC-19/.test(src),
-      'the min(..., damageMax) clamp comment must cite the committed measurement that backs its ' +
-        'reachability claim — the string "AC-19" (per L-015, a claim carries its measurement or ' +
-        'it is an argument).',
-    ).toBe(true);
-  });
-});
+    // spec(T-008:AC-19)
+    it('cites where that measurement lives, so the comment is evidence and not an argument', () => {
+      // ---- LITERAL SOURCE-TEXT CHECK (L-016) -------------------------------------------------
+      // Secondary to the two behavioural tests above. INTERPRETATION FLAGGED IN THE RETURN: the
+      // criterion says the comment "must carry its measurement" without saying in what form. In
+      // this repo a committed measurement is a `spec(T-008:AC-n)`-tagged test, so the comment
+      // carrying it means citing that criterion. If the coordinator wants a numeric probe written
+      // into the prose instead, this is a one-string change.
+      const src = damageSource();
+      expect(
+        /AC-19/.test(src),
+        'the min(..., damageMax) clamp comment must cite the committed measurement that backs its ' +
+          'reachability claim — the string "AC-19" (per L-015, a claim carries its measurement or ' +
+          'it is an argument).',
+      ).toBe(true);
+    });
+  },
+);
 
 // ===========================================================================================
 // AC-20 — a non-finite `timerMs` is the twin of AC-17's hole, and is rejected identically
 // ===========================================================================================
 
-describe('T-008 — a non-finite timerMs throws rather than fabricating a maximum volley', () => {
-  // Measured on the implementation under review, before this criterion existed:
-  //
-  //   timerMs        resolveShot(correct: true)              answerQuality   isPerfectShot
-  //   NaN            rollDamage NaN, damageToEnemy NaN       NaN             false
-  //   Infinity       rollDamage 12 (= damageMax),            1               true
-  //                  perfectShot true, damageToEnemy 13
-  //   -Infinity      throws RangeError                       1               false
-  //
-  // `NaN <= 0` is false, so AC-12's `timerMs <= 0` guard sails straight past a non-finite timer —
-  // the identical shape to `elapsedMs < 0` missing `NaN` (AC-17). `Infinity` is the worse of the
-  // two: `1 - elapsed/Infinity` is `1`, so an impossible timer reports the BEST possible outcome
-  // in every field at once — maximum quality, maximum roll, and a Perfect Shot. And `-Infinity`
-  // shows the three entry points already disagreeing: `resolveShot` throws while `answerQuality`
-  // returns 1, which is what AC-20's "guard identically" clause exists to close.
-  const NON_FINITE = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY] as const;
+describe(
+  'T-008 — a non-finite timerMs throws rather than fabricating a maximum volley',
+  { timeout: 60000 },
+  () => {
+    // Measured on the implementation under review, before this criterion existed:
+    //
+    //   timerMs        resolveShot(correct: true)              answerQuality   isPerfectShot
+    //   NaN            rollDamage NaN, damageToEnemy NaN       NaN             false
+    //   Infinity       rollDamage 12 (= damageMax),            1               true
+    //                  perfectShot true, damageToEnemy 13
+    //   -Infinity      throws RangeError                       1               false
+    //
+    // `NaN <= 0` is false, so AC-12's `timerMs <= 0` guard sails straight past a non-finite timer —
+    // the identical shape to `elapsedMs < 0` missing `NaN` (AC-17). `Infinity` is the worse of the
+    // two: `1 - elapsed/Infinity` is `1`, so an impossible timer reports the BEST possible outcome
+    // in every field at once — maximum quality, maximum roll, and a Perfect Shot. And `-Infinity`
+    // shows the three entry points already disagreeing: `resolveShot` throws while `answerQuality`
+    // returns 1, which is what AC-20's "guard identically" clause exists to close.
+    const NON_FINITE = [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY] as const;
 
-  /** Classifies a call as having thrown, or as having returned a value. */
-  function classify(fn: () => unknown): { threw: boolean; error?: string; value?: unknown } {
-    try {
-      return { threw: false, value: fn() };
-    } catch (error) {
-      return { threw: true, error: (error as Error).constructor.name };
+    /** Classifies a call as having thrown, or as having returned a value. */
+    function classify(fn: () => unknown): { threw: boolean; error?: string; value?: unknown } {
+      try {
+        return { threw: false, value: fn() };
+      } catch (error) {
+        return { threw: true, error: (error as Error).constructor.name };
+      }
     }
-  }
 
-  // spec(T-008:AC-20)
-  it('rejects a NaN, Infinity or -Infinity timerMs from resolveShot, on every cannon', () => {
-    for (const cannon of ALL_CANNONS) {
-      for (const timerMs of NON_FINITE) {
-        for (const correct of [true, false]) {
-          expect(() =>
-            resolveShot({ cannon: withTimer(cannon, timerMs), correct, elapsedMs: 0, rng: createRng(12) }),
-          ).toThrow(RangeError);
+    // spec(T-008:AC-20)
+    it('rejects a NaN, Infinity or -Infinity timerMs from resolveShot, on every cannon', () => {
+      for (const cannon of ALL_CANNONS) {
+        for (const timerMs of NON_FINITE) {
+          for (const correct of [true, false]) {
+            expect(() =>
+              resolveShot({ cannon: withTimer(cannon, timerMs), correct, elapsedMs: 0, rng: createRng(12) }),
+            ).toThrow(RangeError);
+          }
         }
       }
-    }
-  });
+    });
 
-  // spec(T-008:AC-20)
-  it('never lets a non-finite timer produce a volley — least of all a maximum one', () => {
-    // L-012: "it throws" is the mechanism. THIS is the property T-020 depends on: an impossible
-    // timer must not become a shot at all. Written as an outcome assertion so it survives any
-    // later decision to clamp rather than throw, and so it catches `Infinity` — whose fields are
-    // all perfectly FINITE and therefore invisible to a finiteness check alone.
-    for (const cannon of ALL_CANNONS) {
-      for (const timerMs of NON_FINITE) {
-        const result = classify(() =>
-          resolveShot({
-            cannon: withTimer(cannon, timerMs),
-            correct: true,
-            elapsedMs: 0,
-            rng: createRng(12),
-          }),
-        );
-        expect(result.threw).toBe(true);
-        expect(result.error).toBe('RangeError');
-      }
-    }
-  });
-
-  // spec(T-008:AC-20)
-  it('guards the exported predicates identically — all three entry points agree', () => {
-    // "the exported `answerQuality` and `isPerfectShot` guard identically". Swept as the full
-    // CROSS-PRODUCT of both parameters (L-017) rather than a list of cases: whenever EITHER
-    // argument is non-finite, all three entry points must reach the same verdict. Today they do
-    // not — at `timerMs = -Infinity`, `resolveShot` throws while `answerQuality` returns 1.
-    const elapsedAxis = [0, 5_000, ...NON_FINITE];
-    const timerAxis = [20_000, ...NON_FINITE];
-    let combinations = 0;
-
-    for (const cannon of ALL_CANNONS) {
-      for (const elapsedMs of elapsedAxis) {
-        for (const timerMs of timerAxis) {
-          const anyNonFinite = !Number.isFinite(elapsedMs) || !Number.isFinite(timerMs);
-          if (!anyNonFinite) continue;
-          combinations += 1;
-
-          const quality = classify(() => answerQuality(true, elapsedMs, timerMs));
-          const perfect = classify(() => isPerfectShot(true, elapsedMs, timerMs));
-          const shot = classify(() =>
+    // spec(T-008:AC-20)
+    it('never lets a non-finite timer produce a volley — least of all a maximum one', () => {
+      // L-012: "it throws" is the mechanism. THIS is the property T-020 depends on: an impossible
+      // timer must not become a shot at all. Written as an outcome assertion so it survives any
+      // later decision to clamp rather than throw, and so it catches `Infinity` — whose fields are
+      // all perfectly FINITE and therefore invisible to a finiteness check alone.
+      for (const cannon of ALL_CANNONS) {
+        for (const timerMs of NON_FINITE) {
+          const result = classify(() =>
             resolveShot({
               cannon: withTimer(cannon, timerMs),
               correct: true,
-              elapsedMs,
+              elapsedMs: 0,
               rng: createRng(12),
             }),
           );
-
-          expect(quality.threw).toBe(true);
-          expect(perfect.threw).toBe(true);
-          expect(shot.threw).toBe(true);
-          expect([quality.error, perfect.error, shot.error]).toEqual([
-            'RangeError',
-            'RangeError',
-            'RangeError',
-          ]);
+          expect(result.threw).toBe(true);
+          expect(result.error).toBe('RangeError');
         }
       }
-    }
-    // L-017: a sweep that silently swept nothing is no evidence at all. 5 elapsed values x 4
-    // timers = 20 pairs, minus the 2 x 1 = 2 pairs where both are finite, leaves 18 per cannon.
-    expect(elapsedAxis.length * timerAxis.length).toBe(20);
-    expect(combinations).toBe(ALL_CANNONS.length * 18);
-  });
+    });
 
-  // spec(T-008:AC-20)
-  it('still accepts every finite positive timer — the guard rejects the class, not the axis', () => {
-    // L-009: `-Infinity` already threw from `resolveShot` before this criterion existed, so
-    // without a complement the whole AC could be "satisfied" by rejecting every timer outright.
-    // Finite positive timers off the catalog are included so the guard cannot degenerate into an
-    // allowlist of today's four values.
-    for (const timerMs of [1, 500, 12_000, 20_000, 60_000, Number.MAX_SAFE_INTEGER]) {
-      const cannon = withTimer(SWIVEL, timerMs);
-      expect(() => resolveShot({ cannon, correct: true, elapsedMs: 0, rng: createRng(12) })).not.toThrow();
-      expect(answerQuality(true, 0, timerMs)).toBe(1);
-      expect(answerQuality(true, timerMs, timerMs)).toBe(ANSWER_QUALITY_FLOOR);
-      expect(isPerfectShot(true, 0, timerMs)).toBe(true);
-      expect(isPerfectShot(true, timerMs, timerMs)).toBe(false);
-    }
-    // …and every real catalog timer still works across the whole quality axis.
-    for (const cannon of ALL_CANNONS) {
-      for (const elapsedMs of elapsedDimension(cannon.timerMs)) {
-        expect(() => resolveShot({ cannon, correct: true, elapsedMs, rng: createRng(12) })).not.toThrow();
-        expect(Number.isFinite(answerQuality(true, elapsedMs, cannon.timerMs))).toBe(true);
+    // spec(T-008:AC-20)
+    it('guards the exported predicates identically — all three entry points agree', () => {
+      // "the exported `answerQuality` and `isPerfectShot` guard identically". Swept as the full
+      // CROSS-PRODUCT of both parameters (L-017) rather than a list of cases: whenever EITHER
+      // argument is non-finite, all three entry points must reach the same verdict. Today they do
+      // not — at `timerMs = -Infinity`, `resolveShot` throws while `answerQuality` returns 1.
+      const elapsedAxis = [0, 5_000, ...NON_FINITE];
+      const timerAxis = [20_000, ...NON_FINITE];
+      let combinations = 0;
+
+      for (const cannon of ALL_CANNONS) {
+        for (const elapsedMs of elapsedAxis) {
+          for (const timerMs of timerAxis) {
+            const anyNonFinite = !Number.isFinite(elapsedMs) || !Number.isFinite(timerMs);
+            if (!anyNonFinite) continue;
+            combinations += 1;
+
+            const quality = classify(() => answerQuality(true, elapsedMs, timerMs));
+            const perfect = classify(() => isPerfectShot(true, elapsedMs, timerMs));
+            const shot = classify(() =>
+              resolveShot({
+                cannon: withTimer(cannon, timerMs),
+                correct: true,
+                elapsedMs,
+                rng: createRng(12),
+              }),
+            );
+
+            expect(quality.threw).toBe(true);
+            expect(perfect.threw).toBe(true);
+            expect(shot.threw).toBe(true);
+            expect([quality.error, perfect.error, shot.error]).toEqual([
+              'RangeError',
+              'RangeError',
+              'RangeError',
+            ]);
+          }
+        }
       }
-    }
-  });
-});
+      // L-017: a sweep that silently swept nothing is no evidence at all. 5 elapsed values x 4
+      // timers = 20 pairs, minus the 2 x 1 = 2 pairs where both are finite, leaves 18 per cannon.
+      expect(elapsedAxis.length * timerAxis.length).toBe(20);
+      expect(combinations).toBe(ALL_CANNONS.length * 18);
+    });
+
+    // spec(T-008:AC-20)
+    it('still accepts every finite positive timer — the guard rejects the class, not the axis', () => {
+      // L-009: `-Infinity` already threw from `resolveShot` before this criterion existed, so
+      // without a complement the whole AC could be "satisfied" by rejecting every timer outright.
+      // Finite positive timers off the catalog are included so the guard cannot degenerate into an
+      // allowlist of today's four values.
+      for (const timerMs of [1, 500, 12_000, 20_000, 60_000, Number.MAX_SAFE_INTEGER]) {
+        const cannon = withTimer(SWIVEL, timerMs);
+        expect(() => resolveShot({ cannon, correct: true, elapsedMs: 0, rng: createRng(12) })).not.toThrow();
+        expect(answerQuality(true, 0, timerMs)).toBe(1);
+        expect(answerQuality(true, timerMs, timerMs)).toBe(ANSWER_QUALITY_FLOOR);
+        expect(isPerfectShot(true, 0, timerMs)).toBe(true);
+        expect(isPerfectShot(true, timerMs, timerMs)).toBe(false);
+      }
+      // …and every real catalog timer still works across the whole quality axis.
+      for (const cannon of ALL_CANNONS) {
+        for (const elapsedMs of elapsedDimension(cannon.timerMs)) {
+          expect(() => resolveShot({ cannon, correct: true, elapsedMs, rng: createRng(12) })).not.toThrow();
+          expect(Number.isFinite(answerQuality(true, elapsedMs, cannon.timerMs))).toBe(true);
+        }
+      }
+    });
+  },
+);
