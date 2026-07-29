@@ -17,7 +17,8 @@
  * - Purity (AC-12/13/14, DoD-5/6) is behavioural: poison `Math.random`/`Date`, deep-equal
  *   replays, snapshot immutability, JSON round-trip.
  *
- * Traceability: every behavioural test cites `spec(T-017:AC-n)`; DoD items cite `dod(T-017:n)`.
+ * Traceability: behavioural tests use spec tags of the form T-017 AC-<n>; DoD coverage uses
+ * numbered dod tags for T-017 items 1 through 7 (see the Definition of Done block below).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
