@@ -121,6 +121,15 @@ features; they freeze the two deadline-critical claims the earlier build had not
 | A-018 | Rebuilt chart is safe and visible on web and iOS     | backlog | A-007, A-017 | capable  |
 | A-019 | Public Expo web build with working direct deep links | backlog | A-018        | standard |
 
+## Submission hotfixes — 2026-07-29
+
+These tickets record owner-directed defects discovered during the final simulator recording pass.
+They supersede conflicting historical demo prose in `HANDOFF.md`.
+
+| id    | title                                          | status      | deps         | model    |
+| ----- | ---------------------------------------------- | ----------- | ------------ | -------- |
+| A-042 | Demo launch gate and unclipped ship picker     | in-progress | A-005, A-025 | standard |
+
 ## Why the waves were recomputed (2026-07-29)
 
 The previous plan put A-008, A-010, A-014 and A-015 in one wave, "A4", and printed the heading
