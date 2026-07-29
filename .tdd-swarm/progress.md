@@ -1443,6 +1443,99 @@ Partial-wrap / no-cause / answer-before-constraints mutants all die — round 3 
 
 Count stays 21; gate still green on tags. Suite assertions themselves are what must change.
 
+## T-013 round-3 re-review — REJECTED (Composer 2.5)
+
+Two live mutants, both re-measured at **126/126**:
+
+1. **Shallow `Template[]`** — `[...templates]` sharing `Template` object refs. Suite only mutated
+   containers (`pop` / reassignment), never `template.text`. Direct probe: caller overwrites text →
+   state sees `"HACKED BY CALLER"`.
+2. **Shared-core wrapper** — `WeakMap` caches core; each call returns `{ ...cached, phase }`.
+   Top-level `not.toBe` is green; `first.playerLoadout.push` rewrites `second`. Control that
+   returns the same top-level ref still dies on AC-3 — so the reference clause partially bites.
+
+`startsWith` terminal predicate remains equivalent over the closed eight-phase domain — residual,
+not a reject.
+
+### Rulings (count stays 16)
+
+- **AC-16** — deep-copy: new containers **and** new element objects, including each `Template` and
+  its nested `distractors` / `params` / `constraints`.
+- **AC-3** — independent state graphs, not just top-level reference inequality.
+
+## T-007 round 4 — accepted, pending re-review
+
+Cause-identity tightenings landed. Re-verified: hash `1a586570…`, merge-base diff = suite +
+report only, sole `TS2307`, baseline 1229, `spec-lint` 21/21 with DoD-7 SKIP. Suite now asserts
+`cause === undefined` on every AC-11 seed and matches frozen-evaluator `code`/`message` on AC-20/21.
+Agent reported m3 81/81 → 4 fails (AC-11 ×3 + AC-21 ×1); assertion shapes confirm that kill path.
+
+## T-013 round 4 — accepted, pending re-review
+
+Deep-copy / independent-graph tightenings landed. Re-verified: hash `737335df…`, 128 tests,
+merge-base diff = suite + report only, RED still 88 (3/51/34), baseline 1229, `spec-lint` 16/16
+with DoD-9 SKIP. New tests cover AC-3 graph independence (`playerLoadout.push` + nested
+`templatesBySkill[…][0].text`) and AC-16 deep-copy of `Template` plus nested `params` /
+`distractors` / `constraints` with `not.toBe` on those references.
+
+## T-007 FROZEN — Composer ACCEPT round 4
+
+Verdict **ACCEPT** from [T-007 Re-review](fc68fe03-f84a-4103-a0c1-84f8c572c51c). Independently confirmed
+before freeze: suite SHA `1a5865707201bc288bd21deb4865cf8c49d3e176e1f43ef537229460b57799e1`,
+`phase=implement` set in `wt-T-007`, write guard **blocks** the frozen suite (engaged, frozen-test
+reason). Merge-base diff remains suite + report; RED = sole `TS2307`; 21/21 spec-lint.
+
+Reviewer confirmed m3 dead (4 fails: AC-11 ×3 + AC-21 ×1). Two 81/81 survivors are **not** reject
+grounds: (1) copying `ExprError` code+message into a fresh cause — allowed by AC-20 as written;
+(2) calling `buildDistractors` before an explicit `evaluateNumber` — observably identical because
+frozen T-005 evaluates `answerExpr` internally. Residuals recorded, not blockers.
+
+**Do not dispatch the T-007 implementer until T-013 also freezes** — wave 4 is the critical-path
+narrowest point and both should enter GREEN together.
+
+## T-013 round-4 re-review — REJECTED (Composer 2.5)
+
+Round-3 mutants confirmed dead. Three new live mutants re-measured at **128/128**:
+
+1. Shared module-level `tally` / `actionLog` / `recentTemplateIds` while loadouts/templates copy
+2. Deep-copy `Template` but alias `params.b` (suite only probed `params.a`)
+3. Memoised `rng` object identity across two constructions (suite checks deep equality only)
+
+Control shared-core wrapper still dies (127/128). Same pattern: tests measured the last layer's
+exact failures; half-fixes lived one field over.
+
+### Rulings (count stays 16)
+
+- **AC-3** — independence covers every mutable interior: loadouts, templates, `actionLog`,
+  `recentTemplateIds`, `tally`/`bySkill`, and `rng` reference inequality.
+- **AC-16** — every `params` key's range array must be a new reference; mutate an unprobed key.
+
+T-007 remains frozen (`1a586570…`, `phase=implement`); implementer still held.
+
+## T-013 round 5 — accepted, pending re-review
+
+Full-graph / every-params-key tightenings landed. Re-verified: hash `767fc8da…`, 128 tests,
+merge-base diff = suite + report only, RED still 88, baseline 1229, `spec-lint` 16/16 with DoD-9
+SKIP. AC-3 now `not.toBe` + mutates loadouts, nested templates, `actionLog`, `recentTemplateIds`,
+`tally`/`bySkill`, and `rng`. AC-16 loops `Object.keys(params)` and mutates `params.b`.
+
+## Wave 4 FREEZE complete — both suites frozen, implementers dispatched
+
+| Ticket | Frozen SHA                                                         | Composer verdict | phase                            |
+| ------ | ------------------------------------------------------------------ | ---------------- | -------------------------------- |
+| T-007  | `1a586570…`                                                        | ACCEPT round 4   | `implement` (guard blocks suite) |
+| T-013  | `767fc8daf622fac13081d4f1fb7147818e2401cb7afc6464292d0db12656de05` | ACCEPT round 5   | `implement` (guard blocks suite) |
+
+T-013 residuals recorded, not blockers: `startsWith` terminal equivalent on eight phases;
+`toRivalView` loadout alias unpinned by any AC; non-enumerable `params` keys unreachable via zod.
+
+### RED-state facts for implementers (re-verified)
+
+- **T-007:** sole `TS2307` missing `@engine/questions/generator`; baseline **1229** pass; **81**
+  suite tests waiting. Target: module exists → 81/81 + tsc 0.
+- **T-013:** **88** errors all in suite (3×TS2307, 51×TS2322, 34×TS2578). Target: **88 → 0**,
+  not merely clearing the three import errors — positive `Exact<>` probes fire in RED.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
