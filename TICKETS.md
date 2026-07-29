@@ -112,7 +112,7 @@ Cross-ticket probe green (T-007 × T-013). Evidence: `.tdd-swarm/reports/wave4-i
 | T-017 | Gunnery-range drill session — full-rate mastery practice loop                  | backlog     | T-001, T-003, T-004, T-007, T-010        | `ticket/T-017-range-drill`              | standard | —                                          |
 | T-018 | Opponent interface and scripted onboarding rival                               | backlog     | T-003, T-004, T-006, T-013               | `ticket/T-018-opponent-interface`       | standard | —                                          |
 | T-020 | Duel reducer — the pure turn-based state machine                               | backlog     | T-004, T-006, T-007, T-008, T-013        | `ticket/T-020-duel-reducer`             | capable  | —                                          |
-| T-032 | Placement grants starter cannons only (D-6) | tests-written | T-010, T-011 | `ticket/T-032-placement-unlock-overlap` | standard | **frozen** + ACCEPT_WITH_NITS; implementer go |
+| T-032 | Placement grants starter cannons only (D-6)                                    | tests-written | T-010, T-011                             | `ticket/T-032-placement-unlock-overlap` | standard | **frozen** `b07759c1…`+`f90cc079…` ACCEPT_WITH_NITS; implementer go |
 
 ## Wave 6 — golden gate, mercy bot, machine extension
 
@@ -318,7 +318,7 @@ waves and both deliberate:
 | T-030 | Loadout selection — which three cannons sail with you                            | backlog     | T-006, T-010 | design review — 5 cannons available after island 1, tray fits 3, nothing decides                                                         |
 | T-031 | Resolve the Perfect Shot "bonus ball" contradiction                              | backlog     | T-004        | design review + T-004 code review — ARCHITECTURE says "+1 ball", code says "+1 damage"                                                   |
 | T-028 | CHOICE_COUNT must have one home, not two                                         | backlog     | T-003, T-004 | wave-2 integration drift — the merge created a duplicate the dev-screen slider would arm                                                 |
-| T-032 | Placement grants starter cannons only — range guns stay mastery-earned           | in-progress | T-010, T-011 | **D-6 applied** 2026-07-28 — starters only; amend T-011 ACs + placement suite                                                            |
+| T-032 | Placement grants starter cannons only (D-6)                                    | tests-written | T-010, T-011                             | `ticket/T-032-placement-unlock-overlap` | standard | **frozen** `b07759c1…`+`f90cc079…` ACCEPT_WITH_NITS; implementer go |
 | T-033 | The frozen-tests-unmodified gate is unreachable code and has never run           | backlog     | —            | wave-3 integration — the gate sits after `exit`, calls an undefined `report`, and keys off a `.tdd-swarm/phase` file that does not exist |
 | T-027 | validateCatalogs must detect set-level catalog corruption                        | backlog     | T-006        | T-006 code review M-1 — the function is weaker than its signature implies                                                                |
 | T-025 | Replace the expression evaluator's recursive walks with explicit-stack iteration | backlog     | T-002        | T-002 code review — `MAX_AST_DEPTH` is a measured margin (1.5× at a 0.5 MB stack), not a guarantee by construction                       |
