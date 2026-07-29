@@ -551,15 +551,21 @@ describe('T-018 Definition of Done', () => {
     expect(Object.isFrozen(steps)).toBe(true);
   });
 
-  it('dod(T-018:7) production scope is exactly types.ts + scripted.ts under opponents/', () => {
+  it('dod(T-018:7) production scope includes types.ts + scripted.ts under opponents/', () => {
     expect(existsSync(TYPES_SRC_PATH), 'implementer must create src/engine/opponents/types.ts').toBe(true);
     expect(existsSync(SCRIPTED_SRC_PATH), 'implementer must create src/engine/opponents/scripted.ts').toBe(
       true,
     );
 
+    // T-018 shipped the interface + scripted rival. Later tickets (T-021 mercy/bot) add
+    // sibling modules in the same folder — require the T-018 pair, allow the known set.
     const present = readdirSync(OPPONENTS_DIR)
       .filter((name) => name.endsWith('.ts'))
       .sort();
-    expect(present).toEqual(['scripted.ts', 'types.ts']);
+    expect(present).toContain('scripted.ts');
+    expect(present).toContain('types.ts');
+    for (const name of present) {
+      expect(['bot.ts', 'mercy.ts', 'scripted.ts', 'types.ts']).toContain(name);
+    }
   });
 });
