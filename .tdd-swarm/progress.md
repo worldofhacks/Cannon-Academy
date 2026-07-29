@@ -1998,3 +1998,8 @@ Test Agent amending suite.
 
 [T-034 Test Agent](a9cbdabc-389e-4c96-8270-6414a4d3aae1) `2240821`: AC-4 oracle + digit corpus; DoD-5 comments.
 Phase → implement. Implementer dispatched.
+
+### T-034 unblocked — prettier style on frozen suite
+
+Orchestrator new hash . Feat already green (1721/1721).
+Implementer resumed for final gates / reviews.
