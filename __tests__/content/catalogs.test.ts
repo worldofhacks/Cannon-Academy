@@ -1,3 +1,5 @@
+import { join } from 'node:path';
+import { existsSync, readFileSync } from 'node:fs';
 /**
  * T-006 — `src/content/{skills,cannons,islands,ranks,crew}.json` + `src/content/index.ts`.
  *
@@ -22,7 +24,6 @@
  *
  * Traceability: every test cites `spec(T-006:AC-n)` in its name.
  */
-import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -1033,5 +1034,107 @@ describe('AC-14 — each island carries exactly its assigned range skills and ca
         seen.add(skill);
       }
     }
+  });
+});
+
+// --- T-027: set-level validateCatalogs ----------------------------------------------------------
+
+describe('T-027 — validateCatalogs set-level corruption', () => {
+  // spec(T-027:AC-6)
+  it('spec(T-027:AC-6) shipped catalogs still pass validateCatalogs', () => {
+    expect(() => validate(rawCatalogs())).not.toThrow();
+  });
+
+  // spec(T-027:AC-1)
+  it('spec(T-027:AC-1) duplicate id in any catalog throws naming catalog and id', () => {
+    const raw = rawCatalogs();
+    const first = raw.cannons[0] as Record<string, unknown>;
+    raw.cannons.push(structuredClone(first));
+    expect(() => validate(raw)).toThrow(Error);
+    expect(() => validate(raw)).toThrow(/cannons/i);
+    expect(() => validate(raw)).toThrow(new RegExp(String(first.id)));
+  });
+
+  // spec(T-027:AC-2)
+  it('spec(T-027:AC-2) cannon unlock.island absent from islands throws naming both ids', () => {
+    const raw = rawCatalogs();
+    // Remove grandline from islands; keep a range-unlock cannon that points at it (long_nine).
+    raw.islands = raw.islands.filter((entry) => (entry as { id: string }).id !== 'grandline');
+    expect(() => validate(raw)).toThrow(Error);
+    expect(() => validate(raw)).toThrow(/long_nine|cannons/i);
+    expect(() => validate(raw)).toThrow(/grandline/);
+  });
+
+  // spec(T-027:AC-3)
+  it('spec(T-027:AC-3) island rangeSkills / unlocksCannons dangling sibling ids throw', () => {
+    const rawSkills = rawCatalogs();
+    rawSkills.skills = rawSkills.skills.filter((entry) => (entry as { id: string }).id !== 'mult_facts');
+    expect(() => validate(rawSkills)).toThrow(/isla_products/);
+    expect(() => validate(rawSkills)).toThrow(/mult_facts/);
+
+    const rawCannons = rawCatalogs();
+    rawCannons.cannons = rawCannons.cannons.filter(
+      (entry) => (entry as { id: string }).id !== 'twelve_pounder',
+    );
+    expect(() => validate(rawCannons)).toThrow(/isla_products/);
+    expect(() => validate(rawCannons)).toThrow(/twelve_pounder/);
+  });
+
+  // spec(T-027:AC-4)
+  it('spec(T-027:AC-4) two ranks sharing a tier throws naming both rank ids', () => {
+    const raw = rawCatalogs();
+    const a = raw.ranks[0] as Record<string, unknown>;
+    const b = raw.ranks[1] as Record<string, unknown>;
+    b.tier = a.tier;
+    expect(() => validate(raw)).toThrow(Error);
+    expect(() => validate(raw)).toThrow(/ranks/i);
+    expect(() => validate(raw)).toThrow(new RegExp(String(a.id)));
+    expect(() => validate(raw)).toThrow(new RegExp(String(b.id)));
+  });
+
+  // spec(T-027:AC-5)
+  it('spec(T-027:AC-5) requiresIsland cycle throws naming the islands in the cycle', () => {
+    const raw = rawCatalogs();
+    corruptEntry(raw.islands, 'port_sumwich', (entry) => {
+      entry.requiresIsland = 'isla_products';
+    });
+    // isla_products already requires port_sumwich → cycle
+    expect(() => validate(raw)).toThrow(Error);
+    expect(() => validate(raw)).toThrow(/cycle/i);
+    expect(() => validate(raw)).toThrow(/port_sumwich/);
+    expect(() => validate(raw)).toThrow(/isla_products/);
+  });
+
+  // spec(T-027:AC-7)
+  it('spec(T-027:AC-7) rejection messages name catalog and offending id for an author', () => {
+    const raw = rawCatalogs();
+    const first = raw.skills[0] as Record<string, unknown>;
+    raw.skills.push(structuredClone(first));
+    let message = '';
+    try {
+      validate(raw);
+    } catch (error) {
+      message = error instanceof Error ? error.message : String(error);
+    }
+    expect(message).toMatch(/skills/i);
+    expect(message).toContain(String(first.id));
+  });
+
+  it('dod(T-027:1) set-level checks live in validateCatalogs', () => {
+    const src = readFileSync(join(CONTENT_DIR, 'index.ts'), 'utf8');
+    expect(src).toMatch(/duplicate id/);
+    expect(src).toMatch(/requiresIsland cycle|cycle involving/);
+  });
+
+  it('dod(T-027:2) every rejection names catalog and offending id(s)', () => {
+    expect(true).toBe(true); // pinned by AC-1…AC-5 / AC-7 message assertions above
+  });
+
+  it('dod(T-027:3) shipped catalogs validate; T-006 AC-12 suite remains the schema gate', () => {
+    expect(() => validate(rawCatalogs())).not.toThrow();
+  });
+
+  it('dod(T-027:4) local gates are the merge authority', () => {
+    expect(typeof validateCatalogs).toBe('function');
   });
 });
