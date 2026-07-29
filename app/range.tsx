@@ -83,6 +83,7 @@ function asDuelQuestion(question: Question): DuelQuestion {
     answer: right.value,
     choices: question.choices.map((c) => c.value),
     readAloud: question.readAloud,
+    templateId: question.templateId,
   };
 }
 

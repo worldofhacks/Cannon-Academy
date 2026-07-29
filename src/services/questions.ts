@@ -1,119 +1,79 @@
 /**
- * Question source for the duel screen — PROVISIONAL.
+ * The duel's question source — an ADAPTER over the engine's generator.
  *
- * T-007 is the real generator: templates per skill, rejection sampling, a recency window, and
- * T-005's distractor ladder. It is mid-flight on the engine track and this file must be deleted
- * the day it lands. Until then the duel screen needs *something* to ask, and a screen built
- * against a shape that never existed is a rewrite, not a swap.
+ * A-014. What stood here before was a stopgap written so the duel screen had something to ask
+ * while T-007 was in flight: it drew its own operands, assembled its own prompt strings and
+ * hand-built its own near-miss ladder. Its own header said it had no template pool, no recency
+ * window and no distractor plausibility rules, and that it must not reach a child. T-007 and the
+ * nine authored template files are done, so all of that is deleted rather than deprecated —
+ * nothing below computes a number.
  *
- * Two rules keep this from becoming permanent by accident:
+ * The whole of this module is now a PROJECTION. `generateQuestion` produces the engine's
+ * `Question`; this file narrows it to the app-facing `DuelQuestion` that the duel panel and the
+ * gunnery range already render, and hands back the advanced `Rng` untouched.
  *
- *  1. **It threads the engine `Rng`, never `Math.random()`.** The design prototype uses
- *     `Math.random()` — correct for a prototype, fatal here, because a duel that cannot replay
- *     from `{seed, action log}` breaks the property the whole engine is built around. Every draw
- *     below goes through `@engine/rng`, so this stopgap is already deterministic and swapping in
- *     T-007 changes which questions appear, not whether the duel replays.
- *  2. **The signature is T-007's.** `(skill, rng) -> [question, rng]`. When the real generator
- *     lands, `nextQuestion` becomes a re-export and nothing in `src/components` or `app/` moves.
+ * Why the app-facing shape survives instead of re-exporting the engine's `Question`:
+ * `src/components/duel/QuestionPanel.tsx` reads `choices` as bare numbers and compares them to
+ * `answer`, and A-008's frozen duel-outcome suite does the same. Adopting the engine's richer
+ * choice records would rewrite a component and a frozen test for no behavioural gain. The swap
+ * was always meant to change WHICH questions appear, not whether anything moves.
  *
- * What this is NOT: it has no template pool, no recency window, and no distractor plausibility
- * rules. Do not measure question quality against it, and do not let it reach a child.
+ * Why the recency window is a parameter and not module state. The window has to exclude what was
+ * just served; replay-from-seed has to give the same question forever. A module-level history
+ * satisfies the first and destroys the second — the second draw at a given seed would differ
+ * from the first, and a duel would stop replaying from `{seed, action log}`. So the history is
+ * THREADED, exactly as the engine threads it, and `src/stores/duel.ts` carries it on
+ * `DuelState`. The parameter is optional so existing two-argument calls still compile.
  */
 import type { SkillId } from '@content/schemas';
-import { nextInt, shuffle, type Rng } from '@engine/rng';
-import { CHOICE_COUNT } from '@engine/tuning';
+import { generateQuestion } from '@engine/questions/generator';
+import type { Rng } from '@engine/rng';
+
+import { templatesForSkill } from './templatePools';
 
 export interface DuelQuestion {
-  /** The prompt exactly as it renders, e.g. `7 + 5 = ?`. */
+  /** The prompt exactly as it renders — the template's own sentence, tokens filled in. */
   readonly text: string;
+  /** The value the engine marked correct, projected out of its choice set. */
   readonly answer: number;
   /** Exactly `CHOICE_COUNT` options, shuffled, containing `answer` once. */
   readonly choices: readonly number[];
-  /** Whether the prompt needs a read-aloud button (K-1 word problems). Always false here. */
+  /** Whether the prompt needs a read-aloud button — the template's own flag, via the engine. */
   readonly readAloud: boolean;
+  /** Which authored template produced this question; the handle the recency window reads. */
+  readonly templateId: string;
 }
 
-/** Builds the choice set: the answer plus near-misses, deduped and shuffled. */
-function withChoices(
-  text: string,
-  answer: number,
-  candidates: readonly number[],
+/**
+ * Draws the next question for a skill.
+ *
+ * `recentTemplateIds` is most-recent-first; the engine excludes its leading
+ * `RECENT_TEMPLATE_WINDOW` entries and degrades to the full pool rather than starving.
+ */
+export function nextQuestion(
+  skill: SkillId,
   rng: Rng,
+  recentTemplateIds: readonly string[] = [],
 ): readonly [DuelQuestion, Rng] {
-  const pool = new Set<number>([answer]);
-  for (const c of candidates) {
-    if (pool.size >= CHOICE_COUNT) break;
-    if (c >= 0 && !pool.has(c)) pool.add(c);
+  const [question, next] = generateQuestion({
+    templates: templatesForSkill(skill),
+    recentTemplateIds,
+    rng,
+  });
+
+  const correct = question.choices[question.correctIndex];
+  if (correct === undefined) {
+    throw new Error(`nextQuestion: no correct choice was marked for template '${question.templateId}'`);
   }
-  // A ladder, not a loop-until-lucky: for a small answer the near-misses collide fast, and an
-  // unbounded search on a bad draw is a hang on a child's phone.
-  for (let step = 2; pool.size < CHOICE_COUNT; step += 1) {
-    if (!pool.has(answer + step)) pool.add(answer + step);
-  }
 
-  const [choices, next] = shuffle(rng, [...pool]);
-  return [{ text, answer, choices, readAloud: false }, next];
-}
-
-export function nextQuestion(skill: SkillId, rng: Rng): readonly [DuelQuestion, Rng] {
-  switch (skill) {
-    case 'add_within_10':
-    case 'add_within_20': {
-      const cap = skill === 'add_within_10' ? 10 : 20;
-      const [a, r1] = nextInt(rng, 2, Math.floor(cap / 2));
-      const [b, r2] = nextInt(r1, 1, cap - a);
-      const answer = a + b;
-      return withChoices(`${a} + ${b} = ?`, answer, [answer + 1, answer - 1, answer + 2], r2);
-    }
-
-    case 'sub_within_20': {
-      const [total, r1] = nextInt(rng, 6, 20);
-      const [take, r2] = nextInt(r1, 1, total - 1);
-      const answer = total - take;
-      return withChoices(`${total} − ${take} = ?`, answer, [answer + 1, answer - 1, total], r2);
-    }
-
-    case 'place_value_compare': {
-      const [a, r1] = nextInt(rng, 11, 99);
-      const [b, r2] = nextInt(r1, 11, 99);
-      const answer = Math.max(a, b);
-      return withChoices(`Which is bigger: ${a} or ${b}?`, answer, [Math.min(a, b)], r2);
-    }
-
-    case 'mult_facts': {
-      const [a, r1] = nextInt(rng, 2, 9);
-      const [b, r2] = nextInt(r1, 2, 9);
-      const answer = a * b;
-      return withChoices(`${a} × ${b} = ?`, answer, [answer + a, answer - a, a + b], r2);
-    }
-
-    case 'div_facts': {
-      const [b, r1] = nextInt(rng, 2, 9);
-      const [q, r2] = nextInt(r1, 2, 9);
-      const answer = q;
-      return withChoices(`${b * q} ÷ ${b} = ?`, answer, [answer + 1, answer - 1, b], r2);
-    }
-
-    case 'two_step_add_sub': {
-      const [a, r1] = nextInt(rng, 5, 12);
-      const [b, r2] = nextInt(r1, 3, 8);
-      const [c, r3] = nextInt(r2, 2, 5);
-      const answer = a + b - c;
-      return withChoices(`${a} + ${b} − ${c} = ?`, answer, [answer + 1, answer - 1, a + b], r3);
-    }
-
-    case 'fractions_int': {
-      const [half, r1] = nextInt(rng, 4, 10);
-      const whole = half * 2;
-      return withChoices(`½ of ${whole} = ?`, half, [half + 2, half - 2, whole], r1);
-    }
-
-    case 'multi_digit_order_ops': {
-      const [a, r1] = nextInt(rng, 2, 6);
-      const [b, r2] = nextInt(r1, 1, 6);
-      const [c, r3] = nextInt(r2, 1, 6);
-      const answer = a * (b + c);
-      return withChoices(`${a} × (${b} + ${c}) = ?`, answer, [a * b + c, answer + a, answer - a], r3);
-    }
-  }
+  return [
+    {
+      text: question.text,
+      answer: correct.value,
+      choices: question.choices.map((choice) => choice.value),
+      readAloud: question.readAloud,
+      templateId: question.templateId,
+    },
+    next,
+  ];
 }
