@@ -23,6 +23,7 @@ import Animated, {
 import { PERFECT_SHOT_TIMER_FRACTION } from '@engine/tuning';
 
 import type { CannonLook } from '../../theme/cannonPresentation';
+import { questionTypographyFor } from '../../theme/questionTypography';
 import { color, radius, space, type } from '../../theme/tokens';
 import type { DuelQuestion } from '../../services/questions';
 
@@ -39,6 +40,7 @@ interface QuestionPanelProps {
 }
 
 export function QuestionPanel({ question, look, cannonName, timerMs, picked, onAnswer }: QuestionPanelProps) {
+  const questionTypography = questionTypographyFor(question.text);
   const burn = useSharedValue(0);
   useEffect(() => {
     burn.value = 0;
@@ -59,7 +61,14 @@ export function QuestionPanel({ question, look, cannonName, timerMs, picked, onA
       </View>
 
       <View style={s.questionRow}>
-        <Text style={s.question} accessibilityRole="header">
+        <Text
+          style={[s.question, questionTypography.style]}
+          accessibilityRole="header"
+          accessibilityLabel={question.text}
+          numberOfLines={questionTypography.numberOfLines}
+          adjustsFontSizeToFit={questionTypography.adjustsFontSizeToFit}
+          minimumFontScale={questionTypography.minimumFontScale}
+        >
           {question.text}
         </Text>
       </View>
@@ -209,8 +218,8 @@ const s = StyleSheet.create({
   fastStar: { color: color.amber, fontSize: 13 },
   fastText: { ...type.chip, fontSize: 11, color: color.inkDark },
 
-  questionRow: { height: 56, alignItems: 'center', justifyContent: 'center' },
-  question: { ...type.display, fontSize: 44, lineHeight: 50, color: color.inkDark },
+  questionRow: { minHeight: 56, alignItems: 'center', justifyContent: 'center' },
+  question: { ...type.display, color: color.inkDark, textAlign: 'center' },
 
   fuseTrack: {
     height: 18,
