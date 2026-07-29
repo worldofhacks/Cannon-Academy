@@ -1802,3 +1802,10 @@ distractor → `a + b + 2` (ladder 0/1000); AC-7 preflight added. Orchestrator d
 [T-032 Implementer](5508089d-1026-4f34-a62f-f3acac7054c3) `ff66b32`: starters-only. Gates ALL
 PASS, **1456/1456**, frozen hashes unchanged. Code + security review dispatched next; then
 merge + push per ticket policy.
+
+
+### T-032 — review-passed → merged
+
+Code: APPROVE_WITH_NITS ([T-032 Code Review](d4739913-a514-4ac1-bc4f-74cdf6e4fcb2)); header nit fixed.
+Security: **PASS** ([T-032 Security Review](b8f9afa1-bc67-4f3e-8a08-58ab6a9e53fc)).
+Merged into `swarm/engine-core` and pushed (per-ticket push policy).
