@@ -22,11 +22,11 @@
 
 ## Wave A2
 
-| id    | title                                                                         | status  | deps         | model    |
-| ----- | ----------------------------------------------------------------------------- | ------- | ------------ | -------- |
-| A-004 | Anonymous identity that survives a cold start                                 | backlog | A-002        | standard |
-| A-005 | Onboarding wired to placement, and the root layout wired to the flow resolver | backlog | A-001, A-003 | standard |
-| A-006 | Name and flag — the ship becomes theirs before the first chest                | backlog | A-001        | cheap    |
+| id    | title                                                                         | status        | deps         | model    |
+| ----- | ----------------------------------------------------------------------------- | ------------- | ------------ | -------- |
+| A-004 | Anonymous identity that survives a cold start                                 | review-passed | A-002        | standard |
+| A-005 | Onboarding wired to placement, and the root layout wired to the flow resolver | review-passed | A-001, A-003 | standard |
+| A-006 | Name and flag — the ship becomes theirs before the first chest                | backlog       | A-001        | cheap    |
 
 ## Wave A3
 
@@ -36,11 +36,11 @@
 
 ## Wave A4
 
-| id    | title                                                         | status  | deps         | model    |
-| ----- | ------------------------------------------------------------- | ------- | ------------ | -------- |
-| A-008 | The duel earns something — coins, mastery and wins persist    | backlog | A-001, A-007 | standard |
-| A-009 | Gunnery range — the drill that makes mastery real             | backlog | A-001, A-007 | standard |
-| A-010 | Chest ceremony — the real rarity roll, not a hardcoded reward | backlog | A-008        | cheap    |
+| id    | title                                                         | status        | deps         | model    |
+| ----- | ------------------------------------------------------------- | ------------- | ------------ | -------- |
+| A-008 | The duel earns something — coins, mastery and wins persist    | review-passed | A-001, A-007 | standard |
+| A-009 | Gunnery range — the drill that makes mastery real             | backlog       | A-001, A-007 | standard |
+| A-010 | Chest ceremony — the real rarity roll, not a hardcoded reward | backlog       | A-008        | cheap    |
 
 ## Wave A5
 
