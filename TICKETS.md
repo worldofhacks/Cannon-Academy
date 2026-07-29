@@ -93,10 +93,14 @@ blocks the merge; both should close before wave 4 dispatches.
 
 ## Wave 4 — generator and duel vocabulary
 
-| id    | title                                                                            | status        | deps                              | branch                            | model    | issue                                                                                |
-| ----- | -------------------------------------------------------------------------------- | ------------- | --------------------------------- | --------------------------------- | -------- | ------------------------------------------------------------------------------------ |
-| T-007 | Question generator — selection, rejection sampling, render, four-choice assembly | review-passed | T-001, T-002, T-003, T-004, T-005 | `ticket/T-007-question-generator` | capable  | frozen `1a586570…`; impl `a358270`; code APPROVE_WITH_NITS; security PASS_WITH_NOTES |
-| T-013 | Duel state, events, action log, and initial-state construction                   | review-passed | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | frozen `767fc8da…`; impl `f4adb7b`+`f99b25f`; code APPROVE_WITH_NITS; security PASS |
+**Merged into `swarm/engine-core` (`b5b666f..c0b11ca`) — integration PASS.** Two clean merges,
+all repo gates green, **1,438/1,438 tests**, `npm audit` clean, manifests byte-identical.
+Cross-ticket probe green (T-007 × T-013). Evidence: `.tdd-swarm/reports/wave4-integration.md`.
+
+| id    | title                                                                            | status | deps                              | branch                            | model    | issue                                               |
+| ----- | -------------------------------------------------------------------------------- | ------ | --------------------------------- | --------------------------------- | -------- | --------------------------------------------------- |
+| T-007 | Question generator — selection, rejection sampling, render, four-choice assembly | done   | T-001, T-002, T-003, T-004, T-005 | `ticket/T-007-question-generator` | capable  | frozen `1a586570…`; impl `a358270`; merge `63a4388` |
+| T-013 | Duel state, events, action log, and initial-state construction                   | done   | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | frozen `767fc8da…`; impl `f99b25f`; merge `c0b11ca` |
 
 ## Wave 5 — template content, drill, opponents, the duel machine
 

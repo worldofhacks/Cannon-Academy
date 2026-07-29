@@ -1666,7 +1666,6 @@ matched the worktrees' `node_modules` **symlink**. Lessons added this session: *
 L-034**, plus a note that the `SWARM_ORCHESTRATOR=1` bypass is anchored to the first token, so a
 misplaced one is indistinguishable from a real policy hit.
 
-
 ## T-013 — review-passed
 
 Code: APPROVE_WITH_NITS ([T-013 Code Review](87210f96-cac5-4edc-bb48-3c84da28c89f)).
@@ -1676,3 +1675,36 @@ Evidence: `.tdd-swarm/reports/T-013-security-review.md`.
 
 **Wave 4 both tickets review-passed.** Next: integration merge into `swarm/engine-core`
 (T-007 `a358270`, T-013 `f99b25f`) via independent Integration Agent.
+
+---
+
+## Wave 4 INTEGRATED — `b5b666f..c0b11ca`, **PASS**
+
+Independent integration agent, 2026-07-28. Full report:
+`.tdd-swarm/reports/wave4-integration.md`.
+
+| Dimension                      | Result                                                   |
+| ------------------------------ | -------------------------------------------------------- |
+| Merges                         | 2/2 clean, zero conflicts — four pairwise-disjoint files |
+| Tier 1 local gates             | ALL GREEN (8 gates, incl. `frozen-tests-unmodified`)     |
+| spec-lint                      | 2/2 PASS (T-007, T-013)                                  |
+| Test suite                     | **1,438 passed / 1,438**, 15 files, 2.43s                |
+| `npm audit --audit-level=high` | 0 vulnerabilities                                        |
+| `package.json` / lockfile      | byte-identical to pre-merge `b5b666f`                    |
+| Frozen tests                   | mechanical gate PASS: 2 `A`, **0 `M`** under `__tests__` |
+
+Merge commits: `63a4388` (T-007), `c0b11ca` (T-013). Expected test sum verified:
+`1229 + 81 + 128 = 1438`.
+
+### Cross-ticket probe — 2/2 green
+
+`scratchpad/wave4-integration/` per L-028; deleted after. `createDuelState` + `generateQuestion`
+co-executed with real island, loadouts, and templates; composed values dumped (seed 42001 →
+`4 + 4 = ?`, hull 100/45, `rngAdvanced: true`). No composition gap surfaced.
+
+### Findings
+
+No new tickets filed. T-032 (owner decision) and CHOICE_COUNT duplication remain open from prior
+waves; neither blocks the merge.
+
+**Status: Wave 4 COMPLETE — integration PASS.** Next: Wave 5 dispatch (T-014…T-020).
