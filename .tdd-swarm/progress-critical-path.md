@@ -48,3 +48,11 @@ A-015 → A-010 → A-012 → A-033 → A-031 → A-034 → A-038 → A-013
 
 | A-038 demo navigation | **merged** |
 | A-013 design fidelity | **merged** |
+
+
+## Production deploy (2026-07-29)
+
+- Tip: `476c264`
+- Immutable: https://cannon-academy--h5hw43ot9w.expo.app
+- Production: https://cannon-academy.expo.app
+- Remaining backlog: A-019 (release hosting ticket), A-026/A-040 (cloud), A-036 docs, A-037 release proof
