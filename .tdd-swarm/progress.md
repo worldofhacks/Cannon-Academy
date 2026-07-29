@@ -1826,3 +1826,18 @@ Feat `ab41906` JSON refresh green; gates ALL PASS after style. Code + security r
 
 Four REQUIRED_TEMPLATES exceed ladder threshold (same class as T-014). Phase reopened to `tests`;
 Test Agent amending distractors + AC-11 preflight.
+
+
+### T-014 — done (merged)
+
+Code APPROVE_WITH_NITS ([T-014 Code Review](aa31c5a7-cdbf-4dfe-946e-c09681e8024e));
+security PASS ([T-014 Security Review](de6c9b30-e714-4889-b223-4b3157d16c79)).
+Merged into `swarm/engine-core`.
+
+### T-015 FROZEN (`f941a204069afed6…`) — ACCEPT_WITH_NITS
+
+[T-015 re-review](0aaf1e78-54bf-4f95-b650-f3873409e005): Critical/Important closed. Implementer dispatched.
+
+### T-016 re-frozen (`a48a7e7ffe7d41e7…`) after ladder dispute fix
+
+[T-016 Test Agent](d05384d3-5e8d-42e1-8f93-f00010357c9d) `eea35ac`. Phase → `implement`. Implementer re-dispatched.
