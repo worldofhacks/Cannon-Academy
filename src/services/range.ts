@@ -1,0 +1,263 @@
+/**
+ * The gunnery range — what is drillable, where its questions come from, and what a finished
+ * drill is worth.
+ *
+ * A-009. `src/engine/drill.ts` (T-017) has been merged for a full wave with zero callers: the
+ * engine can already run a full-rate practice loop, and nothing in the app could open one. Two
+ * MVP checklist items sat at zero because of it — "run a practice drill that fills a mastery
+ * meter" and "the meter unlocks the next cannon".
+ *
+ * PLAN.md sets the cut line: **reuse the duel question UI against a stationary target buoy — a
+ * meter, not a new mode.** So there is no opponent here, no hull, no damage and no cannon. This
+ * module is deliberately three functions wide, because the middle of a drill is already solved:
+ * `answerDrill` is pure, published, and folds mastery at `MASTERY_RATE_RANGE` itself, so
+ * `app/range.tsx` calls it directly exactly as `app/duel.tsx` calls the duel reducer. What the
+ * engine cannot do is decide WHICH skills an island lets you drill, find that skill's authored
+ * template pool, and write the result onto the captain. Those three are this file, and that is
+ * the whole of it.
+ *
+ * Two rules govern it, both inherited from A-008's `duelRewards.ts`:
+ *
+ *  1. **It prices nothing itself.** The fill rate belongs to `applyAnswer(..., 'range', ...)`
+ *     inside the engine, and reaches the captain through the store's `recordRangeAnswers`. The
+ *     unlock rule belongs to `resolveUnlocks`. No rate, threshold or meter literal appears below.
+ *  2. **It commits exactly once per session.** React re-renders, StrictMode fires effects twice,
+ *     and a finished drill can be observed many times — anything applied per OBSERVATION fills
+ *     the meter at double the tuned rate, which is precisely the bug this ticket exists to
+ *     prevent, arriving through the back door.
+ *
+ * No React import: the logic is frozen-tested headless (`__tests__/app/range.test.ts`), and the
+ * screen is a thin caller.
+ */
+import { getIsland } from '@content/index';
+import type { CannonId, IslandId, SkillId, Template } from '@content/schemas';
+import { templateSchema } from '@content/schemas';
+import { startDrill, type DrillSession } from '@engine/drill';
+import { emptyMastery, isMastered, meterPercent, type SkillMastery } from '@engine/mastery';
+import type { Rng } from '@engine/rng';
+
+import addWithin10Raw from '../content/templates/add_within_10.json';
+import addWithin20Raw from '../content/templates/add_within_20.json';
+import divFactsRaw from '../content/templates/div_facts.json';
+import fractionsIntRaw from '../content/templates/fractions_int.json';
+import multFactsRaw from '../content/templates/mult_facts.json';
+import multiDigitOrderOpsRaw from '../content/templates/multi_digit_order_ops.json';
+import placeValueCompareRaw from '../content/templates/place_value_compare.json';
+import subWithin20Raw from '../content/templates/sub_within_20.json';
+import twoStepAddSubRaw from '../content/templates/two_step_add_sub.json';
+
+import type { Captain, CaptainStore } from '../stores/player';
+
+/** Everything the range summary announces, plus whether any of it actually happened. */
+export interface RangeDrillOutcome {
+  /** False when this session was already committed, or has not finished yet. */
+  readonly applied: boolean;
+  readonly skillId: SkillId;
+  /** Raw corrects actually credited; `0` when not applied. */
+  readonly correct: number;
+  /** Raw attempts actually credited; `0` when not applied. */
+  readonly asked: number;
+  /** Cannons newly granted BY THIS COMMIT — a grant nobody is told about is a reward that did not happen. */
+  readonly unlockedCannons: readonly CannonId[];
+  /** Islands whose fog this commit lifted. */
+  readonly unlockedIslands: readonly IslandId[];
+  /** The 0-100 meter AFTER the commit, so the screen and the store cannot disagree. */
+  readonly meterPercent: number;
+  /** Whether the skill now clears BOTH mastery gates (weighted corrects and the accuracy floor). */
+  readonly mastered: boolean;
+}
+
+/**
+ * How many questions a drill asks when the caller does not say.
+ *
+ * A literal, and it is not in `engine/tuning.ts` on purpose: adding a constant there is
+ * engine-track scope (COORDINATION.md), and no tuned behaviour depends on this number — the
+ * fill rate does, and that IS in tuning. It is the number of questions a child is asked before
+ * the summary appears, which is a screen-pacing decision. `MASTERY_THRESHOLD_CORRECT` worth of
+ * questions is the honest choice: a perfect drill from empty masters the skill in exactly one
+ * visit, which is what makes the meter legible. When T-019 or a pacing ticket wants this tuned,
+ * it moves to `tuning.ts` and this export becomes a re-export.
+ */
+export const RANGE_DRILL_LENGTH = 10;
+
+// ── The authored template pool ──────────────────────────────────────────────────────────────
+//
+// T-019's content registry is still backlog, so resolving a skill's pool is this module's job.
+// Two constraints shape how:
+//
+//   * STATIC imports, never `fs`. A directory read works in the node test runner and breaks
+//     under Metro on a device, where there is no filesystem to read `src/content/templates`
+//     from — the worst possible split, because every gate would stay green.
+//   * Validated through `templateSchema`, exactly as `content/index.ts` validates the catalogs.
+//     It is not ceremony: a raw JSON import types `params` as `number[]` and `Template` requires
+//     `[number, number]`, so the parse is what produces the type as well as the guarantee. A
+//     malformed template throws at import — it must fail a test, never reach a child.
+//
+// `Record<SkillId, ...>` is the safety net: add a skill to `SKILL_IDS` and this file stops
+// compiling until it has a pool, rather than throwing `NO_TEMPLATE` at a child mid-drill.
+
+function pool(skill: SkillId, raw: readonly unknown[]): readonly Template[] {
+  return raw.map((entry) => {
+    const parsed = templateSchema.safeParse(entry);
+    if (!parsed.success) {
+      throw new Error(`content/templates/${skill}.json: invalid template — ${parsed.error.message}`);
+    }
+    if (parsed.data.skill !== skill) {
+      throw new Error(
+        `content/templates/${skill}.json: template '${parsed.data.id}' declares skill '${parsed.data.skill}'`,
+      );
+    }
+    return parsed.data;
+  });
+}
+
+const TEMPLATES: Record<SkillId, readonly Template[]> = {
+  add_within_10: pool('add_within_10', addWithin10Raw),
+  add_within_20: pool('add_within_20', addWithin20Raw),
+  sub_within_20: pool('sub_within_20', subWithin20Raw),
+  place_value_compare: pool('place_value_compare', placeValueCompareRaw),
+  mult_facts: pool('mult_facts', multFactsRaw),
+  two_step_add_sub: pool('two_step_add_sub', twoStepAddSubRaw),
+  div_facts: pool('div_facts', divFactsRaw),
+  fractions_int: pool('fractions_int', fractionsIntRaw),
+  multi_digit_order_ops: pool('multi_digit_order_ops', multiDigitOrderOpsRaw),
+};
+
+// ── Which drills each captain has already been paid for ─────────────────────────────────────
+//
+// Scoped PER STORE, not module-global, for the same reason as A-008's duel ledger: the question
+// is "has THIS captain been credited for this drill", and one shared set would rob a second
+// captain of a drill the first was credited for while quietly making any suite that touches it
+// order-dependent. `WeakMap`/`WeakSet` so a discarded store, or a discarded session, takes its
+// entry with it.
+//
+// The identity is the finished session OBJECT rather than a content hash, because `DrillSession`
+// carries no id and a hash cannot tell an honest repeat drill from a re-render: two drills of the
+// same skill at the same seed from the same captain state are byte-identical and the second one
+// is real practice. Object identity is exactly what a double-effect or a re-observed summary
+// hands over twice, and exactly what a fresh drill never collides with.
+
+const committedDrills = new WeakMap<CaptainStore, WeakSet<DrillSession>>();
+
+function ledgerFor(store: CaptainStore): WeakSet<DrillSession> {
+  const existing = committedDrills.get(store);
+  if (existing !== undefined) return existing;
+  const fresh = new WeakSet<DrillSession>();
+  committedDrills.set(store, fresh);
+  return fresh;
+}
+
+/** The ids present in `after` that were not in `before` — this commit's own grants. */
+function granted<T>(before: readonly T[], after: readonly T[]): readonly T[] {
+  const already = new Set(before);
+  return after.filter((id) => !already.has(id));
+}
+
+/** The outcome for a drill that credits nothing — unfinished, or already committed. */
+function noCredit(captain: Captain, skillId: SkillId): RangeDrillOutcome {
+  const mastery = masteryFor(captain, skillId);
+  return {
+    applied: false,
+    skillId,
+    correct: 0,
+    asked: 0,
+    unlockedCannons: [],
+    unlockedIslands: [],
+    // Reported from the stored captain, not zeroed: a re-render that re-observes a settled drill
+    // must still be able to draw the meter it is looking at.
+    meterPercent: meterPercent(mastery),
+    mastered: isMastered(mastery),
+  };
+}
+
+function masteryFor(captain: Captain, skillId: SkillId): SkillMastery {
+  return captain.mastery[skillId] ?? emptyMastery;
+}
+
+/**
+ * The skills an island's gunnery range trains, in catalog order.
+ *
+ * Straight from the island record — a superset would let a child grind a skill the island does
+ * not teach, and a subset silently strands the cannon that skill unlocks.
+ */
+export function rangeSkills(islandId: IslandId): readonly SkillId[] {
+  return getIsland(islandId).rangeSkills;
+}
+
+/**
+ * Opens a live drill at an island's range.
+ *
+ * Throws when the skill is not one this island trains — refusing loudly rather than quietly
+ * drilling something the range does not teach.
+ *
+ * The session's mastery is SEEDED from the captain's stored meter. A drill that starts every
+ * session at zero shows a child a bar that resets each time they practise, and makes the live
+ * meter and `commitDrill` disagree about where the drill ended up.
+ */
+export function openDrill(input: {
+  readonly islandId: IslandId;
+  readonly skillId: SkillId;
+  readonly captain: Captain;
+  readonly rng: Rng;
+  readonly length?: number;
+}): DrillSession {
+  const drillable = rangeSkills(input.islandId);
+  if (!drillable.includes(input.skillId)) {
+    throw new Error(
+      `openDrill: '${input.skillId}' is not trained at ${input.islandId} — its range drills ${
+        drillable.length === 0 ? 'nothing' : drillable.join(', ')
+      }`,
+    );
+  }
+
+  return startDrill({
+    skillId: input.skillId,
+    templates: TEMPLATES[input.skillId],
+    mastery: masteryFor(input.captain, input.skillId),
+    rng: input.rng,
+    length: input.length ?? RANGE_DRILL_LENGTH,
+  });
+}
+
+/**
+ * Writes a finished drill onto the captain: mastery at the full rate, and whatever that unlocked.
+ *
+ * Safe to call on any session at any time. An unfinished drill and an already-committed one both
+ * return `applied: false` and change nothing — and an unfinished one is NOT recorded as committed,
+ * because the screen will observe a session mid-drill and burning its one commit there would mean
+ * the drill finishes and pays nothing (the A-008 failure mode, in a new place).
+ *
+ * Nothing but mastery is touched. There is no hull to damage, no purse to charge and no rank to
+ * lose: the range is a buoy, so a wrong answer costs an attempt and nothing else. That is a
+ * pedagogy guarantee — a child told practice is safe and then charged for a guess has been lied
+ * to by the software.
+ */
+export function commitDrill(store: CaptainStore, session: DrillSession): RangeDrillOutcome {
+  const before = store.getState().captain;
+  const skillId = session.skillId;
+
+  if (!session.complete) return noCredit(before, skillId);
+
+  const ledger = ledgerFor(store);
+  if (ledger.has(session)) return noCredit(before, skillId);
+  ledger.add(session);
+
+  // `asked` carries the wrong answers with it: crediting only the corrects would inflate accuracy
+  // and hollow out the mastery gate the unlock hangs on. The store folds them at the range rate
+  // and applies the unlocks — this file re-derives neither.
+  store.getState().recordRangeAnswers(skillId, { correct: session.correct, asked: session.answered });
+
+  const after = store.getState().captain;
+  const mastery = masteryFor(after, skillId);
+
+  return {
+    applied: true,
+    skillId,
+    correct: session.correct,
+    asked: session.answered,
+    unlockedCannons: granted(before.ownedCannons, after.ownedCannons),
+    unlockedIslands: granted(before.unlockedIslands, after.unlockedIslands),
+    meterPercent: meterPercent(mastery),
+    mastered: isMastered(mastery),
+  };
+}
