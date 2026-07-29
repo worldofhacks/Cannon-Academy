@@ -8,84 +8,51 @@
 | `git branch --show-current` | `ticket/T-016-templates-g35` |
 | `.tdd-swarm/phase` | `tests` |
 | `.tdd-swarm/active-ticket` | `T-016` |
-| `src/` touched | **no** |
+| `src/` touched | **no** (stale JSON left for implementer refresh) |
 
 ## 1. Status
 
-**DONE (RED)** — review round 2 fixes applied.
+**DONE** — TEST DISPUTE closed (AC-11 ladder freeze).
 
-Failing tests remain for missing content JSON. Spec-lint PASS. Baseline outside this file **1438 passed**. Suite: **49 failed \| 6 passed** (55) — the 6 greens are authoring-contract preflight (3) + DoD meta (1–3).
+Authoring-contract preflight (including new AC-11 ladder preflight) is green. Loaded stale JSON correctly fails AC-1 deep-equals / AC-11 / updated AC-12 spots until the implementer re-copies `REQUIRED_TEMPLATES`. Spec-lint PASS. Baseline outside this file **1438 passed**.
 
 ## 2. Deliverable
 
 | Path | Role |
 | --- | --- |
-| `__tests__/content/templates/g35.test.ts` | Frozen RED suite |
-| Commit | `test(T-016): close AC-12 independence, dead-param, div constraints` |
+| `__tests__/content/templates/g35.test.ts` | Frozen suite + fixed REQUIRED_TEMPLATES |
+| Commit | `test(T-016): fix ladder collisions in REQUIRED_TEMPLATES; add AC-11 preflight` |
 
-## 3. Review closures (Composer REJECT → fixed)
+## 3. TEST DISPUTE — AC-11 ladder collisions
 
-### C-1 — AC-12 independence
+Implementer copied `REQUIRED_TEMPLATES` faithfully (`8de5d24`); AC-11 failed on four rows. Root cause: AC-1 deep-equals froze distractors that routinely collide or fail plausibility, with no AC-11 preflight on REQUIRED (same class as T-014).
 
-**Closed** at `g35.test.ts:66–337` (REQUIRED_TEMPLATES + SPOT_CHECKS), `883–911` (AC-12 assertions).
+### Ladder rates (seeds 1…1000)
 
-- Removed `independentArithmetic` / template-derived expectations.
-- Added T-014-style `REQUIRED_TEMPLATES` (8×3) and literal `SPOT_CHECKS` with concrete `text` / `answer` per id.
-- AC-12 now does `expect(question.text).toBe(text)` and `expect(…).toBe(answer)` from the table.
-- Preflight (`506–540`) proves literals match `generateQuestion` on REQUIRED rows without loading JSON.
+| id | Before | After | Fix |
+| --- | --- | --- | --- |
+| `div_facts_same` | **913** | **0** | Distractors `0,2,3` (answer always 1; param `a` usually fails magnitude) |
+| `multi_digit_order_ops_no_paren` | **520** | **51** | Keep wrong-order; add `b * c` + `+2`; tighten `c∈[2,6]`, `b>=a` so WO stays plausible |
+| `multi_digit_order_ops_paren` | **346** | **124** | Keep wrong-order; near-misses `±1`; tighten `c∈[2,4]` |
+| `multi_digit_order_ops_times_minus` | **893** | **170** | Replace `a*(b-c)` (often negative) with forgot-subtract `a * b` + near-misses |
 
-### I-1 — AC-3 dead-param substring bypass
+SPOT_CHECKS updated for no_paren / paren seed-1 text+answer (param ranges changed).
 
-**Closed** at `g35.test.ts:380–385`.
+### AC-11 preflight added
 
-```typescript
-const word = new RegExp(`\\b${name}\\b`);
-if (word.test(template.answerExpr)) return true;
-return (template.constraints ?? []).some((constraint) => word.test(constraint));
-```
-
-Dead param `a` no longer passes via constraint `ab != 0`.
-
-### I-2 — div_facts structural exact-divisibility
-
-**Closed** at `g35.test.ts:432–495` (`assertDeclaredDivConstraints`), wired into:
-
-- AC-5 structural test — `676–679`
-- AC-5 outcome sweep retained — `682+`
-- DoD-6 — `1050–1058`
-- Preflight on REQUIRED div_facts — `517–521`
-
-For every `ident / ident` pair in `answerExpr` and every `{a} ÷ {b}` pair in text, the template must declare `dividend % divisor == 0` and `divisor != 0` (or `> 0`). Degenerate single-value ranges with only `b != 0` now fail.
+`spec(T-016:AC-11) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples per template` — mirrors T-014's AC-7 preflight so bad distractors cannot freeze again.
 
 ## 4. Gates
 
 | Gate | Result |
 | --- | --- |
+| Preflight (spots, div constraints, headroom, **AC-11 ladder**) | **PASS** |
 | `bash .tdd-swarm/spec-lint.sh tickets/T-016.md` | **PASS** |
-| `npx vitest run __tests__/content/templates/g35.test.ts` | **RED** — 49 failed \| 6 passed (55) |
+| Loaded stale JSON | AC-1 verbatim / AC-11 / AC-12 spots **FAIL** (expected until refresh) |
 | Existing suite excluding this file | **1438 passed** |
-| prettier / eslint on new file | **PASS** |
 
-### RED failure summary
+## 5. Prior review closures (still in force)
 
-All content failures are clean missing-file assertions (`*.json is missing from src/content/templates/`). No setup/import crashes. No unexpected AssertionErrors during RED.
-
-## 5. AC → test mapping (unchanged tags; AC-5/AC-12 strengthened)
-
-| AC | Coverage |
-| --- | --- |
-| AC-1 | parse + ≥8; REQUIRED rows present verbatim |
-| AC-2 | skill / id prefix / uniqueness |
-| AC-3 | token↔params; `\b` live-param check |
-| AC-4 | 1000-seed golden sweep |
-| AC-5 | **structural** `% == 0` + non-zero divisor **and** outcome sweep |
-| AC-6 | ≤1000 bound |
-| AC-7 | no `.` in fractions_int |
-| AC-8 | precedence pair variety |
-| AC-9 | wrong-order distractor |
-| AC-10 | word-problem flag / length |
-| AC-11 | ladder &lt; 250/1000 |
-| AC-12 | **literal** SPOT_CHECKS table (`it.each`) |
-| AC-13 | ≥5 skeletons |
-| AC-14 | seeds 1…200 headroom |
-| AC-15 | distractor hygiene |
+- **C-1** AC-12 literal SPOT_CHECKS (not `independentArithmetic`)
+- **I-1** `\b` word-boundary `paramIsLive`
+- **I-2** structural `dividend % divisor == 0` + non-zero divisor for div_facts

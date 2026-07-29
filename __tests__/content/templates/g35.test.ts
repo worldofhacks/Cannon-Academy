@@ -108,7 +108,8 @@ const REQUIRED_TEMPLATES: readonly Template[] = [
     params: { a: [1, 20] },
     constraints: ['a != 0', 'a % a == 0'],
     answerExpr: 'a / a',
-    distractors: ['0', '2', 'a'],
+    // Answer is always 1; param `a` as a distractor is usually implausible (magnitude).
+    distractors: ['0', '2', '3'],
   },
   {
     id: 'div_facts_quotient_first',
@@ -227,16 +228,17 @@ const REQUIRED_TEMPLATES: readonly Template[] = [
     id: 'multi_digit_order_ops_no_paren',
     skill: 'multi_digit_order_ops',
     text: '{a} + {b} × {c} = ?',
-    params: { a: [1, 20], b: [1, 12], c: [1, 12] },
-    constraints: ['a + b * c <= 1000'],
+    params: { a: [1, 12], b: [2, 12], c: [2, 6] },
+    // c>=2 keeps wrong-order ≠ answer; b>=a keeps (a+b)*c inside the plausibility band.
+    constraints: ['a + b * c <= 1000', 'b >= a'],
     answerExpr: 'a + b * c',
-    distractors: ['(a + b) * c', '(a + b * c) + 1', '(a + b * c) - 1'],
+    distractors: ['(a + b) * c', 'b * c', '(a + b * c) + 2'],
   },
   {
     id: 'multi_digit_order_ops_paren',
     skill: 'multi_digit_order_ops',
     text: '({a} + {b}) × {c} = ?',
-    params: { a: [1, 20], b: [1, 20], c: [1, 12] },
+    params: { a: [1, 15], b: [1, 15], c: [2, 4] },
     constraints: ['(a + b) * c <= 1000'],
     answerExpr: '(a + b) * c',
     distractors: ['a + b * c', '((a + b) * c) + 1', '((a + b) * c) - 1'],
@@ -275,7 +277,8 @@ const REQUIRED_TEMPLATES: readonly Template[] = [
     params: { a: [2, 20], b: [2, 20], c: [1, 50] },
     constraints: ['a * b >= c', 'a * b - c <= 1000'],
     answerExpr: 'a * b - c',
-    distractors: ['a * (b - c)', '(a * b - c) + 1', '(a * b - c) - 1'],
+    // a*(b-c) is often negative under a*b>=c → implausible; use forgot-subtract instead.
+    distractors: ['a * b', '(a * b - c) + 1', '(a * b - c) - 1'],
   },
   {
     id: 'multi_digit_order_ops_word_sum',
@@ -325,8 +328,8 @@ const SPOT_CHECKS: readonly {
   { id: 'fractions_int_of_set_rev', seed: 1, text: '? = 8/5 of 100', answer: 160 },
   { id: 'fractions_int_unit_parts', seed: 1, text: 'How many 2ths make 1 whole?', answer: 2 },
   { id: 'fractions_int_add_like_qfirst', seed: 1, text: '? wholes = 15/5 + 20/5', answer: 7 },
-  { id: 'multi_digit_order_ops_no_paren', seed: 1, text: '1 + 7 × 12 = ?', answer: 85 },
-  { id: 'multi_digit_order_ops_paren', seed: 1, text: '(1 + 11) × 12 = ?', answer: 144 },
+  { id: 'multi_digit_order_ops_no_paren', seed: 1, text: '1 + 7 × 6 = ?', answer: 43 },
+  { id: 'multi_digit_order_ops_paren', seed: 1, text: '(1 + 8) × 4 = ?', answer: 36 },
   { id: 'multi_digit_order_ops_add', seed: 1, text: '11 + 268 = ?', answer: 279 },
   { id: 'multi_digit_order_ops_sub', seed: 1, text: '981 - 485 = ?', answer: 496 },
   { id: 'multi_digit_order_ops_two_by_one', seed: 1, text: '10 × 6 = ?', answer: 60 },
@@ -540,6 +543,30 @@ describe('authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS �
       }
     }
     expect(failures, failures.join('\n')).toEqual([]);
+  });
+
+  it('spec(T-016:AC-11) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples per template', () => {
+    // Freezes the authoring contract against the AC-11 collision class before JSON is copied
+    // (same failure mode as T-014 near_doubles / this ticket's div_facts_same & order-ops rows).
+    const failures: string[] = [];
+    const rates: Record<string, number> = {};
+
+    for (const template of REQUIRED_TEMPLATES) {
+      let ladderHits = 0;
+      for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
+        const [question] = generateOne(template, seed);
+        const sources = describeDistractorSources(template, question.params);
+        if (sources.includes('ladder')) {
+          ladderHits += 1;
+        }
+      }
+      rates[template.id] = ladderHits;
+      if (ladderHits >= LADDER_CEILING) {
+        failures.push(`${template.id}: ladder ${ladderHits}/1000`);
+      }
+    }
+
+    expect(failures, `ladder rates: ${JSON.stringify(rates)}\n${failures.join('\n')}`).toEqual([]);
   });
 });
 
