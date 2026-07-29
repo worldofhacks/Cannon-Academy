@@ -1493,6 +1493,25 @@ frozen T-005 evaluates `answerExpr` internally. Residuals recorded, not blockers
 **Do not dispatch the T-007 implementer until T-013 also freezes** — wave 4 is the critical-path
 narrowest point and both should enter GREEN together.
 
+## T-013 round-4 re-review — REJECTED (Composer 2.5)
+
+Round-3 mutants confirmed dead. Three new live mutants re-measured at **128/128**:
+
+1. Shared module-level `tally` / `actionLog` / `recentTemplateIds` while loadouts/templates copy
+2. Deep-copy `Template` but alias `params.b` (suite only probed `params.a`)
+3. Memoised `rng` object identity across two constructions (suite checks deep equality only)
+
+Control shared-core wrapper still dies (127/128). Same pattern: tests measured the last layer's
+exact failures; half-fixes lived one field over.
+
+### Rulings (count stays 16)
+
+- **AC-3** — independence covers every mutable interior: loadouts, templates, `actionLog`,
+  `recentTemplateIds`, `tally`/`bySkill`, and `rng` reference inequality.
+- **AC-16** — every `params` key's range array must be a new reference; mutate an unprobed key.
+
+T-007 remains frozen (`1a586570…`, `phase=implement`); implementer still held.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
