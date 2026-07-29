@@ -1900,3 +1900,10 @@ Session API published in COORDINATION.md. Merged + pushed.
 ### T-018 started — onboarding rival
 
 Worktree `.worktrees/wt-T-018` from post-T-017 tip. Phase `tests`.
+
+### T-018 RED landed (`c88dc4b`)
+
+[T-018 Test Agent](8826bde0-6987-4103-b5f3-21d78fceaacc): spec-lint PASS; scripted suite RED; baseline 1652.
+**Adjudications:** `Opponent.id` required (ticket > ARCH snippet); AC-6 empty=RangeError / bad step=Error;
+AC-11 membership when scripted in loadout; AC-13 arithmetic-only. Branch name aligned to worktree.
+Test-design review dispatched.
