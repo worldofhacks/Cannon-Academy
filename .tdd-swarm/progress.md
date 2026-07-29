@@ -1519,6 +1519,23 @@ merge-base diff = suite + report only, RED still 88, baseline 1229, `spec-lint` 
 SKIP. AC-3 now `not.toBe` + mutates loadouts, nested templates, `actionLog`, `recentTemplateIds`,
 `tally`/`bySkill`, and `rng`. AC-16 loops `Object.keys(params)` and mutates `params.b`.
 
+## Wave 4 FREEZE complete — both suites frozen, implementers dispatched
+
+| Ticket | Frozen SHA                                                         | Composer verdict | phase                            |
+| ------ | ------------------------------------------------------------------ | ---------------- | -------------------------------- |
+| T-007  | `1a586570…`                                                        | ACCEPT round 4   | `implement` (guard blocks suite) |
+| T-013  | `767fc8daf622fac13081d4f1fb7147818e2401cb7afc6464292d0db12656de05` | ACCEPT round 5   | `implement` (guard blocks suite) |
+
+T-013 residuals recorded, not blockers: `startsWith` terminal equivalent on eight phases;
+`toRivalView` loadout alias unpinned by any AC; non-enumerable `params` keys unreachable via zod.
+
+### RED-state facts for implementers (re-verified)
+
+- **T-007:** sole `TS2307` missing `@engine/questions/generator`; baseline **1229** pass; **81**
+  suite tests waiting. Target: module exists → 81/81 + tsc 0.
+- **T-013:** **88** errors all in suite (3×TS2307, 51×TS2322, 34×TS2578). Target: **88 → 0**,
+  not merely clearing the three import errors — positive `Exact<>` probes fire in RED.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
