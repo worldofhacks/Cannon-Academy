@@ -1512,6 +1512,13 @@ exact failures; half-fixes lived one field over.
 
 T-007 remains frozen (`1a586570…`, `phase=implement`); implementer still held.
 
+## T-013 round 5 — accepted, pending re-review
+
+Full-graph / every-params-key tightenings landed. Re-verified: hash `767fc8da…`, 128 tests,
+merge-base diff = suite + report only, RED still 88, baseline 1229, `spec-lint` 16/16 with DoD-9
+SKIP. AC-3 now `not.toBe` + mutates loadouts, nested templates, `actionLog`, `recentTemplateIds`,
+`tally`/`bySkill`, and `rng`. AC-16 loops `Object.keys(params)` and mutates `params.b`.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
