@@ -55,17 +55,113 @@ function parseCatalog<T>(name: CatalogName, schema: z.ZodType<T>, entries: reado
   });
 }
 
+function assertUniqueIds(catalog: CatalogName, entries: readonly { readonly id: string }[]): void {
+  const seen = new Map<string, number>();
+  for (const entry of entries) {
+    const prior = seen.get(entry.id);
+    if (prior !== undefined) {
+      throw new Error(`content/${catalog}.json: duplicate id '${entry.id}' (entries collide across the set)`);
+    }
+    seen.set(entry.id, 1);
+  }
+}
+
+function assertNoRankTierClash(ranks: readonly Rank[]): void {
+  const byTier = new Map<number, string>();
+  for (const rank of ranks) {
+    const prior = byTier.get(rank.tier);
+    if (prior !== undefined) {
+      throw new Error(`content/ranks.json: duplicate tier ${rank.tier} on ranks '${prior}' and '${rank.id}'`);
+    }
+    byTier.set(rank.tier, rank.id);
+  }
+}
+
+function assertIslandGraphAcyclic(islands: readonly Island[]): void {
+  const byId = new Map<string, Island>(islands.map((island) => [island.id, island]));
+  for (const island of islands) {
+    if (island.requiresIsland === undefined) continue;
+    if (!byId.has(island.requiresIsland)) {
+      throw new Error(
+        `content/islands.json: island '${island.id}' requiresIsland '${island.requiresIsland}' which is absent from islands`,
+      );
+    }
+  }
+
+  const visiting = new Set<string>();
+  const visited = new Set<string>();
+
+  const visit = (id: string, trail: string[]): void => {
+    if (visited.has(id)) return;
+    if (visiting.has(id)) {
+      const cycleStart = trail.indexOf(id);
+      const cycle = [...trail.slice(cycleStart), id].join(' -> ');
+      throw new Error(`content/islands.json: requiresIsland cycle involving ${cycle}`);
+    }
+    visiting.add(id);
+    const island = byId.get(id);
+    if (island?.requiresIsland !== undefined) {
+      visit(island.requiresIsland, [...trail, id]);
+    }
+    visiting.delete(id);
+    visited.add(id);
+  };
+
+  for (const island of islands) {
+    visit(island.id, []);
+  }
+}
+
 /**
- * Validates a raw catalog object against every T-003 schema, throwing an Error naming the
- * offending catalog and entry id on the first invalid entry. Exported for tests and for any
- * caller wanting to validate authored content before it reaches `src/content/*.json`.
+ * Validates a raw catalog object against every T-003 schema **and** set-level invariants
+ * (unique ids, cross-catalog references, rank tiers, island requiresIsland DAG). Throws an
+ * Error naming the catalog and offending id(s). Exported for tests and for any future editor
+ * / runtime loader that validates authored content before it reaches `src/content/*.json`.
  */
 export function validateCatalogs(input: RawCatalogs): void {
-  parseCatalog('skills', skillSchema, input.skills);
-  parseCatalog('cannons', cannonSchema, input.cannons);
-  parseCatalog('islands', islandSchema, input.islands);
-  parseCatalog('ranks', rankSchema, input.ranks);
-  parseCatalog('crew', crewSchema, input.crew);
+  const skills = parseCatalog('skills', skillSchema, input.skills);
+  const cannons = parseCatalog('cannons', cannonSchema, input.cannons);
+  const islands = parseCatalog('islands', islandSchema, input.islands);
+  const ranks = parseCatalog('ranks', rankSchema, input.ranks);
+  const crew = parseCatalog('crew', crewSchema, input.crew);
+
+  assertUniqueIds('skills', skills);
+  assertUniqueIds('cannons', cannons);
+  assertUniqueIds('islands', islands);
+  assertUniqueIds('ranks', ranks);
+  assertUniqueIds('crew', crew);
+  assertNoRankTierClash(ranks);
+
+  const skillIds = new Set(skills.map((s) => s.id));
+  const cannonIds = new Set(cannons.map((c) => c.id));
+  const islandIds = new Set(islands.map((i) => i.id));
+
+  for (const cannon of cannons) {
+    if (cannon.unlock.kind === 'range' && !islandIds.has(cannon.unlock.island)) {
+      throw new Error(
+        `content/cannons.json: cannon '${cannon.id}' unlock.island '${cannon.unlock.island}' is absent from islands`,
+      );
+    }
+  }
+
+  for (const island of islands) {
+    for (const skillId of island.rangeSkills) {
+      if (!skillIds.has(skillId)) {
+        throw new Error(
+          `content/islands.json: island '${island.id}' rangeSkills entry '${skillId}' is absent from skills`,
+        );
+      }
+    }
+    for (const cannonId of island.unlocksCannons) {
+      if (!cannonIds.has(cannonId)) {
+        throw new Error(
+          `content/islands.json: island '${island.id}' unlocksCannons entry '${cannonId}' is absent from cannons`,
+        );
+      }
+    }
+  }
+
+  assertIslandGraphAcyclic(islands);
 }
 
 export const skills: readonly Skill[] = parseCatalog('skills', skillSchema, skillsRaw);
