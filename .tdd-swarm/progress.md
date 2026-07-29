@@ -2022,5 +2022,5 @@ Merged + pushed. Engine Wave 5 tickets (T-014…T-020, T-032, T-034) done. **T-0
 
 ### T-035 — done (merged) — unblocks A-011
 
-Split from T-030: in . Frozen .
-App track may import for gun-deck slot count. T-030 still owns loadout rules.
+Split from T-030: `TRAY_CAPACITY = 3` in `tuning.ts`. Frozen `b994d1f714e4b150…`.
+App track may import `@engine/tuning` for gun-deck slot count. T-030 still owns loadout rules.
