@@ -7,6 +7,11 @@ dist/
 *.log
 .DS_Store
 
+# Firebase/Expo public client configuration is provisioned locally and through EAS.
+.env
+.env.local
+.env.preview
+
 # Swarm control state — per worktree, never shared
 .worktrees/
 .tdd-swarm/phase
