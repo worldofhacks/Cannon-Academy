@@ -1745,15 +1745,13 @@ clean RED); baseline 1438 green. Test-design review dispatched (Composer).
 - **frozen-tests-unmodified:** allow `test|style|spec|freeze`; on `swarm/engine-core` compare
   `main..HEAD` with `--no-merges` (was vacuously green via empty `swarm/engine-core..HEAD`).
 
-
 ### Wave 5 template suites — status pulse
 
-| Ticket | Tests commit | Orchestrator verify | Next |
-| --- | --- | --- | --- |
-| T-014 | `f509c7c` (47 fail / 7 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438 | test-design review dispatched |
-| T-015 | `ef6353f` (22 fail / 3 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438 | test-design review dispatched |
-| T-016 | `953bc7d` | review **REJECT** (AC-12 independence, dead-param ``, div structural constraints) | Test Agent fix re-dispatched |
-
+| Ticket | Tests commit                                         | Orchestrator verify                                                               | Next                          |
+| ------ | ---------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------- |
+| T-014  | `f509c7c` (47 fail / 7 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438                                                     | test-design review dispatched |
+| T-015  | `ef6353f` (22 fail / 3 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438                                                     | test-design review dispatched |
+| T-016  | `953bc7d`                                            | review **REJECT** (AC-12 independence, dead-param ``, div structural constraints) | Test Agent fix re-dispatched  |
 
 ### T-014 FROZEN (`66e68a23fc4570a7…`) — ACCEPT_WITH_NITS
 
@@ -1762,14 +1760,12 @@ clean RED); baseline 1438 green. Test-design review dispatched (Composer).
 REQUIRED_TEMPLATES) — accepted for content-as-data ticket (T-006 precedent). Phase → `implement`.
 Frozen suite sha256 `66e68a23fc4570a7a65156f965ada4a8817d4ffd3bb562c68d21f9f9b9fe5745`. Implementer dispatched.
 
-
 ### T-014 unfrozen — BLOCKED(TEST_DISPUTE) on AC-1 vs AC-7
 
-Implementer copied `REQUIRED_TEMPLATES` faithfully (`31cb5ba`) then hit AC-7: 
+Implementer copied `REQUIRED_TEMPLATES` faithfully (`31cb5ba`) then hit AC-7:
 `add_within_{10,20}_near_doubles` use distractors `a + a` and `a + b - 1` under constraint
 `b == a + 1` → algebraic identity → 1000/1000 ladder. Deep-equals AC-1 forbids content fix.
 Phase reopened to `tests`; Test Agent fixing contract + adding AC-7 preflight (review I-3).
-
 
 ### Pulse — T-015 REJECT / T-016 fixed / T-032 RED / T-014 dispute in flight
 
@@ -1778,13 +1774,11 @@ Phase reopened to `tests`; Test Agent fixing contract + adding AC-7 preflight (r
 - **T-032:** RED suite `fe76dd2` verified (29 fail — range still pre-granted); test-design review dispatched.
 - **T-014:** implementer BLOCKED confirmed; Test Agent amending near_doubles + AC-7 preflight (uncommitted).
 
-
 ### T-032 FROZEN (`b07759c1b3a850e7…` / `f90cc07904d61d40…`) — ACCEPT_WITH_NITS
 
 [T-032 test-design review](08ef7c4b-d2da-41a7-ba08-26b11084ef5b): no Critical/Important.
 Suites encode D-6 starters-only + mastery composition; correctly RED (29 fail). Phase → `implement`.
 Frozen hashes: placement `b07759c1b3a850e7989dc8950e04a426c46af0260125285cbca79cf52a4d66fa`, mastery `f90cc07904d61d40cefe5c2ce11e054213b46dd983fde74a889bc56466122f8f`. Implementer dispatched.
-
 
 ### T-014 re-frozen (`63628812983a2e2b…`) after AC-7 dispute fix
 
@@ -1803,19 +1797,16 @@ distractor → `a + b + 2` (ladder 0/1000); AC-7 preflight added. Orchestrator d
 PASS, **1456/1456**, frozen hashes unchanged. Code + security review dispatched next; then
 merge + push per ticket policy.
 
-
 ### T-032 — review-passed → merged
 
 Code: APPROVE_WITH_NITS ([T-032 Code Review](d4739913-a514-4ac1-bc4f-74cdf6e4fcb2)); header nit fixed.
 Security: **PASS** ([T-032 Security Review](b8f9afa1-bc67-4f3e-8a08-58ab6a9e53fc)).
 Merged into `swarm/engine-core` and pushed (per-ticket push policy).
 
-
 ### T-015 REJECT fixes landed (`3ec4364`)
 
 Verified: SPOT_CHECKS + `\b` params + operator allowlist; 47 fail / 6 pass (missing JSON);
 baseline 1438; no `independentArithmetic`. Re-review dispatched.
-
 
 ### T-014 unblocked — prettier style + content green
 
@@ -1826,7 +1817,6 @@ Feat `ab41906` JSON refresh green; gates ALL PASS after style. Code + security r
 
 Four REQUIRED_TEMPLATES exceed ladder threshold (same class as T-014). Phase reopened to `tests`;
 Test Agent amending distractors + AC-11 preflight.
-
 
 ### T-014 — done (merged)
 
@@ -1842,21 +1832,30 @@ Merged into `swarm/engine-core`.
 
 [T-016 Test Agent](d05384d3-5e8d-42e1-8f93-f00010357c9d) `eea35ac`. Phase → `implement`. Implementer re-dispatched.
 
-
 ### T-016 implementation verified green (`1198daa`)
 
 Orchestrator: gates ALL PASS; g35 56/56; frozen hash `a48a7e7f…` unchanged. Code + security
 reviews dispatched.
-
 
 ### T-015 implementation verified green (`30d2f83`)
 
 Orchestrator: gates ALL PASS; g23 53/53; frozen hash `f941a204…` unchanged. Code + security
 reviews dispatched.
 
-
 ### T-016 — done (merged)
 
 Code APPROVE_WITH_NITS ([T-016 Code Review](05b12eee-bf5c-47ae-a6ab-5c7c05d8c618));
 security PASS ([T-016 Security Review](b3e18507-96fc-456c-8579-bcd3bf4c883a)).
 Merged into `swarm/engine-core` and pushed.
+
+### T-016 code review ingested + DoD-7 composition fix
+
+[T-016 Code Review](05b12eee-bf5c-47ae-a6ab-5c7c05d8c618): APPROVE_WITH_NITS (already merged).
+Post-merge red: `dod(T-016:7)` claimed exclusive `templates/` — broke after T-014.
+Hotfix `test(T-016)` `8d01118` / merge: own three files + no `index.ts` (T-014 pattern).
+New suite hash `e50a87a3e9cc7bf3…`.
+
+### T-015 — done (merged)
+
+Code APPROVE_WITH_NITS; security PASS. DoD-7 sibling fix `6a60077` pre-merge.
+Frozen hash `a987150c86df4bc8…`. Full suite **1620/1620**.
