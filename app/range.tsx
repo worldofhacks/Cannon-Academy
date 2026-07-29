@@ -17,6 +17,7 @@ import type { DuelQuestion } from '../src/services/questions';
 import { captainActions, captainStore, useCaptain } from '../src/stores/useCaptain';
 import { cannonLook } from '../src/theme/cannonPresentation';
 import { seaStageHeight } from '../src/theme/responsive';
+import { ResponsiveFrame } from '../src/components/ResponsiveFrame';
 import { useLayout } from '../src/theme/useLayout';
 import { color, radius, space, type } from '../src/theme/tokens';
 
@@ -180,66 +181,68 @@ export default function RangeScreen() {
   const meter = session === null ? 0 : meterPercent(session.mastery);
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
-      <View style={[s.header, { paddingHorizontal: L.gutter }]}>
-        <View style={{ flex: 1, minWidth: 0 }}>
-          <Text style={s.kicker}>GUNNERY RANGE</Text>
-          <Text style={s.islandName} numberOfLines={1}>
-            {getIsland(islandId).displayName}
-          </Text>
-        </View>
-        <Pressable
-          onPress={() => router.back()}
-          accessibilityRole="button"
-          accessibilityLabel="Leave the range"
-          style={({ pressed }) => [s.leave, pressed && s.pressed]}
-        >
-          <Text style={s.leaveText}>LEAVE</Text>
-        </Pressable>
-      </View>
-
-      <TargetBuoy height={seaStageHeight(L)} art={L.art} struck={struck} firing={live !== null} />
-
-      {session !== null ? (
-        <View style={[s.meterWrap, { paddingHorizontal: L.gutter }]}>
-          <View style={s.meterHead}>
-            <Text style={s.meterLabel}>{getSkill(session.skillId).displayName.toUpperCase()}</Text>
-            <Text style={s.meterValue}>
-              {meter}/{MASTERY_METER_MAX}
+    <ResponsiveFrame surface="reading">
+      <View style={[s.screen, { paddingTop: insets.top }]}>
+        <View style={[s.header, { paddingHorizontal: L.gutter }]}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={s.kicker}>GUNNERY RANGE</Text>
+            <Text style={s.islandName} numberOfLines={1}>
+              {getIsland(islandId).displayName}
             </Text>
           </View>
-          <View style={s.meterTrack}>
-            <View style={[s.meterFill, { width: `${meter}%` }]} />
-          </View>
+          <Pressable
+            onPress={() => router.back()}
+            accessibilityRole="button"
+            accessibilityLabel="Leave the range"
+            style={({ pressed }) => [s.leave, pressed && s.pressed]}
+          >
+            <Text style={s.leaveText}>LEAVE</Text>
+          </Pressable>
         </View>
-      ) : null}
 
-      <View style={[s.sheet, { paddingBottom: insets.bottom }]}>
-        {session === null ? <SkillPicker islandId={islandId} onPick={begin} /> : null}
+        <TargetBuoy height={seaStageHeight(L)} art={L.art} struck={struck} firing={live !== null} />
 
-        {live !== null && question !== null && gun !== null ? (
-          <QuestionPanel
-            question={asDuelQuestion(question)}
-            look={cannonLook[gun.id]}
-            // The panel's label slot carries the SKILL here, not a gun: at the range the child is
-            // practising multiplication, not firing the Twelve-Pounder.
-            cannonName={getSkill(live.skillId).displayName}
-            timerMs={gun.timerMs}
-            picked={tap?.value ?? null}
-            onAnswer={onAnswer}
-          />
+        {session !== null ? (
+          <View style={[s.meterWrap, { paddingHorizontal: L.gutter }]}>
+            <View style={s.meterHead}>
+              <Text style={s.meterLabel}>{getSkill(session.skillId).displayName.toUpperCase()}</Text>
+              <Text style={s.meterValue}>
+                {meter}/{MASTERY_METER_MAX}
+              </Text>
+            </View>
+            <View style={s.meterTrack}>
+              <View style={[s.meterFill, { width: `${meter}%` }]} />
+            </View>
+          </View>
         ) : null}
 
-        {session !== null && session.complete ? (
-          <DrillSummary
-            session={session}
-            outcome={outcome}
-            onAgain={() => begin(session.skillId)}
-            onLeave={() => router.back()}
-          />
-        ) : null}
+        <View style={[s.sheet, { paddingBottom: insets.bottom }]}>
+          {session === null ? <SkillPicker islandId={islandId} onPick={begin} /> : null}
+
+          {live !== null && question !== null && gun !== null ? (
+            <QuestionPanel
+              question={asDuelQuestion(question)}
+              look={cannonLook[gun.id]}
+              // The panel's label slot carries the SKILL here, not a gun: at the range the child is
+              // practising multiplication, not firing the Twelve-Pounder.
+              cannonName={getSkill(live.skillId).displayName}
+              timerMs={gun.timerMs}
+              picked={tap?.value ?? null}
+              onAnswer={onAnswer}
+            />
+          ) : null}
+
+          {session !== null && session.complete ? (
+            <DrillSummary
+              session={session}
+              outcome={outcome}
+              onAgain={() => begin(session.skillId)}
+              onLeave={() => router.back()}
+            />
+          ) : null}
+        </View>
       </View>
-    </View>
+    </ResponsiveFrame>
   );
 }
 

@@ -8,6 +8,7 @@ import { DEFAULT_CAPTAIN_NAME } from '../src/stores/player';
 import { captainStore } from '../src/stores/useCaptain';
 import { DEFAULT_FLAG_ID, FLAGS } from '../src/theme/flags';
 import { color, radius, space, type, MIN_TAP_TARGET } from '../src/theme/tokens';
+import { ResponsiveFrame } from '../src/components/ResponsiveFrame';
 import { useLayout } from '../src/theme/useLayout';
 
 /**
@@ -59,103 +60,105 @@ export default function NameFlag() {
   };
 
   return (
-    <View
-      style={[
-        s.screen,
-        {
-          paddingTop: insets.top + px(14),
-          paddingBottom: insets.bottom + px(14),
-          paddingHorizontal: L.gutter,
-          gap: px(14),
-        },
-      ]}
-    >
-      <Text style={[s.title, { fontSize: tx(23), lineHeight: tx(26) }]}>Name your ship</Text>
-
-      <View style={[s.card, { borderRadius: px(radius.card), padding: px(12), borderBottomWidth: px(4) }]}>
-        <TextInput
-          value={name}
-          onChangeText={setName}
-          placeholder={DEFAULT_CAPTAIN_NAME}
-          placeholderTextColor={color.inkDarkMuted}
-          accessibilityLabel="Your captain name"
-          maxLength={20}
-          autoCorrect={false}
-          returnKeyType="done"
-          onSubmitEditing={commit}
-          style={[s.input, { fontSize: tx(22), lineHeight: tx(28), minHeight: px(MIN_TAP_TARGET) }]}
-        />
-      </View>
-
-      <Text style={[s.eyebrow, { fontSize: tx(11), letterSpacing: tx(11) * 0.08 }]}>CHOOSE YOUR FLAG</Text>
-
-      <View style={[s.flagRow, { gap: px(10) }]}>
-        {FLAGS.map((f) => {
-          const chosen = flag === f.id;
-          return (
-            <Pressable
-              key={f.id}
-              onPress={() => setFlag(f.id)}
-              accessibilityRole="radio"
-              accessibilityState={{ selected: chosen }}
-              accessibilityLabel={`${f.label} flag`}
-              style={({ pressed }) => [
-                s.flagCard,
-                {
-                  borderRadius: px(radius.tile),
-                  padding: px(8),
-                  gap: px(6),
-                  minWidth: px(MIN_TAP_TARGET),
-                  minHeight: px(MIN_TAP_TARGET),
-                  borderBottomWidth: px(4),
-                  borderBottomColor: chosen ? color.amber : color.parchmentEdge,
-                },
-                pressed && { transform: [{ translateY: px(3) }], borderBottomWidth: px(1) },
-              ]}
-            >
-              {/* The pennant shape, not a square chip — the swatch is a small rehearsal of what
-                  will be flying off the mast in the duel. */}
-              <View
-                style={{
-                  width: px(34),
-                  height: px(22),
-                  borderRadius: px(3),
-                  backgroundColor: f.color,
-                }}
-              />
-              {/* Labelled, because six swatches alone are unusable to a colour-blind child. */}
-              <Text style={[s.flagLabel, { fontSize: tx(10) }]}>{f.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      <View style={{ flex: 1 }} />
-
-      <Pressable
-        onPress={commit}
-        accessibilityRole="button"
-        accessibilityLabel="Set sail"
-        style={({ pressed }) => [
-          s.primary,
-          { height: px(MIN_TAP_TARGET), borderRadius: px(radius.card), borderBottomWidth: px(4) },
-          pressed && { transform: [{ translateY: px(3) }], borderBottomWidth: px(1) },
+    <ResponsiveFrame surface="reading">
+      <View
+        style={[
+          s.screen,
+          {
+            paddingTop: insets.top + px(14),
+            paddingBottom: insets.bottom + px(14),
+            paddingHorizontal: L.gutter,
+            gap: px(14),
+          },
         ]}
       >
-        <Text style={[s.primaryText, { fontSize: tx(20), lineHeight: tx(24) }]}>Set sail</Text>
-      </Pressable>
+        <Text style={[s.title, { fontSize: tx(23), lineHeight: tx(26) }]}>Name your ship</Text>
 
-      {/* Skip commits too. A skip wired only to `router` would leave the captain unnamed and
+        <View style={[s.card, { borderRadius: px(radius.card), padding: px(12), borderBottomWidth: px(4) }]}>
+          <TextInput
+            value={name}
+            onChangeText={setName}
+            placeholder={DEFAULT_CAPTAIN_NAME}
+            placeholderTextColor={color.inkDarkMuted}
+            accessibilityLabel="Your captain name"
+            maxLength={20}
+            autoCorrect={false}
+            returnKeyType="done"
+            onSubmitEditing={commit}
+            style={[s.input, { fontSize: tx(22), lineHeight: tx(28), minHeight: px(MIN_TAP_TARGET) }]}
+          />
+        </View>
+
+        <Text style={[s.eyebrow, { fontSize: tx(11), letterSpacing: tx(11) * 0.08 }]}>CHOOSE YOUR FLAG</Text>
+
+        <View style={[s.flagRow, { gap: px(10) }]}>
+          {FLAGS.map((f) => {
+            const chosen = flag === f.id;
+            return (
+              <Pressable
+                key={f.id}
+                onPress={() => setFlag(f.id)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: chosen }}
+                accessibilityLabel={`${f.label} flag`}
+                style={({ pressed }) => [
+                  s.flagCard,
+                  {
+                    borderRadius: px(radius.tile),
+                    padding: px(8),
+                    gap: px(6),
+                    minWidth: px(MIN_TAP_TARGET),
+                    minHeight: px(MIN_TAP_TARGET),
+                    borderBottomWidth: px(4),
+                    borderBottomColor: chosen ? color.amber : color.parchmentEdge,
+                  },
+                  pressed && { transform: [{ translateY: px(3) }], borderBottomWidth: px(1) },
+                ]}
+              >
+                {/* The pennant shape, not a square chip — the swatch is a small rehearsal of what
+                  will be flying off the mast in the duel. */}
+                <View
+                  style={{
+                    width: px(34),
+                    height: px(22),
+                    borderRadius: px(3),
+                    backgroundColor: f.color,
+                  }}
+                />
+                {/* Labelled, because six swatches alone are unusable to a colour-blind child. */}
+                <Text style={[s.flagLabel, { fontSize: tx(10) }]}>{f.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        <View style={{ flex: 1 }} />
+
+        <Pressable
+          onPress={commit}
+          accessibilityRole="button"
+          accessibilityLabel="Set sail"
+          style={({ pressed }) => [
+            s.primary,
+            { height: px(MIN_TAP_TARGET), borderRadius: px(radius.card), borderBottomWidth: px(4) },
+            pressed && { transform: [{ translateY: px(3) }], borderBottomWidth: px(1) },
+          ]}
+        >
+          <Text style={[s.primaryText, { fontSize: tx(20), lineHeight: tx(24) }]}>Set sail</Text>
+        </Pressable>
+
+        {/* Skip commits too. A skip wired only to `router` would leave the captain unnamed and
           unflagged, and `flow.ts` would send them right back here — a button that does nothing. */}
-      <Pressable
-        onPress={commit}
-        accessibilityRole="button"
-        accessibilityLabel="Skip, choose for me"
-        style={({ pressed }) => [s.skip, { minHeight: px(MIN_TAP_TARGET) }, pressed && { opacity: 0.6 }]}
-      >
-        <Text style={[s.skipText, { fontSize: tx(13) }]}>Skip — choose for me</Text>
-      </Pressable>
-    </View>
+        <Pressable
+          onPress={commit}
+          accessibilityRole="button"
+          accessibilityLabel="Skip, choose for me"
+          style={({ pressed }) => [s.skip, { minHeight: px(MIN_TAP_TARGET) }, pressed && { opacity: 0.6 }]}
+        >
+          <Text style={[s.skipText, { fontSize: tx(13) }]}>Skip — choose for me</Text>
+        </Pressable>
+      </View>
+    </ResponsiveFrame>
   );
 }
 

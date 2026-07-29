@@ -73,10 +73,24 @@ export function Splash({ ready, onStart }: { ready: boolean; onStart: () => void
         ))}
       </View>
 
-      {/* wordmark */}
-      <View style={[s.title, { top: px(150) }]}>
-        <Text style={[s.kicker, { fontSize: tx(15), letterSpacing: tx(15) * 0.24 }]}>CANNON</Text>
-        <Text style={[s.wordmark, { fontSize: tx(46), lineHeight: tx(46) }]}>ACADEMY</Text>
+      {/* wordmark — lineHeight must exceed fontSize (Baloo-2 clips when equal; same class as A-042). */}
+      <View style={[s.title, { top: L.isShort ? px(96) : px(150) }]}>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={[s.kicker, { fontSize: tx(15), lineHeight: tx(20), letterSpacing: tx(15) * 0.24 }]}
+        >
+          CANNON
+        </Text>
+        <Text
+          numberOfLines={1}
+          adjustsFontSizeToFit
+          minimumFontScale={0.8}
+          style={[s.wordmark, { fontSize: tx(46), lineHeight: tx(56) }]}
+        >
+          ACADEMY
+        </Text>
         <View
           style={{
             width: px(120),

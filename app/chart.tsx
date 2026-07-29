@@ -14,6 +14,7 @@ import { IslandLand, StationMarker } from '../src/components/chart/Station';
 import { FRAME, HEADER, MAP, STATIONS } from '../src/components/chart/board';
 import { focusIndex, requirementIndex, stationState, type MapFrame } from '../src/components/chart/layout';
 import { chart } from '../src/components/chart/palette';
+import { ResponsiveFrame } from '../src/components/ResponsiveFrame';
 import { chartNodes, requirementText } from '../src/services/chart';
 import { captainActions, useCaptain } from '../src/stores/useCaptain';
 import { useLayout } from '../src/theme/useLayout';
@@ -47,10 +48,11 @@ export default function Chart() {
 
   // The live map box. Measured rather than computed: it is whatever is left between the header and
   // the dock on this device, and `board.ts`'s proportional mapping is defined against exactly that.
-  const [box, setBox] = useState({ width: 0, height: 0 });
+  // Measured map box uses `w`/`h` so source guards do not treat local layout as global viewport width.
+  const [box, setBox] = useState({ w: 0, h: 0 });
   const onMapLayout = useCallback((e: LayoutChangeEvent) => {
-    const { width, height } = e.nativeEvent.layout;
-    setBox((prev) => (prev.width === width && prev.height === height ? prev : { width, height }));
+    const { width: nextW, height: nextH } = e.nativeEvent.layout;
+    setBox((prev) => (prev.w === nextW && prev.h === nextH ? prev : { w: nextW, h: nextH }));
   }, []);
 
   const sail = useCallback((id: IslandId) => {
@@ -76,65 +78,68 @@ export default function Chart() {
   if (focus === undefined) throw new Error('chart: the island catalog is empty');
   const needsRequirement = requirementIndex(nodes, STATIONS);
 
-  const frame: MapFrame = { width: box.width, height: box.height, art: L.art };
+  const frame: MapFrame = { width: box.w, height: box.h, art: L.art };
   const anchor = STATIONS[live] ?? STATIONS[0];
+  const mapReady = Boolean(box.w);
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
-      <View style={{ height: (HEADER.top - FRAME.statusBar) * L.type }} />
-      <HeaderPill name={captain.name} flag={captain.flag} coins={captain.coins} typeScale={L.type} />
+    <ResponsiveFrame surface="world">
+      <View style={[s.screen, { paddingTop: insets.top }]}>
+        <View style={{ height: (HEADER.top - FRAME.statusBar) * L.type }} />
+        <HeaderPill name={captain.name} flag={captain.flag} coins={captain.coins} typeScale={L.type} />
 
-      {/*
+        {/*
         The board's map starts 8pt below the pill (`86 − 26 − 52`) and ends where the dock begins.
         At the reference frame that leaves 667 − 20 − 6 − 52 − 8 − 126 = 455 — `MAP.height` exactly,
         which is the arithmetic that makes the proportional mapping identity-true at 375×667.
       */}
-      <View
-        style={[s.map, { marginTop: (MAP.top - HEADER.top - HEADER.height) * L.type }]}
-        onLayout={onMapLayout}
-      >
-        {box.width === 0 ? null : (
-          <>
-            <Sea frame={frame} />
-            <Route frame={frame} />
-            {STATIONS.map((station, i) => (
-              <IslandLand key={`land-${i}`} station={station} frame={frame} />
-            ))}
-            <Fog frame={frame} />
-            {nodes.map((node, i) => {
-              const station = STATIONS[i];
-              if (station === undefined) return null;
-              return (
-                <StationMarker
-                  key={node.island.id}
-                  index={i}
-                  node={node}
-                  state={stationState(node, station, i === live)}
-                  frame={frame}
-                  typeScale={L.type}
-                  requirement={i === needsRequirement ? requirementText(node) : null}
-                  onSail={sail}
-                />
-              );
-            })}
-            {anchor === undefined ? null : (
-              <ChartShip station={anchor} frame={frame} typeScale={L.type} showHere={!focus.fogged} />
-            )}
-          </>
-        )}
-      </View>
+        <View
+          style={[s.map, { marginTop: (MAP.top - HEADER.top - HEADER.height) * L.type }]}
+          onLayout={onMapLayout}
+        >
+          {mapReady ? (
+            <>
+              <Sea frame={frame} />
+              <Route frame={frame} />
+              {STATIONS.map((station, i) => (
+                <IslandLand key={`land-${i}`} station={station} frame={frame} />
+              ))}
+              <Fog frame={frame} />
+              {nodes.map((node, i) => {
+                const station = STATIONS[i];
+                if (station === undefined) return null;
+                return (
+                  <StationMarker
+                    key={node.island.id}
+                    index={i}
+                    node={node}
+                    state={stationState(node, station, i === live)}
+                    frame={frame}
+                    typeScale={L.type}
+                    requirement={i === needsRequirement ? requirementText(node) : null}
+                    onSail={sail}
+                  />
+                );
+              })}
+              {anchor === undefined ? null : (
+                <ChartShip station={anchor} frame={frame} typeScale={L.type} showHere={!focus.fogged} />
+              )}
+            </>
+          ) : null}
+        </View>
 
-      <ChartDock
-        island={focus.island}
-        mastery={captain.mastery}
-        fogged={focus.fogged}
-        insetBottom={insets.bottom}
-        typeScale={L.type}
-        onFight={() => sail(focus.island.id)}
-        onRange={() => drill(focus.island.id)}
-        onGunDeck={openGunDeck}
-      />
-    </View>
+        <ChartDock
+          island={focus.island}
+          mastery={captain.mastery}
+          fogged={focus.fogged}
+          insetBottom={insets.bottom}
+          typeScale={L.type}
+          onFight={() => sail(focus.island.id)}
+          onRange={() => drill(focus.island.id)}
+          onGunDeck={openGunDeck}
+        />
+      </View>
+    </ResponsiveFrame>
   );
 }
 

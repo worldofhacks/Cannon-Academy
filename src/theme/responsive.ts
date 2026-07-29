@@ -104,3 +104,45 @@ export function seaStageHeight(l: Layout): number {
   const proportional = l.height * SEA_STAGE_RATIO;
   return Math.round(clamp(proportional, 150, 250));
 }
+
+/** A-043 viewport classes — width alone, never platform. */
+export type ViewportClass = 'compact' | 'tablet' | 'desktop';
+export type ResponsiveSurface = 'reading' | 'world';
+
+export interface SurfaceLayout {
+  readonly viewport: ViewportClass;
+  readonly contentWidth: number;
+  readonly gutter: number;
+  readonly left: number;
+  readonly right: number;
+}
+
+const READING_CAP = 760;
+const WORLD_CAP = 1180;
+const TABLET_GUTTER = 24;
+const DESKTOP_GUTTER = 32;
+
+export function viewportClassForWidth(width: number): ViewportClass {
+  if (width < 600) return 'compact';
+  if (width < 1024) return 'tablet';
+  return 'desktop';
+}
+
+/**
+ * Pure geometry for a reading (forms/lists) or world (chart/duel) surface.
+ * Compact keeps the existing phone gutters from `computeLayout`; larger classes center a capped column.
+ */
+export function resolveResponsiveSurface(width: number, surface: ResponsiveSurface): SurfaceLayout {
+  const viewport = viewportClassForWidth(width);
+  const gutter =
+    viewport === 'compact'
+      ? computeLayout(width, REFERENCE.height).gutter
+      : viewport === 'tablet'
+        ? TABLET_GUTTER
+        : DESKTOP_GUTTER;
+  const cap = surface === 'reading' ? READING_CAP : WORLD_CAP;
+  const available = width - 2 * gutter;
+  const contentWidth = viewport === 'compact' ? available : Math.min(cap, available);
+  const edge = (width - contentWidth) / 2;
+  return { viewport, gutter, contentWidth, left: edge, right: edge };
+}

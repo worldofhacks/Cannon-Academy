@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { GradeBand } from '@content/schemas';
 
 import { Poly } from '../src/components/Poly';
+import { ResponsiveFrame } from '../src/components/ResponsiveFrame';
 import { commitGradeBand } from '../src/services/onboarding';
 import { captainStore, useCaptain } from '../src/stores/useCaptain';
 import { useLayout } from '../src/theme/useLayout';
@@ -66,88 +67,90 @@ export default function Onboarding() {
   const chosen = useCaptain((s) => s.captain.gradeBand);
 
   return (
-    <View
-      style={[
-        s.screen,
-        {
-          paddingTop: insets.top + px(14),
-          paddingBottom: insets.bottom + px(14),
-          paddingHorizontal: L.gutter,
-        },
-      ]}
-    >
-      <Text style={[s.title, { fontSize: tx(23), lineHeight: tx(26) }]}>Which ship is yours?</Text>
+    <ResponsiveFrame surface="reading">
+      <View
+        style={[
+          s.screen,
+          {
+            paddingTop: insets.top + px(14),
+            paddingBottom: insets.bottom + px(14),
+            paddingHorizontal: L.gutter,
+          },
+        ]}
+      >
+        <Text style={[s.title, { fontSize: tx(23), lineHeight: tx(26) }]}>Which ship is yours?</Text>
 
-      {BANDS.map((b) => {
-        const selected = chosen === b.band;
-        return (
-          <Pressable
-            key={b.band}
-            onPress={() => {
-              // The commit writes the band through the store — which is what runs placement — and
-              // hands back the flow resolver's answer. This screen navigates to what it is given;
-              // it does not know, and must not decide, what comes after the picker.
-              const destination = commitGradeBand(captainStore, b.band);
-              router.replace(`/${destination}`);
-            }}
-            accessibilityRole="button"
-            accessibilityLabel={`${b.problem}, ${b.label}`}
-            style={({ pressed }) => [
-              s.card,
-              {
-                borderRadius: px(20),
-                padding: px(12),
-                gap: px(12),
-                borderBottomWidth: px(4),
-                borderBottomColor: selected ? color.amber : color.parchmentEdge,
-              },
-              pressed && { transform: [{ translateY: px(3) }], borderBottomWidth: px(1) },
-            ]}
-          >
-            <View style={{ width: px(b.shipWidth), alignItems: 'center', justifyContent: 'flex-end' }}>
-              <LadderShip width={px(b.shipWidth)} height={px(b.shipHeight)} mast={px(b.mastHeight)} />
-            </View>
+        {BANDS.map((b) => {
+          const selected = chosen === b.band;
+          return (
+            <Pressable
+              key={b.band}
+              onPress={() => {
+                // The commit writes the band through the store — which is what runs placement — and
+                // hands back the flow resolver's answer. This screen navigates to what it is given;
+                // it does not know, and must not decide, what comes after the picker.
+                const destination = commitGradeBand(captainStore, b.band);
+                router.replace(`/${destination}`);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${b.problem}, ${b.label}`}
+              style={({ pressed }) => [
+                s.card,
+                {
+                  borderRadius: px(20),
+                  padding: px(12),
+                  gap: px(12),
+                  borderBottomWidth: px(4),
+                  borderBottomColor: selected ? color.amber : color.parchmentEdge,
+                },
+                pressed && { transform: [{ translateY: px(3) }], borderBottomWidth: px(1) },
+              ]}
+            >
+              <View style={{ width: px(b.shipWidth), alignItems: 'center', justifyContent: 'flex-end' }}>
+                <LadderShip width={px(b.shipWidth)} height={px(b.shipHeight)} mast={px(b.mastHeight)} />
+              </View>
 
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.8}
-                style={[s.problem, { fontSize: tx(34), lineHeight: tx(40) }]}
-              >
-                {b.problem}
-              </Text>
-              <View style={[s.meta, { gap: px(6), marginTop: px(8) }]}>
-                <View style={{ flexDirection: 'row', gap: px(3) }}>
-                  {[0, 1, 2].map((i) => (
-                    <View
-                      key={i}
-                      style={{
-                        width: px(10),
-                        height: px(10),
-                        borderRadius: 999,
-                        backgroundColor: i < b.pips ? color.amber : '#E8DCC4',
-                      }}
-                    />
-                  ))}
-                </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   minimumFontScale={0.8}
-                  style={[s.bandLabel, { fontSize: tx(11), letterSpacing: tx(11) * 0.05 }]}
+                  style={[s.problem, { fontSize: tx(34), lineHeight: tx(40) }]}
                 >
-                  {b.label}
+                  {b.problem}
                 </Text>
+                <View style={[s.meta, { gap: px(6), marginTop: px(8) }]}>
+                  <View style={{ flexDirection: 'row', gap: px(3) }}>
+                    {[0, 1, 2].map((i) => (
+                      <View
+                        key={i}
+                        style={{
+                          width: px(10),
+                          height: px(10),
+                          borderRadius: 999,
+                          backgroundColor: i < b.pips ? color.amber : '#E8DCC4',
+                        }}
+                      />
+                    ))}
+                  </View>
+                  <Text
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    minimumFontScale={0.8}
+                    style={[s.bandLabel, { fontSize: tx(11), letterSpacing: tx(11) * 0.05 }]}
+                  >
+                    {b.label}
+                  </Text>
+                </View>
               </View>
-            </View>
-          </Pressable>
-        );
-      })}
+            </Pressable>
+          );
+        })}
 
-      {/* The board's note to the adult, not to the child. */}
-      <Text style={[s.grownups, { fontSize: tx(12) }]}>Grown-ups: pick the hardest one they can read.</Text>
-    </View>
+        {/* The board's note to the adult, not to the child. */}
+        <Text style={[s.grownups, { fontSize: tx(12) }]}>Grown-ups: pick the hardest one they can read.</Text>
+      </View>
+    </ResponsiveFrame>
   );
 }
 

@@ -7,6 +7,7 @@ import type { CannonId } from '@content/schemas';
 import { TRAY_CAPACITY } from '@engine/tuning';
 
 import { TemperBadge } from '../src/components/duel/TemperBadge';
+import { ResponsiveFrame, useResponsiveSurface } from '../src/components/ResponsiveFrame';
 import { resolveDestination } from '../src/services/flow';
 import {
   commitLoadout,
@@ -94,8 +95,17 @@ function refusalText(refusal: Refusal): string {
 }
 
 export default function GunDeck() {
+  return (
+    <ResponsiveFrame surface="reading">
+      <GunDeckBody />
+    </ResponsiveFrame>
+  );
+}
+
+function GunDeckBody() {
   const insets = useSafeAreaInsets();
   const L = useLayout();
+  const { contentWidth } = useResponsiveSurface();
   const tx = L.t;
   const ax = L.a;
 
@@ -202,7 +212,7 @@ export default function GunDeck() {
   const backSlop = Math.max(0, Math.round((MIN_TAP_TARGET - backSize) / 2));
 
   const gridGap = tx(10);
-  const cardWidth = (L.width - 2 * L.gutter - gridGap) / 2;
+  const cardWidth = (contentWidth - gridGap) / 2;
 
   return (
     <View style={s.screen}>
