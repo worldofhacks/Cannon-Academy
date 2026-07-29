@@ -12,7 +12,9 @@ import { createRng } from '@engine/rng';
 import { MASTERY_METER_MAX } from '@engine/tuning';
 
 import { QuestionPanel } from '../src/components/duel/QuestionPanel';
-import { commitDrill, openDrill, rangeSkills, type RangeDrillOutcome } from '../src/services/range';
+import { commitDrill, openDrill, type RangeDrillOutcome } from '../src/services/range';
+import { trainingCatalog } from '../src/services/trainingCatalog';
+import { difficultyPresentation } from '../src/theme/difficultyPresentation';
 import type { DuelQuestion } from '../src/services/questions';
 import { captainActions, captainStore, useCaptain } from '../src/stores/useCaptain';
 import { cannonLook } from '../src/theme/cannonPresentation';
@@ -101,6 +103,7 @@ export default function RangeScreen() {
   const islandId = captain.currentIsland ?? captain.unlockedIslands[0] ?? FIRST_ISLAND;
 
   const [session, setSession] = useState<DrillSession | null>(null);
+  const [drillIslandId, setDrillIslandId] = useState<IslandId | null>(null);
   const [tap, setTap] = useState<Tap | null>(null);
   const [outcome, setOutcome] = useState<RangeDrillOutcome | null>(null);
   const askedAt = useRef(0);
@@ -119,24 +122,20 @@ export default function RangeScreen() {
     setTap(null);
   }, []);
 
-  const begin = useCallback(
-    (skillId: SkillId) => {
-      setTap(null);
-      setOutcome(null);
-      // Read the captain imperatively rather than from the render subscription: drilling again
-      // must seed from the mastery the previous drill just committed, not from the snapshot this
-      // render closed over.
-      setSession(
+  const begin = useCallback((pickIslandId: IslandId, skillId: SkillId, next?: DrillSession) => {
+    setTap(null);
+    setOutcome(null);
+    setDrillIslandId(pickIslandId);
+    setSession(
+      next ??
         openDrill({
-          islandId,
+          islandId: pickIslandId,
           skillId,
           captain: captainActions().captain,
           rng: createRng(Date.now() >>> 0),
         }),
-      );
-    },
-    [islandId],
-  );
+    );
+  }, []);
 
   // The fuse. It is the duel's fuse because it is the duel's panel — so it has to mean the same
   // thing here: when it burns out the question passes as a missed attempt, which at the range
@@ -236,7 +235,7 @@ export default function RangeScreen() {
             <DrillSummary
               session={session}
               outcome={outcome}
-              onAgain={() => begin(session.skillId)}
+              onAgain={() => begin(drillIslandId ?? islandId, session.skillId)}
               onLeave={() => router.back()}
             />
           ) : null}
@@ -278,10 +277,42 @@ function TargetBuoy({
   );
 }
 
-/** What this island's range trains — nothing more, which is AC-1 made visible. */
-function SkillPicker({ islandId, onPick }: { islandId: IslandId; onPick: (skill: SkillId) => void }) {
+/** Every eligible drill across unlocked islands — warm-up practice stays reachable (A-028). */
+function SkillPicker({
+  islandId,
+  onPick,
+}: {
+  islandId: IslandId;
+  onPick: (pickIslandId: IslandId, skill: SkillId, session?: DrillSession) => void;
+}) {
   const captain = useCaptain((c) => c.captain);
-  const skills = rangeSkills(islandId);
+  const gradeBand = captain.gradeBand;
+  const groups =
+    gradeBand === null
+      ? []
+      : trainingCatalog({
+          unlockedIslands: captain.unlockedIslands,
+          currentIsland: islandId,
+          gradeBand,
+        });
+  const hasEntries = groups.some((group) => group.entries.length > 0);
+
+  if (!hasEntries) {
+    return (
+      <View style={s.picker}>
+        <Text style={s.pickerTitle}>No drills ready</Text>
+        <Text style={s.pickerBody}>Sail back to the chart and unlock more practice for your grade.</Text>
+        <Pressable
+          onPress={() => router.back()}
+          accessibilityRole="button"
+          accessibilityLabel="Back to the chart"
+          style={({ pressed }) => [s.primary, pressed && s.pressed]}
+        >
+          <Text style={s.primaryText}>Back to the chart</Text>
+        </Pressable>
+      </View>
+    );
+  }
 
   return (
     <ScrollView contentContainerStyle={s.picker} showsVerticalScrollIndicator={false}>
@@ -289,31 +320,55 @@ function SkillPicker({ islandId, onPick }: { islandId: IslandId; onPick: (skill:
       <Text style={s.pickerBody}>
         Practice fills the meter twice as fast as a duel, and nothing here can be lost.
       </Text>
-      {skills.map((skill) => {
-        const filled = meterPercent(captain.mastery[skill] ?? emptyMastery);
-        return (
-          <Pressable
-            key={skill}
-            onPress={() => onPick(skill)}
-            accessibilityRole="button"
-            accessibilityLabel={`Drill ${getSkill(skill).displayName}, meter ${filled} of ${MASTERY_METER_MAX}`}
-            style={({ pressed }) => [s.pickerRow, pressed && s.pressed]}
-          >
-            <View style={s.pickerGlyph}>
-              <Text style={s.pickerGlyphText}>{cannonLook[gunForSkill(skill).id].glyph}</Text>
-            </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={s.pickerSkill} numberOfLines={1}>
-                {getSkill(skill).displayName}
-              </Text>
-              <View style={s.pickerTrack}>
-                <View style={[s.pickerFill, { width: `${filled}%` }]} />
-              </View>
-            </View>
-            <Text style={s.pickerPercent}>{filled}%</Text>
-          </Pressable>
-        );
-      })}
+      {groups.map((group) => (
+        <View key={group.islandId} style={s.pickerGroup}>
+          <Text style={s.pickerGroupTitle}>
+            {getIsland(group.islandId).displayName}
+            {group.isCurrentIsland ? ' · you are here' : ''}
+          </Text>
+          {group.entries.map((entry) => {
+            const filled = meterPercent(captain.mastery[entry.skillId] ?? emptyMastery);
+            const difficulty =
+              gradeBand === null
+                ? { label: 'Practice', accessibilityDescription: `Drill ${getSkill(entry.skillId).displayName}` }
+                : difficultyPresentation({ skillId: entry.skillId, gradeBand });
+            return (
+              <Pressable
+                key={`${entry.islandId}:${entry.skillId}`}
+                onPress={() =>
+                  onPick(
+                    entry.islandId,
+                    entry.skillId,
+                    openDrill({
+                      islandId: entry.islandId,
+                      skillId: entry.skillId,
+                      captain: captainActions().captain,
+                      rng: createRng(Date.now() >>> 0),
+                    }),
+                  )
+                }
+                accessibilityRole="button"
+                accessibilityLabel={`${difficulty.accessibilityDescription}, meter ${filled} of ${MASTERY_METER_MAX}`}
+                style={({ pressed }) => [s.pickerRow, pressed && s.pressed]}
+              >
+                <View style={s.pickerGlyph}>
+                  <Text style={s.pickerGlyphText}>{cannonLook[gunForSkill(entry.skillId).id].glyph}</Text>
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={s.pickerSkill} numberOfLines={1}>
+                    {getSkill(entry.skillId).displayName}
+                  </Text>
+                  <Text style={s.pickerDifficulty}>{difficulty.label}</Text>
+                  <View style={s.pickerTrack}>
+                    <View style={[s.pickerFill, { width: `${filled}%` }]} />
+                  </View>
+                </View>
+                <Text style={s.pickerPercent}>{filled}%</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      ))}
     </ScrollView>
   );
 }
@@ -439,6 +494,8 @@ const s = StyleSheet.create({
   picker: { padding: space[3], gap: space[2] },
   pickerTitle: { ...type.title, color: color.inkDark },
   pickerBody: { ...type.caption, color: color.inkDarkMuted },
+  pickerGroup: { gap: space[2] },
+  pickerGroupTitle: { ...type.eyebrow, color: color.inkDarkMuted },
   pickerRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -460,6 +517,7 @@ const s = StyleSheet.create({
   },
   pickerGlyphText: { ...type.glyph, fontSize: 26, lineHeight: 30, color: color.inkDark },
   pickerSkill: { ...type.subtitle, color: color.inkDark },
+  pickerDifficulty: { ...type.chip, color: color.inkDarkMuted, marginTop: 2 },
   pickerTrack: {
     height: 8,
     marginTop: 6,
