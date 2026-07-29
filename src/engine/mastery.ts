@@ -17,8 +17,9 @@
  * as a precondition that the predecessor island itself is unlocked. Do not add that precondition
  * — a frozen test pins the literal reading.
  */
-import type { CannonId, IslandId, SkillId } from '@content/schemas';
-import { cannons, getIsland, islands } from '@content/index';
+import { cannons, getIsland, getSkill, islands } from '@content/index';
+import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
+import { maxGradeForBand } from '@engine/placement';
 import {
   MASTERY_METER_MAX,
   MASTERY_MIN_ACCURACY,
@@ -108,6 +109,7 @@ function masteredSkillIds(mastery: Readonly<Partial<Record<SkillId, SkillMastery
  *   delta — never as a precondition that `J` is unlocked (see module docs above).
  */
 export function resolveUnlocks(input: {
+  readonly gradeBand?: GradeBand;
   readonly mastery: Readonly<Partial<Record<SkillId, SkillMastery>>>;
   readonly unlockedCannons: readonly CannonId[];
   readonly unlockedIslands: readonly IslandId[];
@@ -115,6 +117,8 @@ export function resolveUnlocks(input: {
   const mastered = masteredSkillIds(input.mastery);
   const alreadyCannons = new Set(input.unlockedCannons);
   const alreadyIslands = new Set(input.unlockedIslands);
+  const maxGrade =
+    input.gradeBand === undefined ? Number.POSITIVE_INFINITY : maxGradeForBand(input.gradeBand);
 
   const newCannons = cannons
     .filter((c) => c.unlock.kind === 'range' && mastered.has(c.skill) && !alreadyCannons.has(c.id))
@@ -124,6 +128,7 @@ export function resolveUnlocks(input: {
     .filter((i) => {
       if (alreadyIslands.has(i.id)) return false;
       if (i.requiresIsland === undefined) return false;
+      if (!i.rangeSkills.some((skillId) => getSkill(skillId).minGrade <= maxGrade)) return false;
       const predecessor = getIsland(i.requiresIsland);
       return predecessor.rangeSkills.some((s) => mastered.has(s));
     })

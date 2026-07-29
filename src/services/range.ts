@@ -29,10 +29,11 @@
  * No React import: the logic is frozen-tested headless (`__tests__/app/range.test.ts`), and the
  * screen is a thin caller.
  */
-import { getIsland } from '@content/index';
-import type { CannonId, IslandId, SkillId } from '@content/schemas';
+import { getIsland, getSkill } from '@content/index';
+import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
 import { startDrill, type DrillSession } from '@engine/drill';
 import { emptyMastery, isMastered, meterPercent, type SkillMastery } from '@engine/mastery';
+import { maxGradeForBand } from '@engine/placement';
 import type { Rng } from '@engine/rng';
 
 import { templatesForSkill } from './templatePools';
@@ -137,8 +138,11 @@ function masteryFor(captain: Captain, skillId: SkillId): SkillMastery {
  * Straight from the island record — a superset would let a child grind a skill the island does
  * not teach, and a subset silently strands the cannon that skill unlocks.
  */
-export function rangeSkills(islandId: IslandId): readonly SkillId[] {
-  return getIsland(islandId).rangeSkills;
+export function rangeSkills(islandId: IslandId, band?: GradeBand): readonly SkillId[] {
+  const skills = getIsland(islandId).rangeSkills;
+  if (band === undefined) return skills;
+  const maxGrade = maxGradeForBand(band);
+  return skills.filter((skillId) => getSkill(skillId).minGrade <= maxGrade);
 }
 
 /**
@@ -158,9 +162,17 @@ export function openDrill(input: {
   readonly rng: Rng;
   readonly length?: number;
 }): DrillSession {
-  const drillable = rangeSkills(input.islandId);
+  const gradeBand = input.captain.gradeBand;
+  const maxGrade = maxGradeForBand(gradeBand);
+  if (getSkill(input.skillId).minGrade > maxGrade) {
+    throw new RangeError(
+      `openDrill: '${input.skillId}' exceeds the ${gradeBand} grade ceiling of ${maxGrade}`,
+    );
+  }
+
+  const drillable = rangeSkills(input.islandId, gradeBand as GradeBand);
   if (!drillable.includes(input.skillId)) {
-    throw new Error(
+    throw new RangeError(
       `openDrill: '${input.skillId}' is not trained at ${input.islandId} — its range drills ${
         drillable.length === 0 ? 'nothing' : drillable.join(', ')
       }`,

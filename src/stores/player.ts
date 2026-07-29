@@ -132,6 +132,7 @@ function applyTally(
 
   const mastery = { ...captain.mastery, [skill]: m };
   const unlocked = resolveUnlocks({
+    ...(captain.gradeBand === null ? {} : { gradeBand: captain.gradeBand }),
     mastery,
     unlockedCannons: captain.ownedCannons,
     unlockedIslands: captain.unlockedIslands,

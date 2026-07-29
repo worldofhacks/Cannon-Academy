@@ -37,6 +37,16 @@ const MAX_GRADE_BY_BAND: Readonly<Record<GradeBand, number>> = {
   g4_5: 5,
 };
 
+/** Resolves the shared curriculum ceiling and rejects missing or corrupt persisted band data. */
+export function maxGradeForBand(band: unknown): number {
+  if (!(GRADE_BANDS as readonly unknown[]).includes(band)) {
+    throw new RangeError(
+      `maxGradeForBand: invalid GradeBand ${JSON.stringify(band)} — expected one of ${GRADE_BANDS.join(', ')}`,
+    );
+  }
+  return MAX_GRADE_BY_BAND[band as GradeBand];
+}
+
 /**
  * A cannon is placement-eligible when its `unlock.kind` is `starter` only (never `range` or
  * `chest` — range guns stay mastery-earned, D-6; the Nine-Pounder stays a chest reward) and it
@@ -80,13 +90,7 @@ function sortIslands(list: readonly Island[]): IslandId[] {
  * never leak into a later invocation's result.
  */
 export function resolvePlacement(band: GradeBand): Placement {
-  if (!(GRADE_BANDS as readonly string[]).includes(band)) {
-    throw new Error(
-      `resolvePlacement: invalid GradeBand ${JSON.stringify(band)} — expected one of ${GRADE_BANDS.join(', ')}`,
-    );
-  }
-
-  const maxGrade = MAX_GRADE_BY_BAND[band];
+  const maxGrade = maxGradeForBand(band);
 
   const unlockedCannons = sortCannons(cannons.filter((c) => isCannonEligible(c, maxGrade)));
   const unlockedIslands = sortIslands(islands.filter((i) => isIslandEligible(i, maxGrade)));
