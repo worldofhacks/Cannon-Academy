@@ -4,7 +4,7 @@
 **Branch:** `ticket/T-018-onboarding-rival`
 **Phase:** `implement`
 **Active ticket:** `T-018`
-**Commit:** (see git after commit) — `feat(T-018): opponent interface and scripted onboarding rival`
+**Commit:** `702a804cb4b6d47e22202fa054ede200850cd7b0` — `feat(T-018): opponent interface and scripted onboarding rival`
 **Files changed:** `src/engine/opponents/types.ts`, `src/engine/opponents/scripted.ts` (exactly `file_scopes`), plus this report.
 **Tests edited:** **none** (`__tests__/**` untouched; frozen suite hash preserved).
 
