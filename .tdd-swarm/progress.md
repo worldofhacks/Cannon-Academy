@@ -1982,3 +1982,9 @@ Reducer state/event API published in COORDINATION.md. Merged + pushed.
 ### T-034 started — param key grammar
 
 Worktree `.worktrees/wt-T-034` from post-T-020 tip. Phase `tests`. T-029 still blocked.
+
+### T-034 RED landed (`51c37df`)
+
+[T-034 Test Agent](a9cbdabc-389e-4c96-8270-6414a4d3aae1): 7 fail / 102 pass in schemas suite; baseline 1612.
+**Adjudication:** file_scopes += `expr.ts` for pure IDENT export only; schemas must import it.
+Test-design review dispatched.
