@@ -30,9 +30,9 @@
 
 ## Wave A3
 
-| id    | title                                             | status  | deps         | model   |
-| ----- | ------------------------------------------------- | ------- | ------------ | ------- |
-| A-007 | Sea chart — the hub the whole loop routes through | backlog | A-001, A-003 | capable |
+| id    | title                                             | status      | deps         | model   |
+| ----- | ------------------------------------------------- | ----------- | ------------ | ------- |
+| A-007 | Sea chart — the hub the whole loop routes through | in-progress | A-001, A-003 | capable |
 
 ## Wave A4
 
