@@ -1809,3 +1809,9 @@ merge + push per ticket policy.
 Code: APPROVE_WITH_NITS ([T-032 Code Review](d4739913-a514-4ac1-bc4f-74cdf6e4fcb2)); header nit fixed.
 Security: **PASS** ([T-032 Security Review](b8f9afa1-bc67-4f3e-8a08-58ab6a9e53fc)).
 Merged into `swarm/engine-core` and pushed (per-ticket push policy).
+
+
+### T-015 REJECT fixes landed (`3ec4364`)
+
+Verified: SPOT_CHECKS + `\b` params + operator allowlist; 47 fail / 6 pass (missing JSON);
+baseline 1438; no `independentArithmetic`. Re-review dispatched.
