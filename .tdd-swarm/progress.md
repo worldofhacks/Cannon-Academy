@@ -1381,6 +1381,68 @@ expected RED-state typecheck and unit failures.
 
 Count verified 19 → **21**, gate red on AC-20 and AC-21 only ([[L-026]]).
 
+## T-013 round 3 — accepted, pending re-review
+
+Narrow scope delivered as asked: one AC-3 reference-inequality test and three AC-16 aliasing
+tests covering `playerLoadout`, `rivalLoadout`, and `templatesBySkill` plus nested `Template[]`.
+Authored on Grok 4.5 fast after Opus hit the API limit. Re-verified by me:
+
+| Claim                                                | Verified                                |
+| ---------------------------------------------------- | --------------------------------------- |
+| Start hash `154ebee1…` → end `c5e80f2b…`             | matches                                 |
+| Diff vs merge base                                   | suite + report only, **0 under `src/`** |
+| RED still 88: 3 `TS2307` / 51 `TS2322` / 34 `TS2578` | matches, 0 outside suite                |
+| Baseline                                             | `Tests 1229 passed`                     |
+| `spec-lint`                                          | **PASS** — 16/16 AC, DoD-9 `SKIP`       |
+| Prettier / ESLint / `no-todos`                       | 0 / 0 / PASS                            |
+| `types.ts` absent; scratchpad gone                   | yes                                     |
+
+Liveness method held: aliasing and memoising impls passed the old suite and die on the new tests.
+Matrix 51/51 killed, 5/5 controls surviving including the three T-022 forward-compat ones.
+Implementer target remains **88 → 0**.
+
+## T-007 round 3 — accepted, pending re-review
+
+Round-3 suite closes the re-review rejection: AC-20 (ExprError wrap at all three sites with
+`cause`), AC-21 (failure precedence), AC-5 negative half. Authored on Grok 4.5 fast. Re-verified:
+
+| Claim                               | Verified                                    |
+| ----------------------------------- | ------------------------------------------- |
+| Start `09b3da13…` → end `f7c62e4d…` | matches                                     |
+| Diff vs merge base                  | suite + report only, **0 under `src/`**     |
+| RED                                 | sole `TS2307`; baseline `Tests 1229 passed` |
+| `spec-lint`                         | **PASS** — 21/21 AC, DoD-7 `SKIP`           |
+| Prettier / ESLint / `no-todos`      | 0 / 0 / PASS                                |
+| Tags                                | AC-20 ×5, AC-21 ×3, AC-5 ×3; 81 tests       |
+| `generator.ts` absent               | yes                                         |
+
+Cause assertions are real (`toBeInstanceOf(ExprError)`), and AC-20 includes a premise that the three
+fixtures are schema-valid and throw `ExprError` directly — so the translation is testable.
+
+T-013's GPT Terra re-review died on API limit before starting; both re-reviews re-dispatched on
+Claude Sonnet (still cross-family vs Grok authoring).
+
+## T-007 round-3 re-review — REJECTED (Composer 2.5)
+
+Cross-model review found one live mutant, re-measured by me:
+
+`m3-render-first-fake-cause` — runs render (step 6) before distractors (step 5), and on render
+failure attaches a **fabricated** `ExprError` cause. **81/81 + clean tsc.** Control without the
+fake cause dies on exactly AC-21's step-5-vs-6 test (80/81). So AC-21's `instanceof ExprError`
+check partially bites and still lets a competent cheat through.
+
+Partial-wrap / no-cause / answer-before-constraints mutants all die — round 3 closed those.
+
+### Rulings (no new AC numbers; tighten existing)
+
+- **AC-11** — render `INVALID_QUESTION` must have `cause === undefined`, every swept seed.
+- **AC-20** — `cause` must match the frozen evaluator's `code` **and** `message` for that
+  expression+params, not merely `instanceof ExprError`.
+- **AC-21** — step-5 diagnosis uses AC-20's identity rule; step-6 absence is asserted via AC-11
+  too, not only implied by the dual-failure fixture.
+
+Count stays 21; gate still green on tags. Suite assertions themselves are what must change.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
