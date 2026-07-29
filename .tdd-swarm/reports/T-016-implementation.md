@@ -2,7 +2,7 @@
 
 **Status: DONE**
 
-**Commit:** (see SHA after commit) — `feat(T-016): refresh grade 3-5 templates after ladder fix`
+**Commit:** `1198daab8c1f3b389e705a5fe4058e9d6aa9be3f` — `feat(T-016): refresh grade 3-5 templates after ladder fix`
 
 ## Files refreshed (file_scopes only)
 
