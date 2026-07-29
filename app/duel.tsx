@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, router } from 'expo-router';
@@ -18,9 +18,10 @@ import {
 } from '../src/components/duel/Panels';
 import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
-import { applyDuelOutcome } from '../src/services/duelRewards';
+import { applyDuelOutcome, type DuelRewardOutcome } from '../src/services/duelRewards';
 import { resolveDestination } from '../src/services/flow';
 import { trayCannons } from '../src/services/loadout';
+import { retainFirstApplied, victoryRewards } from '../src/services/victoryRewards';
 import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
 import { seaStageHeight } from '../src/theme/responsive';
@@ -48,6 +49,7 @@ export default function DuelScreen() {
   // first chest ever drops. Resolved here because the sea stage renders colours, not captains.
   const playerShip = shipCosmeticsForCaptain(useCaptain((s) => s.captain));
   const [state, dispatch] = useReducer(duelReducer, 0, () => initialDuelState(freshSeed()));
+  const [appliedReward, setAppliedReward] = useState<DuelRewardOutcome | null>(null);
   const askedAt = useRef(0);
 
   // The captain's OWN loadout, in catalog order — via trayCannons (A-011), never a grade-band lookup.
@@ -87,8 +89,14 @@ export default function DuelScreen() {
   // opens — so `applyDuelOutcome` is idempotent per `duelId` and the second call is a no-op.
   useEffect(() => {
     if (state.phase !== 'victory' && state.phase !== 'defeat') return;
-    applyDuelOutcome(captainStore, state);
+    const observed = applyDuelOutcome(captainStore, state);
+    setAppliedReward((current) => retainFirstApplied(current, observed));
   }, [state.phase, state.duelId]);
+
+  // "Sail again" keeps this screen mounted, so its next duel needs its own retained settlement.
+  useEffect(() => {
+    setAppliedReward(null);
+  }, [state.duelId]);
 
   const onAnswer = useCallback((value: number) => {
     dispatch({ type: 'ANSWER', value, elapsedMs: Date.now() - askedAt.current });
@@ -159,12 +167,12 @@ export default function DuelScreen() {
           />
         ) : null}
 
-        {state.phase === 'victory' ? (
+        {state.phase === 'victory' && appliedReward !== null ? (
           <VictoryPanel
             right={state.right}
             asked={state.asked}
             perfects={state.perfects}
-            coins={state.coins}
+            rewards={victoryRewards(appliedReward)}
             chestOpen={state.chestOpen}
             onOpenChest={() => dispatch({ type: 'OPEN_CHEST' })}
             onLeave={leave}
