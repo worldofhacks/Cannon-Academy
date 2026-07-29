@@ -1815,3 +1815,14 @@ Merged into `swarm/engine-core` and pushed (per-ticket push policy).
 
 Verified: SPOT_CHECKS + `\b` params + operator allowlist; 47 fail / 6 pass (missing JSON);
 baseline 1438; no `independentArithmetic`. Re-review dispatched.
+
+
+### T-014 unblocked — prettier style + content green
+
+Orchestrator style commit `f0496f2` on suite; new frozen hash `9c239b355136e2b3…`.
+Feat `ab41906` JSON refresh green; gates ALL PASS after style. Code + security review dispatched.
+
+### T-016 unfrozen — BLOCKED(TEST_DISPUTE) AC-1 vs AC-11 ladder
+
+Four REQUIRED_TEMPLATES exceed ladder threshold (same class as T-014). Phase reopened to `tests`;
+Test Agent amending distractors + AC-11 preflight.
