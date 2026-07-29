@@ -10,7 +10,7 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { getIsland, getSkill } from '@content/index';
+import { getSkill } from '@content/index';
 import type { GradeBand, SkillId } from '@content/schemas';
 import { maxGradeForBand } from '@engine/placement';
 import { MIN_TAP_TARGET } from '../../src/theme/tokens';
