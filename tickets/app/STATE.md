@@ -21,12 +21,8 @@ Questions are **real** as of A-014 — the placeholder generator is deleted, not
 
 ## Ticket state — 17 tickets, `tickets/app/APP-TICKETS.md`
 
-| done | A-001…A-009 (spine, identity, onboarding, name/flag, chart logic, duel payout, range), A-014 |
-| open / in flight | **A-011 gun deck** (unblocked — `TRAY_CAPACITY` shipped) · A-010 chest · A-012 rank · A-013 sprites · A-015 guided duel · A-016 duel core · A-017 timeout |
-
-`A-016` and `A-017` are **retrospective** — they specify shipped code that had no acceptance
-criteria (MVP checklist items 5 and 10). Their ACs will likely pass immediately; the point is that
-the duel stops being 300 unspecified lines under a `review-passed` label.
+| done | A-001…A-009, A-011, A-014 |
+| open | A-010 chest · A-012 rank · A-013 sprites · A-015 guided duel · A-016 duel core · A-017 timeout |
 
 ## Engine blockers — cleared
 

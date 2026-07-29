@@ -27,13 +27,13 @@ ticket numbering and not tidiness.
 
 **Checklist-critical, must land:**
 
-| ticket | checklist item                                          | state                                                         |
-| ------ | ------------------------------------------------------- | ------------------------------------------------------------- |
-| A-016  | 5 — win a real duel against a bot                       | shipped, now specified                                        |
-| A-017  | 10 — time out a question and see the misfire            | shipped, now specified                                        |
-| A-014  | 5 — the four-choice questions a child is actually asked | **not built** (all fake)                                      |
-| A-015  | 4 — an easy guided duel you win                         | **not built** (23-line stub)                                  |
-| A-011  | 5 — "two starter cannons that are a real choice"        | **in flight** — `TRAY_CAPACITY` unblocked; frozen suite ready |
+| ticket | checklist item                                          | state                                       |
+| ------ | ------------------------------------------------------- | ------------------------------------------- |
+| A-016  | 5 — win a real duel against a bot                       | shipped, now specified                      |
+| A-017  | 10 — time out a question and see the misfire            | shipped, now specified                      |
+| A-014  | 5 — the four-choice questions a child is actually asked | **not built** (all fake)                    |
+| A-015  | 4 — an easy guided duel you win                         | **not built** (23-line stub)                |
+| A-011  | 5 — "two starter cannons that are a real choice"        | **done** — gun deck chooses the sailing set |
 
 **Not checklist-critical — droppable if Friday is tight**, and PLAN.md says so itself:
 
