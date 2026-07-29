@@ -19,11 +19,11 @@ import { captainStore } from '../src/stores/useCaptain';
 
 const ignorePendingStart = () => undefined;
 
-function PendingLaunchShell({ ready }: { ready: boolean }) {
+function PendingLaunchShell({ ready, fontsLoaded }: { ready: boolean; fontsLoaded: boolean }) {
   return (
     <SafeAreaProvider>
       <StatusBar style="light" />
-      <Splash ready={ready} onStart={ignorePendingStart} />
+      <Splash ready={ready} fontsLoaded={fontsLoaded} onStart={ignorePendingStart} />
     </SafeAreaProvider>
   );
 }
@@ -95,7 +95,7 @@ export default function RootLayout() {
   // Board 4a: the hold is either a white rectangle or it is the splash. `useWindowDimensions`
   // rather than a constant, because the splash scales off the design's 375pt reference width.
   if (!fontsLoaded || destination === null)
-    return <PendingLaunchShell ready={fontsLoaded && destination !== null} />;
+    return <PendingLaunchShell ready={fontsLoaded && destination !== null} fontsLoaded={fontsLoaded} />;
   launchGate.markReady(destination);
   if (!launchAcknowledged) {
     return (
@@ -103,6 +103,7 @@ export default function RootLayout() {
         <StatusBar style="light" />
         <Splash
           ready={fontsLoaded && destination !== null}
+          fontsLoaded={fontsLoaded}
           onStart={() => {
             if (launchGate.start((resolvedDestination) => router.replace(`/${resolvedDestination}`))) {
               setLaunchAcknowledged(launchGate.acknowledged);

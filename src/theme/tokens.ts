@@ -181,7 +181,7 @@ export const type = {
    * 32 on the board. It existed only as a hardcoded `fontSize: 32` at the call site until the
    * design fixture noticed there was no token within 1pt of it.
    */
-  glyph: { fontFamily: font.displayBold, fontSize: 32, lineHeight: 34 },
+  glyph: { fontFamily: font.displayBold, fontSize: 32, lineHeight: 40 },
   /** Card headline. */
   title: { fontFamily: font.displayBold, fontSize: 19, lineHeight: 24 },
   /** Sub-headline inside a card. */

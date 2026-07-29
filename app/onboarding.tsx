@@ -78,7 +78,7 @@ export default function Onboarding() {
           },
         ]}
       >
-        <Text style={[s.title, { fontSize: tx(23), lineHeight: tx(26) }]}>Which ship is yours?</Text>
+        <Text style={[s.title, { fontSize: tx(23), lineHeight: tx(30) }]}>Which ship is yours?</Text>
 
         {BANDS.map((b) => {
           const selected = chosen === b.band;
@@ -137,7 +137,10 @@ export default function Onboarding() {
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     minimumFontScale={0.8}
-                    style={[s.bandLabel, { fontSize: tx(11), letterSpacing: tx(11) * 0.05 }]}
+                    style={[
+                      s.bandLabel,
+                      { fontSize: tx(11), lineHeight: tx(15), letterSpacing: tx(11) * 0.05 },
+                    ]}
                   >
                     {b.label}
                   </Text>
@@ -148,7 +151,9 @@ export default function Onboarding() {
         })}
 
         {/* The board's note to the adult, not to the child. */}
-        <Text style={[s.grownups, { fontSize: tx(12) }]}>Grown-ups: pick the hardest one they can read.</Text>
+        <Text style={[s.grownups, { fontSize: tx(12), lineHeight: tx(18) }]}>
+          Grown-ups: pick the hardest one they can read.
+        </Text>
       </View>
     </ResponsiveFrame>
   );

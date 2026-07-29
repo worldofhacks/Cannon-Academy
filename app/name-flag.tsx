@@ -72,7 +72,7 @@ export default function NameFlag() {
           },
         ]}
       >
-        <Text style={[s.title, { fontSize: tx(23), lineHeight: tx(26) }]}>Name your ship</Text>
+        <Text style={[s.title, { fontSize: tx(23), lineHeight: tx(30) }]}>Name your ship</Text>
 
         <View style={[s.card, { borderRadius: px(radius.card), padding: px(12), borderBottomWidth: px(4) }]}>
           <TextInput
@@ -89,7 +89,9 @@ export default function NameFlag() {
           />
         </View>
 
-        <Text style={[s.eyebrow, { fontSize: tx(11), letterSpacing: tx(11) * 0.08 }]}>CHOOSE YOUR FLAG</Text>
+        <Text style={[s.eyebrow, { fontSize: tx(11), lineHeight: tx(15), letterSpacing: tx(11) * 0.08 }]}>
+          CHOOSE YOUR FLAG
+        </Text>
 
         <View style={[s.flagRow, { gap: px(10) }]}>
           {FLAGS.map((f) => {
@@ -126,7 +128,7 @@ export default function NameFlag() {
                   }}
                 />
                 {/* Labelled, because six swatches alone are unusable to a colour-blind child. */}
-                <Text style={[s.flagLabel, { fontSize: tx(10) }]}>{f.label}</Text>
+                <Text style={[s.flagLabel, { fontSize: tx(10), lineHeight: tx(14) }]}>{f.label}</Text>
               </Pressable>
             );
           })}
@@ -155,7 +157,7 @@ export default function NameFlag() {
           accessibilityLabel="Skip, choose for me"
           style={({ pressed }) => [s.skip, { minHeight: px(MIN_TAP_TARGET) }, pressed && { opacity: 0.6 }]}
         >
-          <Text style={[s.skipText, { fontSize: tx(13) }]}>Skip — choose for me</Text>
+          <Text style={[s.skipText, { fontSize: tx(13), lineHeight: tx(18) }]}>Skip — choose for me</Text>
         </Pressable>
       </View>
     </ResponsiveFrame>

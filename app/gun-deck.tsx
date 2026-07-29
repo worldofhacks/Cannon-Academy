@@ -301,7 +301,7 @@ function GunDeckBody() {
                   pressed && s.pressedDrop,
                 ]}
               >
-                <Text style={[s.slotGlyph, { fontSize: tx(34), lineHeight: tx(34) }]}>{look.glyph}</Text>
+                <Text style={[s.slotGlyph, { fontSize: tx(34), lineHeight: tx(42) }]}>{look.glyph}</Text>
                 <Text style={[s.slotRange, { fontSize: tx(10) }]}>{look.range}</Text>
                 <TemperBadge temper={slot.cannon.temperament} size={ax(26)} />
               </Pressable>

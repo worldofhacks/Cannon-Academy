@@ -21,16 +21,32 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { computeLayout } from '../theme/responsive';
 import { useLayout } from '../theme/useLayout';
 import { color } from '../theme/tokens';
 import { Poly } from './Poly';
 
-export function Splash({ ready, onStart }: { ready: boolean; onStart: () => void }) {
-  const L = useLayout();
-  const { width } = L;
-  // The ship and the sea are art — they scale. The wordmark and the loader label are type.
+/** Cap the splash composition so tablet/desktop web keep the phone board proportions. */
+const STAGE_MAX_WIDTH = 430;
+
+export function Splash({
+  ready,
+  fontsLoaded = true,
+  onStart,
+}: {
+  ready: boolean;
+  /** When false, skip custom faces so web does not paint invisible zero-metric text. */
+  fontsLoaded?: boolean;
+  onStart: () => void;
+}) {
+  const window = useLayout();
+  // Art/type scale off a phone-width stage, not the full desktop viewport.
+  const stageWidth = Math.min(window.width, STAGE_MAX_WIDTH);
+  const L = computeLayout(stageWidth, window.height);
   const px = L.a;
   const tx = L.t;
+  const displayFace = fontsLoaded ? 'Baloo2_800ExtraBold' : undefined;
+  const bodyFace = fontsLoaded ? 'Nunito_800ExtraBold' : undefined;
 
   const bob = useSharedValue(0);
   useEffect(() => {
@@ -53,12 +69,12 @@ export function Splash({ ready, onStart }: { ready: boolean; onStart: () => void
   }));
 
   const art = (
-    <>
+    <View style={[s.stage, { width: stageWidth }]}>
       {/* sea */}
       <View style={[s.sea, { height: px(210), borderTopWidth: px(5) }]} />
       {/* the dashed swell — 26pt on, 26pt off */}
       <View style={[s.swell, { bottom: px(150), height: px(4) }]}>
-        {Array.from({ length: Math.ceil(width / px(52)) + 1 }, (_, i) => (
+        {Array.from({ length: Math.ceil(stageWidth / px(52)) + 1 }, (_, i) => (
           <View
             key={i}
             style={{
@@ -73,21 +89,41 @@ export function Splash({ ready, onStart }: { ready: boolean; onStart: () => void
         ))}
       </View>
 
-      {/* wordmark — lineHeight must exceed fontSize (Baloo-2 clips when equal; same class as A-042). */}
-      <View style={[s.title, { top: L.isShort ? px(96) : px(150) }]}>
+      {/* wordmark — never equal fontSize/lineHeight; no adjustsFontSizeToFit (web can shrink to 0). */}
+      <View
+        style={[
+          s.title,
+          {
+            top: L.isShort ? px(96) : px(150),
+            paddingHorizontal: px(16),
+          },
+        ]}
+      >
         <Text
           numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.8}
-          style={[s.kicker, { fontSize: tx(15), lineHeight: tx(20), letterSpacing: tx(15) * 0.24 }]}
+          style={[
+            s.kicker,
+            {
+              fontFamily: displayFace,
+              fontSize: tx(15),
+              lineHeight: tx(22),
+              letterSpacing: tx(15) * 0.18,
+            },
+          ]}
         >
           CANNON
         </Text>
         <Text
           numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.8}
-          style={[s.wordmark, { fontSize: tx(46), lineHeight: tx(56) }]}
+          style={[
+            s.wordmark,
+            {
+              fontFamily: displayFace,
+              fontSize: tx(46),
+              lineHeight: tx(58),
+              paddingVertical: tx(2),
+            },
+          ]}
         >
           ACADEMY
         </Text>
@@ -175,21 +211,30 @@ export function Splash({ ready, onStart }: { ready: boolean; onStart: () => void
           style={{ position: 'absolute', left: 0, bottom: 0 }}
         />
       </Animated.View>
-    </>
+    </View>
   );
 
   if (!ready) {
     return (
       <View style={s.screen}>
         {art}
-        {/* loader */}
         <View style={[s.loader, { bottom: px(64), gap: px(12) }]}>
           <View style={{ flexDirection: 'row', gap: px(8) }}>
             {[0, 180, 360].map((delay) => (
               <PulseDot key={delay} delay={delay} size={px(14)} />
             ))}
           </View>
-          <Text style={[s.hoisting, { fontSize: tx(12), letterSpacing: tx(12) * 0.1 }]}>
+          <Text
+            style={[
+              s.hoisting,
+              {
+                fontFamily: bodyFace,
+                fontSize: tx(12),
+                lineHeight: tx(16),
+                letterSpacing: tx(12) * 0.08,
+              },
+            ]}
+          >
             HOISTING THE SAILS
           </Text>
         </View>
@@ -205,9 +250,9 @@ export function Splash({ ready, onStart }: { ready: boolean; onStart: () => void
           accessibilityRole="button"
           accessibilityLabel="SET SAIL"
           onPress={onStart}
-          style={({ pressed }) => [s.start, { minHeight: px(64) }, pressed && s.startPressed]}
+          style={({ pressed }) => [s.start, { minHeight: Math.max(px(64), 64) }, pressed && s.startPressed]}
         >
-          <Text style={[s.startLabel, { fontSize: tx(18), lineHeight: tx(24) }]}>
+          <Text style={[s.startLabel, { fontFamily: displayFace, fontSize: tx(18), lineHeight: tx(24) }]}>
             {['SET', 'SAIL'].join(' ')}
           </Text>
         </Pressable>
@@ -239,7 +284,13 @@ function PulseDot({ delay, size }: { delay: number; size: number }) {
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: '#0C5E86', overflow: 'hidden' },
+  screen: {
+    flex: 1,
+    backgroundColor: '#0C5E86',
+    overflow: 'hidden',
+    alignItems: 'center',
+  },
+  stage: { flex: 1, alignSelf: 'center', maxWidth: '100%' },
   sea: {
     position: 'absolute',
     left: 0,
@@ -250,10 +301,10 @@ const s = StyleSheet.create({
   },
   swell: { position: 'absolute', left: 0, right: 0, opacity: 0.6, overflow: 'hidden' },
   title: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 6 },
-  kicker: { fontFamily: 'Baloo2_800ExtraBold', color: color.gold },
-  wordmark: { fontFamily: 'Baloo2_800ExtraBold', color: color.parchment },
+  kicker: { color: color.gold, textAlign: 'center' },
+  wordmark: { color: color.parchment, textAlign: 'center' },
   loader: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
-  hoisting: { fontFamily: 'Nunito_800ExtraBold', color: color.chipInk },
+  hoisting: { color: color.chipInk, textAlign: 'center' },
   start: {
     minWidth: 160,
     alignItems: 'center',
@@ -265,5 +316,5 @@ const s = StyleSheet.create({
     borderBottomColor: color.woodDeep,
   },
   startPressed: { transform: [{ translateY: 3 }], borderBottomWidth: 1 },
-  startLabel: { fontFamily: 'Baloo2_800ExtraBold', color: color.inkDark },
+  startLabel: { color: color.inkDark },
 });
