@@ -6,8 +6,11 @@ import {
 } from '@expo-google-fonts/baloo-2';
 import { Nunito_600SemiBold, Nunito_700Bold, Nunito_800ExtraBold } from '@expo-google-fonts/nunito';
 import { Stack } from 'expo-router';
+import { useWindowDimensions } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+
+import { Splash } from '../src/components/Splash';
 
 /**
  * Root layout.
@@ -23,6 +26,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
  * cold start, which on a 375pt phone reflows the whole HUD.
  */
 export default function RootLayout() {
+  const { width } = useWindowDimensions();
   const [fontsLoaded] = useFonts({
     Baloo2_500Medium,
     Baloo2_600SemiBold,
@@ -32,7 +36,16 @@ export default function RootLayout() {
     Nunito_800ExtraBold,
   });
 
-  if (!fontsLoaded) return null;
+  // Board 4a: the hold is either a white rectangle or it is the splash. `useWindowDimensions`
+  // rather than a constant, because the splash scales off the design's 375pt reference width.
+  if (!fontsLoaded) {
+    return (
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <Splash width={width} />
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
