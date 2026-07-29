@@ -1,0 +1,17 @@
+[
+  {
+    "id": "gunner",
+    "displayName": "Gunner",
+    "role": "Keeps a steady eye on every shot before the fuse is lit"
+  },
+  {
+    "id": "carpenter",
+    "displayName": "Carpenter",
+    "role": "Minds the hull and keeps the ship shipshape between duels"
+  },
+  {
+    "id": "cook",
+    "displayName": "Cook",
+    "role": "Keeps the galley running and spirits high, duel after duel"
+  }
+]

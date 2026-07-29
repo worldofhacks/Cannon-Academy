@@ -45,5 +45,25 @@ else
   echo "  PASS  engine-purity"
 fi
 
+# Frozen tests unmodified. The PreToolUse hook blocks Write/Edit under __tests__/,
+# but cannot see a shell write (cp, cat >, sed -i). This catches the OUTCOME regardless
+# of mechanism: any committed change under __tests__/ must come from a test(...) or
+# style(...) commit. See LESSONS.md L-023. Runs in every phase -- an earlier revision
+# gated on .tdd-swarm/phase, which is untracked and absent in the main repo, and that
+# was one of three reasons it silently never executed at all (L-001, L-007).
+if git rev-parse --verify --quiet swarm/engine-core >/dev/null 2>&1; then
+  BAD=$(git log --format='%H %s' swarm/engine-core..HEAD -- '__tests__' 2>/dev/null \
+        | grep -vE '^[0-9a-f]+ (test|style)\(' || true)
+  if [ -n "$BAD" ]; then
+    echo "  FAIL  frozen-tests-unmodified"
+    printf '%s\n' "$BAD" | sed 's/^/        /'
+    FAIL=1
+  else
+    echo "  PASS  frozen-tests-unmodified"
+  fi
+else
+  echo "  PASS  frozen-tests-unmodified (no integration branch to compare against)"
+fi
+
 [ "$FAIL" -eq 0 ] && echo "== ALL LOCAL GATES PASS ==" || echo "== LOCAL GATES RED =="
 exit "$FAIL"

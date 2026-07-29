@@ -1,0 +1,65 @@
+[
+  {
+    "id": "add_within_10",
+    "displayName": "Addition within 10",
+    "minGrade": 0,
+    "maxGrade": 1,
+    "symbolicOnly": true
+  },
+  {
+    "id": "add_within_20",
+    "displayName": "Addition within 20",
+    "minGrade": 1,
+    "maxGrade": 2,
+    "symbolicOnly": true
+  },
+  {
+    "id": "sub_within_20",
+    "displayName": "Subtraction within 20",
+    "minGrade": 1,
+    "maxGrade": 2,
+    "symbolicOnly": true
+  },
+  {
+    "id": "place_value_compare",
+    "displayName": "Place value and comparison",
+    "minGrade": 2,
+    "maxGrade": 2,
+    "symbolicOnly": false
+  },
+  {
+    "id": "two_step_add_sub",
+    "displayName": "Two-step addition and subtraction",
+    "minGrade": 2,
+    "maxGrade": 3,
+    "symbolicOnly": false
+  },
+  {
+    "id": "mult_facts",
+    "displayName": "Multiplication facts",
+    "minGrade": 3,
+    "maxGrade": 3,
+    "symbolicOnly": false
+  },
+  {
+    "id": "div_facts",
+    "displayName": "Division facts",
+    "minGrade": 3,
+    "maxGrade": 4,
+    "symbolicOnly": false
+  },
+  {
+    "id": "fractions_int",
+    "displayName": "Fractions (integer-answerable)",
+    "minGrade": 4,
+    "maxGrade": 5,
+    "symbolicOnly": false
+  },
+  {
+    "id": "multi_digit_order_ops",
+    "displayName": "Multi-digit operations and order of operations",
+    "minGrade": 5,
+    "maxGrade": 5,
+    "symbolicOnly": false
+  }
+]

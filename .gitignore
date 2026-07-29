@@ -1,6 +1,17 @@
+# Both forms: worktrees carry `node_modules` as a symlink, which `node_modules/` misses.
+node_modules
 node_modules/
 coverage/
 dist/
 .expo/
 *.log
 .DS_Store
+
+# Swarm control state — per worktree, never shared
+.worktrees/
+.tdd-swarm/phase
+.tdd-swarm/active-ticket
+
+# Agent scratch space: throwaway reference implementations and mutation harnesses.
+# Never committed, so nothing built here can be mistaken for production code.
+scratchpad/

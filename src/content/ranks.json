@@ -1,0 +1,7 @@
+[
+  { "id": "cadet", "displayName": "Cadet", "tier": 0, "minWins": 0 },
+  { "id": "ensign", "displayName": "Ensign", "tier": 1, "minWins": 10 },
+  { "id": "captain", "displayName": "Captain", "tier": 2, "minWins": 25 },
+  { "id": "commodore", "displayName": "Commodore", "tier": 3, "minWins": 50 },
+  { "id": "fleet_legend", "displayName": "Fleet Legend", "tier": 4, "minWins": 100 }
+]

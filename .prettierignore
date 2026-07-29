@@ -1,12 +1,19 @@
-node_modules
-coverage
-dist
-package-lock.json
+# Vendored CC0 art packs — third-party files, never hand-edited, and reformatting
+# a .gltf would rewrite 20 MB of vendor data for zero benefit.
+assets/source/
 
-# Human-authored planning artifacts — the swarm reads these, never reformats them.
-ARCHITECTURE.md
-PLAN.md
-README.md
-TICKETS.md
-tickets/
-.tdd-swarm/
+# Rendered sprite output and binary assets.
+assets/sprites/
+assets/lottie/
+assets/audio/
+
+# Blender working files.
+tools/
+
+# Agent working artifacts — every dispatch writes one, and formatting them
+# gates the build on a byproduct rather than on source.
+.tdd-swarm/reports/
+
+node_modules/
+coverage/
+dist/
