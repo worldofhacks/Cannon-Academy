@@ -2,19 +2,22 @@
 
 | | |
 | --- | --- |
-| Status | `DONE` (RED) |
+| Status | `DONE` (RED) — test-design nits I-1…I-3 closed |
 | Worktree | `.worktrees/wt-T-020` |
 | Branch | `ticket/T-020-duel-reducer` |
 | Phase | `tests` |
 | Test file | `__tests__/engine/duel/reducer.test.ts` |
 | `src/` touched | **no** (`reducer.ts` intentionally absent) |
+| Prior suite | `d43dfd7` |
+| Review | `.tdd-swarm/reports/T-020-test-design-review.md` (`ACCEPT_WITH_NITS`) |
 
 ---
 
 ## 1. Status
 
 **DONE** — failing suite encodes AC-1…AC-24 and DoD-1…DoD-8. Module
-`@engine/duel/reducer` is absent (Iron Law RED).
+`@engine/duel/reducer` is absent (Iron Law RED). Important findings from the
+independent test-design review are closed in this revision.
 
 | Gate | Result |
 | --- | --- |
@@ -23,7 +26,15 @@
 | `npx vitest run --exclude '__tests__/engine/duel/reducer.test.ts'` | **GREEN** — 21 files / **1674** passed |
 | Prettier / ESLint on suite | **PASS** |
 
-Suite SHA-256: `532cfd83959606757711f30d59379dc0ec35aede0a43bf153c10ef39c19048be`
+---
+
+## 1b. Test-design nits closed (Important)
+
+| # | Fix |
+| --- | --- |
+| **I-1** | Added `resolveRival` + `ANIMATION_DONE` → `defeat` (`playerHull: 0`, `enemyHull > 0`) tagged `spec(T-020:AC-11)`, plus symmetric `resolveRival` → `victory` (`enemyHull: 0`) tagged `spec(T-020:AC-10)`. |
+| **I-2** | AC-5 and AC-9 now precompute `resolveShot(...)` with the same inputs and assert `next.outcome.toEqual(expectedOutcome)` (mirrors AC-4). AC-5 also pins self-damage from `expectedOutcome.damageToSelf`. |
+| **I-3** | Scripted-duel driver asserts `playerHull` unchanged (still `PLAYER_HULL`) after every rival miss `RIVAL_ACTION` and again after the following `ANIMATION_DONE`; AC-18 also asserts final `playerHull === PLAYER_HULL`. |
 
 ---
 
@@ -34,7 +45,9 @@ Suite SHA-256: `532cfd83959606757711f30d59379dc0ec35aede0a43bf153c10ef39c19048be
 | `__tests__/engine/duel/reducer.test.ts` | Frozen RED suite: transitions, answer matrix, terminals, no-ops, scripted duel, determinism, serialisation, purity |
 | `.tdd-swarm/reports/T-020-tests.md` | This report |
 
-Commit message: `test(T-020): failing tests for duel reducer`
+Commits:
+- `d43dfd7` — `test(T-020): failing tests for duel reducer`
+- (this) — `test(T-020): pin resolveRival defeat, resolveShot oracles, rival-miss hull`
 
 ---
 
@@ -46,20 +59,20 @@ Commit message: `test(T-020): failing tests for duel reducer`
 | AC-2 | in-loadout `CANNON_SELECTED` → `reload` with 4 distinct choices, `timerMs`, `recentTemplateIds[0]`, advanced `rng` |
 | AC-3 | out-of-loadout cannon → `===` no-op |
 | AC-4 | correct @ 90% timer → `resolvePlayer` volley, hull/tally/log via `resolveShot` expectation |
-| AC-5 | wrong on `double_broadside` (volatile recoil > 0) → misfire, self-damage, attempts-only tally |
+| AC-5 | wrong on `double_broadside` → full `resolveShot` outcome oracle + recoil/tally/log |
 | AC-6 | wrong on `swivel_gun` (reliable) → both hulls unchanged |
 | AC-7 | `TIMER_EXPIRED` deep-equals wrong `ANSWER_CHOSEN` at `elapsedMs === timerMs` |
 | AC-8 | `choiceIndex` ∉ [0,3] or negative `elapsedMs` → `===` no-op |
-| AC-9 | below perfect fraction → `perfectShot`, `perfectShots++`, `ballCount = BASE+1` |
-| AC-10 | `enemyHull === 0` resolvePlayer → `victory` + result fields |
-| AC-11 | `playerHull === 0` after volatile → `defeat` |
+| AC-9 | below perfect fraction → full `resolveShot` outcome oracle + perfect flags/tally |
+| AC-10 | `enemyHull === 0` at `resolvePlayer` **and** `resolveRival` → `victory` + result fields |
+| AC-11 | `playerHull === 0` at `resolvePlayer` **and** `resolveRival` → `defeat` |
 | AC-12 | both hulls > 0 → `rivalTurn`, `turnToken++`, `volleyNumber` unchanged |
 | AC-13 | correct rival volley → player damage + rival log; `tally.totalAnswers` unchanged |
 | AC-14 | rival cannon outside loadout → `===` no-op |
 | AC-15 | resolveRival continue → `playerChoose`, `volleyNumber++`, `turnToken++` |
 | AC-16 | hardcoded 8×5 out-of-phase matrix → reference identity (`dod(T-020:5)`) |
 | AC-17 | `victory`/`defeat` ignore all five events |
-| AC-18 | seed `0`, four perfect swivel volleys vs `port_sumwich` (45) + rival misses → victory, alternating log |
+| AC-18 | seed `0`, four perfect swivel volleys vs `port_sumwich` (45) + rival misses → victory, alternating log; rival misses leave `playerHull === PLAYER_HULL` |
 | AC-19 | same sequence × 20 → deep-equal finals |
 | AC-20 | every mid-duel state JSON round-trip + next event equals live path |
 | AC-21 | missing skill templates → `QuestionGenerationError` / `NO_TEMPLATE` |

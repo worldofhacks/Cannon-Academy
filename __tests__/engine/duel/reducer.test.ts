@@ -327,6 +327,8 @@ function resolveRivalState(
     turnToken: number;
     volley: RivalVolley;
     damageToPlayer: number;
+    tally: DuelState['tally'];
+    actionLog: readonly ActionLogEntry[];
   }> = {},
 ): Extract<DuelState, { phase: 'resolveRival' }> {
   return {
@@ -397,6 +399,7 @@ function driveScriptedDuel(): DuelState {
 
     if (volley < 4) {
       expect(state.phase, `volley ${volley} rivalTurn`).toBe('rivalTurn');
+      const hullBeforeRival = state.playerHull;
       apply({
         type: 'RIVAL_ACTION',
         volley: {
@@ -406,8 +409,13 @@ function driveScriptedDuel(): DuelState {
         },
       });
       expect(state.phase, `volley ${volley} resolveRival`).toBe('resolveRival');
+      // I-3: a standard miss must deal zero player damage (hit-on-miss would still leave the
+      // player alive through three volleys and green AC-18 without this check).
+      expect(state.playerHull, `volley ${volley} rival miss must not damage player`).toBe(hullBeforeRival);
+      expect(state.playerHull).toBe(PLAYER_HULL);
       apply({ type: 'ANIMATION_DONE' });
       expect(state.phase, `volley ${volley} back to playerChoose`).toBe('playerChoose');
+      expect(state.playerHull).toBe(PLAYER_HULL);
     }
   }
 
@@ -543,19 +551,28 @@ describe('T-020 duelReducer — answer resolution', () => {
       actionLog: [],
       rng: createRng(50),
     });
+    const elapsedMs = 4000;
     const recoil = getCannon('double_broadside').recoilDamage;
     expect(recoil).toBeGreaterThan(0);
+    const [expectedOutcome] = resolveShot({
+      cannon: getCannon('double_broadside'),
+      correct: false,
+      elapsedMs,
+      rng: start.rng,
+    });
 
     const next = duelReducer(start, {
       type: 'ANSWER_CHOSEN',
       choiceIndex: wrongIndex(start.question),
-      elapsedMs: 4000,
+      elapsedMs,
     });
 
     expect(next.phase).toBe('resolvePlayer');
     if (next.phase !== 'resolvePlayer') return;
     expect(next.outcome.kind).toBe('misfire');
+    expect(next.outcome).toEqual(expectedOutcome);
     expect(next.enemyHull).toBe(40);
+    expect(next.playerHull).toBe(50 - expectedOutcome.damageToSelf);
     expect(next.playerHull).toBe(50 - recoil);
     expect(next.tally.totalAnswers).toBe(4);
     expect(next.tally.correctAnswers).toBe(2);
@@ -630,6 +647,12 @@ describe('T-020 duelReducer — answer resolution', () => {
     const boundary = PERFECT_SHOT_TIMER_FRACTION * start.timerMs;
     const elapsedMs = boundary - 1;
     expect(elapsedMs).toBeLessThan(boundary);
+    const [expectedOutcome] = resolveShot({
+      cannon: getCannon('swivel_gun'),
+      correct: true,
+      elapsedMs,
+      rng: start.rng,
+    });
 
     const next = duelReducer(start, {
       type: 'ANSWER_CHOSEN',
@@ -639,6 +662,7 @@ describe('T-020 duelReducer — answer resolution', () => {
 
     expect(next.phase).toBe('resolvePlayer');
     if (next.phase !== 'resolvePlayer') return;
+    expect(next.outcome).toEqual(expectedOutcome);
     expect(next.outcome.perfectShot).toBe(true);
     expect(next.tally.perfectShots).toBe(1);
     expect(next.outcome.ballCount).toBe(BASE_BALLS_PER_VOLLEY + 1);
@@ -694,6 +718,59 @@ describe('T-020 duelReducer — terminals and hull clamp', () => {
     if (next.phase !== 'defeat') return;
     expect(next.result.won).toBe(false);
     expect(next.playerHull).toBe(0);
+  });
+
+  it('spec(T-020:AC-11) resolveRival with playerHull <= 0 + ANIMATION_DONE → defeat', () => {
+    const tally = {
+      correctAnswers: 2,
+      totalAnswers: 3,
+      perfectShots: 0,
+      bySkill: { add_within_10: { correct: 2, attempts: 3 } },
+    };
+    const start = resolveRivalState({
+      enemyHull: 28,
+      playerHull: 0,
+      volleyNumber: 3,
+      damageToPlayer: 12,
+      tally,
+    });
+
+    const next = duelReducer(start, { type: 'ANIMATION_DONE' });
+
+    expect(next.phase).toBe('defeat');
+    if (next.phase !== 'defeat') return;
+    expect(next.result.won).toBe(false);
+    expect(next.result.tally).toEqual(tally);
+    expect(next.result.volleys).toBe(3);
+    expect(next.playerHull).toBe(0);
+    expect(next.enemyHull).toBe(28);
+  });
+
+  it('spec(T-020:AC-10) resolveRival with enemyHull <= 0 + ANIMATION_DONE → victory', () => {
+    const tally = {
+      correctAnswers: 4,
+      totalAnswers: 4,
+      perfectShots: 1,
+      bySkill: { add_within_10: { correct: 4, attempts: 4 } },
+    };
+    // Enemy-first terminal order: even with playerHull already 0, enemyHull <= 0 wins.
+    // The pure continue-symmetric case keeps playerHull > 0.
+    const start = resolveRivalState({
+      enemyHull: 0,
+      playerHull: 40,
+      volleyNumber: 4,
+      damageToPlayer: 0,
+      tally,
+    });
+
+    const next = duelReducer(start, { type: 'ANIMATION_DONE' });
+
+    expect(next.phase).toBe('victory');
+    if (next.phase !== 'victory') return;
+    expect(next.result.won).toBe(true);
+    expect(next.result.tally).toEqual(tally);
+    expect(next.result.volleys).toBe(4);
+    expect(next.enemyHull).toBe(0);
   });
 
   it('spec(T-020:AC-23) overkill clamps at damage application (resolvePlayer / resolveRival), not at terminal', () => {
@@ -847,6 +924,7 @@ describe('T-020 duelReducer — scripted duel paths', () => {
     expect(end.result.won).toBe(true);
     expect(end.result.volleys).toBe(4);
     expect(end.enemyHull).toBe(0);
+    expect(end.playerHull).toBe(PLAYER_HULL);
 
     const actors = end.actionLog.map((e) => e.actor);
     expect(actors).toEqual(['player', 'rival', 'player', 'rival', 'player', 'rival', 'player']);
