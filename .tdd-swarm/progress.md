@@ -1777,3 +1777,10 @@ Phase reopened to `tests`; Test Agent fixing contract + adding AC-7 preflight (r
 - **T-016:** fix commit `2929435` verified (SPOT_CHECKS, `\b` params, structural div constraints); re-review dispatched.
 - **T-032:** RED suite `fe76dd2` verified (29 fail — range still pre-granted); test-design review dispatched.
 - **T-014:** implementer BLOCKED confirmed; Test Agent amending near_doubles + AC-7 preflight (uncommitted).
+
+
+### T-032 FROZEN ( / ) — ACCEPT_WITH_NITS
+
+[T-032 test-design review](08ef7c4b-d2da-41a7-ba08-26b11084ef5b): no Critical/Important.
+Suites encode D-6 starters-only + mastery composition; correctly RED (29 fail). Phase → .
+Frozen hashes: placement , mastery . Implementer dispatched.

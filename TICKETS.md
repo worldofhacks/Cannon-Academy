@@ -112,7 +112,7 @@ Cross-ticket probe green (T-007 × T-013). Evidence: `.tdd-swarm/reports/wave4-i
 | T-017 | Gunnery-range drill session — full-rate mastery practice loop                  | backlog     | T-001, T-003, T-004, T-007, T-010        | `ticket/T-017-range-drill`              | standard | —                                          |
 | T-018 | Opponent interface and scripted onboarding rival                               | backlog     | T-003, T-004, T-006, T-013               | `ticket/T-018-opponent-interface`       | standard | —                                          |
 | T-020 | Duel reducer — the pure turn-based state machine                               | backlog     | T-004, T-006, T-007, T-008, T-013        | `ticket/T-020-duel-reducer`             | capable  | —                                          |
-| T-032 | Placement grants starter cannons only (D-6)                                    | in-progress | T-010, T-011                             | `ticket/T-032-placement-unlock-overlap` | standard | owner ruling D-6 — parallel with templates |
+| T-032 | Placement grants starter cannons only (D-6) | tests-written | T-010, T-011 | `ticket/T-032-placement-unlock-overlap` | standard | **frozen** + ACCEPT_WITH_NITS; implementer go |
 
 ## Wave 6 — golden gate, mercy bot, machine extension
 
