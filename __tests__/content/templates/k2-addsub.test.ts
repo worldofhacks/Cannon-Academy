@@ -110,7 +110,8 @@ const REQUIRED_TEMPLATES: readonly Template[] = [
     params: { a: [0, 4], b: [1, 5] },
     constraints: ['b == a + 1', 'a + b <= 10'],
     answerExpr: 'a + b',
-    distractors: ['a + b + 1', 'a + b - 1', 'a + a'],
+    // Under b == a + 1, a + a === a + b - 1, so the third distractor must NOT be a + a.
+    distractors: ['a + b + 1', 'a + b - 1', 'a + b + 2'],
   },
   {
     id: 'add_within_10_make_ten',
@@ -183,7 +184,8 @@ const REQUIRED_TEMPLATES: readonly Template[] = [
     params: { a: [0, 9], b: [1, 10] },
     constraints: ['b == a + 1', 'a + b <= 20'],
     answerExpr: 'a + b',
-    distractors: ['a + b + 1', 'a + b - 1', 'a + a'],
+    // Under b == a + 1, a + a === a + b - 1, so the third distractor must NOT be a + a.
+    distractors: ['a + b + 1', 'a + b - 1', 'a + b + 2'],
   },
   {
     id: 'add_within_20_make_ten',
@@ -388,6 +390,34 @@ describe('authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS �
         ).not.toThrow();
       }
     }
+  });
+
+  it("spec(T-014:AC-7) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples per template", () => {
+    // Freezes the authoring contract against the AC-7 collision class (e.g. near_doubles
+    // declaring both a+b-1 and a+a under b == a + 1) before JSON is ever copied.
+    const failures: string[] = [];
+    const rates: Record<string, number> = {};
+
+    for (const template of REQUIRED_TEMPLATES) {
+      let ladderHits = 0;
+      for (let seed = 1; seed <= 1000; seed += 1) {
+        const [question] = generateQuestion({
+          templates: [template],
+          recentTemplateIds: [],
+          rng: createRng(seed),
+        });
+        const sources = describeDistractorSources(template, question.params);
+        if (sources.includes('ladder')) {
+          ladderHits += 1;
+        }
+      }
+      rates[template.id] = ladderHits;
+      if (ladderHits >= 250) {
+        failures.push(`${template.id}: ladder ${ladderHits}/1000`);
+      }
+    }
+
+    expect(failures, `ladder rates: ${JSON.stringify(rates)}\n${failures.join('\n')}`).toEqual([]);
   });
 });
 
