@@ -70,7 +70,19 @@ describe('A-027 band-safe gunnery range', () => {
           rng: createRng(28),
           length: 1,
         }),
-      ).toThrow(/grade|band/i);
+      ).toThrow(RangeError);
     },
   );
+
+  it('spec(A-027:AC-5) synchronously refuses an explicitly requested skill above the K-1 ceiling', () => {
+    expect(() =>
+      openDrill({
+        islandId: 'port_sumwich',
+        skillId: 'add_within_20',
+        captain: captain('k_1'),
+        rng: createRng(29),
+        length: 1,
+      }),
+    ).toThrow(RangeError);
+  });
 });

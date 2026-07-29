@@ -431,6 +431,23 @@ describe('resolveUnlocks', () => {
     expect(result.islands).not.toContain('isla_products');
   });
 
+  it('spec(A-027:AC-3) the player-store tally grants K-1 Saker while keeping Isla Products closed', () => {
+    const store = createCaptainStore({
+      ...emptyCaptain(),
+      gradeBand: 'k_1',
+      unlockedIslands: ['port_sumwich'],
+    });
+
+    store.getState().recordRangeAnswers('add_within_10', {
+      correct: MASTERY_THRESHOLD_CORRECT,
+      asked: MASTERY_THRESHOLD_CORRECT,
+    });
+
+    const captain = store.getState().captain;
+    expect(captain.ownedCannons).toContain('saker');
+    expect(captain.unlockedIslands).not.toContain('isla_products');
+  });
+
   it('spec(A-027:AC-4) a mastered eligible predecessor opens its next eligible island without revoking a prior higher-band placement unlock', () => {
     const priorHigherBandIsland: IslandId = 'fraction_reef';
     const store = createCaptainStore({
