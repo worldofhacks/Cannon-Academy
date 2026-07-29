@@ -1033,3 +1033,14 @@ habit. For pattern-matching gates, require the marker to look like a marker (`TO
 so prose _about_ markers cannot trip it, and accept the narrower miss — an ambiguous red costs more
 than an un-punctuated `// TODO fix this` slipping past. And run every gate in a tree where the files
 under test actually exist.
+
+## L-040 — An integration-branch tip compared to itself is a vacuous gate (Wave 5)
+
+**Pattern:** `frozen-tests-unmodified` used `swarm/engine-core..HEAD`. On ticket branches that
+range is meaningful. On the integration branch itself it is **empty**, so the gate printed PASS
+while never inspecting the commits that actually landed test files via merge. Separately, the
+allowed subject prefix list lagged the swarm's real vocabulary (`spec(`, `freeze(`).
+
+**What to do instead:** when `HEAD == swarm/engine-core`, compare `main..HEAD` with
+`--no-merges`, and accept `test|style|spec|freeze`. Same class as L-033 — pick a range that
+cannot be trivially empty for the unit under test.
