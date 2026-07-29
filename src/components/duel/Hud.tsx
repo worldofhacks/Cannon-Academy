@@ -27,11 +27,16 @@ export function TurnBar({ label, turn, playerActive, onLeave }: TurnBarProps) {
         accessibilityLabel="Drop anchor and leave the duel"
         style={s.anchor}
       >
-        <Text style={s.anchorGlyph}>⚓</Text>
+        {/* U+FE0E: U+2693 defaults to EMOJI presentation, so iOS paints a colour anchor and
+            ignores `anchorGlyph.color` — a dark emoji on the dark #0A4E70 chip, i.e. an
+            invisible leave-duel button in every duel of the demo. */}
+        <Text style={s.anchorGlyph}>⚓︎</Text>
       </Pressable>
       <View style={s.turnCard}>
         <View style={[s.turnPip, { backgroundColor: playerActive ? color.success : '#6C4BD6' }]}>
-          <Text style={s.turnPipGlyph}>{playerActive ? '▶' : '◀'}</Text>
+          {/* U+FE0E on both: emoji-capable triangles that iOS can promote to colour glyphs,
+              which would drop `turnPipGlyph.color` and kill the white-on-green/purple read. */}
+          <Text style={s.turnPipGlyph}>{playerActive ? '▶︎' : '◀︎'}</Text>
         </View>
         <Text style={s.turnLabel} numberOfLines={1}>
           {label}

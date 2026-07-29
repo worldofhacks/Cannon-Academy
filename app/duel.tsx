@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { router } from 'expo-router';
+import { Redirect, router } from 'expo-router';
 
 import { captainStore, useCaptain } from '../src/stores/useCaptain';
 import { captainPoseForPhase } from '../src/components/duel/Captain';
@@ -19,6 +19,7 @@ import {
 import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
 import { applyDuelOutcome } from '../src/services/duelRewards';
+import { resolveDestination } from '../src/services/flow';
 import { trayCannons } from '../src/services/loadout';
 import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
@@ -53,11 +54,13 @@ export default function DuelScreen() {
   const captain = useCaptain((s) => s.captain);
   const tray = useMemo(() => [...trayCannons(captain)], [captain]);
 
-  // `tray[0]` is a total lookup, not an optimistic one: placement always grants at least one
-  // cannon, and if that ever stops being true the duel is unplayable and should say so loudly
-  // rather than render a screen with no gun on it.
+  // An empty tray is unplayable, but it is NOT unrecoverable, so it must not throw. Placement
+  // always equips at least one cannon, so the only way here is a legacy or corrupted save
+  // hydrating with cannons owned but none equipped — and `resolveDestination` returns exactly
+  // `gun-deck` for that state (flow.ts step 4). Throwing red-screened a child on a condition the
+  // flow resolver already knows how to fix; this hands them the screen that fixes it.
   const fallback = tray[0];
-  if (fallback === undefined) throw new Error('duel: captain has no equipped cannons');
+  if (fallback === undefined) return <Redirect href={`/${resolveDestination(captain)}`} />;
   const cannon = state.cannon ?? fallback;
   const look = cannonLook[cannon.id];
 
@@ -272,7 +275,8 @@ function resolveCopy(state: ReturnType<typeof initialDuelState>): ResolveCopy {
     case 'rivalImpact':
       return {
         background: '#6C4BD6',
-        icon: '◀',
+        // U+FE0E — this icon renders white on purple in ResolvePanel; see Hud.tsx.
+        icon: '◀︎',
         title: 'They landed one',
         body: `−${state.rivalDamage} to your hull`,
         hint: 'Planks, not lives. Your hull is always patched after a duel.',

@@ -31,7 +31,8 @@ export function WatchPanel() {
     <View style={[s.wrap, { backgroundColor: '#EFE6F7' }]}>
       <View style={s.rivalBanner}>
         <View style={s.rivalIcon}>
-          <Text style={s.rivalIconText}>◀</Text>
+          {/* U+FE0E — see Hud.tsx. White-on-purple depends on `color` surviving. */}
+          <Text style={s.rivalIconText}>◀︎</Text>
         </View>
         <View style={{ flex: 1 }}>
           <Text style={s.bannerTitleLight}>The rival is firing</Text>
