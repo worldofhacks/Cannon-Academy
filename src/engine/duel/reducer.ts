@@ -171,7 +171,8 @@ function resolvePlayerAnswer(
     actionLog: [...state.actionLog, entry],
     cannonId: state.cannonId,
     outcome,
-  };
+    question: state.question,
+  } as Extract<DuelState, { phase: 'resolvePlayer' }>;
 }
 
 function answerChosen(

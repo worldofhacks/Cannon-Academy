@@ -15,6 +15,7 @@ import {
 } from '../contracts/rewards';
 import { applyCaptainTally, type Captain, type CaptainStore } from '../stores/player';
 import type { SkillId } from '@content/schemas';
+import type { DuelResult, DuelState } from '@engine/duel/types';
 
 import { hashReceiptKey, rollChestSettlement, type RollChestFn } from './chestSettlement';
 import type { DuelRewardOutcome } from './duelRewards';
@@ -38,6 +39,28 @@ export interface DuelSettlementInput {
   readonly skillTally: Readonly<
     Partial<Record<SkillId, { readonly correct: number; readonly asked: number }>>
   >;
+}
+
+type TerminalCore = Extract<DuelState, { phase: 'victory' | 'defeat' }>;
+
+function settlementInputFromTerminal(core: TerminalCore): DuelSettlementInput {
+  const result = core.result as DuelResult & { readonly coins: number };
+  const skillTally: Partial<Record<SkillId, { correct: number; asked: number }>> = {};
+  for (const [skill, tally] of Object.entries(result.tally.bySkill)) {
+    if (tally === undefined) continue;
+    skillTally[skill as SkillId] = { correct: tally.correct, asked: tally.attempts };
+  }
+  return {
+    duelId: core.duelId ?? '',
+    seed: canonicalDuelSeed(core.duelId ?? ''),
+    won: result.won,
+    purseCoins: result.coins,
+    skillTally,
+  };
+}
+
+function resolveSettlementInput(input: DuelSettlementInput | TerminalCore): DuelSettlementInput {
+  return 'purseCoins' in input ? input : settlementInputFromTerminal(input);
 }
 
 export interface DuelSettlementOutcome extends DuelRewardOutcome {
@@ -202,29 +225,30 @@ export function canonicalDuelSeed(duelId: string): number {
 
 export function settleDuelRewards(
   store: CaptainStore,
-  input: DuelSettlementInput,
+  input: DuelSettlementInput | TerminalCore,
 ): DuelSettlementOutcome {
+  const resolved = resolveSettlementInput(input);
   const before = store.getState().captain;
-  const key = duelReceiptKey(input.duelId);
+  const key = duelReceiptKey(resolved.duelId);
   const existing = before.rewardReceipts[key];
   if (existing !== undefined) {
-    return noPayment(input.won, before.rankTier, existing);
+    return noPayment(resolved.won, before.rankTier, existing);
   }
 
-  if (!input.won) {
+  if (!resolved.won) {
     const ledger = defeatLedgerFor(store);
-    if (ledger.has(input.duelId)) return noPayment(false, before.rankTier);
+    if (ledger.has(resolved.duelId)) return noPayment(false, before.rankTier);
   }
 
-  let next = applySkillTallies(before, input.skillTally);
-  next = { ...next, coins: next.coins + input.purseCoins };
-  next = recordWin(next, input.won);
+  let next = applySkillTallies(before, resolved.skillTally);
+  next = { ...next, coins: next.coins + resolved.purseCoins };
+  next = recordWin(next, resolved.won);
 
   let chestReceipt: ChestReceipt | null = null;
   let chestCoins = 0;
 
-  if (input.won) {
-    const chestSeed = canonicalDuelSeed(input.duelId);
+  if (resolved.won) {
+    const chestSeed = canonicalDuelSeed(resolved.duelId);
     const roll = rollChestSettlement(chestSeed, next.ownedCannons);
     chestReceipt = {
       key,
@@ -241,11 +265,19 @@ export function settleDuelRewards(
       rewardReceipts: { ...next.rewardReceipts, [key]: chestReceipt },
     };
   } else {
-    defeatLedgerFor(store).add(input.duelId);
+    defeatLedgerFor(store).add(resolved.duelId);
   }
 
   store.getState().replaceCaptain(next);
-  return outcomeFromCaptain(before, next, input.won, input.purseCoins, chestReceipt, chestCoins, true);
+  return outcomeFromCaptain(
+    before,
+    next,
+    resolved.won,
+    resolved.purseCoins,
+    chestReceipt,
+    chestCoins,
+    true,
+  );
 }
 
 export function settleStoreChest(
