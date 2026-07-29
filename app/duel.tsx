@@ -25,7 +25,7 @@ import { trayCannons } from '../src/services/loadout';
 import { retainFirstApplied, victoryRewards } from '../src/services/victoryRewards';
 import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
-import { seaStageHeight, worldArtScale } from '../src/theme/responsive';
+import { seaStageHeight, worldArtScale, worldBoardWidth } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
 import { color, radius, space } from '../src/theme/tokens';
 import { duelReducer, initialDuelState, PHASE_DURATION_MS, type DuelPhase } from '../src/stores/duel';
@@ -55,7 +55,8 @@ function DuelBody() {
   const insets = useSafeAreaInsets();
   const L = useLayout();
   const { contentWidth } = useResponsiveSurface();
-  const stageArt = worldArtScale(contentWidth);
+  const boardWidth = worldBoardWidth(contentWidth);
+  const stageArt = worldArtScale(boardWidth);
   // The flag chosen at onboarding IS the pennant (board 5b) — a child's ship is theirs before the
   // first chest ever drops. Resolved here because the sea stage renders colours, not captains.
   const playerShip = shipCosmeticsForCaptain(useCaptain((s) => s.captain));
@@ -134,18 +135,22 @@ function DuelBody() {
         </View>
       </View>
 
-      <SeaStage
-        height={seaStageHeight(L)}
-        art={stageArt}
-        phase={state.phase}
-        playerShip={playerShip}
-        captainPose={captainPoseForPhase(state.phase, state.outcome?.perfectShot === true)}
-        look={look}
-        playerHullPct={state.playerHull / state.playerMax}
-        rivalHullPct={state.rivalHull / state.rivalMax}
-        damageToRival={state.phase === 'impact' ? (state.outcome?.damageToEnemy ?? null) : null}
-        damageToPlayer={state.phase === 'rivalImpact' ? state.rivalDamage : null}
-      />
+      <View style={[s.seaBand, { backgroundColor: color.skyTop }]}>
+        <View style={{ width: boardWidth, maxWidth: '100%', alignSelf: 'center' }}>
+          <SeaStage
+            height={seaStageHeight(L)}
+            art={stageArt}
+            phase={state.phase}
+            playerShip={playerShip}
+            captainPose={captainPoseForPhase(state.phase, state.outcome?.perfectShot === true)}
+            look={look}
+            playerHullPct={state.playerHull / state.playerMax}
+            rivalHullPct={state.rivalHull / state.rivalMax}
+            damageToRival={state.phase === 'impact' ? (state.outcome?.damageToEnemy ?? null) : null}
+            damageToPlayer={state.phase === 'rivalImpact' ? state.rivalDamage : null}
+          />
+        </View>
+      </View>
 
       {/* The sheet carries the phase's own colour, not just parchment. The rival's turn tints the
           whole sheet lavender, and with a fixed parchment sheet the home-indicator inset showed as
@@ -316,6 +321,7 @@ const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#0C5E86' },
   hud: { paddingHorizontal: space[3], paddingTop: 4, paddingBottom: space[2], gap: space[2] },
   hullRow: { flexDirection: 'row', gap: space[2] },
+  seaBand: { width: '100%' },
   sheet: {
     flex: 1,
     backgroundColor: color.parchment,

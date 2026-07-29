@@ -3,10 +3,9 @@
  *
  * ## Geometry
  *
- * `board.ts` states it: a MAP coordinate maps PROPORTIONALLY (`x / 375`, `y / 455`) against
- * whatever box is left between the header and the dock, while a SIZE scales by
- * `worldArtScale(box.width)` so art tracks the same measured box (not the phone-clamped window
- * art). That keeps the board composed from 360pt through the A-043 world cap.
+ * `board.ts` states it: a MAP coordinate maps PROPORTIONALLY (`x / 375`, `y / 455`) against the
+ * letterboxed board frame from `containWorldBoard`, while a SIZE scales by that same uniform
+ * scale. The outer map box may be wider on tablet/desktop; the composition stays board-faithful.
  *
  * The two are deliberately different multipliers. Scaling positions by `art` would let the map
  * overflow a narrow screen; scaling sizes proportionally would squash every island on a tall one.

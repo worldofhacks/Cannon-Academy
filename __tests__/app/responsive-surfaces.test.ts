@@ -452,15 +452,30 @@ describe('responsive tablet and desktop surfaces', () => {
     }
   });
 
-  it('scales world art with the measured content width past the phone clamp', () => {
+  it('letterboxes world boards instead of magnifying phone art across the world column', () => {
     const scale = (responsive as { worldArtScale?: (w: number) => number }).worldArtScale;
-    expect(scale, 'responsive.ts must export worldArtScale for chart/duel composition').toBeTypeOf(
-      'function',
-    );
+    const boardWidth = (responsive as { worldBoardWidth?: (w: number) => number }).worldBoardWidth;
+    const contain = (
+      responsive as {
+        containWorldBoard?: (
+          boxW: number,
+          boxH: number,
+          designW: number,
+          designH: number,
+        ) => { width: number; height: number; scale: number };
+      }
+    ).containWorldBoard;
+    expect(scale, 'responsive.ts must export worldArtScale').toBeTypeOf('function');
+    expect(boardWidth, 'responsive.ts must export worldBoardWidth').toBeTypeOf('function');
+    expect(contain, 'responsive.ts must export containWorldBoard').toBeTypeOf('function');
     expect(scale!(375)).toBeCloseTo(1);
     expect(scale!(351)).toBeGreaterThanOrEqual(0.92);
-    expect(scale!(1180)).toBeCloseTo(1180 / 375);
-    expect(scale!(1180)).toBeGreaterThan(1.28);
+    expect(boardWidth!(1180)).toBeLessThanOrEqual(560);
+    expect(scale!(1180)).toBeLessThanOrEqual(560 / 375 + 0.001);
+    const board = contain!(1180, 700, 375, 455);
+    expect(board.width).toBeLessThanOrEqual(560);
+    expect(board.scale).toBeLessThanOrEqual(560 / 375 + 0.001);
+    expect(board.width / board.height).toBeCloseTo(375 / 455);
   });
 
   it('spec(A-043:AC-5) makes the actual returned root of every child route its one role-correct frame', () => {

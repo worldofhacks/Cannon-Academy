@@ -8,6 +8,9 @@
  * rehydration will be too, so there is always a gap between launch and first paint — and
  * ARCHITECTURE.md §8 requires the root layout to hold until `hasHydrated` anyway. That hold is
  * either a white rectangle or it is this.
+ *
+ * Desktop/tablet: full-bleed sea and sky. Art scales from a soft design width so the scene grows
+ * with the viewport without becoming a phone-width pillar floating in a void.
  */
 import { useEffect } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -21,13 +24,17 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { computeLayout } from '../theme/responsive';
+import { computeLayout, viewportClassForWidth } from '../theme/responsive';
 import { useLayout } from '../theme/useLayout';
 import { color } from '../theme/tokens';
 import { Poly } from './Poly';
 
-/** Cap the splash composition so tablet/desktop web keep the phone board proportions. */
-const STAGE_MAX_WIDTH = 430;
+/** Soft design width for splash art — grows on large screens, never phone-pillars the scene. */
+const SPLASH_DESIGN_WIDTH = {
+  compact: 430,
+  tablet: 640,
+  desktop: 820,
+} as const;
 
 export function Splash({
   ready,
@@ -40,12 +47,21 @@ export function Splash({
   onStart: () => void;
 }) {
   const window = useLayout();
-  const stageWidth = Math.min(window.width, STAGE_MAX_WIDTH);
-  const L = computeLayout(stageWidth, window.height);
-  const px = L.a;
+  const viewport = viewportClassForWidth(window.width);
+  const designWidth = Math.min(window.width, SPLASH_DESIGN_WIDTH[viewport]);
+  const L = computeLayout(designWidth, window.height);
+  // Type stays clamped; splash art may grow with the soft design width so desktop is present
+  // without magnifying body copy.
+  const artScale = Math.min(
+    designWidth / 375,
+    viewport === 'desktop' ? 1.55 : viewport === 'tablet' ? 1.4 : L.art,
+  );
+  const px = (n: number) => n * artScale;
   const tx = L.t;
   const displayFace = fontsLoaded ? 'Baloo2_800ExtraBold' : undefined;
   const bodyFace = fontsLoaded ? 'Nunito_800ExtraBold' : undefined;
+  const swellCount = Math.ceil(window.width / Math.max(px(52), 1)) + 2;
+  const seaHeight = Math.max(px(210), Math.round(window.height * 0.32));
 
   const bob = useSharedValue(0);
   useEffect(() => {
@@ -65,9 +81,9 @@ export function Splash({
 
   const scenery = (
     <>
-      <View style={[s.sea, { height: px(210), borderTopWidth: px(5) }]} />
-      <View style={[s.swell, { bottom: px(150), height: px(4) }]}>
-        {Array.from({ length: Math.ceil(stageWidth / px(52)) + 1 }, (_, i) => (
+      <View style={[s.sea, { height: seaHeight, borderTopWidth: px(5) }]} />
+      <View style={[s.swell, { bottom: seaHeight - px(60), height: px(4) }]}>
+        {Array.from({ length: swellCount }, (_, i) => (
           <View
             key={i}
             style={{
@@ -86,7 +102,7 @@ export function Splash({
         style={[
           s.title,
           {
-            top: L.isShort ? px(96) : px(150),
+            top: L.isShort ? px(96) : Math.max(px(120), Math.round(window.height * 0.14)),
             paddingHorizontal: px(16),
           },
         ]}
@@ -136,7 +152,7 @@ export function Splash({
             position: 'absolute',
             left: '50%',
             marginLeft: -px(78),
-            bottom: px(196),
+            bottom: seaHeight - px(14),
             width: px(156),
             height: px(118),
             transformOrigin: '50% 90%',
@@ -208,28 +224,26 @@ export function Splash({
   if (!ready) {
     return (
       <View style={s.screen}>
-        <View style={[s.stage, { width: stageWidth }]}>
-          {scenery}
-          <View style={[s.loader, { bottom: px(64), gap: px(12) }]}>
-            <View style={{ flexDirection: 'row', gap: px(8) }}>
-              {[0, 180, 360].map((delay) => (
-                <PulseDot key={delay} delay={delay} size={px(14)} />
-              ))}
-            </View>
-            <Text
-              style={[
-                s.hoisting,
-                {
-                  fontFamily: bodyFace,
-                  fontSize: tx(12),
-                  lineHeight: tx(16),
-                  letterSpacing: tx(12) * 0.08,
-                },
-              ]}
-            >
-              HOISTING THE SAILS
-            </Text>
+        {scenery}
+        <View style={[s.footer, { bottom: px(64), gap: px(12) }]}>
+          <View style={{ flexDirection: 'row', gap: px(8) }}>
+            {[0, 180, 360].map((delay) => (
+              <PulseDot key={delay} delay={delay} size={px(14)} />
+            ))}
           </View>
+          <Text
+            style={[
+              s.hoisting,
+              {
+                fontFamily: bodyFace,
+                fontSize: tx(12),
+                lineHeight: tx(16),
+                letterSpacing: tx(12) * 0.08,
+              },
+            ]}
+          >
+            HOISTING THE SAILS
+          </Text>
         </View>
       </View>
     );
@@ -237,20 +251,18 @@ export function Splash({
 
   return (
     <View style={s.screen}>
-      <View style={[s.stage, { width: stageWidth }]}>
-        {scenery}
-        <View style={[s.loader, { bottom: px(64) }]}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="SET SAIL"
-            onPress={onStart}
-            style={({ pressed }) => [s.start, { minHeight: Math.max(px(64), 64) }, pressed && s.startPressed]}
-          >
-            <Text style={[s.startLabel, { fontFamily: displayFace, fontSize: tx(18), lineHeight: tx(24) }]}>
-              {['SET', 'SAIL'].join(' ')}
-            </Text>
-          </Pressable>
-        </View>
+      {scenery}
+      <View style={[s.footer, { bottom: px(64) }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="SET SAIL"
+          onPress={onStart}
+          style={({ pressed }) => [s.start, { minHeight: Math.max(px(64), 64) }, pressed && s.startPressed]}
+        >
+          <Text style={[s.startLabel, { fontFamily: displayFace, fontSize: tx(18), lineHeight: tx(24) }]}>
+            {['SET', 'SAIL'].join(' ')}
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -283,9 +295,7 @@ const s = StyleSheet.create({
     flex: 1,
     backgroundColor: '#0C5E86',
     overflow: 'hidden',
-    alignItems: 'center',
   },
-  stage: { height: '100%', maxWidth: '100%', position: 'relative' },
   sea: {
     position: 'absolute',
     left: 0,
@@ -298,7 +308,7 @@ const s = StyleSheet.create({
   title: { position: 'absolute', left: 0, right: 0, alignItems: 'center', gap: 6 },
   kicker: { color: color.gold, textAlign: 'center' },
   wordmark: { color: color.parchment, textAlign: 'center' },
-  loader: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
+  footer: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   hoisting: { color: color.chipInk, textAlign: 'center' },
   start: {
     minWidth: 160,

@@ -39,17 +39,45 @@ const ART_SCALE_MIN = 0.92;
 const ART_SCALE_MAX = 1.28;
 
 /**
- * Art scale for a measured world surface (chart map box, duel sea stage).
+ * Soft ceiling for phone-board world scenes inside an A-043 world column.
  *
- * Phone `computeLayout` clamps art at 1.28 so a Pro Max does not blow up chrome. World surfaces
- * after A-043 are intentionally wider (up to 1180pt); their illustration sizes must track the
- * measured content width or positions stretch while islands/ships stay phone-sized.
+ * Stretching a 375pt board across 1180pt with matching art reads as a 3× zoom. Instead, letterbox a
+ * board-faithful composition and let the extra column width stay scenic gutter.
  */
-export function worldArtScale(contentWidth: number): number {
-  return Math.max(ART_SCALE_MIN, contentWidth / REFERENCE.width);
-}
+export const WORLD_BOARD_MAX_WIDTH = 560;
+export const WORLD_BOARD_ART_MAX = WORLD_BOARD_MAX_WIDTH / REFERENCE.width;
 
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
+
+/** Width of the playable board inside a (possibly wider) world column. */
+export function worldBoardWidth(contentWidth: number): number {
+  return Math.min(contentWidth, WORLD_BOARD_MAX_WIDTH);
+}
+
+/**
+ * Art scale for a measured board width. Tracks the board, not the outer world column, and never
+ * exceeds {@link WORLD_BOARD_ART_MAX}.
+ */
+export function worldArtScale(contentWidth: number): number {
+  return clamp(contentWidth / REFERENCE.width, ART_SCALE_MIN, WORLD_BOARD_ART_MAX);
+}
+
+/**
+ * Uniform contain-fit for a design board inside a measured box. Preserves aspect ratio, centers
+ * via the caller, and soft-caps scale so desktop does not magnify the phone composition.
+ */
+export function containWorldBoard(
+  boxW: number,
+  boxH: number,
+  designW: number,
+  designH: number,
+): { readonly width: number; readonly height: number; readonly scale: number } {
+  if (boxW <= 0 || boxH <= 0 || designW <= 0 || designH <= 0) {
+    return { width: 0, height: 0, scale: 1 };
+  }
+  const scale = Math.min(boxW / designW, boxH / designH, WORLD_BOARD_ART_MAX);
+  return { width: designW * scale, height: designH * scale, scale };
+}
 
 export interface Layout {
   readonly width: number;

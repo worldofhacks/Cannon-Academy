@@ -35,28 +35,33 @@ export default function GuidedDuelGate() {
           },
         ]}
       >
-        <Text style={[s.kicker, { fontSize: tx(14), lineHeight: tx(18) }]}>FIRST VOYAGE</Text>
-        <Text style={[s.title, { fontSize: tx(28), lineHeight: tx(34) }]}>Cannons fire when you answer.</Text>
-        <Text style={[s.body, { fontSize: tx(16), lineHeight: tx(22) }]}>
-          Pick a cannon, solve the math before the fuse burns out, and a correct answer aims the shot. Faster
-          answers hit harder. Practice at the range when you want a calmer drill.
-        </Text>
-        <View style={s.spacer} />
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Continue to the sea chart"
-          onPress={continueToChart}
-          style={({ pressed }) => [s.cta, { minHeight: L.t(64) }, pressed && s.ctaPressed]}
-        >
-          <Text style={[s.ctaLabel, { fontSize: tx(18), lineHeight: tx(24) }]}>Set sail</Text>
-        </Pressable>
+        <View style={s.copy}>
+          <Text style={[s.kicker, { fontSize: tx(14), lineHeight: tx(18) }]}>FIRST VOYAGE</Text>
+          <Text style={[s.title, { fontSize: tx(28), lineHeight: tx(34) }]}>
+            Cannons fire when you answer.
+          </Text>
+          <Text style={[s.body, { fontSize: tx(16), lineHeight: tx(22) }]}>
+            Pick a cannon, solve the math before the fuse burns out, and a correct answer aims the shot.
+            Faster answers hit harder. Practice at the range when you want a calmer drill.
+          </Text>
+          <View style={s.spacer} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Continue to the sea chart"
+            onPress={continueToChart}
+            style={({ pressed }) => [s.cta, { minHeight: L.t(64) }, pressed && s.ctaPressed]}
+          >
+            <Text style={[s.ctaLabel, { fontSize: tx(18), lineHeight: tx(24) }]}>Set sail</Text>
+          </Pressable>
+        </View>
       </View>
     </ResponsiveFrame>
   );
 }
 
 const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.parchment, justifyContent: 'flex-start' },
+  screen: { flex: 1, backgroundColor: color.parchment, justifyContent: 'flex-start', alignItems: 'center' },
+  copy: { flex: 1, width: '100%', maxWidth: 560 },
   kicker: { fontFamily: type.chip.fontFamily, color: color.inkDarkMuted, letterSpacing: 1.2 },
   title: { fontFamily: type.display.fontFamily, color: color.inkDark, marginTop: 12 },
   body: { fontFamily: type.body.fontFamily, color: color.inkDarkMuted, marginTop: 16 },
