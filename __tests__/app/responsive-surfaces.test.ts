@@ -452,6 +452,17 @@ describe('responsive tablet and desktop surfaces', () => {
     }
   });
 
+  it('scales world art with the measured content width past the phone clamp', () => {
+    const scale = (responsive as { worldArtScale?: (w: number) => number }).worldArtScale;
+    expect(scale, 'responsive.ts must export worldArtScale for chart/duel composition').toBeTypeOf(
+      'function',
+    );
+    expect(scale!(375)).toBeCloseTo(1);
+    expect(scale!(351)).toBeGreaterThanOrEqual(0.92);
+    expect(scale!(1180)).toBeCloseTo(1180 / 375);
+    expect(scale!(1180)).toBeGreaterThan(1.28);
+  });
+
   it('spec(A-043:AC-5) makes the actual returned root of every child route its one role-correct frame', () => {
     for (const [path, surface] of Object.entries(routeRoles) as [keyof typeof routeRoles, Surface][]) {
       const source = routeSource(path);

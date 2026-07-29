@@ -6,8 +6,8 @@
  * `damage` only to print it on a chip, and why the arc SHAPE comes from the cannon's look table
  * rather than from its damage band.
  */
-import { useEffect } from 'react';
-import { Image, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Image, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -18,6 +18,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ARC_PEAK, type CannonLook } from '../../theme/cannonPresentation';
+import { REFERENCE } from '../../theme/responsive';
 import { sprite } from '../../theme/sprites';
 import { color, motion, radius, type } from '../../theme/tokens';
 import type { DuelPhase } from '../../stores/duel';
@@ -33,6 +34,25 @@ const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as c
  * phones we support is 640pt to 932pt and a flat 176 wastes a Pro Max while crowding an SE.
  */
 const SEA_BAND_RATIO = 58 / 176;
+
+/**
+ * Horizontal board geometry at the 375pt reference. On tablet/desktop the world surface is far
+ * wider (A-043), so these must be multiplied by `stageWidth / REFERENCE.width` or the ball lands
+ * in open water while the ships stay edge-anchored.
+ */
+const BOARD = {
+  travelX: 208,
+  shotLeft: 128,
+  incomingRight: 104,
+  impactRight: 44,
+  splashRight: 20,
+  rivalBurstLeft: 34,
+  puffLeft: 120,
+  playerLeft: 4,
+  rivalRight: 2,
+  damageInset: 44,
+  rivalArrowRight: 12,
+} as const;
 
 interface SeaStageProps {
   readonly phase: DuelPhase;
@@ -64,16 +84,26 @@ export function SeaStage({
 }: SeaStageProps) {
   const rivalTurn = phase === 'watch' || phase === 'rivalFly' || phase === 'rivalImpact';
   const seaHeight = Math.round(height * SEA_BAND_RATIO);
+  const [stageWidth, setStageWidth] = useState<number>(REFERENCE.width);
+  const onStageLayout = (e: LayoutChangeEvent) => {
+    const next = e.nativeEvent.layout.width;
+    setStageWidth((prev) => (prev === next ? prev : next));
+  };
+  // Prefer the measured stage so the arc tracks A-043's world column; fall back to the art factor
+  // (phone) when layout has not fired yet.
+  const boardScale = stageWidth > 0 ? stageWidth / REFERENCE.width : art;
+  const travelX = BOARD.travelX * boardScale;
+  const x = (designPx: number) => designPx * boardScale;
 
   return (
-    <View style={[s.stage, { height }]}>
+    <View style={[s.stage, { height }]} onLayout={onStageLayout}>
       <View style={[s.sky, { bottom: seaHeight }]} />
-      <View style={[s.cloud, { left: 32, top: 16, width: 58, height: 16, opacity: 0.85 }]} />
-      <View style={[s.cloud, { left: 52, top: 8, width: 34, height: 14, opacity: 0.85 }]} />
-      <View style={[s.cloud, { right: 26, top: 30, width: 44, height: 13, opacity: 0.7 }]} />
+      <View style={[s.cloud, { left: x(32), top: 16, width: x(58), height: 16, opacity: 0.85 }]} />
+      <View style={[s.cloud, { left: x(52), top: 8, width: x(34), height: 14, opacity: 0.85 }]} />
+      <View style={[s.cloud, { right: x(26), top: 30, width: x(44), height: 13, opacity: 0.7 }]} />
       <View style={[s.sea, { height: seaHeight }]} />
 
-      <View style={s.playerSlot}>
+      <View style={[s.playerSlot, { left: x(BOARD.playerLeft) }]}>
         <Ship
           cosmetics={playerShip}
           facing="right"
@@ -82,7 +112,7 @@ export function SeaStage({
           captainPose={captainPose}
         />
       </View>
-      <View style={s.rivalSlot}>
+      <View style={[s.rivalSlot, { right: x(BOARD.rivalRight) }]}>
         <Ship
           cosmetics={RIVAL_SHIP}
           facing="left"
@@ -91,23 +121,30 @@ export function SeaStage({
         />
       </View>
 
-      {phase === 'fly' ? <Projectile look={look} /> : null}
-      {phase === 'rivalFly' ? <IncomingShot /> : null}
-      {phase === 'impact' ? <Impact look={look} /> : null}
+      {phase === 'fly' ? <Projectile look={look} travelX={travelX} originLeft={x(BOARD.shotLeft)} /> : null}
+      {phase === 'rivalFly' ? <IncomingShot travelX={travelX} originRight={x(BOARD.incomingRight)} /> : null}
+      {phase === 'impact' ? <Impact look={look} insetRight={x(BOARD.impactRight)} /> : null}
       {phase === 'rivalImpact' ? (
-        <Burst source={sprite.explosionMid} style={{ left: 34, bottom: 48, width: 82 }} />
+        <Burst
+          source={sprite.explosionMid}
+          style={{ left: x(BOARD.rivalBurstLeft), bottom: 48, width: x(82) }}
+        />
       ) : null}
-      {phase === 'miss' ? <Splash /> : null}
-      {phase === 'timeout' ? <MisfirePuff /> : null}
+      {phase === 'miss' ? <Splash insetRight={x(BOARD.splashRight)} width={x(56)} /> : null}
+      {phase === 'timeout' ? <MisfirePuff left={x(BOARD.puffLeft)} /> : null}
 
-      {damageToRival !== null ? <DamageChip value={damageToRival} side="right" /> : null}
-      {damageToPlayer !== null ? <DamageChip value={damageToPlayer} side="left" /> : null}
+      {damageToRival !== null ? (
+        <DamageChip value={damageToRival} side="right" inset={x(BOARD.damageInset)} />
+      ) : null}
+      {damageToPlayer !== null ? (
+        <DamageChip value={damageToPlayer} side="left" inset={x(BOARD.damageInset)} />
+      ) : null}
 
       {rivalTurn ? (
         <>
           {/* A wash, not a curtain. The child must still see their own ship taking the hit. */}
           <View style={s.rivalWash} pointerEvents="none" />
-          <View style={s.rivalArrow}>
+          <View style={[s.rivalArrow, { right: x(BOARD.rivalArrowRight) }]}>
             <Text style={s.rivalArrowText}>▼</Text>
           </View>
         </>
@@ -117,7 +154,15 @@ export function SeaStage({
 }
 
 /** The player's shot, arcing left to right. Arc height is the cannon's identity (board 5c). */
-function Projectile({ look }: { look: CannonLook }) {
+function Projectile({
+  look,
+  travelX,
+  originLeft,
+}: {
+  look: CannonLook;
+  travelX: number;
+  originLeft: number;
+}) {
   const t = useSharedValue(0);
   useEffect(() => {
     t.value = withTiming(1, {
@@ -131,14 +176,14 @@ function Projectile({ look }: { look: CannonLook }) {
     // A parabola, not two linear legs: 4·t·(1−t) peaks at t=0.5 and lands flat, which is what
     // makes a lobbed Mortar read differently from a snapped Long Nine.
     transform: [
-      { translateX: 208 * t.value },
+      { translateX: travelX * t.value },
       { translateY: -peak * 4 * t.value * (1 - t.value) + 6 * t.value },
       { scale: 0.7 + 0.3 * Math.min(1, t.value * 2) },
     ],
   }));
 
   return (
-    <Animated.View style={[s.shotOrigin, animated]}>
+    <Animated.View style={[s.shotOrigin, { left: originLeft }, animated]}>
       {look.projectile === 'chain' ? <ChainShot /> : null}
       {look.projectile === 'bolt' ? <Bolt /> : null}
       {look.projectile === 'fire' ? <FireBarrel /> : null}
@@ -199,7 +244,7 @@ function KrakenBall() {
 }
 
 /** The rival's shot, arcing right to left. */
-function IncomingShot() {
+function IncomingShot({ travelX, originRight }: { travelX: number; originRight: number }) {
   const t = useSharedValue(0);
   useEffect(() => {
     t.value = withTiming(1, {
@@ -209,19 +254,19 @@ function IncomingShot() {
   }, [t]);
   const animated = useAnimatedStyle(() => ({
     transform: [
-      { translateX: -208 * t.value },
+      { translateX: -travelX * t.value },
       { translateY: -56 * 4 * t.value * (1 - t.value) + 6 * t.value },
     ],
   }));
   return (
-    <Animated.View style={[{ position: 'absolute', right: 104, bottom: 60 }, animated]}>
+    <Animated.View style={[{ position: 'absolute', right: originRight, bottom: 60 }, animated]}>
       <Image source={sprite.cannonball} style={{ width: 22, height: 22 }} />
     </Animated.View>
   );
 }
 
 /** Blast size tracks the shot's spectacle, not its damage. Board 5c. */
-function Impact({ look }: { look: CannonLook }) {
+function Impact({ look, insetRight }: { look: CannonLook; insetRight: number }) {
   const big = look.projectile === 'bolt' || look.projectile === 'fire' || look.projectile === 'tentacle';
   const source = big
     ? sprite.explosionBig
@@ -230,7 +275,7 @@ function Impact({ look }: { look: CannonLook }) {
       : sprite.explosionSmall;
   return (
     <>
-      <Burst source={source} style={{ right: 44, bottom: 52, width: big ? 74 : 48 }} />
+      <Burst source={source} style={{ right: insetRight, bottom: 52, width: big ? 74 : 48 }} />
       {look.projectile === 'bolt' ? <Flash /> : null}
     </>
   );
@@ -272,7 +317,7 @@ function Flash() {
  * fires and still looks like a shot, because the alternative teaches a child that being wrong
  * means nothing happens.
  */
-function Splash() {
+function Splash({ insetRight, width }: { insetRight: number; width: number }) {
   const t = useSharedValue(0);
   useEffect(() => {
     t.value = withTiming(1, { duration: 520, easing: Easing.out(Easing.quad) });
@@ -281,10 +326,10 @@ function Splash() {
     opacity: t.value < 0.4 ? t.value / 0.4 : 1 - (t.value - 0.4) / 0.6,
     transform: [{ translateY: 10 - 20 * Math.min(1, t.value / 0.4) }, { scaleY: 0.3 + 0.7 * t.value }],
   }));
-  return <Animated.View style={[s.splash, animated]} />;
+  return <Animated.View style={[s.splash, { right: insetRight, width }, animated]} />;
 }
 
-function MisfirePuff() {
+function MisfirePuff({ left }: { left: number }) {
   const t = useSharedValue(0);
   useEffect(() => {
     t.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.quad) });
@@ -293,7 +338,7 @@ function MisfirePuff() {
     opacity: 0.75 * (1 - t.value),
     transform: [{ translateY: -26 * t.value }, { scale: 0.6 + 0.9 * t.value }],
   }));
-  return <Animated.View style={[s.puff, animated]} />;
+  return <Animated.View style={[s.puff, { left }, animated]} />;
 }
 
 /**
@@ -304,7 +349,7 @@ function MisfirePuff() {
  * sometimes fails to appear is worse than one that never moves, because the volley silently
  * stops explaining itself.
  */
-function DamageChip({ value, side }: { value: number; side: 'left' | 'right' }) {
+function DamageChip({ value, side, inset }: { value: number; side: 'left' | 'right'; inset: number }) {
   const t = useSharedValue(0);
   useEffect(() => {
     t.value = withTiming(1, { duration: 320, easing: Easing.out(Easing.quad) });
@@ -315,8 +360,8 @@ function DamageChip({ value, side }: { value: number; side: 'left' | 'right' }) 
       style={[
         s.damageChip,
         side === 'right'
-          ? { right: 44, backgroundColor: color.inkDark }
-          : { left: 44, backgroundColor: color.purple },
+          ? { right: inset, backgroundColor: color.inkDark }
+          : { left: inset, backgroundColor: color.purple },
         animated,
       ]}
     >
@@ -338,9 +383,9 @@ const s = StyleSheet.create({
     borderTopWidth: 5,
     borderTopColor: color.seaFoam,
   },
-  playerSlot: { position: 'absolute', left: 4, bottom: 26 },
-  rivalSlot: { position: 'absolute', right: 2, bottom: 32 },
-  shotOrigin: { position: 'absolute', left: 128, bottom: 68, width: 26, height: 30 },
+  playerSlot: { position: 'absolute', bottom: 26 },
+  rivalSlot: { position: 'absolute', bottom: 32 },
+  shotOrigin: { position: 'absolute', bottom: 68, width: 26, height: 30 },
 
   chainBar: { position: 'absolute', left: 0, top: 9, width: 24, height: 5, backgroundColor: color.inkSoft },
   chainBall: {
@@ -378,9 +423,7 @@ const s = StyleSheet.create({
 
   splash: {
     position: 'absolute',
-    right: 20,
     bottom: 44,
-    width: 56,
     height: 40,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -390,7 +433,6 @@ const s = StyleSheet.create({
   },
   puff: {
     position: 'absolute',
-    left: 120,
     bottom: 62,
     width: 34,
     height: 34,
@@ -410,7 +452,6 @@ const s = StyleSheet.create({
   rivalWash: { ...FILL, backgroundColor: 'rgba(76,47,160,0.16)' },
   rivalArrow: {
     position: 'absolute',
-    right: 12,
     top: 52,
     width: 26,
     height: 26,

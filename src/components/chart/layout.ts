@@ -4,9 +4,9 @@
  * ## Geometry
  *
  * `board.ts` states it: a MAP coordinate maps PROPORTIONALLY (`x / 375`, `y / 455`) against
- * whatever box is left between the header and the dock, while a SIZE scales by the layout's art
- * factor. That is `theme/responsive.ts`'s governing principle applied to a composition — the
- * arrangement survives, the art grows — and it is what holds the board at 360pt as well as at 430.
+ * whatever box is left between the header and the dock, while a SIZE scales by
+ * `worldArtScale(box.width)` so art tracks the same measured box (not the phone-clamped window
+ * art). That keeps the board composed from 360pt through the A-043 world cap.
  *
  * The two are deliberately different multipliers. Scaling positions by `art` would let the map
  * overflow a narrow screen; scaling sizes proportionally would squash every island on a tall one.

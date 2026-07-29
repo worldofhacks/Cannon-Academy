@@ -38,6 +38,17 @@ const TYPE_SCALE_MAX = 1.08;
 const ART_SCALE_MIN = 0.92;
 const ART_SCALE_MAX = 1.28;
 
+/**
+ * Art scale for a measured world surface (chart map box, duel sea stage).
+ *
+ * Phone `computeLayout` clamps art at 1.28 so a Pro Max does not blow up chrome. World surfaces
+ * after A-043 are intentionally wider (up to 1180pt); their illustration sizes must track the
+ * measured content width or positions stretch while islands/ships stay phone-sized.
+ */
+export function worldArtScale(contentWidth: number): number {
+  return Math.max(ART_SCALE_MIN, contentWidth / REFERENCE.width);
+}
+
 const clamp = (v: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, v));
 
 export interface Layout {

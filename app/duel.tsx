@@ -18,14 +18,14 @@ import {
 } from '../src/components/duel/Panels';
 import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
-import { ResponsiveFrame } from '../src/components/ResponsiveFrame';
+import { ResponsiveFrame, useResponsiveSurface } from '../src/components/ResponsiveFrame';
 import { applyDuelOutcome, type DuelRewardOutcome } from '../src/services/duelRewards';
 import { resolveDestination } from '../src/services/flow';
 import { trayCannons } from '../src/services/loadout';
 import { retainFirstApplied, victoryRewards } from '../src/services/victoryRewards';
 import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
-import { seaStageHeight } from '../src/theme/responsive';
+import { seaStageHeight, worldArtScale } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
 import { color, radius, space } from '../src/theme/tokens';
 import { duelReducer, initialDuelState, PHASE_DURATION_MS, type DuelPhase } from '../src/stores/duel';
@@ -44,8 +44,18 @@ import { duelReducer, initialDuelState, PHASE_DURATION_MS, type DuelPhase } from
  * fine in `app/**` — the engine stays replayable because the time it consumes is an input.
  */
 export default function DuelScreen() {
+  return (
+    <ResponsiveFrame surface="world">
+      <DuelBody />
+    </ResponsiveFrame>
+  );
+}
+
+function DuelBody() {
   const insets = useSafeAreaInsets();
   const L = useLayout();
+  const { contentWidth } = useResponsiveSurface();
+  const stageArt = worldArtScale(contentWidth);
   // The flag chosen at onboarding IS the pennant (board 5b) — a child's ship is theirs before the
   // first chest ever drops. Resolved here because the sea stage renders colours, not captains.
   const playerShip = shipCosmeticsForCaptain(useCaptain((s) => s.captain));
@@ -110,94 +120,92 @@ export default function DuelScreen() {
   }, []);
 
   return (
-    <ResponsiveFrame surface="world">
-      <View style={[s.screen, { paddingTop: insets.top }]}>
-        <View style={[s.hud, { paddingHorizontal: L.gutter }]}>
-          <TurnBar
-            label={turnLabel(state.phase)}
-            turn={state.turn}
-            playerActive={!isRivalTurn(state.phase)}
-            onLeave={leave}
-          />
-          <View style={s.hullRow}>
-            <HullCard name="You" flag={color.amber} hp={state.playerHull} max={state.playerMax} />
-            <HullCard name="Rival" flag="#6C4BD6" hp={state.rivalHull} max={state.rivalMax} />
-          </View>
-        </View>
-
-        <SeaStage
-          height={seaStageHeight(L)}
-          art={L.art}
-          phase={state.phase}
-          playerShip={playerShip}
-          captainPose={captainPoseForPhase(state.phase, state.outcome?.perfectShot === true)}
-          look={look}
-          playerHullPct={state.playerHull / state.playerMax}
-          rivalHullPct={state.rivalHull / state.rivalMax}
-          damageToRival={state.phase === 'impact' ? (state.outcome?.damageToEnemy ?? null) : null}
-          damageToPlayer={state.phase === 'rivalImpact' ? state.rivalDamage : null}
+    <View style={[s.screen, { paddingTop: insets.top }]}>
+      <View style={[s.hud, { paddingHorizontal: L.gutter }]}>
+        <TurnBar
+          label={turnLabel(state.phase)}
+          turn={state.turn}
+          playerActive={!isRivalTurn(state.phase)}
+          onLeave={leave}
         />
-
-        {/* The sheet carries the phase's own colour, not just parchment. The rival's turn tints the
-          whole sheet lavender, and with a fixed parchment sheet the home-indicator inset showed as
-          a cream strip under it — the panel stopped short of the bottom of the screen. */}
-        <View
-          style={[
-            s.sheet,
-            { paddingBottom: insets.bottom },
-            isRivalTurn(state.phase) ? { backgroundColor: '#EFE6F7' } : null,
-            state.phase === 'perfect' ? { backgroundColor: color.gold } : null,
-          ]}
-        >
-          {state.phase === 'select' ? <CannonTray cannons={tray} onPick={pickCannon} /> : null}
-
-          {state.phase === 'question' && state.question !== null ? (
-            <QuestionPanel
-              question={state.question}
-              look={look}
-              cannonName={cannon.displayName}
-              timerMs={cannon.timerMs}
-              picked={state.picked}
-              onAnswer={onAnswer}
-            />
-          ) : null}
-
-          {state.phase === 'perfect' ? <PerfectShotPanel /> : null}
-          {state.phase === 'fly' ? <FlyingPanel glyph={look.glyph} spectacle={look.spectacle} /> : null}
-          {state.phase === 'watch' || state.phase === 'rivalFly' ? <WatchPanel /> : null}
-
-          {isResolve(state.phase) ? (
-            <ResolvePanel
-              copy={resolveCopy(state)}
-              correction={state.phase === 'miss' || state.phase === 'timeout' ? correctionText(state) : null}
-            />
-          ) : null}
-
-          {state.phase === 'victory' && appliedReward !== null ? (
-            <VictoryPanel
-              right={state.right}
-              asked={state.asked}
-              perfects={state.perfects}
-              rewards={victoryRewards(appliedReward)}
-              chestOpen={state.chestOpen}
-              onOpenChest={() => dispatch({ type: 'OPEN_CHEST' })}
-              onLeave={leave}
-            />
-          ) : null}
-
-          {state.phase === 'defeat' ? (
-            <DefeatPanel
-              right={state.right}
-              asked={state.asked}
-              perfects={state.perfects}
-              coins={state.coins}
-              onAgain={() => dispatch({ type: 'RESET' })}
-              onLeave={leave}
-            />
-          ) : null}
+        <View style={s.hullRow}>
+          <HullCard name="You" flag={color.amber} hp={state.playerHull} max={state.playerMax} />
+          <HullCard name="Rival" flag="#6C4BD6" hp={state.rivalHull} max={state.rivalMax} />
         </View>
       </View>
-    </ResponsiveFrame>
+
+      <SeaStage
+        height={seaStageHeight(L)}
+        art={stageArt}
+        phase={state.phase}
+        playerShip={playerShip}
+        captainPose={captainPoseForPhase(state.phase, state.outcome?.perfectShot === true)}
+        look={look}
+        playerHullPct={state.playerHull / state.playerMax}
+        rivalHullPct={state.rivalHull / state.rivalMax}
+        damageToRival={state.phase === 'impact' ? (state.outcome?.damageToEnemy ?? null) : null}
+        damageToPlayer={state.phase === 'rivalImpact' ? state.rivalDamage : null}
+      />
+
+      {/* The sheet carries the phase's own colour, not just parchment. The rival's turn tints the
+          whole sheet lavender, and with a fixed parchment sheet the home-indicator inset showed as
+          a cream strip under it — the panel stopped short of the bottom of the screen. */}
+      <View
+        style={[
+          s.sheet,
+          { paddingBottom: insets.bottom },
+          isRivalTurn(state.phase) ? { backgroundColor: '#EFE6F7' } : null,
+          state.phase === 'perfect' ? { backgroundColor: color.gold } : null,
+        ]}
+      >
+        {state.phase === 'select' ? <CannonTray cannons={tray} onPick={pickCannon} /> : null}
+
+        {state.phase === 'question' && state.question !== null ? (
+          <QuestionPanel
+            question={state.question}
+            look={look}
+            cannonName={cannon.displayName}
+            timerMs={cannon.timerMs}
+            picked={state.picked}
+            onAnswer={onAnswer}
+          />
+        ) : null}
+
+        {state.phase === 'perfect' ? <PerfectShotPanel /> : null}
+        {state.phase === 'fly' ? <FlyingPanel glyph={look.glyph} spectacle={look.spectacle} /> : null}
+        {state.phase === 'watch' || state.phase === 'rivalFly' ? <WatchPanel /> : null}
+
+        {isResolve(state.phase) ? (
+          <ResolvePanel
+            copy={resolveCopy(state)}
+            correction={state.phase === 'miss' || state.phase === 'timeout' ? correctionText(state) : null}
+          />
+        ) : null}
+
+        {state.phase === 'victory' && appliedReward !== null ? (
+          <VictoryPanel
+            right={state.right}
+            asked={state.asked}
+            perfects={state.perfects}
+            rewards={victoryRewards(appliedReward)}
+            chestOpen={state.chestOpen}
+            onOpenChest={() => dispatch({ type: 'OPEN_CHEST' })}
+            onLeave={leave}
+          />
+        ) : null}
+
+        {state.phase === 'defeat' ? (
+          <DefeatPanel
+            right={state.right}
+            asked={state.asked}
+            perfects={state.perfects}
+            coins={state.coins}
+            onAgain={() => dispatch({ type: 'RESET' })}
+            onLeave={leave}
+          />
+        ) : null}
+      </View>
+    </View>
   );
 }
 

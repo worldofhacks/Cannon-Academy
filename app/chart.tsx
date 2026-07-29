@@ -17,6 +17,7 @@ import { chart } from '../src/components/chart/palette';
 import { ResponsiveFrame } from '../src/components/ResponsiveFrame';
 import { chartNodes, requirementText } from '../src/services/chart';
 import { captainActions, useCaptain } from '../src/stores/useCaptain';
+import { worldArtScale } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
 
 /**
@@ -34,8 +35,10 @@ import { useLayout } from '../src/theme/useLayout';
  *            sizes scaled by ART
  *   dock   — a fixed 126pt band whose four measured pieces sum to exactly 126, scaled by TYPE
  *
- * `theme/responsive.ts`'s rule is why the two scales differ: **art scales with the screen; type
- * and touch targets do not.** The islands grow on a Pro Max; the captain's name does not.
+ * `theme/responsive.ts`'s rule is why the two scales differ: **art scales with the measured map
+ * box; type and touch targets do not.** Positions stay proportional to the box; island sizes use
+ * `worldArtScale(box.width)` so a tablet/desktop world column does not leave phone-sized blobs in
+ * a stretched ocean. The captain's name still uses the clamped type scale.
  *
  * All fog and ordering decisions come from `services/chart.ts`, which is exhaustively tested. This
  * file renders that decision, positions it, and owns nothing else.
@@ -78,7 +81,11 @@ export default function Chart() {
   if (focus === undefined) throw new Error('chart: the island catalog is empty');
   const needsRequirement = requirementIndex(nodes, STATIONS);
 
-  const frame: MapFrame = { width: box.w, height: box.h, art: L.art };
+  const frame: MapFrame = {
+    width: box.w,
+    height: box.h,
+    art: box.w > 0 ? worldArtScale(box.w) : L.art,
+  };
   const anchor = STATIONS[live] ?? STATIONS[0];
   const mapReady = Boolean(box.w);
 
