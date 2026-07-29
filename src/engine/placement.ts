@@ -37,12 +37,12 @@ const MAX_GRADE_BY_BAND: Readonly<Record<GradeBand, number>> = {
 };
 
 /**
- * A cannon is placement-eligible when its `unlock.kind` is `starter` or `range` (never `chest` —
- * the Nine-Pounder stays a reward, ticket Planning Decisions) and it is reachable at this band
- * (`minGrade <= maxGrade`), not "outgrown".
+ * A cannon is placement-eligible when its `unlock.kind` is `starter` only (never `range` or
+ * `chest` — range guns stay mastery-earned, D-6; the Nine-Pounder stays a chest reward) and it
+ * is reachable at this band (`minGrade <= maxGrade`), not "outgrown".
  */
 function isCannonEligible(cannon: Cannon, maxGrade: number): boolean {
-  return cannon.unlock.kind !== 'chest' && cannon.minGrade <= maxGrade;
+  return cannon.unlock.kind === 'starter' && cannon.minGrade <= maxGrade;
 }
 
 /**
