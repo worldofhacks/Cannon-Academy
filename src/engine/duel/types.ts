@@ -1,7 +1,7 @@
 /**
  * Duel state vocabulary and initial-state construction (ARCHITECTURE.md §4.2).
  *
- * Transitions live in T-020; this module owns the shapes those transitions move between.
+ * Transitions live in T-020 / A-039; this module owns the shapes those transitions move between.
  * Immutability is enforced by typing, not `Object.freeze` — see tickets/T-013.md locked decision.
  * Templates are deep-copied at construction so a caller-held config cannot rewrite a live duel.
  */
@@ -30,6 +30,10 @@ export interface ActionLogEntry {
   readonly cannonId: CannonId;
   readonly correct: boolean;
   readonly elapsedMs: number;
+  /** Distinct timeout marker (A-039 / D-8). Omitted on ordinary hit/miss rows. */
+  readonly result?: 'timeout';
+  /** Replayable source event for timeout rows (A-039 AC-2). */
+  readonly event?: { readonly type: 'TIMER_EXPIRED' };
 }
 
 export interface RivalAction {
@@ -80,9 +84,13 @@ export interface DuelConfig {
   readonly rivalLoadout: readonly CannonId[];
   readonly templatesBySkill: Readonly<Partial<Record<SkillId, readonly Template[]>>>;
   readonly enemyMaxHull?: number;
+  /** Stable duel identity for settlement / replay (A-039). */
+  readonly duelId?: string;
+  /** Guided-mode floor; omitted preserves a normal duel (floor 0). */
+  readonly playerHullFloor?: number;
 }
 
-interface DuelCore {
+export interface DuelCore {
   readonly seed: number;
   readonly rng: Rng;
   readonly turnToken: number;
@@ -97,6 +105,10 @@ interface DuelCore {
   readonly actionLog: readonly ActionLogEntry[];
   readonly tally: DuelTally;
   readonly templatesBySkill: Readonly<Partial<Record<SkillId, readonly Template[]>>>;
+  /** Set by createDuelState; optional so hand-built fixtures keep compiling. */
+  readonly duelId?: string;
+  /** Set by createDuelState (default 0); optional for hand-built fixtures. */
+  readonly playerHullFloor?: number;
 }
 
 export type DuelState =
@@ -189,6 +201,11 @@ function copyTemplatesBySkill(
   return out;
 }
 
+function duelIdFor(config: DuelConfig): string {
+  if (config.duelId !== undefined) return config.duelId;
+  return `duel-${(config.seed >>> 0).toString(36)}`;
+}
+
 function buildCore(config: DuelConfig): DuelCore {
   const enemyHull = config.enemyMaxHull ?? ENEMY_HULL_BY_ISLAND[config.islandId];
 
@@ -212,6 +229,8 @@ function buildCore(config: DuelConfig): DuelCore {
       bySkill: {},
     },
     templatesBySkill: copyTemplatesBySkill(config.templatesBySkill),
+    duelId: duelIdFor(config),
+    playerHullFloor: config.playerHullFloor ?? 0,
   };
 }
 
@@ -229,10 +248,14 @@ export function isTerminalPhase(phase: DuelPhase): boolean {
 /**
  * Projects the information an Opponent may see — hulls, volley, own loadout, and the
  * player's recent correctness (most-recent-first). Hides seed, rng, question, and actionLog.
+ * Timeouts are excluded from mercy accuracy (A-039 / D-8).
  */
 export function toRivalView(state: DuelState): RivalView {
   const playerRecentCorrect = state.actionLog
-    .filter((entry): entry is ActionLogEntry & { actor: 'player' } => entry.actor === 'player')
+    .filter(
+      (entry): entry is ActionLogEntry & { actor: 'player' } =>
+        entry.actor === 'player' && entry.result !== 'timeout',
+    )
     .map((entry) => entry.correct)
     .reverse();
 
