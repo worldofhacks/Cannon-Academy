@@ -29,6 +29,7 @@ export type SkillId = (typeof SKILL_IDS)[number];
 export const CANNON_IDS = [
   'swivel_gun',
   'culverin',
+  'saker', // T-029 / D-7 — invented range payoff for add_within_10 (not in PLAN armory table)
   'six_pounder',
   'chain_shot',
   'nine_pounder',
