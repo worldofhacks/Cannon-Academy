@@ -1878,5 +1878,5 @@ Phase → `implement`. Implementer dispatched.
 
 ### T-017 TEST_DISPUTE closed — DoD-3 header self-poison
 
-[T-017 Implementer](1b4a4546-66b3-4300-8290-8d3895f1a617): 31/32; header matched DoD-3 scanner.
-Suite fix re-frozen . Phase → implement; implementer resumed.
+[T-017 Implementer](1b4a4546-66b3-4300-8290-8d3895f1a617): 31/32; header placeholder matched DoD-3 scanner.
+Suite fix `6007ef6` re-frozen `7db026f67f89e6dc…`. Phase → implement; implementer resumed.
