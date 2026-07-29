@@ -126,10 +126,10 @@ features; they freeze the two deadline-critical claims the earlier build had not
 These tickets record owner-directed defects discovered during the final simulator recording pass.
 They supersede conflicting historical demo prose in `HANDOFF.md`.
 
-| id    | title                                          | status      | deps         | model    |
-| ----- | ---------------------------------------------- | ----------- | ------------ | -------- |
-| A-042 | Demo launch gate and unclipped ship picker     | in-progress | A-005, A-025 | standard |
-| A-043 | Responsive tablet and desktop surfaces        | in-progress | A-042        | capable  |
+| id    | title                                      | status      | deps         | model    |
+| ----- | ------------------------------------------ | ----------- | ------------ | -------- |
+| A-042 | Demo launch gate and unclipped ship picker | in-progress | A-005, A-025 | standard |
+| A-043 | Responsive tablet and desktop surfaces     | in-progress | A-042        | capable  |
 
 ## Why the waves were recomputed (2026-07-29)
 
