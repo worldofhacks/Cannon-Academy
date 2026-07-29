@@ -66,3 +66,52 @@ five-year-old has no business being offered on turn one.
 
 **Watch for:** with two cannons the tray no longer scrolls, but the ScrollView stays — the arsenal
 still grows to ten by the Grandline, and A-011 (gun deck) is the screen that manages that.
+
+---
+
+## D-7 — A K-1 captain must be able to practise, and practice must pay (T-029 + islands.json)
+
+**Ruled 2026-07-29.** Owner: "make sure a kindergartner can practice."
+
+### The gap
+
+`add_within_10` is on **no island's** `rangeSkills`. After D-6 a K-1 captain owns exactly
+`swivel_gun` and `culverin`, and **both use `add_within_10`**. So the youngest player cannot
+practise the only skill their guns ask. Port Sumwich trains `add_within_20`, `sub_within_20` and
+`two_step_add_sub` — all harder than their own cannons.
+
+### Why the obvious one-line fix is wrong
+
+Adding `add_within_10` to `port_sumwich.rangeSkills` alone produces two bad outcomes, both verified
+against the shipped catalog and `resolveUnlocks`:
+
+1. **Practice would pay nothing.** No cannon anywhere has `unlock.kind === 'range'` with
+   `skill === 'add_within_10'`. A child would drill, fill the meter, master it — and receive
+   nothing. A meter with no payoff teaches that the meter is decoration.
+2. **It would open content they cannot do.** `resolveUnlocks` lifts an island's fog when _any_
+   skill in its predecessor's `rangeSkills` is mastered. So a five-year-old mastering `3 + 4` would
+   be shown **Isla Products — multiplication**.
+
+### The ruling
+
+Both halves, as one content change, or neither:
+
+- **`add_within_10` joins `port_sumwich.rangeSkills`** so the K-1 lane exists.
+- **A cannon must unlock from it**, so the lane pays. This is what T-029 already proposes and is the
+  reason that ticket exists — the real question was never "does K-1 get a third cannon", it was
+  "can a K-1 child practise at all". T-029 and this are one problem.
+- **The fog consequence must be handled deliberately** — either the predecessor rule is tightened,
+  or Isla Products opening early is accepted as harmless because band-gating still governs what
+  content a K-1 captain is served. State which, in writing, in the ticket.
+
+### Ownership
+
+`src/content/islands.json`, `src/content/cannons.json` and `src/engine/mastery.ts` are all
+engine-track scope per `COORDINATION.md`. The app track records this ruling; the engine track
+implements it under T-029, with the fog decision named explicitly rather than discovered.
+
+### App-side consequence
+
+None. `src/services/range.ts` reads `rangeSkills(island)` from the catalog, and `chartNodes` reads
+fog from `resolveUnlocks`. Both follow the content automatically — which is the point of having
+kept them catalog-driven.
