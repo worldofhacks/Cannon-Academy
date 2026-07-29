@@ -194,7 +194,7 @@ describe('AC-1 — startDrill constructs a live, unstarted session', () => {
 // =============================================================================================
 
 describe('AC-2 — startDrill rejects invalid length and empty pools', () => {
-  it.each([0, -1, -10, 1.5, Number.NaN, Number.POSITIVE_INFINITY] as const)(
+  it.each([0, -1, -10, 1.5, Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY] as const)(
     'spec(T-017:AC-2) length %s throws RangeError',
     (length) => {
       expect(() => start({ length })).toThrow(RangeError);
