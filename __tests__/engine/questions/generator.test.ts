@@ -33,11 +33,26 @@
  *    `Math.random` before calling and asserts the generator still produces its answer.
  *  - **Bulk loops collect then assert once**, so a failure reports the aggregate rather than
  *    dying on the first sample.
+ *  - **A sweep says what threw, never just that something did** (LESSONS.md L-034). The first
+ *    draft's AC-7 and AC-11 sweeps caught bare and asserted an empty survivor list, and a
+ *    cross-model review walked through both with an implementation returning the typed error at
+ *    the one directly-tested seed and a bare `RangeError` at every other. Every error sweep now
+ *    classifies each seed by error TYPE, `code`, and whether the message names the template,
+ *    and compares the whole profile at once.
+ *
+ * Amended 2026-07-28, after that review: AC-7 and AC-11 hardened as above, AC-16's sweep
+ * hardened alongside them (it checked `code` but not type), AC-12's `skill`/`templateId`/`label`
+ * assertions promoted into the criterion, AC-14's statistical draw-inequality test replaced by
+ * the reset comparison the rewritten criterion asks for, and AC-17 (both replay-critical
+ * orderings), AC-18 (zero-parameter templates) and AC-19 (the identifier grammar) added.
  *
  * API surface, taken verbatim from the ticket's Context section:
  *
  *     generateQuestion({ templates, recentTemplateIds, rng }) -> readonly [Question, Rng]
  */
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import { templateSchema } from '@content/schemas';
@@ -322,6 +337,75 @@ function expectGenerationError(call: () => unknown, code: string): QuestionGener
   return error;
 }
 
+/**
+ * Classifies what `call` did at each seed, as one comparable string per seed.
+ *
+ * AC-7 and AC-11 require the error **type and `code`** on every seed swept, not merely that
+ * something was thrown. A sweep that catches bare and asserts an empty survivor list certifies
+ * only that the call did not return — an implementation throwing `RangeError` at every seed but
+ * one passes it (LESSONS.md L-034). Returning a profile rather than asserting in the loop keeps
+ * the bulk-loop contract: one comparison at the end reports every deviant seed and what it threw.
+ */
+function errorProfileOverSeeds(
+  seeds: readonly number[],
+  call: (seed: number) => unknown,
+  /** The id the message must name, or `null` for the `NO_TEMPLATE` carve-out. */
+  templateId: string | null,
+): readonly string[] {
+  return seeds.map((seed) => {
+    let thrown: unknown;
+    let returned = false;
+    try {
+      call(seed);
+      returned = true;
+    } catch (error) {
+      thrown = error;
+    }
+    if (returned) {
+      return `${seed}: returned normally`;
+    }
+    if (!(thrown instanceof QuestionGenerationError)) {
+      const name = thrown instanceof Error ? thrown.constructor.name : typeof thrown;
+      return `${seed}: ${name} (not a QuestionGenerationError)`;
+    }
+    let idPart: string;
+    if (templateId === null) {
+      idPart = thrown.message.trim().length > 0 ? 'no-id-required' : 'EMPTY-MESSAGE';
+    } else {
+      idPart = thrown.message.includes(templateId) ? 'names-id' : 'NO-ID-IN-MESSAGE';
+    }
+    return `${seed}: QuestionGenerationError/${thrown.code}/${idPart}`;
+  });
+}
+
+/**
+ * Replays the generator's stream up to the point where step 7 shuffles: one `pick` draw, then
+ * one `nextInt` per parameter in lexicographically ascending order. Only valid for templates
+ * whose first attempt always satisfies their constraints, which is why AC-17's fixture declares
+ * none.
+ */
+function streamBeforeShuffle(seed: number, template: Template): readonly [Params, Rng] {
+  return drawInKeyOrder(seed, template, Object.keys(template.params).sort());
+}
+
+/**
+ * The draw a single attempt produces if the parameter keys are consumed in `keys` order, with
+ * the Rng left where that attempt ended. Taking the order as an argument is what lets AC-17
+ * state the two competing readings side by side and show they disagree.
+ */
+function drawInKeyOrder(seed: number, template: Template, keys: readonly string[]): readonly [Params, Rng] {
+  const [, afterPick] = pick(createRng(seed), [template]);
+  let rng = afterPick;
+  const draw: Record<string, number> = {};
+  for (const name of keys) {
+    const [lo, hi] = rangeOf(template, name);
+    const [value, next] = nextInt(rng, lo, hi);
+    rng = next;
+    draw[name] = value;
+  }
+  return [draw, rng];
+}
+
 /** Generates `count` questions, threading the returned `Rng` forward. */
 function generateSequence(templates: readonly Template[], seed: number, count: number): readonly Question[] {
   let rng = createRng(seed);
@@ -526,6 +610,17 @@ const DIMENSION_MATRIX: readonly Template[] = [
 const SWEEP_SEEDS: readonly number[] = [
   1, 2, 3, 7, 42, 99, 256, 1023, 4096, 20260728, 123456789, 999999937, 0x7fffffff, 0xfffffffe,
 ];
+
+/**
+ * Seeds for the error sweeps (AC-7, AC-11, AC-16): the spread-out set above plus a contiguous
+ * run of 100, deduplicated. The contiguous run is not padding. The implementation these sweeps
+ * exist to reject special-cases the seeds the direct fixtures use, and those are small integers,
+ * so a sweep sampling only sparse large seeds could be satisfied by a lookup table.
+ */
+const ERROR_SWEEP_SEEDS: readonly number[] = [
+  ...SWEEP_SEEDS,
+  ...Array.from({ length: 100 }, (_unused, index) => index + 1),
+].filter((seed, index, all) => all.indexOf(seed) === index);
 
 // =============================================================================================
 // AC-1 — determinism and purity
@@ -1051,52 +1146,6 @@ describe('generateQuestion — rejection sampling (AC-6)', () => {
     }
     expect(violations).toStrictEqual([]);
   });
-
-  it('spec(T-007:AC-6) draws parameters in lexicographically ascending key order', () => {
-    // LESSONS.md L-020: a fixture whose keys are declared in sorted order cannot distinguish
-    // the ticket's rule from `Object.keys` insertion order, because the two coincide.
-    // ORDERING_TEMPLATE declares `b` before `a` with disjoint ranges, so the two readings assign
-    // the two draws the other way round.
-    expect(Object.keys(ORDERING_TEMPLATE.params)).toStrictEqual(['b', 'a']);
-
-    const wrong: string[] = [];
-    let discriminating = 0;
-    const seeds = 200;
-
-    for (let seed = 1; seed <= seeds; seed += 1) {
-      const [, afterPick] = pick(createRng(seed), [ORDERING_TEMPLATE]);
-      const [aRangeLo, aRangeHi] = rangeOf(ORDERING_TEMPLATE, 'a');
-      const [bRangeLo, bRangeHi] = rangeOf(ORDERING_TEMPLATE, 'b');
-
-      // Lexicographic order: `a` consumes the first draw, `b` the second.
-      const [sortedA, afterFirst] = nextInt(afterPick, aRangeLo, aRangeHi);
-      const [sortedB] = nextInt(afterFirst, bRangeLo, bRangeHi);
-      // Declaration order: `b` consumes the first draw, `a` the second.
-      const [insertionB, afterFirstInsertion] = nextInt(afterPick, bRangeLo, bRangeHi);
-      const [insertionA] = nextInt(afterFirstInsertion, aRangeLo, aRangeHi);
-
-      if (sortedA !== insertionA || sortedB !== insertionB) {
-        discriminating += 1;
-      }
-
-      const [question] = generateQuestion({
-        templates: [ORDERING_TEMPLATE],
-        recentTemplateIds: [],
-        rng: createRng(seed),
-      });
-      if (paramOf(question.params, 'a') !== sortedA || paramOf(question.params, 'b') !== sortedB) {
-        wrong.push(
-          `seed ${seed}: got a=${paramOf(question.params, 'a')} b=${paramOf(question.params, 'b')}` +
-            `, lexicographic order requires a=${sortedA} b=${sortedB}`,
-        );
-      }
-    }
-
-    // Proving the assertion above is not vacuous: for almost every seed the two readings
-    // genuinely disagree, so passing it is evidence rather than coincidence.
-    expect(discriminating).toBeGreaterThanOrEqual(seeds - 5);
-    expect(wrong).toStrictEqual([]);
-  });
 });
 
 // =============================================================================================
@@ -1117,21 +1166,31 @@ describe('generateQuestion — unsatisfiable constraints (AC-7)', () => {
     expect(error.message).toContain(UNSATISFIABLE_TEMPLATE.id);
   });
 
-  it('spec(T-007:AC-7) throws for every seed, not just an unlucky one', () => {
-    const survivors: number[] = [];
-    for (const seed of SWEEP_SEEDS) {
-      try {
+  it('spec(T-007:AC-7) throws the same typed error and code at every seed swept', () => {
+    // AC-7, verbatim: "This must hold for every seed swept, asserting the error type and `code`
+    // on each — not merely that something was thrown."
+    //
+    // The first draft of this test wrote `catch {}` and asserted only that the survivor list
+    // was empty, which proves SOMETHING threw and nothing about what. A cross-model review
+    // walked straight through the gap with an implementation returning the typed error only at
+    // the one seed this block tests directly and a bare `RangeError` everywhere else; it passed
+    // all 57 tests (LESSONS.md L-034). Every seed is now classified and the whole classification
+    // compared at once, so a failure names the seeds and what they threw instead of dying on the
+    // first one.
+    const classified = errorProfileOverSeeds(
+      ERROR_SWEEP_SEEDS,
+      (seed) =>
         generateQuestion({
           templates: [UNSATISFIABLE_TEMPLATE],
           recentTemplateIds: [],
           rng: createRng(seed),
-        });
-        survivors.push(seed);
-      } catch {
-        // expected
-      }
-    }
-    expect(survivors).toStrictEqual([]);
+        }),
+      UNSATISFIABLE_TEMPLATE.id,
+    );
+    const expected = ERROR_SWEEP_SEEDS.map(
+      (seed) => `${seed}: QuestionGenerationError/CONSTRAINTS_UNSATISFIED/names-id`,
+    );
+    expect(classified).toStrictEqual(expected);
   });
 
   it('spec(T-007:AC-7) the bound is exactly MAX_PARAM_SAMPLE_ATTEMPTS attempts', () => {
@@ -1430,23 +1489,26 @@ describe('generateQuestion — unrendered tokens (AC-11)', () => {
     }
   });
 
-  it('spec(T-007:AC-11) throws for every seed, so the check is not draw-dependent', () => {
+  it('spec(T-007:AC-11) throws the same typed error and code at every seed swept', () => {
+    // AC-11: "As with AC-7, the error type and `code` must be asserted on every seed swept, not
+    // just at one fixture." Same correction as AC-7's sweep and for the same reason — the first
+    // draft caught bare here too, and the cross-model review's second live mutant was exactly
+    // this one wearing a different code (LESSONS.md L-034).
     const template = makeTemplate({
       id: 'undeclared-every-seed',
       text: '{a} + {z} = ?',
       params: { a: [1, 9] },
       answerExpr: 'a',
     });
-    const survivors: number[] = [];
-    for (const seed of SWEEP_SEEDS) {
-      try {
-        generateQuestion({ templates: [template], recentTemplateIds: [], rng: createRng(seed) });
-        survivors.push(seed);
-      } catch {
-        // expected
-      }
-    }
-    expect(survivors).toStrictEqual([]);
+    const classified = errorProfileOverSeeds(
+      ERROR_SWEEP_SEEDS,
+      (seed) => generateQuestion({ templates: [template], recentTemplateIds: [], rng: createRng(seed) }),
+      template.id,
+    );
+    const expected = ERROR_SWEEP_SEEDS.map(
+      (seed) => `${seed}: QuestionGenerationError/INVALID_QUESTION/names-id`,
+    );
+    expect(classified).toStrictEqual(expected);
   });
 
   it('spec(T-007:AC-11) does not reject a text whose every token is declared', () => {
@@ -1721,36 +1783,45 @@ describe('generateQuestion — the Rng advances (AC-14)', () => {
     expect(mismatches).toStrictEqual([]);
   });
 
-  it('spec(T-007:AC-14) a chained call almost never repeats the previous parameter draw', () => {
-    // AC-14 also asks for "a different parameter draw than the first call". Two legal draws CAN
-    // coincide, so the sound form of that claim is a rate rather than a per-seed guarantee:
-    // with two parameters over [1, 12] the collision probability is 1/144, so over N = 500 seeds
-    // the expected number of repeats is 500/144 = 3.47 with sd = sqrt(500 * (1/144) * (143/144))
-    // = 1.86. The ceiling below sits about twenty sd above the mean, while an implementation that
-    // reset the stream would score the full 500 — the discrimination is between 3 and 500, not
-    // between 3 and 4.
-    const trials = 500;
-    let repeats = 0;
-    for (let seed = 1; seed <= trials; seed += 1) {
-      const [first, afterFirst] = generateQuestion({
+  it('spec(T-007:AC-14) the chained result differs from a reset to the original seed', () => {
+    // The amended AC-14's second clause: the chained call's result must "differ from what a
+    // reset to the original seed would produce".
+    //
+    // This replaces a statistical test the amendment made unsound. The earlier version bounded
+    // how OFTEN two consecutive parameter draws coincide, which was the only defensible reading
+    // of the old wording ("produces a different parameter draw") — but the old wording is gone
+    // precisely because draw inequality is not a property of a correct implementation, and the
+    // amendment now says never to assert it. The reset comparison below carries the same
+    // discriminating power with none of the chance: a reset implementation returns the FIRST
+    // call's exact result from the second call, and the returned `Rng` state alone makes that
+    // categorical rather than probabilistic, so no seed can coincide its way past this.
+    const identical: string[] = [];
+    for (const seed of SWEEP_SEEDS) {
+      const first = generateQuestion({
         templates: [TWO_PARAM_TEMPLATE],
         recentTemplateIds: [],
         rng: createRng(seed),
       });
-      const [second] = generateQuestion({
+      const chained = generateQuestion({
         templates: [TWO_PARAM_TEMPLATE],
         recentTemplateIds: [],
-        rng: afterFirst,
+        rng: first[1],
       });
-      if (JSON.stringify(first.params) === JSON.stringify(second.params)) {
-        repeats += 1;
+      const reset = generateQuestion({
+        templates: [TWO_PARAM_TEMPLATE],
+        recentTemplateIds: [],
+        rng: createRng(seed),
+      });
+      if (JSON.stringify(chained) === JSON.stringify(reset)) {
+        identical.push(`seed ${seed}: the chained call reproduced the reset result`);
+      }
+      // And the reset really is a reset — same input, same output — so the comparison above is
+      // between two live results rather than against an accidentally-unreachable value.
+      if (JSON.stringify(reset) !== JSON.stringify(first)) {
+        identical.push(`seed ${seed}: re-running from the original seed was not reproducible`);
       }
     }
-
-    const expectedRepeats = trials / 144;
-    const sd = Math.sqrt(trials * (1 / 144) * (143 / 144));
-    expect(repeats).toBeLessThanOrEqual(Math.ceil(expectedRepeats + 20 * sd));
-    expect(repeats).toBeLessThan(trials);
+    expect(identical).toStrictEqual([]);
   });
 });
 
@@ -1905,20 +1976,566 @@ describe('generateQuestion — distractor failure propagates (AC-16)', () => {
     expect(propagated.name).toBe(direct.name);
   });
 
-  it('spec(T-007:AC-16) propagates for every seed rather than only an unlucky draw', () => {
-    const survivors: number[] = [];
-    for (const seed of SWEEP_SEEDS) {
-      try {
+  it('spec(T-007:AC-16) propagates the same typed error and code at every seed swept', () => {
+    // Hardened alongside AC-7 and AC-11. This sweep already checked `code`, which a bare
+    // `RangeError` fails on (it carries no `code`), but it never checked the TYPE — so a plain
+    // `Error` with a `code` property bolted on would have satisfied it while breaking every
+    // `instanceof` call site downstream. The review found the shape in the other two sweeps;
+    // this is the third instance of it, found by auditing the class rather than the report.
+    const classified = errorProfileOverSeeds(
+      ERROR_SWEEP_SEEDS,
+      (seed) =>
         generateQuestion({
           templates: [AC16_TEMPLATE],
           recentTemplateIds: [],
           rng: createRng(seed),
-        });
-        survivors.push(seed);
-      } catch (error) {
-        expect((error as QuestionGenerationError).code, `seed ${seed}`).toBe('DISTRACTOR_FAILURE');
+        }),
+      AC16_TEMPLATE.id,
+    );
+    const expected = ERROR_SWEEP_SEEDS.map(
+      (seed) => `${seed}: QuestionGenerationError/DISTRACTOR_FAILURE/names-id`,
+    );
+    expect(classified).toStrictEqual(expected);
+  });
+});
+
+// =============================================================================================
+// AC-17 — the two orderings T-024's replay proof depends on
+// =============================================================================================
+
+describe('generateQuestion — parameter order and pre-shuffle order (AC-17)', () => {
+  /** A template whose four choice values are distinct and whose single draw is unconstrained. */
+  const ORDER_TEMPLATE = makeTemplate({
+    id: 'preshuffle-order',
+    text: '{a} + 1 = ?',
+    params: { a: [1, 9] },
+    answerExpr: 'a + 1',
+  });
+
+  it('spec(T-007:AC-17) draws parameters in lexicographically ascending key order', () => {
+    // Retagged from AC-6 by the 2026-07-28 amendment, which gave this behaviour its own
+    // criterion. The test itself is unchanged: it was written before any criterion required it,
+    // because replay cannot survive the order being left free.
+    //
+    // LESSONS.md L-020: a fixture whose keys are declared in sorted order cannot distinguish
+    // the ticket's rule from `Object.keys` insertion order, because the two coincide.
+    // ORDERING_TEMPLATE declares `b` before `a` with disjoint ranges, so the two readings assign
+    // the two draws the other way round.
+    expect(Object.keys(ORDERING_TEMPLATE.params)).toStrictEqual(['b', 'a']);
+
+    const wrong: string[] = [];
+    let discriminating = 0;
+    const seeds = 200;
+
+    for (let seed = 1; seed <= seeds; seed += 1) {
+      const [, afterPick] = pick(createRng(seed), [ORDERING_TEMPLATE]);
+      const [aRangeLo, aRangeHi] = rangeOf(ORDERING_TEMPLATE, 'a');
+      const [bRangeLo, bRangeHi] = rangeOf(ORDERING_TEMPLATE, 'b');
+
+      // Lexicographic order: `a` consumes the first draw, `b` the second.
+      const [sortedA, afterFirst] = nextInt(afterPick, aRangeLo, aRangeHi);
+      const [sortedB] = nextInt(afterFirst, bRangeLo, bRangeHi);
+      // Declaration order: `b` consumes the first draw, `a` the second.
+      const [insertionB, afterFirstInsertion] = nextInt(afterPick, bRangeLo, bRangeHi);
+      const [insertionA] = nextInt(afterFirstInsertion, aRangeLo, aRangeHi);
+
+      if (sortedA !== insertionA || sortedB !== insertionB) {
+        discriminating += 1;
+      }
+
+      const [question] = generateQuestion({
+        templates: [ORDERING_TEMPLATE],
+        recentTemplateIds: [],
+        rng: createRng(seed),
+      });
+      if (paramOf(question.params, 'a') !== sortedA || paramOf(question.params, 'b') !== sortedB) {
+        wrong.push(
+          `seed ${seed}: got a=${paramOf(question.params, 'a')} b=${paramOf(question.params, 'b')}` +
+            `, lexicographic order requires a=${sortedA} b=${sortedB}`,
+        );
       }
     }
-    expect(survivors).toStrictEqual([]);
+
+    // Proving the assertion above is not vacuous: for almost every seed the two readings
+    // genuinely disagree, so passing it is evidence rather than coincidence.
+    expect(discriminating).toBeGreaterThanOrEqual(seeds - 5);
+    expect(wrong).toStrictEqual([]);
+  });
+
+  /**
+   * A second ordering fixture, in mixed case. AC-17's original fixture uses `b` and `a`, and
+   * every key in the real template catalog is a lowercase single letter — a set on which
+   * `Array.sort()` (UTF-16 code point order) and `String.localeCompare` (locale collation)
+   * agree completely. AC-19 has just made `Total` and `_x` legal keys, and on those the two
+   * disagree: code point order is `["A_1b2", "Total", "_x", "a1", "z_"]` where collation gives
+   * `["_x", "A_1b2", "a1", "Total", "z_"]`. Measured, not argued (LESSONS.md L-015): an
+   * implementation sorting by `localeCompare` passed all 71 tests before this fixture existed.
+   *
+   * Declared `a` first so that collation order and declaration order coincide, which makes the
+   * one assertion below discriminate against both competing readings at once.
+   */
+  const MIXED_CASE_TEMPLATE = makeTemplate({
+    id: 'ordering-mixed-case',
+    text: '{B} - {a}',
+    params: { a: [1, 100], B: [1000, 1100] },
+    answerExpr: 'B - a',
+  });
+
+  it('spec(T-007:AC-17) orders keys by code point, not by locale collation', () => {
+    const declared = Object.keys(MIXED_CASE_TEMPLATE.params);
+    const codePoint = [...declared].sort();
+    const collation = [...declared].sort((left, right) => left.localeCompare(right));
+
+    // The premise: on this fixture the three candidate orders are genuinely different, so the
+    // assertion that follows distinguishes them instead of measuring a coincidence.
+    expect(codePoint).toStrictEqual(['B', 'a']);
+    expect(collation).toStrictEqual(['a', 'B']);
+    expect(declared).toStrictEqual(collation);
+
+    // Compared by name-to-value, not by JSON: which key a value landed on is the behaviour under
+    // test, while the insertion order of the returned object is not something the ticket fixes.
+    const byName = (params: Params): string =>
+      Object.keys(params)
+        .sort()
+        .map((name) => `${name}=${paramOf(params, name)}`)
+        .join(',');
+
+    const wrong: string[] = [];
+    for (const seed of SWEEP_SEEDS) {
+      const [byCodePoint] = drawInKeyOrder(seed, MIXED_CASE_TEMPLATE, codePoint);
+      const [byCollation] = drawInKeyOrder(seed, MIXED_CASE_TEMPLATE, collation);
+      if (byName(byCodePoint) === byName(byCollation)) {
+        wrong.push(`seed ${seed}: the two orders happen to agree, so this seed proves nothing`);
+      }
+      const [question] = generateQuestion({
+        templates: [MIXED_CASE_TEMPLATE],
+        recentTemplateIds: [],
+        rng: createRng(seed),
+      });
+      if (byName(question.params) !== byName(byCodePoint)) {
+        wrong.push(
+          `seed ${seed}: drew ${byName(question.params)}; code point order requires ` +
+            `${byName(byCodePoint)}, locale collation would give ${byName(byCollation)}`,
+        );
+      }
+    }
+    expect(wrong).toStrictEqual([]);
+  });
+
+  it('spec(T-007:AC-17) hands shuffle the array answer-first, not distractors-first', () => {
+    // The ticket's second new ordering, asserted directly against the frozen `shuffle` rather
+    // than only through the composed oracle. Both readings are "a shuffle of the four choices"
+    // and both produce a legal Question, so nothing but this pins which one a given seed
+    // yields — and the owner ruled `[answer, ...distractors]`.
+    const wrong: string[] = [];
+    let discriminating = 0;
+
+    for (const seed of SWEEP_SEEDS) {
+      const [params, beforeShuffle] = streamBeforeShuffle(seed, ORDER_TEMPLATE);
+      const answer = evaluateNumber(ORDER_TEMPLATE.answerExpr, params);
+      const distractors = buildDistractors(ORDER_TEMPLATE, params);
+
+      const [answerFirst] = shuffle(beforeShuffle, [answer, ...distractors]);
+      const [distractorsFirst] = shuffle(beforeShuffle, [...distractors, answer]);
+      if (answerFirst.indexOf(answer) !== distractorsFirst.indexOf(answer)) {
+        discriminating += 1;
+      }
+
+      const [question] = generateQuestion({
+        templates: [ORDER_TEMPLATE],
+        recentTemplateIds: [],
+        rng: createRng(seed),
+      });
+      const actual = question.choices.map((choice) => choice.value);
+      if (JSON.stringify(actual) !== JSON.stringify(answerFirst)) {
+        wrong.push(
+          `seed ${seed}: choices ${JSON.stringify(actual)}; answer-first gives ` +
+            `${JSON.stringify(answerFirst)}, distractors-first ${JSON.stringify(distractorsFirst)}`,
+        );
+      }
+      // "so `correctIndex` is the post-shuffle position of that element".
+      if (question.correctIndex !== answerFirst.indexOf(answer)) {
+        wrong.push(
+          `seed ${seed}: correctIndex ${question.correctIndex}, answer sits at ` +
+            `${answerFirst.indexOf(answer)}`,
+        );
+      }
+    }
+
+    // The two readings must actually disagree, or the assertion above proves nothing about
+    // which one the implementation used (LESSONS.md L-020).
+    expect(discriminating).toBe(SWEEP_SEEDS.length);
+    expect(wrong).toStrictEqual([]);
+  });
+});
+
+// =============================================================================================
+// AC-18 — a zero-parameter template is legal and must succeed
+// =============================================================================================
+
+describe('generateQuestion — zero-parameter templates (AC-18)', () => {
+  const ZERO_PARAM_TEMPLATE = makeTemplate({
+    id: 'zero-param',
+    text: 'what is seven',
+    params: {},
+    answerExpr: '7',
+    distractors: ['8', '6', '9'],
+  });
+
+  it('spec(T-007:AC-18) the fixture really is schema-valid with no parameters', () => {
+    // The branch existed and no fixture reached it, which is why an implementation rejecting it
+    // as INVALID_QUESTION passed the first draft of this suite (LESSONS.md L-034). The premise
+    // is therefore asserted rather than assumed: the schema accepts it, and every frozen
+    // primitive downstream tolerates an empty environment.
+    expect(Object.keys(ZERO_PARAM_TEMPLATE.params)).toStrictEqual([]);
+    expect(evaluateNumber(ZERO_PARAM_TEMPLATE.answerExpr, {})).toBe(7);
+    expect(buildDistractors(ZERO_PARAM_TEMPLATE, {})).toHaveLength(CHOICE_COUNT - 1);
+  });
+
+  it('spec(T-007:AC-18) succeeds and returns an empty params object', () => {
+    const failures: string[] = [];
+    for (const seed of SWEEP_SEEDS) {
+      const input: GeneratorInput = {
+        templates: [ZERO_PARAM_TEMPLATE],
+        recentTemplateIds: [],
+        rng: createRng(seed),
+      };
+      const [question] = generateQuestion(input);
+      if (JSON.stringify(question.params) !== '{}') {
+        failures.push(`seed ${seed}: params ${JSON.stringify(question.params)}`);
+      }
+      if (question.text !== ZERO_PARAM_TEMPLATE.text) {
+        failures.push(`seed ${seed}: text ${JSON.stringify(question.text)}`);
+      }
+      if (question.choices.length !== CHOICE_COUNT) {
+        failures.push(`seed ${seed}: ${question.choices.length} choices`);
+      }
+      const correct = question.choices[question.correctIndex];
+      if (correct === undefined || correct.value !== 7) {
+        failures.push(`seed ${seed}: correct choice ${JSON.stringify(correct)}`);
+      }
+    }
+    expect(failures).toStrictEqual([]);
+  });
+
+  it('spec(T-007:AC-18) performs zero nextInt draws, so steps 4-7 run on the pick state', () => {
+    // "step 3 performs zero `nextInt` draws". Asserted on the PRNG stream rather than on the
+    // params object, because an implementation could return `{}` while still burning a draw —
+    // and a burnt draw silently changes every subsequent question in a replayed session.
+    const drifted: string[] = [];
+    for (const seed of SWEEP_SEEDS) {
+      const [, afterPick] = pick(createRng(seed), [ZERO_PARAM_TEMPLATE]);
+      const [, expectedAfter] = shuffle(
+        afterPick,
+        Array.from({ length: CHOICE_COUNT }, (_unused, index) => index),
+      );
+      const [, actualAfter] = generateQuestion({
+        templates: [ZERO_PARAM_TEMPLATE],
+        recentTemplateIds: [],
+        rng: createRng(seed),
+      });
+      if (actualAfter.state !== expectedAfter.state) {
+        drifted.push(`seed ${seed}: returned ${actualAfter.state}, expected ${expectedAfter.state}`);
+      }
+    }
+    expect(drifted).toStrictEqual([]);
+  });
+});
+
+// =============================================================================================
+// AC-19 — the parameter-key grammar, and substitution of every declared token
+// =============================================================================================
+
+describe('generateQuestion — parameter keys are expression identifiers (AC-19)', () => {
+  /** T-002's grammar, verbatim: `IDENT := [A-Za-z_][A-Za-z0-9_]*`. */
+  const IDENT = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+  /**
+   * Keys spanning the whole grammar: a leading underscore, a capital, a trailing digit, mixed
+   * case with an embedded underscore and digits, and a trailing underscore. Every range is
+   * degenerate, so this fixture tests substitution alone and stays independent of AC-17's
+   * draw-order rule.
+   */
+  const GRAMMAR_KEYS = ['_x', 'Total', 'a1', 'A_1b2', 'z_'] as const;
+  const GRAMMAR_ANSWER_EXPR = GRAMMAR_KEYS.join(' + ');
+  const GRAMMAR_TEMPLATE = makeTemplate({
+    id: 'grammar-keys',
+    text: GRAMMAR_KEYS.map((key) => `{${key}}`).join(' and '),
+    params: Object.fromEntries(GRAMMAR_KEYS.map((key, index) => [key, [index + 1, index + 1] as ParamRange])),
+    answerExpr: GRAMMAR_ANSWER_EXPR,
+  });
+
+  it('spec(T-007:AC-19) every parameter key in this suite matches the identifier grammar', () => {
+    const offenders: string[] = [];
+    for (const template of [...DIMENSION_MATRIX, ...POOL, GRAMMAR_TEMPLATE, AC16_TEMPLATE]) {
+      for (const key of Object.keys(template.params)) {
+        if (!IDENT.test(key)) {
+          offenders.push(`${template.id}: ${JSON.stringify(key)}`);
+        }
+      }
+    }
+    expect(offenders).toStrictEqual([]);
+  });
+
+  it('spec(T-007:AC-19) the grammar is T-002s, so every legal key is a usable variable', () => {
+    // The criterion's rationale is that a param key IS an expression variable. That is a claim
+    // about T-002, so it is measured against T-002 rather than restated: each key resolves in
+    // both an arithmetic and a predicate context.
+    const env: Record<string, number> = {};
+    GRAMMAR_KEYS.forEach((key, index) => {
+      env[key] = index + 1;
+    });
+    expect(GRAMMAR_KEYS.every((key) => IDENT.test(key))).toBe(true);
+    expect(evaluateNumber(GRAMMAR_ANSWER_EXPR, env)).toBe(1 + 2 + 3 + 4 + 5);
+    expect(evaluatePredicate(`${GRAMMAR_KEYS[0]} < ${GRAMMAR_KEYS[1]}`, env)).toBe(true);
+  });
+
+  it('spec(T-007:AC-19) substitutes tokens across the whole grammar, not a narrower one', () => {
+    // The discriminator. A renderer written as `\{([a-z]+)\}` — the shape a K-5 template
+    // catalog's lowercase single-letter keys would never punish — matches NONE of these five,
+    // so it leaves every token standing and the call throws INVALID_QUESTION instead.
+    const narrow = /^[a-z]+$/;
+    expect(GRAMMAR_KEYS.filter((key) => narrow.test(key))).toStrictEqual([]);
+
+    const [question] = generateQuestion({
+      templates: [GRAMMAR_TEMPLATE],
+      recentTemplateIds: [],
+      rng: createRng(7),
+    });
+    expect(question.text).toBe('1 and 2 and 3 and 4 and 5');
+    expect(question.params).toStrictEqual({ _x: 1, Total: 2, a1: 3, A_1b2: 4, z_: 5 });
+  });
+
+  it('spec(T-007:AC-19) leaves no declared token unsubstituted in any fixture', () => {
+    const leftovers: string[] = [];
+    for (const template of [...DIMENSION_MATRIX, GRAMMAR_TEMPLATE]) {
+      for (const seed of SWEEP_SEEDS) {
+        const [question] = generateQuestion({
+          templates: [template],
+          recentTemplateIds: [],
+          rng: createRng(seed),
+        });
+        for (const key of Object.keys(template.params)) {
+          const token = `{${key}}`;
+          if (!template.text.includes(token)) {
+            continue;
+          }
+          if (question.text.includes(token)) {
+            leftovers.push(`${template.id}@${seed}: ${token} survived in ${question.text}`);
+          }
+          if (!question.text.includes(String(paramOf(question.params, key)))) {
+            leftovers.push(`${template.id}@${seed}: ${token} was removed without inserting its value`);
+          }
+        }
+      }
+    }
+    expect(leftovers).toStrictEqual([]);
+  });
+});
+
+// =============================================================================================
+// Definition of Done
+//
+// `spec-lint` harvests DoD checkboxes as well as criteria and numbers them in file order
+// (LESSONS.md L-036), so each behavioural item is carried by a test tagged `dod(T-007:n)`.
+// Items 1 and 3 are the traceability contract, 2 is the local gate script, 4 to 6 are
+// behavioural. Item 7 — "files changed are exactly those in `file_scopes`" — is a statement
+// about the repository's diff, not about the module, and is deliberately left uncovered; see
+// this ticket's test report.
+// =============================================================================================
+
+const TICKET_PATH = fileURLToPath(new URL('../../../tickets/T-007.md', import.meta.url));
+const SUITE_PATH = fileURLToPath(import.meta.url);
+
+/** DoD items with no behavioural content a test of this module could assert. */
+const NON_BEHAVIOURAL_DOD: readonly number[] = [7];
+
+describe('generateQuestion — Definition of Done', () => {
+  it('dod(T-007:1) dod(T-007:3) cites every criterion the ticket declares, and no other', () => {
+    // Both items state the same contract from opposite ends: item 1 that every AC has a tagged
+    // test, item 3 that `spec-lint` — whose entire job is that mapping — is green.
+    //
+    // This is not a re-implementation of the gate. `spec-lint` checks the forward direction per
+    // criterion and the reverse direction per FILE, so a tag citing a criterion that does not
+    // exist is invisible to it: retiring an AC leaves its test tagged and still counted. The
+    // set equality below closes that, and it runs on every `vitest run` rather than only when
+    // someone invokes the gate.
+    const ticket = readFileSync(TICKET_PATH, 'utf8');
+    const suite = readFileSync(SUITE_PATH, 'utf8');
+
+    const declared = [...ticket.matchAll(/\*\*AC-(\d+)\*\*/g)].map((match) => Number(match[1]));
+    const cited = [...suite.matchAll(/spec\(T-007:AC-(\d+)\)/g)].map((match) => Number(match[1]));
+    const unique = (values: readonly number[]): readonly number[] =>
+      [...new Set(values)].sort((left, right) => left - right);
+
+    expect(declared.length, 'the ticket declares no criteria — wrong path?').toBeGreaterThan(0);
+    expect(unique(cited)).toStrictEqual(unique(declared));
+  });
+
+  it('dod(T-007:1) dod(T-007:3) cites every Definition-of-Done item the gate numbers', () => {
+    // The same contract for DoD items, minus the ones with no behavioural content. Written as
+    // an explicit carve-out rather than a loose bound so that a NEW DoD item appearing in the
+    // ticket fails here until it is either tagged or classified.
+    const ticket = readFileSync(TICKET_PATH, 'utf8');
+    const suite = readFileSync(SUITE_PATH, 'utf8');
+
+    // Mirrors spec-lint's own harvest: the Definition-of-Done section up to the next heading,
+    // counting checkbox lines. Verified against the gate — both see the same number.
+    const section = ticket.split('## Definition of Done')[1] ?? '';
+    const body = section.split('\n## ')[0] ?? section;
+    const count = body.split('\n').filter((line) => /^- \[[ x]\]/.test(line)).length;
+    const cited = [...new Set([...suite.matchAll(/dod\(T-007:(\d+)\)/g)].map((m) => Number(m[1])))];
+
+    expect(count, 'no Definition-of-Done checkboxes found — wrong path?').toBeGreaterThan(0);
+    const expected = Array.from({ length: count }, (_unused, index) => index + 1).filter(
+      (item) => !NON_BEHAVIOURAL_DOD.includes(item),
+    );
+    expect([...cited].sort((left, right) => left - right)).toStrictEqual(expected);
+  });
+
+  it('dod(T-007:2) contains no skipped or focused test, which would hide a gap silently', () => {
+    // One of the eight checks `run-local-gates.sh` performs, and the only one whose failure
+    // would quietly shrink THIS file's coverage while every other gate stayed green. The other
+    // seven — prettier, eslint, tsc, vitest itself, no-TODO markers, engine purity, and the
+    // frozen-test commit check — cannot be asserted from inside a vitest run without either
+    // recursion or reaching for git, so the script remains their authority.
+    const suite = readFileSync(SUITE_PATH, 'utf8');
+    const focused = [...suite.matchAll(/\b(?:it|test|describe)\.(?:skip|only)\b|\bx(?:it|describe)\b/g)];
+    expect(focused.map((match) => match[0])).toStrictEqual([]);
+  });
+
+  it('dod(T-007:4) reaches neither Math.random nor Date, and returns the advanced Rng', () => {
+    // Behavioural, not a source scan (LESSONS.md L-013): the determinism lint rule is scoped to
+    // `src/**`, so it cannot be this suite's authority on the module's purity. Both globals are
+    // replaced with throwing stubs, the work is done inside that window, and the comparison
+    // happens after they are restored so a failure inside `expect` cannot be mistaken for the
+    // module reaching a clock.
+    const originalRandom = Math.random;
+    const originalDate = globalThis.Date;
+    class PoisonedDate {
+      constructor() {
+        throw new Error('new Date() — the generator must be a pure function of its inputs');
+      }
+      static now(): number {
+        throw new Error('Date.now() — the generator must be a pure function of its inputs');
+      }
+    }
+
+    const input: GeneratorInput = {
+      templates: DIMENSION_MATRIX,
+      recentTemplateIds: [],
+      rng: createRng(4096),
+    };
+    let actual: readonly [Question, Rng] | undefined;
+    let expected: readonly [Question, Rng] | undefined;
+    let escaped: unknown;
+    try {
+      Math.random = (): number => {
+        throw new Error('Math.random() — every draw must go through the seeded Rng');
+      };
+      globalThis.Date = PoisonedDate as unknown as DateConstructor;
+      actual = generateQuestion(input);
+      expected = composeExpected(input);
+    } catch (error) {
+      escaped = error;
+    } finally {
+      Math.random = originalRandom;
+      globalThis.Date = originalDate;
+    }
+
+    expect(escaped, `a global was reached: ${String(escaped)}`).toBeUndefined();
+    // Equality with the composed stream is the second half of the item: every draw went through
+    // the Rng passed in, in the order the ticket specifies, and the advanced Rng came back.
+    expect(actual).toStrictEqual(expected);
+  });
+
+  it('dod(T-007:5) throws a typed error with a code on every failure path', () => {
+    // "with the template id except for NO_TEMPLATE" — the carve-out this suite proposed and the
+    // amendment accepted. It is asserted as a carve-out, not skipped: NO_TEMPLATE must still be
+    // typed, still carry its code, and still say something.
+    const undeclared = makeTemplate({
+      id: 'dod5-undeclared',
+      text: '{a} + {z}',
+      params: { a: [1, 9] },
+      answerExpr: 'a',
+    });
+    const paths: readonly (readonly [string, () => unknown, string | null])[] = [
+      [
+        'NO_TEMPLATE',
+        () => generateQuestion({ templates: [], recentTemplateIds: [], rng: createRng(1) }),
+        null,
+      ],
+      [
+        'CONSTRAINTS_UNSATISFIED',
+        () =>
+          generateQuestion({
+            templates: [UNSATISFIABLE_TEMPLATE],
+            recentTemplateIds: [],
+            rng: createRng(1),
+          }),
+        UNSATISFIABLE_TEMPLATE.id,
+      ],
+      [
+        'INVALID_QUESTION',
+        () => generateQuestion({ templates: [undeclared], recentTemplateIds: [], rng: createRng(1) }),
+        undeclared.id,
+      ],
+      [
+        'DISTRACTOR_FAILURE',
+        () => generateQuestion({ templates: [AC16_TEMPLATE], recentTemplateIds: [], rng: createRng(1) }),
+        AC16_TEMPLATE.id,
+      ],
+    ];
+
+    const profile = paths.map(([code, call, expectedId]) => {
+      const [classified] = errorProfileOverSeeds([0], () => call(), expectedId);
+      return `${code} -> ${String(classified).replace('0: ', '')}`;
+    });
+    expect(profile).toStrictEqual([
+      'NO_TEMPLATE -> QuestionGenerationError/NO_TEMPLATE/no-id-required',
+      'CONSTRAINTS_UNSATISFIED -> QuestionGenerationError/CONSTRAINTS_UNSATISFIED/names-id',
+      'INVALID_QUESTION -> QuestionGenerationError/INVALID_QUESTION/names-id',
+      'DISTRACTOR_FAILURE -> QuestionGenerationError/DISTRACTOR_FAILURE/names-id',
+    ]);
+  });
+
+  it('dod(T-007:6) behaviour tracks the three tuning constants, not three literals', () => {
+    // What is observable from outside is that the module behaves as the CURRENT values require.
+    // A literal equal to today's value is behaviourally identical to the import and no
+    // black-box test can separate them — that limit is recorded in the report rather than
+    // papered over. What this does catch is the module drifting away from a retuned constant.
+
+    // CHOICE_COUNT: the assembled question carries exactly that many choices.
+    const [question] = generateQuestion({
+      templates: [AC9_TEMPLATE],
+      recentTemplateIds: [],
+      rng: createRng(11),
+    });
+    expect(question.choices).toHaveLength(CHOICE_COUNT);
+
+    // RECENT_TEMPLATE_WINDOW: with a pool of exactly w + 1 and a history of w distinct ids, one
+    // template is eligible and its id is forced. A window of w - 1 or w + 1 serves a different
+    // id or degrades to the whole pool, and either shows up here.
+    const window = RECENT_TEMPLATE_WINDOW;
+    const pool = makePool(window + 1);
+    const history = pool.slice(0, window).map((template) => template.id);
+    const forced = pool[window];
+    expect(forced, 'fixture error: pool smaller than the window').toBeDefined();
+    const served = new Set<string>();
+    for (const seed of SWEEP_SEEDS) {
+      const [only] = generateQuestion({
+        templates: pool,
+        recentTemplateIds: history,
+        rng: createRng(seed),
+      });
+      served.add(only.templateId);
+    }
+    expect([...served]).toStrictEqual([forced?.id]);
+
+    // MAX_PARAM_SAMPLE_ATTEMPTS is pinned by AC-7's boundary test, which locates the seed whose
+    // first satisfying draw lands exactly on the bound at run time rather than baking one in.
+    expect(firstSatisfyingAttempt(1, UNSATISFIABLE_TEMPLATE, MAX_PARAM_SAMPLE_ATTEMPTS)).toBe(
+      Number.POSITIVE_INFINITY,
+    );
   });
 });
