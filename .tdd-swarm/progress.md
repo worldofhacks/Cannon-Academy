@@ -1708,3 +1708,25 @@ No new tickets filed. T-032 (owner decision) and CHOICE_COUNT duplication remain
 waves; neither blocks the merge.
 
 **Status: Wave 4 COMPLETE — integration PASS.** Next: Wave 5 dispatch (T-014…T-020).
+
+
+## Wave 5 — dispatched 2026-07-28 (owner priority)
+
+Baseline: `swarm/engine-core` @ `6acaa39`, **1438/1438**, all local gates PASS.
+
+Owner order (do not reorder): **T-014, T-015, T-016** (templates — highest priority; generator has
+nothing real to fire) → **T-017** (publish session API in `COORDINATION.md`) → **T-018** →
+**T-020** (publish reducer shape in `COORDINATION.md`; never edit `src/stores/duel.ts`) →
+**T-034** last. **T-029 / T-032** remain owner-blocked.
+
+Push policy: merge each ticket into `swarm/engine-core` and **push immediately** (L-037 lesson —
+do not batch 14 invisible commits).
+
+Worktrees (phase=`tests`):
+| Ticket | Worktree | Branch |
+| --- | --- | --- |
+| T-014 | `.worktrees/wt-T-014` | `ticket/T-014-templates-k2-addsub` |
+| T-015 | `.worktrees/wt-T-015` | `ticket/T-015-templates-g23` |
+| T-016 | `.worktrees/wt-T-016` | `ticket/T-016-templates-g35` |
+
+Test Agents dispatched in parallel for the three template tickets.

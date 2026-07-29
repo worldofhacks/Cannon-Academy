@@ -39,9 +39,12 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 
 ## Current state at the time of writing
 
-- Engine: waves 1–3 merged, **1,229 tests green**. Wave 4 (T-007 generator, T-013 duel types) is
-  **paused at its freeze gate with both suites rejected** — `.tdd-swarm/progress.md` holds the exact
-  resume point and the five contract holes.
-- App: **nothing exists.** No Expo, no screens, no theme. `package.json` has `zod` only.
-- iOS: Xcode installed with iPhone 17 Pro / Air simulators. EAS not installed. **Apple Developer $99
-  unpaid**, so TestFlight is upside — the demo path is iOS Simulator plus an Expo web build.
+- Engine: waves 1–4 merged on `swarm/engine-core`, **1,438 tests green**. Wave 5 in flight —
+  priority order from owner (2026-07-28): **T-014 → T-015 → T-016** (templates, ≥8/skill floor)
+  first, then **T-017** (range drill; publish session API here when it lands), **T-018**
+  (onboarding rival), **T-020** (duel reducer; publish state/event shape here — do **not** edit
+  `src/stores/duel.ts`), **T-034** last. Do not touch owner-blocked **T-029** / **T-032**.
+  Push `swarm/engine-core` after every ticket merge, not at wave end.
+- App track (`app/shell`): owns presentation; currently uses a placeholder question service that
+  must not ship — real templates from T-014…T-016 replace it.
+- iOS: Simulator + Expo web demo path; TestFlight gated on Apple Developer enrollment.
