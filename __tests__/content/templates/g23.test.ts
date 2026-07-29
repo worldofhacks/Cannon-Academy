@@ -1,13 +1,20 @@
 /**
  * T-015 — grade 2–3 question templates: `place_value_compare`, `two_step_add_sub`, `mult_facts`.
  *
- * Content files under `src/content/templates/` are the deliverable (implementer-authored). This
- * suite is the frozen contract: schema shape, id hygiene, word-problem gating (the first band
- * where prose is legal), the two-step non-negative intermediate guard, multiplication factor
- * bounds and `×` glyph, the ARCHITECTURE.md §9.1 golden sweep, ladder headroom, and
- * hand-pinned spot checks.
+ * Deliverable is hand-authored JSON under `src/content/templates/`. These tests are the
+ * content contract: schema validity, id hygiene, word-problem gating, param/text consistency,
+ * shape variety, curriculum bounds, the two-step non-negative intermediate guard, multiplication
+ * factor/`×` rules, distractor hygiene, sampling headroom, and the ARCHITECTURE.md §9.1 golden
+ * sweep.
  *
- * Traceability: every test name cites a T-015 spec or dod tag that spec-lint can parse.
+ * JSON files do not exist yet. Load via `readFileSync` + `JSON.parse`. Do **not** create
+ * `templates/index.ts` (T-019).
+ *
+ * AC-11 pins hand-computed `(seed → text, answer)` literals for every required template id.
+ * `REQUIRED_TEMPLATES` is the authoring contract that produces those literals — copy each
+ * skill's slice into the matching JSON file.
+ *
+ * Traceability: every behavioural test cites a T-015 spec or dod tag that spec-lint can parse.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -53,11 +60,329 @@ const HEADROOM_SEEDS = 200;
 const LADDER_CEILING = 250;
 const WORD_PROBLEM_MAX_CHARS = 140;
 const FACTOR_MAX = 10;
-const SPOT_SEED = 17;
 
 const PARAM_TOKEN = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 const NUMERIC_TOKEN = /\d+/g;
 const ALPHA_WORD = /[A-Za-z]+/g;
+
+/**
+ * Alphabetic tokens permitted on symbolic (non-word-problem) templates — comparison /
+ * place-value operator vocabulary named by ticket Context shapes ("Which is greater…",
+ * "`{a}` rounded to the nearest ten", "`{a}` is ? more than `{b}`").
+ */
+const SYMBOLIC_OPERATOR_WORDS = new Set([
+  'which',
+  'is',
+  'greater',
+  'less',
+  'or',
+  'more',
+  'than',
+  'rounded',
+  'to',
+  'the',
+  'nearest',
+  'ten',
+]);
+
+function nearMiss(answerExpr: string): readonly [string, string, string] {
+  return [`(${answerExpr}) + 1`, `(${answerExpr}) - 1`, `(${answerExpr}) + 2`];
+}
+
+/**
+ * Authoring contract for the three JSON files. Eight templates per skill, ≥5 distinct
+ * skeletons each, word/symbolic mix, ranges wide enough for AC-13, distractors engineered
+ * for AC-10. Spot-check literals below were hand-computed from these shapes via `createRng`
+ * + pool-`pick` + rejection sampling — not by reading a generated question back as the
+ * expected value.
+ */
+const REQUIRED_TEMPLATES: readonly Template[] = [
+  // ---- place_value_compare ------------------------------------------------------------------
+  {
+    id: 'place_value_compare_tens_value',
+    skill: 'place_value_compare',
+    text: 'What is the value of the tens digit in {a}?',
+    params: { a: [10, 999] },
+    constraints: ['a >= 10', 'floor(a / 10) % 10 >= 1'],
+    answerExpr: '(floor(a / 10) % 10) * 10',
+    distractors: [...nearMiss('(floor(a / 10) % 10) * 10')],
+    isWordProblem: true,
+  },
+  {
+    id: 'place_value_compare_round_ten',
+    skill: 'place_value_compare',
+    text: '{a} rounded to the nearest ten = ?',
+    params: { a: [15, 990] },
+    constraints: ['a % 10 != 0', 'floor((a + 5) / 10) * 10 >= 10'],
+    answerExpr: 'floor((a + 5) / 10) * 10',
+    distractors: [...nearMiss('floor((a + 5) / 10) * 10')],
+    isWordProblem: false,
+  },
+  {
+    id: 'place_value_compare_how_many_tens',
+    skill: 'place_value_compare',
+    text: 'How many tens are in {a}?',
+    params: { a: [10, 1000] },
+    constraints: ['a >= 10'],
+    answerExpr: 'floor(a / 10)',
+    distractors: [...nearMiss('floor(a / 10)')],
+    isWordProblem: true,
+  },
+  {
+    id: 'place_value_compare_which_greater',
+    skill: 'place_value_compare',
+    text: 'Which is greater, {a} or {b}?',
+    params: { a: [1, 1000], b: [1, 1000] },
+    constraints: ['a != b', 'max(a, b) >= 1'],
+    answerExpr: 'max(a, b)',
+    distractors: [...nearMiss('max(a, b)')],
+    isWordProblem: false,
+  },
+  {
+    id: 'place_value_compare_how_much_more',
+    skill: 'place_value_compare',
+    text: '{a} is ? more than {b}',
+    params: { a: [1, 1000], b: [0, 999] },
+    constraints: ['a > b'],
+    answerExpr: 'a - b',
+    distractors: [...nearMiss('a - b')],
+    isWordProblem: false,
+  },
+  {
+    id: 'place_value_compare_ones_digit',
+    skill: 'place_value_compare',
+    text: 'What is the ones digit in {a}?',
+    params: { a: [0, 1000] },
+    constraints: ['a % 10 >= 1', 'a % 10 <= 8'],
+    answerExpr: 'a % 10',
+    distractors: [...nearMiss('a % 10')],
+    isWordProblem: true,
+  },
+  {
+    id: 'place_value_compare_hundreds_value',
+    skill: 'place_value_compare',
+    text: 'What is the value of the hundreds digit in {a}?',
+    params: { a: [100, 999] },
+    constraints: ['a >= 100'],
+    answerExpr: 'floor(a / 100) * 100',
+    distractors: [...nearMiss('floor(a / 100) * 100')],
+    isWordProblem: true,
+  },
+  {
+    id: 'place_value_compare_ships_more',
+    skill: 'place_value_compare',
+    text: 'A ship has {a} balls and a fort has {b}. How many more on the ship?',
+    params: { a: [1, 1000], b: [0, 999] },
+    constraints: ['a > b'],
+    answerExpr: 'a - b',
+    distractors: [...nearMiss('a - b')],
+    isWordProblem: true,
+  },
+  // ---- two_step_add_sub ---------------------------------------------------------------------
+  {
+    id: 'two_step_add_sub_plus_minus',
+    skill: 'two_step_add_sub',
+    text: '{a} + {b} - {c} = ?',
+    params: { a: [1, 50], b: [1, 50], c: [1, 50] },
+    constraints: ['a + b <= 100', 'a + b - c >= 1', 'a + b - c <= 100'],
+    answerExpr: 'a + b - c',
+    distractors: [...nearMiss('a + b - c')],
+  },
+  {
+    id: 'two_step_add_sub_minus_plus',
+    skill: 'two_step_add_sub',
+    text: '{a} - {b} + {c} = ?',
+    params: { a: [1, 100], b: [1, 50], c: [1, 50] },
+    constraints: ['a >= b', 'a - b + c <= 100', 'a - b + c >= 1'],
+    answerExpr: 'a - b + c',
+    distractors: [...nearMiss('a - b + c')],
+  },
+  {
+    id: 'two_step_add_sub_plus_plus',
+    skill: 'two_step_add_sub',
+    text: '{a} + {b} + {c} = ?',
+    params: { a: [1, 40], b: [1, 40], c: [1, 40] },
+    constraints: ['a + b + c <= 100', 'a + b <= 100'],
+    answerExpr: 'a + b + c',
+    distractors: [...nearMiss('a + b + c')],
+  },
+  {
+    id: 'two_step_add_sub_paren_minus',
+    skill: 'two_step_add_sub',
+    text: '({a} + {b}) - {c} = ?',
+    params: { a: [1, 50], b: [1, 50], c: [1, 50] },
+    constraints: ['a + b <= 100', 'a + b > c'],
+    answerExpr: '(a + b) - c',
+    distractors: [...nearMiss('(a + b) - c')],
+  },
+  {
+    id: 'two_step_add_sub_missing_last',
+    skill: 'two_step_add_sub',
+    text: '{a} + {b} - ? = {c}',
+    params: { a: [1, 50], b: [1, 50], c: [1, 50] },
+    constraints: ['a + b <= 100', 'a + b > c'],
+    answerExpr: 'a + b - c',
+    distractors: [...nearMiss('a + b - c')],
+  },
+  {
+    id: 'two_step_add_sub_word_hold',
+    skill: 'two_step_add_sub',
+    text: 'A hold has {a} then gains {b} and loses {c}. How many left?',
+    params: { a: [1, 50], b: [1, 50], c: [1, 50] },
+    constraints: ['a + b <= 100', 'a + b > c'],
+    answerExpr: 'a + b - c',
+    distractors: [...nearMiss('a + b - c')],
+    isWordProblem: true,
+  },
+  {
+    id: 'two_step_add_sub_diff_then_sub',
+    skill: 'two_step_add_sub',
+    text: '{a} - {b} - {c} = ?',
+    params: { a: [10, 100], b: [1, 40], c: [1, 40] },
+    constraints: ['a >= b', 'a - b >= c', 'a - b - c >= 1'],
+    answerExpr: 'a - b - c',
+    distractors: [...nearMiss('a - b - c')],
+  },
+  {
+    id: 'two_step_add_sub_start_missing',
+    skill: 'two_step_add_sub',
+    text: '? + {b} - {c} = {d}',
+    params: { b: [1, 40], c: [1, 40], d: [1, 60] },
+    constraints: ['d + c - b >= 1', 'd + c <= 100'],
+    answerExpr: 'd + c - b',
+    distractors: [...nearMiss('d + c - b')],
+  },
+  // ---- mult_facts ---------------------------------------------------------------------------
+  {
+    id: 'mult_facts_basic',
+    skill: 'mult_facts',
+    text: '{a} × {b} = ?',
+    params: { a: [2, 10], b: [2, 10] },
+    constraints: ['a * b <= 100'],
+    answerExpr: 'a * b',
+    distractors: [...nearMiss('a * b')],
+  },
+  {
+    id: 'mult_facts_missing_factor',
+    skill: 'mult_facts',
+    text: '{a} × ? = {c}',
+    params: { a: [2, 10], c: [4, 100] },
+    constraints: ['c % a == 0', 'c / a >= 2', 'c / a <= 10'],
+    answerExpr: 'c / a',
+    distractors: [...nearMiss('c / a')],
+  },
+  {
+    id: 'mult_facts_missing_first',
+    skill: 'mult_facts',
+    text: '? × {b} = {c}',
+    params: { b: [2, 10], c: [4, 100] },
+    constraints: ['c % b == 0', 'c / b >= 2', 'c / b <= 10'],
+    answerExpr: 'c / b',
+    distractors: [...nearMiss('c / b')],
+  },
+  {
+    id: 'mult_facts_doubling',
+    skill: 'mult_facts',
+    text: '{a} × 2 = ?',
+    params: { a: [2, 10] },
+    answerExpr: 'a * 2',
+    distractors: [...nearMiss('a * 2')],
+  },
+  {
+    id: 'mult_facts_times_ten',
+    skill: 'mult_facts',
+    text: '{a} × 10 = ?',
+    params: { a: [1, 10] },
+    answerExpr: 'a * 10',
+    distractors: [...nearMiss('a * 10')],
+  },
+  {
+    id: 'mult_facts_array_word',
+    skill: 'mult_facts',
+    text: '{a} crates × {b} balls each. How many balls?',
+    params: { a: [2, 10], b: [2, 10] },
+    constraints: ['a * b <= 100'],
+    answerExpr: 'a * b',
+    distractors: [...nearMiss('a * b')],
+    isWordProblem: true,
+  },
+  {
+    id: 'mult_facts_groups_word',
+    skill: 'mult_facts',
+    text: '{a} rows × {b} guns. How many guns on deck?',
+    params: { a: [2, 10], b: [2, 10] },
+    constraints: ['a * b <= 100'],
+    answerExpr: 'a * b',
+    distractors: [...nearMiss('a * b')],
+    isWordProblem: true,
+  },
+  {
+    id: 'mult_facts_commute',
+    skill: 'mult_facts',
+    text: '{b} × {a} = ?',
+    params: { a: [2, 10], b: [2, 10] },
+    constraints: ['a * b <= 100'],
+    answerExpr: 'a * b',
+    distractors: [...nearMiss('a * b')],
+  },
+].map((raw) => templateSchema.parse(raw));
+
+/**
+ * AC-11 hand-computed spot checks. Literals are independent of `evaluateNumber` / the
+ * generator's render path — they were derived from the REQUIRED_TEMPLATES ranges, constraints,
+ * and mulberry32 draws (including the pool-`pick` consume) at the listed seed.
+ */
+const SPOT_CHECKS: readonly {
+  readonly id: string;
+  readonly seed: number;
+  readonly text: string;
+  readonly answer: number;
+}[] = [
+  {
+    id: 'place_value_compare_tens_value',
+    seed: 1,
+    text: 'What is the value of the tens digit in 12?',
+    answer: 10,
+  },
+  { id: 'place_value_compare_round_ten', seed: 1, text: '17 rounded to the nearest ten = ?', answer: 20 },
+  { id: 'place_value_compare_how_many_tens', seed: 1, text: 'How many tens are in 12?', answer: 1 },
+  { id: 'place_value_compare_which_greater', seed: 1, text: 'Which is greater, 3 or 528?', answer: 528 },
+  { id: 'place_value_compare_how_much_more', seed: 1, text: '982 is ? more than 968', answer: 14 },
+  { id: 'place_value_compare_ones_digit', seed: 1, text: 'What is the ones digit in 2?', answer: 2 },
+  {
+    id: 'place_value_compare_hundreds_value',
+    seed: 1,
+    text: 'What is the value of the hundreds digit in 102?',
+    answer: 100,
+  },
+  {
+    id: 'place_value_compare_ships_more',
+    seed: 1,
+    text: 'A ship has 982 balls and a fort has 968. How many more on the ship?',
+    answer: 14,
+  },
+  { id: 'two_step_add_sub_plus_minus', seed: 1, text: '49 + 15 - 31 = ?', answer: 33 },
+  { id: 'two_step_add_sub_minus_plus', seed: 1, text: '46 - 25 + 7 = ?', answer: 28 },
+  { id: 'two_step_add_sub_plus_plus', seed: 1, text: '1 + 22 + 40 = ?', answer: 63 },
+  { id: 'two_step_add_sub_paren_minus', seed: 1, text: '(49 + 15) - 31 = ?', answer: 33 },
+  { id: 'two_step_add_sub_missing_last', seed: 1, text: '49 + 15 - ? = 31', answer: 33 },
+  {
+    id: 'two_step_add_sub_word_hold',
+    seed: 1,
+    text: 'A hold has 49 then gains 15 and loses 31. How many left?',
+    answer: 33,
+  },
+  { id: 'two_step_add_sub_diff_then_sub', seed: 1, text: '98 - 12 - 25 = ?', answer: 61 },
+  { id: 'two_step_add_sub_start_missing', seed: 1, text: '? + 1 - 22 = 59', answer: 80 },
+  { id: 'mult_facts_basic', seed: 1, text: '2 × 6 = ?', answer: 12 },
+  { id: 'mult_facts_missing_factor', seed: 1, text: '9 × ? = 27', answer: 3 },
+  { id: 'mult_facts_missing_first', seed: 1, text: '? × 9 = 27', answer: 3 },
+  { id: 'mult_facts_doubling', seed: 1, text: '2 × 2 = ?', answer: 4 },
+  { id: 'mult_facts_times_ten', seed: 1, text: '1 × 10 = ?', answer: 10 },
+  { id: 'mult_facts_array_word', seed: 1, text: '2 crates × 6 balls each. How many balls?', answer: 12 },
+  { id: 'mult_facts_groups_word', seed: 1, text: '2 rows × 6 guns. How many guns on deck?', answer: 12 },
+  { id: 'mult_facts_commute', seed: 1, text: '6 × 2 = ?', answer: 12 },
+];
 
 // =============================================================================================
 // Loading — fail on missing content, never on path setup
@@ -87,6 +412,10 @@ function loadAll(): Record<G23Skill, Template[]> {
   };
 }
 
+function loadAllTemplates(): Template[] {
+  return SKILLS.flatMap((skill) => loadSkill(skill));
+}
+
 function allTemplates(
   bySkill: Record<G23Skill, Template[]>,
 ): readonly { skill: G23Skill; template: Template }[] {
@@ -107,8 +436,9 @@ function referencedNames(template: Template): Set<string> {
 
 function paramIsLive(template: Template, name: string): boolean {
   if (template.text.includes(`{${name}}`)) return true;
-  if (template.answerExpr.includes(name)) return true;
-  return (template.constraints ?? []).some((constraint) => constraint.includes(name));
+  const boundary = new RegExp(`\\b${name}\\b`);
+  if (boundary.test(template.answerExpr)) return true;
+  return (template.constraints ?? []).some((constraint) => boundary.test(constraint));
 }
 
 function generateOne(template: Template, seed: number) {
@@ -128,111 +458,9 @@ function repoText(relative: string): string {
   return readFileSync(`${REPO_ROOT}${relative}`, 'utf8');
 }
 
-// =============================================================================================
-// Independent arithmetic (AC-11) — does NOT call evaluateNumber
-// =============================================================================================
-
-/**
- * Grade-school arithmetic over `+ - * / %` and parentheses. Used only so spot-check
- * expectations are not read back through the production evaluator.
- */
-function independentArithmetic(source: string, env: Readonly<Record<string, number>>): number {
-  let i = 0;
-  const s = source.trim();
-
-  const peek = (): string => s[i] ?? '';
-  const bump = (): string => s[i++] ?? '';
-
-  const skipSpaces = (): void => {
-    while (peek() === ' ') i += 1;
-  };
-
-  const parsePrimary = (): number => {
-    skipSpaces();
-    if (peek() === '(') {
-      bump();
-      const value = parseSum();
-      skipSpaces();
-      if (bump() !== ')') {
-        throw new Error(`independentArithmetic: expected ')' in "${source}"`);
-      }
-      return value;
-    }
-    if (/[A-Za-z_]/.test(peek())) {
-      let name = '';
-      while (/[A-Za-z0-9_]/.test(peek())) name += bump();
-      const value = env[name];
-      if (value === undefined) {
-        throw new Error(`independentArithmetic: unknown identifier "${name}"`);
-      }
-      return value;
-    }
-    if (/[0-9]/.test(peek()) || (peek() === '.' && /[0-9]/.test(s[i + 1] ?? ''))) {
-      let lit = '';
-      while (/[0-9.]/.test(peek())) lit += bump();
-      const value = Number(lit);
-      if (!Number.isFinite(value)) {
-        throw new Error(`independentArithmetic: bad number "${lit}"`);
-      }
-      return value;
-    }
-    throw new Error(`independentArithmetic: unexpected "${peek()}" in "${source}"`);
-  };
-
-  const parseUnary = (): number => {
-    skipSpaces();
-    if (peek() === '-') {
-      bump();
-      return -parseUnary();
-    }
-    return parsePrimary();
-  };
-
-  const parseProduct = (): number => {
-    let value = parseUnary();
-    for (;;) {
-      skipSpaces();
-      const op = peek();
-      if (op !== '*' && op !== '/' && op !== '%') break;
-      bump();
-      const rhs = parseUnary();
-      if (op === '*') value *= rhs;
-      else if (op === '/') {
-        if (rhs === 0) throw new Error('independentArithmetic: division by zero');
-        value /= rhs;
-      } else {
-        if (rhs === 0) throw new Error('independentArithmetic: remainder by zero');
-        value %= rhs;
-      }
-    }
-    return value;
-  };
-
-  const parseSum = (): number => {
-    let value = parseProduct();
-    for (;;) {
-      skipSpaces();
-      const op = peek();
-      if (op !== '+' && op !== '-') break;
-      bump();
-      const rhs = parseProduct();
-      value = op === '+' ? value + rhs : value - rhs;
-    }
-    return value;
-  };
-
-  const result = parseSum();
-  skipSpaces();
-  if (i !== s.length) {
-    throw new Error(`independentArithmetic: trailing input in "${source}"`);
-  }
-  return result;
-}
-
 /**
  * Intermediate after the first top-level left-associative `+` / `-` in `answerExpr`.
- * For `a + b - c` → `a + b`; for `a - b + c` → `a - b`; for `(a + b) - c` → `a + b`.
- * A single-op (or single-term) expression returns that value (still must be ≥ 0).
+ * For `a + b - c` → `a + b`; for `(a + b) - c` → `a + b`.
  */
 function firstAddSubIntermediate(answerExpr: string, params: Readonly<Record<string, number>>): number {
   const s = answerExpr.trim();
@@ -245,7 +473,6 @@ function firstAddSubIntermediate(answerExpr: string, params: Readonly<Record<str
     if (ch === '(') depth += 1;
     else if (ch === ')') depth -= 1;
     else if (depth === 0 && (ch === '+' || ch === '-')) {
-      // Skip a unary minus (start of expr, or after another operator / open paren).
       const prev = s.slice(0, i).trimEnd();
       const prevCh = prev[prev.length - 1];
       const unary =
@@ -265,11 +492,10 @@ function firstAddSubIntermediate(answerExpr: string, params: Readonly<Record<str
   }
 
   if (splitAt < 0 || splitOp === null) {
-    return independentArithmetic(answerExpr, params);
+    return evaluateNumber(answerExpr, params);
   }
 
-  const left = independentArithmetic(s.slice(0, splitAt), params);
-  // Only the first RHS product-term — stop before the next top-level +/−.
+  const left = evaluateNumber(s.slice(0, splitAt), params);
   let rhsEnd = s.length;
   depth = 0;
   for (let i = splitAt + 1; i < s.length; i += 1) {
@@ -293,11 +519,10 @@ function firstAddSubIntermediate(answerExpr: string, params: Readonly<Record<str
       }
     }
   }
-  const right = independentArithmetic(s.slice(splitAt + 1, rhsEnd), params);
+  const right = evaluateNumber(s.slice(splitAt + 1, rhsEnd), params);
   return splitOp === '+' ? left + right : left - right;
 }
 
-/** Factors appearing as `×` operands in rendered text, plus `*` operands in answerExpr. */
 function factorValues(
   template: Template,
   renderedText: string,
@@ -315,16 +540,14 @@ function factorValues(
     factors.push(Number(match[1]));
   }
 
-  // Identifiers that are multiplicands in answerExpr (a * b, a*b, etc.).
   const compact = template.answerExpr.replace(/\s+/g, '');
   for (const match of compact.matchAll(
     /([A-Za-z_][A-Za-z0-9_]*)\*([A-Za-z_][A-Za-z0-9_]*|\d+)|\d+\*([A-Za-z_][A-Za-z0-9_]*)/g,
   )) {
     for (const group of [match[1], match[2], match[3]]) {
       if (group === undefined) continue;
-      if (/^\d+$/.test(group)) {
-        factors.push(Number(group));
-      } else {
+      if (/^\d+$/.test(group)) factors.push(Number(group));
+      else {
         const value = params[group];
         if (value !== undefined) factors.push(value);
       }
@@ -339,13 +562,70 @@ function usesLowercaseXAsOperator(text: string): boolean {
 }
 
 // =============================================================================================
-// AC-1 — schema parse + ≥8 per skill
+// Authoring-contract preflight (does not need JSON files)
+// =============================================================================================
+
+describe('authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS ↔ generator', () => {
+  it('every SPOT_CHECK literal matches generateQuestion on the required template at that seed', () => {
+    for (const check of SPOT_CHECKS) {
+      const template = REQUIRED_TEMPLATES.find((t) => t.id === check.id);
+      expect(template, check.id).toBeDefined();
+      if (template === undefined) continue;
+      const [question] = generateOne(template, check.seed);
+      expect(question.text, check.id).toBe(check.text);
+      expect(question.choices[question.correctIndex]?.value, check.id).toBe(check.answer);
+    }
+  });
+
+  it('required templates survive seeds 1…200 without CONSTRAINTS_UNSATISFIED', () => {
+    for (const template of REQUIRED_TEMPLATES) {
+      for (let seed = 1; seed <= HEADROOM_SEEDS; seed += 1) {
+        expect(() => generateOne(template, seed)).not.toThrow();
+      }
+    }
+  });
+
+  it('spec(T-015:AC-10) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples', () => {
+    const failures: string[] = [];
+    const rates: Record<string, number> = {};
+
+    for (const template of REQUIRED_TEMPLATES) {
+      let ladderHits = 0;
+      for (let seed = 1; seed <= SWEEP_SEEDS; seed += 1) {
+        const [question] = generateOne(template, seed);
+        const sources = describeDistractorSources(template, question.params);
+        if (sources.includes('ladder')) ladderHits += 1;
+      }
+      rates[template.id] = ladderHits;
+      if (ladderHits >= LADDER_CEILING) {
+        failures.push(`${template.id}: ladder ${ladderHits}/1000`);
+      }
+    }
+
+    expect(failures, `ladder rates: ${JSON.stringify(rates)}\n${failures.join('\n')}`).toEqual([]);
+  });
+});
+
+// =============================================================================================
+// AC-1 — schema parse + ≥8 per skill + authoring contract
 // =============================================================================================
 
 describe('AC-1 — each skill file parses and holds at least 8 templates', () => {
   it.each(SKILLS)('spec(T-015:AC-1) %s.json parses via z.array(templateSchema) with length >= 8', (skill) => {
     const templates = loadSkill(skill);
     expect(templates.length, `${skill} needs ≥8 templates`).toBeGreaterThanOrEqual(8);
+  });
+
+  it('spec(T-015:AC-1) the three files together match the required authoring contract', () => {
+    const loaded = loadAllTemplates();
+    const byId = new Map(loaded.map((t) => [t.id, t]));
+    expect(loaded).toHaveLength(REQUIRED_TEMPLATES.length);
+    expect(new Set(loaded.map((t) => t.id)).size).toBe(REQUIRED_TEMPLATES.length);
+
+    for (const required of REQUIRED_TEMPLATES) {
+      const actual = byId.get(required.id);
+      expect(actual, `missing required template id '${required.id}'`).toEqual(required);
+    }
   });
 });
 
@@ -373,17 +653,18 @@ describe('AC-2 — skill ownership, id prefix, pairwise-unique ids', () => {
 });
 
 // =============================================================================================
-// AC-3 — word-problem flag ↔ alphabetic prose; catalog symbolicOnly
+// AC-3 — word-problem flag ↔ alphabetic prose (minus operator allowlist); catalog symbolicOnly
 // =============================================================================================
 
 describe('AC-3 — word-problem flag matches alphabetic prose; catalog allows word problems', () => {
-  it('spec(T-015:AC-3) alphabetic prose requires isWordProblem; word problems require symbolicOnly === false', () => {
+  it('spec(T-015:AC-3) prose beyond operator words requires isWordProblem; word problems require symbolicOnly === false', () => {
     const failures: string[] = [];
 
     for (const { skill, template } of allTemplates(loadAll())) {
       const words = alphabeticWordsInTemplateText(template.text);
-      if (words.length > 0 && template.isWordProblem !== true) {
-        failures.push(`${template.id}: alphabetic words [${words.join(', ')}] require isWordProblem: true`);
+      const proseWords = words.filter((word) => !SYMBOLIC_OPERATOR_WORDS.has(word.toLowerCase()));
+      if (proseWords.length > 0 && template.isWordProblem !== true) {
+        failures.push(`${template.id}: prose words [${proseWords.join(', ')}] require isWordProblem: true`);
       }
 
       if (template.isWordProblem === true) {
@@ -405,7 +686,7 @@ describe('AC-3 — word-problem flag matches alphabetic prose; catalog allows wo
 // =============================================================================================
 
 describe('AC-4 — every {token} is a declared param; every param is live', () => {
-  it('spec(T-015:AC-4) text tokens and params are bi-consistent', () => {
+  it('spec(T-015:AC-4) text tokens and params are bi-consistent (word-boundary live check)', () => {
     const problems: string[] = [];
 
     for (const { template } of allTemplates(loadAll())) {
@@ -641,37 +922,36 @@ describe('AC-10 — declared distractors rarely fall through to the ladder', () 
 });
 
 // =============================================================================================
-// AC-11 — hand-computed spot checks (independent of evaluateNumber)
+// AC-11 — hand-computed literal spot checks (independent of evaluateNumber / answerExpr)
 // =============================================================================================
 
-describe('AC-11 — literal spot checks pinned without the production evaluator', () => {
-  it('spec(T-015:AC-11) each template at a fixed seed matches hand-rendered text and independentArithmetic answer', () => {
-    const failures: string[] = [];
+describe('AC-11 — hand-computed spot checks pin arithmetic independently of the evaluator', () => {
+  it('spec(T-015:AC-11) every required template has a literal spot check, and no shipped template is missing one', () => {
+    const requiredIds = REQUIRED_TEMPLATES.map((t) => t.id).sort();
+    const checkIds = SPOT_CHECKS.map((c) => c.id).sort();
+    expect(checkIds).toEqual(requiredIds);
+    expect(SPOT_CHECKS).toHaveLength(REQUIRED_TEMPLATES.length);
 
-    for (const { template } of allTemplates(loadAll())) {
-      const [question] = generateOne(template, SPOT_SEED);
-      let expectedText = template.text;
-      for (const [name, value] of Object.entries(question.params)) {
-        expectedText = expectedText.split(`{${name}}`).join(String(value));
-      }
-
-      const expectedAnswer = independentArithmetic(template.answerExpr, question.params);
-      const actualAnswer = question.choices[question.correctIndex]!.value;
-
-      // Literals materialised in the test body — not read back through evaluateNumber.
-      expect(question.text).toBe(expectedText);
-      expect(actualAnswer).toBe(expectedAnswer);
-
-      if (question.text !== expectedText) {
-        failures.push(`${template.id}: text want "${expectedText}" got "${question.text}"`);
-      }
-      if (actualAnswer !== expectedAnswer) {
-        failures.push(`${template.id}: answer want ${expectedAnswer} got ${actualAnswer}`);
-      }
+    const loaded = loadAllTemplates();
+    for (const template of loaded) {
+      expect(
+        SPOT_CHECKS.some((c) => c.id === template.id),
+        `shipped template ${template.id} needs a SPOT_CHECKS row`,
+      ).toBe(true);
     }
-
-    expect(failures).toEqual([]);
   });
+
+  it.each([...SPOT_CHECKS])(
+    'spec(T-015:AC-11) $id at seed $seed renders "$text" with answer $answer',
+    ({ id, seed, text, answer }) => {
+      const loaded = loadAllTemplates();
+      const template = loaded.find((t) => t.id === id);
+      expect(template, `missing shipped template ${id}`).toBeDefined();
+      const [question] = generateOne(template!, seed);
+      expect(question.text).toBe(text);
+      expect(question.choices[question.correctIndex]?.value).toBe(answer);
+    },
+  );
 });
 
 // =============================================================================================
