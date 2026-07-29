@@ -1,4 +1,4 @@
-# App track — handoff, 2026-07-29 10:10
+# App track — handoff, 2026-07-29 10:25
 
 **Submission target: today, ~12:00.** Read this file, then `git log --oneline -15`, before anything.
 Supersedes `STATE.md` (which is now stale — it predates the chart rebuild, D-8, A-016 and A-017).
@@ -126,6 +126,76 @@ anyone.** Grep every `useAnimatedStyle` in `src/components/chart/` for calls to 
 anything else.
 
 Run the demo script in §7 end to end on the simulator. Screenshot the chart.
+
+---
+
+## 5A. HOSTING — required live by 12:00 today
+
+**Status: de-risked and proven, not yet deployed.** I built and smoke-tested the web bundle
+locally before writing this. Findings below are measured, not assumed.
+
+### What is already true
+
+- `app.json` is fully configured for web: `"web": { "bundler": "metro", "output": "static" }`.
+- `react-dom`, `react-native-web`, `@expo/metro-runtime` are all installed at correct versions.
+- **The export works.** `npx expo export --platform web` succeeds in ~6s and emits **10 statically
+  rendered routes**, 6.6 MB total (2.3 MB JS bundle):
+  `/`, `/onboarding`, `/name-flag`, `/guided-duel`, `/chart`, `/duel`, `/gun-deck`, `/range`,
+  `/_sitemap`, `/+not-found`.
+- **The app RUNS on web with zero console errors.** Verified in a 375×812 viewport: the grade
+  picker renders correctly (ships, math, band pips), tapping a ship advances to name-and-flag,
+  choosing a flag and sailing advances again, and **the duel screen renders fully** — hull bars,
+  both ships with the captain aboard, the cannon tray with damage bands and temper badges.
+  Reanimated 4 worklets and `react-native-svg` both survive the web bundler. **This was the main
+  hosting risk and it is retired.**
+- The U+FE0E anchor fix is confirmed rendering correctly on the duel HUD.
+
+### What is NOT yet verified
+
+- **The rebuilt sea chart has not been seen rendered.** Navigation during the smoke test landed on
+  `/duel` rather than the chart, and I ran out of budget before diagnosing it. **Verify the chart
+  renders first, on both web and device.** It is the newest, least-observed screen in the build.
+- Nothing has been run on a physical device or simulator since the chart rebuild (see §5).
+
+### The one hosting requirement that will bite
+
+A plain static file server returns **"Unmatched Route"** for a deep link like `/chart`, because the
+export writes `chart.html` and there is no rewrite. Client-side navigation works fine — only direct
+URL entry breaks. **The host must map extensionless paths to their `.html` files.** Confirmed by
+reproduction with `python -m http.server`; do not use that as your smoke test and conclude routing
+is broken.
+
+### Recommended path — EAS Hosting (~10 minutes)
+
+`eas.json` already exists and the project is EAS-linked, so this needs no new account and handles
+expo-router static output natively:
+
+```bash
+cd "/Users/quietguy/Documents/Dev/Gauntlet/Math Game/.worktrees/wt-app"
+npx expo export --platform web
+eas deploy --prod
+```
+
+Returns a live `*.expo.app` URL. If `eas deploy` prompts for a project link, accept it.
+
+**Fallbacks, in order**, if EAS Hosting stalls:
+
+1. **Firebase Hosting** — `firebase` is already a dependency. Needs `firebase.json` with
+   `"public": "dist"` and a rewrite of `**` → `/index.html`, then `firebase deploy --only hosting`.
+2. **Netlify drop** — drag `dist/` onto app.netlify.com/drop, plus a `_redirects` file containing
+   `/*  /index.html  200`.
+3. **Vercel** — `npx vercel deploy --prod dist` with a rewrite rule.
+
+### Hosting schedule
+
+| time   | action                                                                                         |
+| ------ | ---------------------------------------------------------------------------------------------- |
+| ~11:00 | first deploy, whatever state the build is in — **get a URL existing early**; redeploy is cheap |
+| ~11:40 | final deploy after A-015 (or its fallback) lands                                               |
+| ~11:50 | smoke-test the live URL: cold load, deep link to `/chart`, one full duel                       |
+
+**Deploy early and redeploy.** The failure mode that loses the deadline is discovering a hosting
+problem at 11:55, not shipping a slightly older bundle.
 
 ---
 
