@@ -1231,6 +1231,357 @@ this narrows the schema by accident.
 4. **Sequencing: review first, amend once.** Both reviews are now in, so the amendment round can
    proceed with full information.
 
+## T-007 round 2 — accepted, pending re-review
+
+The Test Agent killed all three review mutants and, by auditing the suite's _shape_ rather than
+working from the review's list, found two more. Suite is 72 tests (was 57) over 19 criteria, 53 of
+53 mutants killed. Everything below I re-ran myself rather than taking from the report.
+
+| Claim                                          | Verified                                                                      |
+| ---------------------------------------------- | ----------------------------------------------------------------------------- |
+| Frozen file SHA-256 `09b3da13…`                | matches                                                                       |
+| Diff vs **merge base** `a7249fef` (L-033)      | exactly 2 files: the suite + its report, **0 under `src/`**                   |
+| RED is a module-resolution failure only        | `tsc --noEmit` exit 2, one diagnostic, `TS2307`                               |
+| Wave 1–3 baseline intact                       | `Tests 1229 passed`, suite fails at the import                                |
+| Prettier / ESLint                              | exit 0 / exit 0                                                               |
+| `spec-lint`                                    | **PASS** after the two rulings below — 19/19 AC, DoD 1–6 tagged, DoD-7 `SKIP` |
+| DoD-7 itself ("files changed ⊆ `file_scopes`") | verified by me from the diff above, which is what `[process]` promises        |
+
+**The two mutants the review missed** are worth naming because neither was a gap in the review's
+diligence — they were only visible from the suite's structure. One was a third instance of the
+`catch` shape the review found twice (AC-16 checked an error's `code` but never its type). The other
+**the amendment itself created**, which is the more interesting failure: AC-17 said keys are consumed
+in "lexicographically ascending" order without naming a collation, and AC-19 — added last round —
+made mixed-case keys legal, which is exactly where code-point order and `localeCompare` diverge. A
+`localeCompare` implementation passed all 71 tests. This is [[L-020]] precisely: the two orderings
+agree on every lowercase single letter, which is every key in the real catalog **and both keys in
+AC-17's own fixture**, so the criterion could not see its own ambiguity. Tightening a spec can open
+a hole elsewhere in it, and only a suite audited as a whole catches that.
+
+### Rulings
+
+- **A-8, collation → code point.** AC-17 now names ascending code-point order (`sort()` with no
+  comparator) and forbids `localeCompare`. Code point is `sort()`'s default and needs no locale data,
+  so it cannot drift with a platform's ICU version — the property T-024's replay proof rests on. The
+  agent had pinned this reading already, so no test changes; the criterion now states what the suite
+  measures. (I checked whether `localeCompare` actually varies by locale for identifier-shaped keys
+  and it did not across four locales — the hazard is the ambiguity, not observed platform drift.)
+- **A-9, process items → the gate skips them.** A DoD item marked `[process]` reports `SKIP` and is
+  verified by the orchestrator's diff instead of by a test. The agent was right to leave DoD-7 red
+  rather than tag it with a narrower check; see [[L-036]]. The marker is **required, not inferred**,
+  so a forgotten marker still fails. Numbering spans skipped items, so no `dod(id:n)` tag shifted —
+  confirmed by re-running the gate on T-013 and a grandfathered ticket.
+
+Open, carried to review: `composeExpected` is the suite's strongest oracle and is the agent's own
+code; a lookup-table implementation would still pass the 114-seed error sweeps; AC-5 bounds when
+`NO_TEMPLATE` must fire but never when it must not.
+
+## T-013 round 2 — accepted, one criterion added, needs a short round 3
+
+Both contract holes closed. The agent did the thing that makes a kill trustworthy: it **built each
+mutant first and confirmed it was live** — mutable `DuelCore.seed` and a variant-only `debug?: string`
+each produced 0 tsc errors and 100/100 passing against the old suite — then killed them, at 10 and 1
+tsc errors. Suite is 122 tests (was 100), 45 of 45 mutants killed, 5 of 5 negative controls surviving.
+Re-verified by me, not taken from the report:
+
+| Claim                                                  | Verified                                            |
+| ------------------------------------------------------ | --------------------------------------------------- |
+| Frozen file SHA-256 `154ebee1…`                        | matches                                             |
+| Diff vs merge base `a7249fef`                          | exactly 2 files: suite + report, **0 under `src/`** |
+| RED is 88 errors: 3 `TS2307`, 51 `TS2322`, 34 `TS2578` | matches exactly, **0 outside the suite**            |
+| Wave 1–3 baseline                                      | `Tests 1229 passed`                                 |
+| Prettier / ESLint / `spec-lint` (pre-amendment)        | 0 / 0 / PASS at 15 AC + 9 DoD                       |
+| DoD-9 ("files changed ⊆ `file_scopes`")                | verified by me from the diff above                  |
+
+Two pieces of self-correction are worth more than the mutant counts. The agent **retracted its own
+round-1 claim** that positive `Exact<>` probes go vacuous in RED: measured, `Exact<any, X>` is
+`false`, those 51 `TS2322`s are probes _firing_, and **the implementer's target is 88 → 0**, not
+merely clearing the 3 import errors. And it reported one mutant it **could not** kill as genuinely
+equivalent rather than claiming it — `isTerminalPhase` via `startsWith('v') || startsWith('d')` is
+identical over the closed eight-phase domain, and becomes a bug only if a phase like `draw` is added,
+at which point AC-1 fails first. Both are [[L-027]] honoured rather than cited.
+
+It also avoided a trap that would have manufactured a false defect: `Exact<Readonly<T>, T>` is a
+false negative on every variant, because the variants are intersections and `Readonly<A & B>` is a
+flattened mapped type while `A & B` is not. Written that way, AC-14 would have been unsatisfiable.
+
+### Rulings on the three escalations
+
+- **Config-array aliasing → new AC-16.** Accepted as the one finding that earns a criterion.
+  `state.playerLoadout` was the caller's array, and callers hold a mutable `CannonId[]`; a push
+  anywhere in the app rewrites a duel in flight and makes it unreproducible from its own seed. The
+  aliasing is on the **caller's** side, so `readonly` cannot reach it and no engine test was looking.
+  This is [[L-012]] at the value level: a modifier says the field cannot be reassigned, never that
+  the object it points at belongs to the duel. Count verified 15 → **16**, gate correctly RED on
+  AC-16 ([[L-026]]).
+- **Memoised construction → a clause on AC-3, not a criterion.** Every field is readonly, so a
+  shared cached state is confusion rather than corruption. AC-3 now also demands the two calls not
+  return the same reference.
+- **Runtime freezing → declined, and recorded as a locked decision** so it is not re-raised.
+  `Object.freeze` would sit on T-020's per-event hot path; T-024's invariant checker is the right
+  home. AC-16 is the deliberate exception, and for the one reason freezing could not have helped
+  anyway — it guards a reference the caller owns.
+- **DoD-9 marked `[process]`, for consistency with T-007.** The two agents made opposite calls on the
+  same item: T-007's declined to tag it, T-013's tagged it with a directory check. The directory
+  assertion is useful and stays in the suite, but it constrains `src/engine/duel/`'s contents rather
+  than the branch diff, so the gate no longer credits it. DoD-2 and DoD-3 stay enforced — both assert
+  something real and neither name overclaims, and DoD-3's tag-numbering check is the test that would
+  have caught round 1's own bug.
+
+**Round 3 is two tests wide:** cover AC-16, add the reference clause to AC-3. Everything else is
+frozen-ready.
+
+## T-007 round-2 re-review — REJECTED, and it was worth the round
+
+Cross-model re-review (different family) rejected the suite on **one live mutant**, verified by me
+rather than accepted: an ordinary generator that calls `evaluateNumber` / `evaluatePredicate` /
+`buildDistractors` without translating their `ExprError`s **passes all 72 tests and typechecks
+clean**, while breaking DoD-5's promise that every failure path throws a typed
+`QuestionGenerationError`. I confirmed both halves of its reachability argument: `answerExpr` is
+`z.string()` in `src/content/schemas.ts`, so `"a +"` is schema-valid; and `distractors.ts` really does
+document `@throws {ExprError} unchanged`. Its harness was proven live first (a sentinel produced 60
+failures), so the 72-pass result means what it says.
+
+That is a second rejection of a suite that had already killed 53 of 53 mutants — and the reason is
+[[L-038]]: **no fixture in the suite carried a malformed expression**, so the whole failure class was
+invisible to the suite and to its own mutation matrix. This is the clearest evidence yet for
+cross-model review: one family wrote the suite and its mutants, so the blind spot was shared.
+
+### Rulings
+
+- **AC-20 (new) — the generator wraps, `distractors.ts` does not change.** `ExprError` from any of the
+  three evaluated sites surfaces as `QuestionGenerationError` code `INVALID_QUESTION`, naming the
+  template id, with the original as `cause`. This resolves the apparent spec conflict instead of
+  choosing a side: the frozen module keeps propagating unchanged, and translation happens at the
+  generator's boundary because that is what the app and T-020 call, and DoD-5's whole value is one
+  error type per caller. `Error.cause` is assignable at ES2022 — verified — so no change to the frozen
+  `types.ts` is needed.
+- **AC-5 gains its negative half.** `NO_TEMPLATE` is now forbidden whenever a usable template exists,
+  including when recency filtering empties the eligible pool. The criterion had bounded only when it
+  _must_ fire.
+- **AC-21 (new) — failure precedence is the documented step order.** Two implementations could report
+  different codes for one template and both be defensible. Where two failures share
+  `INVALID_QUESTION`, the test separates them by `cause`.
+- **`assertQuestion` — locked as output validity, not an observable call.** The review was right that
+  `types.ts` claims T-007 calls it while the ticket never required that. A spy test would freeze an
+  implementation detail and buy nothing, since the guard's checks are a subset of what the criteria
+  already assert on the output.
+- **DoD-7 reworded in both tickets — it was unsatisfiable.** "Files changed are exactly those in
+  `file_scopes`" cannot hold for any branch, which also changes its test file and its report. I had
+  been verifying the sensible reading and reporting the literal checkbox green ([[L-039]]).
+
+### One gate defect the review found that my own baseline could not
+
+`run-local-gates.sh` matched a bare `(TODO|FIXME|HACK)`, so the suite's phrase "no-TODO markers"
+**failed the gate on its own description**. It passed for me at the root only because the file
+containing that phrase exists solely in the worktree — my green described a tree without the code in
+it. Fixed to require the canonical `TODO:` / `FIXME(owner):` form; verified it still catches all three
+real markers, ignores the prose, and that `no-todos` now PASSes in `wt-T-007`, leaving only the
+expected RED-state typecheck and unit failures.
+
+Count verified 19 → **21**, gate red on AC-20 and AC-21 only ([[L-026]]).
+
+## T-013 round 3 — accepted, pending re-review
+
+Narrow scope delivered as asked: one AC-3 reference-inequality test and three AC-16 aliasing
+tests covering `playerLoadout`, `rivalLoadout`, and `templatesBySkill` plus nested `Template[]`.
+Authored on Grok 4.5 fast after Opus hit the API limit. Re-verified by me:
+
+| Claim                                                | Verified                                |
+| ---------------------------------------------------- | --------------------------------------- |
+| Start hash `154ebee1…` → end `c5e80f2b…`             | matches                                 |
+| Diff vs merge base                                   | suite + report only, **0 under `src/`** |
+| RED still 88: 3 `TS2307` / 51 `TS2322` / 34 `TS2578` | matches, 0 outside suite                |
+| Baseline                                             | `Tests 1229 passed`                     |
+| `spec-lint`                                          | **PASS** — 16/16 AC, DoD-9 `SKIP`       |
+| Prettier / ESLint / `no-todos`                       | 0 / 0 / PASS                            |
+| `types.ts` absent; scratchpad gone                   | yes                                     |
+
+Liveness method held: aliasing and memoising impls passed the old suite and die on the new tests.
+Matrix 51/51 killed, 5/5 controls surviving including the three T-022 forward-compat ones.
+Implementer target remains **88 → 0**.
+
+## T-007 round 3 — accepted, pending re-review
+
+Round-3 suite closes the re-review rejection: AC-20 (ExprError wrap at all three sites with
+`cause`), AC-21 (failure precedence), AC-5 negative half. Authored on Grok 4.5 fast. Re-verified:
+
+| Claim                               | Verified                                    |
+| ----------------------------------- | ------------------------------------------- |
+| Start `09b3da13…` → end `f7c62e4d…` | matches                                     |
+| Diff vs merge base                  | suite + report only, **0 under `src/`**     |
+| RED                                 | sole `TS2307`; baseline `Tests 1229 passed` |
+| `spec-lint`                         | **PASS** — 21/21 AC, DoD-7 `SKIP`           |
+| Prettier / ESLint / `no-todos`      | 0 / 0 / PASS                                |
+| Tags                                | AC-20 ×5, AC-21 ×3, AC-5 ×3; 81 tests       |
+| `generator.ts` absent               | yes                                         |
+
+Cause assertions are real (`toBeInstanceOf(ExprError)`), and AC-20 includes a premise that the three
+fixtures are schema-valid and throw `ExprError` directly — so the translation is testable.
+
+T-013's GPT Terra re-review died on API limit before starting; both re-reviews re-dispatched on
+Claude Sonnet (still cross-family vs Grok authoring).
+
+## T-007 round-3 re-review — REJECTED (Composer 2.5)
+
+Cross-model review found one live mutant, re-measured by me:
+
+`m3-render-first-fake-cause` — runs render (step 6) before distractors (step 5), and on render
+failure attaches a **fabricated** `ExprError` cause. **81/81 + clean tsc.** Control without the
+fake cause dies on exactly AC-21's step-5-vs-6 test (80/81). So AC-21's `instanceof ExprError`
+check partially bites and still lets a competent cheat through.
+
+Partial-wrap / no-cause / answer-before-constraints mutants all die — round 3 closed those.
+
+### Rulings (no new AC numbers; tighten existing)
+
+- **AC-11** — render `INVALID_QUESTION` must have `cause === undefined`, every swept seed.
+- **AC-20** — `cause` must match the frozen evaluator's `code` **and** `message` for that
+  expression+params, not merely `instanceof ExprError`.
+- **AC-21** — step-5 diagnosis uses AC-20's identity rule; step-6 absence is asserted via AC-11
+  too, not only implied by the dual-failure fixture.
+
+Count stays 21; gate still green on tags. Suite assertions themselves are what must change.
+
+## T-013 round-3 re-review — REJECTED (Composer 2.5)
+
+Two live mutants, both re-measured at **126/126**:
+
+1. **Shallow `Template[]`** — `[...templates]` sharing `Template` object refs. Suite only mutated
+   containers (`pop` / reassignment), never `template.text`. Direct probe: caller overwrites text →
+   state sees `"HACKED BY CALLER"`.
+2. **Shared-core wrapper** — `WeakMap` caches core; each call returns `{ ...cached, phase }`.
+   Top-level `not.toBe` is green; `first.playerLoadout.push` rewrites `second`. Control that
+   returns the same top-level ref still dies on AC-3 — so the reference clause partially bites.
+
+`startsWith` terminal predicate remains equivalent over the closed eight-phase domain — residual,
+not a reject.
+
+### Rulings (count stays 16)
+
+- **AC-16** — deep-copy: new containers **and** new element objects, including each `Template` and
+  its nested `distractors` / `params` / `constraints`.
+- **AC-3** — independent state graphs, not just top-level reference inequality.
+
+## T-007 round 4 — accepted, pending re-review
+
+Cause-identity tightenings landed. Re-verified: hash `1a586570…`, merge-base diff = suite +
+report only, sole `TS2307`, baseline 1229, `spec-lint` 21/21 with DoD-7 SKIP. Suite now asserts
+`cause === undefined` on every AC-11 seed and matches frozen-evaluator `code`/`message` on AC-20/21.
+Agent reported m3 81/81 → 4 fails (AC-11 ×3 + AC-21 ×1); assertion shapes confirm that kill path.
+
+## T-013 round 4 — accepted, pending re-review
+
+Deep-copy / independent-graph tightenings landed. Re-verified: hash `737335df…`, 128 tests,
+merge-base diff = suite + report only, RED still 88 (3/51/34), baseline 1229, `spec-lint` 16/16
+with DoD-9 SKIP. New tests cover AC-3 graph independence (`playerLoadout.push` + nested
+`templatesBySkill[…][0].text`) and AC-16 deep-copy of `Template` plus nested `params` /
+`distractors` / `constraints` with `not.toBe` on those references.
+
+## T-007 FROZEN — Composer ACCEPT round 4
+
+Verdict **ACCEPT** from [T-007 Re-review](fc68fe03-f84a-4103-a0c1-84f8c572c51c). Independently confirmed
+before freeze: suite SHA `1a5865707201bc288bd21deb4865cf8c49d3e176e1f43ef537229460b57799e1`,
+`phase=implement` set in `wt-T-007`, write guard **blocks** the frozen suite (engaged, frozen-test
+reason). Merge-base diff remains suite + report; RED = sole `TS2307`; 21/21 spec-lint.
+
+Reviewer confirmed m3 dead (4 fails: AC-11 ×3 + AC-21 ×1). Two 81/81 survivors are **not** reject
+grounds: (1) copying `ExprError` code+message into a fresh cause — allowed by AC-20 as written;
+(2) calling `buildDistractors` before an explicit `evaluateNumber` — observably identical because
+frozen T-005 evaluates `answerExpr` internally. Residuals recorded, not blockers.
+
+**Do not dispatch the T-007 implementer until T-013 also freezes** — wave 4 is the critical-path
+narrowest point and both should enter GREEN together.
+
+## T-013 round-4 re-review — REJECTED (Composer 2.5)
+
+Round-3 mutants confirmed dead. Three new live mutants re-measured at **128/128**:
+
+1. Shared module-level `tally` / `actionLog` / `recentTemplateIds` while loadouts/templates copy
+2. Deep-copy `Template` but alias `params.b` (suite only probed `params.a`)
+3. Memoised `rng` object identity across two constructions (suite checks deep equality only)
+
+Control shared-core wrapper still dies (127/128). Same pattern: tests measured the last layer's
+exact failures; half-fixes lived one field over.
+
+### Rulings (count stays 16)
+
+- **AC-3** — independence covers every mutable interior: loadouts, templates, `actionLog`,
+  `recentTemplateIds`, `tally`/`bySkill`, and `rng` reference inequality.
+- **AC-16** — every `params` key's range array must be a new reference; mutate an unprobed key.
+
+T-007 remains frozen (`1a586570…`, `phase=implement`); implementer still held.
+
+## T-013 round 5 — accepted, pending re-review
+
+Full-graph / every-params-key tightenings landed. Re-verified: hash `767fc8da…`, 128 tests,
+merge-base diff = suite + report only, RED still 88, baseline 1229, `spec-lint` 16/16 with DoD-9
+SKIP. AC-3 now `not.toBe` + mutates loadouts, nested templates, `actionLog`, `recentTemplateIds`,
+`tally`/`bySkill`, and `rng`. AC-16 loops `Object.keys(params)` and mutates `params.b`.
+
+## Wave 4 FREEZE complete — both suites frozen, implementers dispatched
+
+| Ticket | Frozen SHA                                                         | Composer verdict | phase                            |
+| ------ | ------------------------------------------------------------------ | ---------------- | -------------------------------- |
+| T-007  | `1a586570…`                                                        | ACCEPT round 4   | `implement` (guard blocks suite) |
+| T-013  | `767fc8daf622fac13081d4f1fb7147818e2401cb7afc6464292d0db12656de05` | ACCEPT round 5   | `implement` (guard blocks suite) |
+
+T-013 residuals recorded, not blockers: `startsWith` terminal equivalent on eight phases;
+`toRivalView` loadout alias unpinned by any AC; non-enumerable `params` keys unreachable via zod.
+
+### RED-state facts for implementers (re-verified)
+
+- **T-007:** sole `TS2307` missing `@engine/questions/generator`; baseline **1229** pass; **81**
+  suite tests waiting. Target: module exists → 81/81 + tsc 0.
+- **T-013:** **88** errors all in suite (3×TS2307, 51×TS2322, 34×TS2578). Target: **88 → 0**,
+  not merely clearing the three import errors — positive `Exact<>` probes fire in RED.
+
+## T-007 implementation — verified green, pending code review
+
+Implementer DONE (`a358270`). Re-verified: frozen suite still `1a586570…`; commit touches only
+`generator.ts` + implementation report; prettier/eslint/tsc 0; **1310/1310**; spec-lint PASS;
+`run-local-gates` ALL PASS including `frozen-tests-unmodified`.
+
+## T-013 implementation — verified green, pending code review
+
+Implementer DONE_WITH_CONCERNS (`f4adb7b`). Re-verified: frozen suite still `767fc8da…`;
+commit touches only `types.ts` + report; **tsc 88→0**; **1357/1357**; prettier/eslint/spec-lint
+PASS. The sole concern was real: two Test Agent commits used `spec(T-013):` subjects, which
+`frozen-tests-unmodified` rejected. Gate now also accepts `spec(` — its job is blocking
+implement commits that touch tests, not policing Test Agent synonyms. Local gates ALL PASS
+after that fix.
+
+## T-007 code review — APPROVE_WITH_NITS
+
+[T-007 Code Review](ef18d061-3d72-41d9-a853-0c0607ccddf7): all 21 ACs / DoD items verified; gates
+re-confirmed green (1310/1310, tsc 0, frozen-tests-unmodified). One low nit: `correctIndex` via
+`findIndex` on value rather than tracked shuffle index — safe under AC-12 distinctness; no fix
+required. Security review dispatched next. T-013 code review still in flight.
+
+## T-013 code review — APPROVE_WITH_NITS
+
+[T-013 Code Review](87210f96-cac5-4edc-bb48-3c84da28c89f): all 16 ACs verified; gates re-confirmed
+(1357/1357, tsc 0, frozen-tests-unmodified PASS). Two nits, neither AC-blocking: blanket
+`getCannon` catch may mislabel errors; optional `enemyMaxHull` accepts any number. No fixes
+required. Security review dispatched. T-007 security still in flight.
+
+## T-007 — review-passed
+
+Code: APPROVE_WITH_NITS. Security: **PASS_WITH_NOTES**
+([T-007 Security Review](91061579-ab2b-40f0-ac4a-325a78f9fc55)). No Critical/Important. Minor
+content-trust notes around `__proto__` / `renderText` membership recorded in
+`.tdd-swarm/reports/T-007-security-review.md` — T-034 / catalog validation are the right homes;
+no code change for merge. Waiting on T-013 security before wave-4 integration.
+
+## T-013 security — FAIL (Important), fix dispatched
+
+[T-013 Security Review](79fb1844-ca7d-4474-8968-c2b0db05fe64): **FAIL**. Verified live:
+`islandId in ENEMY_HULL_BY_ISLAND` accepts `"constructor"` / `"__proto__"` (prototype-chain),
+producing non-numeric `enemyHull`. Fix: `Object.hasOwn`. Minor `toRivalView` loadout alias
+recorded, not a FAIL driver. Implementer re-dispatched for the one-line fix; tests stay frozen
+(AC-5 already requires rejecting unknown islands — suite covers ordinary unknowns, not this
+prototype-key case).
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
@@ -1251,6 +1602,54 @@ this narrows the schema by accident.
    surfaced: T-013's `tsc` must go **75 → 0**, not merely lose its `TS2307`s, and T-007's suite is one
    failing _file_, not one failing assertion.
 
+## Resumed 2026-07-28 evening — amendment round complete, agents not yet re-dispatched
+
+Baseline re-established before touching anything: all local gates PASS, guard proven **37/37** on
+this host. Two concurrent tracks are now live (`COORDINATION.md`); this track stayed inside
+`src/engine/**`, `src/content/**`, `__tests__/**`, `tickets/**`, `.tdd-swarm/**` throughout.
+
+**Tickets amended, each count-verified per L-026.** T-007 **16 → 19** criteria, T-013 **12 → 15**,
+every new one confirmed to parse rather than assumed:
+
+| ticket | amendment                                                                                                                        |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| T-007  | AC-7/AC-11 now demand the error **type and code on every swept seed**, closing the bare-`catch` hole                             |
+| T-007  | AC-12 extended to `skill`, `templateId`, `label`                                                                                 |
+| T-007  | AC-14 rewritten — the old wording was measurably false                                                                           |
+| T-007  | **AC-17** lexicographic param order + answer-first pre-shuffle order (both load-bearing for T-024)                               |
+| T-007  | **AC-18** zero-parameter templates must succeed                                                                                  |
+| T-007  | **AC-19** param keys are identifier-shaped; every declared token substituted                                                     |
+| T-007  | DoD carve-out: `NO_TEMPLATE` cannot name a template id                                                                           |
+| T-013  | AC-2 gains the optional `enemyMaxHull` override; AC-4 reworded to "distinct modulo 2³²"                                          |
+| T-013  | AC-5 gains seed validation — validate and throw, never mask                                                                      |
+| T-013  | **AC-13** per-variant `DuelEvent` payload exactness; **AC-14** `Exact<Readonly<T>, T>` throughout; **AC-15** closed rival shapes |
+
+The drafted AC-15 from the review round was **not** adopted as written — it required `RivalVolley`'s
+"actions" to be ordered, and `RivalVolley` has no such field. Rewritten as a closed-shape criterion.
+
+**Owner rulings applied this round:** narrow the schema to the identifier grammar (now **T-034**,
+wave 5 — it edits merged wave-1 code, so it is a ticket rather than an edit, which is also what the
+guard enforces mid-wave), and make DoD coverage a failing gate for new work while grandfathering the
+twelve merged tickets.
+
+**L-036 — the gate that closed L-032 was itself inert.** It reported `SPEC-LINT PASS` for T-013 with
+all nine DoD items uncovered: misses were `WARN`, and the existing tests tag by name
+(`dod(T-013:events)`) where the gate numbers by file order. Both now fixed and **proven in both
+directions** — T-013 and T-007 exit 1, a grandfathered ticket exits 0.
+
+**Both wave-4 tickets are now legitimately RED** on spec-lint: the new criteria have no citing tests
+and the DoD items are untagged. That is the intended pre-dispatch state, not a regression.
+
+### Still to do on resume
+
+Re-dispatch both Test Agents (resume them — they hold the context) to fix the five live mutants,
+cover AC-17/18/19 and AC-13/14/15, and tag every DoD item `dod(<id>:<n>)` in file order. Then
+re-review cross-model, freeze, and only then implement. The two RED-state facts for implementers
+still stand: T-013's `tsc` must go 75 → 0, and T-007's suite is one failing _file_.
+
+**Blocked on owner, not on me:** T-029 (does K-1 get a third starter cannon) and T-032 (placement
+pre-grants the cannons mastery is meant to award, so a 4–5 player can currently earn zero).
+
 ## Open decision, deferred deliberately
 
 **L-032:** `spec-lint` harvests only numbered `**AC-n**`, so DoD checkboxes and prose requirements are
@@ -1266,3 +1665,208 @@ fixed: the root lint gate was linting `.worktrees/*/` (L-029's blast radius), an
 matched the worktrees' `node_modules` **symlink**. Lessons added this session: **L-031, L-032, L-033,
 L-034**, plus a note that the `SWARM_ORCHESTRATOR=1` bypass is anchored to the first token, so a
 misplaced one is indistinguishable from a real policy hit.
+
+## T-013 — review-passed
+
+Code: APPROVE_WITH_NITS ([T-013 Code Review](87210f96-cac5-4edc-bb48-3c84da28c89f)).
+Security: **PASS** after Important FAIL fix (`f99b25f` — `Object.hasOwn` for `islandId`).
+Live re-probe 5/5; frozen suite still `767fc8da…`; gates 1357/1357, tsc 0.
+Evidence: `.tdd-swarm/reports/T-013-security-review.md`.
+
+**Wave 4 both tickets review-passed.** Next: integration merge into `swarm/engine-core`
+(T-007 `a358270`, T-013 `f99b25f`) via independent Integration Agent.
+
+---
+
+## Wave 4 INTEGRATED — `b5b666f..c0b11ca`, **PASS**
+
+Independent integration agent, 2026-07-28. Full report:
+`.tdd-swarm/reports/wave4-integration.md`.
+
+| Dimension                      | Result                                                   |
+| ------------------------------ | -------------------------------------------------------- |
+| Merges                         | 2/2 clean, zero conflicts — four pairwise-disjoint files |
+| Tier 1 local gates             | ALL GREEN (8 gates, incl. `frozen-tests-unmodified`)     |
+| spec-lint                      | 2/2 PASS (T-007, T-013)                                  |
+| Test suite                     | **1,438 passed / 1,438**, 15 files, 2.43s                |
+| `npm audit --audit-level=high` | 0 vulnerabilities                                        |
+| `package.json` / lockfile      | byte-identical to pre-merge `b5b666f`                    |
+| Frozen tests                   | mechanical gate PASS: 2 `A`, **0 `M`** under `__tests__` |
+
+Merge commits: `63a4388` (T-007), `c0b11ca` (T-013). Expected test sum verified:
+`1229 + 81 + 128 = 1438`.
+
+### Cross-ticket probe — 2/2 green
+
+`scratchpad/wave4-integration/` per L-028; deleted after. `createDuelState` + `generateQuestion`
+co-executed with real island, loadouts, and templates; composed values dumped (seed 42001 →
+`4 + 4 = ?`, hull 100/45, `rngAdvanced: true`). No composition gap surfaced.
+
+### Findings
+
+No new tickets filed. T-032 (owner decision) and CHOICE_COUNT duplication remain open from prior
+waves; neither blocks the merge.
+
+**Status: Wave 4 COMPLETE — integration PASS.** Next: Wave 5 dispatch (T-014…T-020).
+
+## Wave 5 — dispatched 2026-07-28 (owner priority)
+
+Baseline: `swarm/engine-core` @ `6acaa39`, **1438/1438**, all local gates PASS.
+
+Owner order (do not reorder): **T-014, T-015, T-016** (templates — highest priority; generator has
+nothing real to fire) → **T-017** (publish session API in `COORDINATION.md`) → **T-018** →
+**T-020** (publish reducer shape in `COORDINATION.md`; never edit `src/stores/duel.ts`) →
+**T-034** last. **T-029 / T-032** remain owner-blocked.
+
+Push policy: merge each ticket into `swarm/engine-core` and **push immediately** (L-037 lesson —
+do not batch 14 invisible commits).
+
+Worktrees (phase=`tests`):
+
+| Ticket | Worktree              | Branch                             |
+| ------ | --------------------- | ---------------------------------- |
+| T-014  | `.worktrees/wt-T-014` | `ticket/T-014-templates-k2-addsub` |
+| T-015  | `.worktrees/wt-T-015` | `ticket/T-015-templates-g23`       |
+| T-016  | `.worktrees/wt-T-016` | `ticket/T-016-templates-g35`       |
+
+Test Agents dispatched in parallel for the three template tickets.
+
+### T-016 tests-written (commit `953bc7d`)
+
+[T-016 Test Agent](d05384d3-5e8d-42e1-8f93-f00010357c9d): suite `__tests__/content/templates/g35.test.ts`
+(sha `d478d382…`). Orchestrator verified: spec-lint PASS; 23 failed / 3 passed (missing JSON —
+clean RED); baseline 1438 green. Test-design review dispatched (Composer).
+
+## Owner ruling D-6 + gate fix — 2026-07-28
+
+- **D-6:** Placement grants islands (band-scoped) + **starter cannons only**. Range/chest earned
+  via declared unlocks. T-011 AC-2/4/5 + Rules amended; T-032 rewritten with composition ACs and
+  dispatched. Rationale: `tickets/app/OWNER-RULINGS.md` on `app/shell`.
+- **frozen-tests-unmodified:** allow `test|style|spec|freeze`; on `swarm/engine-core` compare
+  `main..HEAD` with `--no-merges` (was vacuously green via empty `swarm/engine-core..HEAD`).
+
+### Wave 5 template suites — status pulse
+
+| Ticket | Tests commit                                         | Orchestrator verify                                                               | Next                          |
+| ------ | ---------------------------------------------------- | --------------------------------------------------------------------------------- | ----------------------------- |
+| T-014  | `f509c7c` (47 fail / 7 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438                                                     | test-design review dispatched |
+| T-015  | `ef6353f` (22 fail / 3 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438                                                     | test-design review dispatched |
+| T-016  | `953bc7d`                                            | review **REJECT** (AC-12 independence, dead-param ``, div structural constraints) | Test Agent fix re-dispatched  |
+
+### T-014 FROZEN (`66e68a23fc4570a7…`) — ACCEPT_WITH_NITS
+
+[T-014 test-design review](1a72715b-da51-4076-a7aa-d3d4f1deac2c): no Critical. Important nits recorded
+(exact-24 deep-freeze beyond ≥8 wording; AC-8 preflight uses generator; no AC-7 preflight on
+REQUIRED_TEMPLATES) — accepted for content-as-data ticket (T-006 precedent). Phase → `implement`.
+Frozen suite sha256 `66e68a23fc4570a7a65156f965ada4a8817d4ffd3bb562c68d21f9f9b9fe5745`. Implementer dispatched.
+
+### T-014 unfrozen — BLOCKED(TEST_DISPUTE) on AC-1 vs AC-7
+
+Implementer copied `REQUIRED_TEMPLATES` faithfully (`31cb5ba`) then hit AC-7:
+`add_within_{10,20}_near_doubles` use distractors `a + a` and `a + b - 1` under constraint
+`b == a + 1` → algebraic identity → 1000/1000 ladder. Deep-equals AC-1 forbids content fix.
+Phase reopened to `tests`; Test Agent fixing contract + adding AC-7 preflight (review I-3).
+
+### Pulse — T-015 REJECT / T-016 fixed / T-032 RED / T-014 dispute in flight
+
+- **T-015:** [review](f74531b4-806b-4e0c-b3e3-37d2ff32b51b) **REJECT** (AC-11 parallel evaluator, dead-param). Fix dispatched.
+- **T-016:** fix commit `2929435` verified (SPOT_CHECKS, `\b` params, structural div constraints); re-review dispatched.
+- **T-032:** RED suite `fe76dd2` verified (29 fail — range still pre-granted); test-design review dispatched.
+- **T-014:** implementer BLOCKED confirmed; Test Agent amending near_doubles + AC-7 preflight (uncommitted).
+
+### T-032 FROZEN (`b07759c1b3a850e7…` / `f90cc07904d61d40…`) — ACCEPT_WITH_NITS
+
+[T-032 test-design review](08ef7c4b-d2da-41a7-ba08-26b11084ef5b): no Critical/Important.
+Suites encode D-6 starters-only + mastery composition; correctly RED (29 fail). Phase → `implement`.
+Frozen hashes: placement `b07759c1b3a850e7989dc8950e04a426c46af0260125285cbca79cf52a4d66fa`, mastery `f90cc07904d61d40cefe5c2ce11e054213b46dd983fde74a889bc56466122f8f`. Implementer dispatched.
+
+### T-014 re-frozen (`63628812983a2e2b…`) after AC-7 dispute fix
+
+[T-014 Test Agent](bb6cbd48-bc07-4cd2-88c9-705344157053) commit `a0cbaeb`: near_doubles third
+distractor → `a + b + 2` (ladder 0/1000); AC-7 preflight added. Orchestrator deleted untracked
+`_ladder-measure.test.ts`. Phase → `implement`. Hash `63628812983a2e2b0414e4f5f1dfc65fd8f4afbf787e63a3517eeff1892a6864`.
+
+### T-016 FROZEN (`026215158d38c033…`) — ACCEPT
+
+[T-016 re-review](3f400934-f8fc-4e1a-b15b-c515f2727e37): prior Critical/Important closed on
+`2929435`. Phase → `implement`. Hash `026215158d38c0338542bb901dfa7703e8f961aec34e1182d817a0d0d2d5115c`.
+
+### T-032 implementation verified green
+
+[T-032 Implementer](5508089d-1026-4f34-a62f-f3acac7054c3) `ff66b32`: starters-only. Gates ALL
+PASS, **1456/1456**, frozen hashes unchanged. Code + security review dispatched next; then
+merge + push per ticket policy.
+
+### T-032 — review-passed → merged
+
+Code: APPROVE_WITH_NITS ([T-032 Code Review](d4739913-a514-4ac1-bc4f-74cdf6e4fcb2)); header nit fixed.
+Security: **PASS** ([T-032 Security Review](b8f9afa1-bc67-4f3e-8a08-58ab6a9e53fc)).
+Merged into `swarm/engine-core` and pushed (per-ticket push policy).
+
+### T-015 REJECT fixes landed (`3ec4364`)
+
+Verified: SPOT_CHECKS + `\b` params + operator allowlist; 47 fail / 6 pass (missing JSON);
+baseline 1438; no `independentArithmetic`. Re-review dispatched.
+
+### T-014 unblocked — prettier style + content green
+
+Orchestrator style commit `f0496f2` on suite; new frozen hash `9c239b355136e2b3…`.
+Feat `ab41906` JSON refresh green; gates ALL PASS after style. Code + security review dispatched.
+
+### T-016 unfrozen — BLOCKED(TEST_DISPUTE) AC-1 vs AC-11 ladder
+
+Four REQUIRED_TEMPLATES exceed ladder threshold (same class as T-014). Phase reopened to `tests`;
+Test Agent amending distractors + AC-11 preflight.
+
+### T-014 — done (merged)
+
+Code APPROVE_WITH_NITS ([T-014 Code Review](aa31c5a7-cdbf-4dfe-946e-c09681e8024e));
+security PASS ([T-014 Security Review](de6c9b30-e714-4889-b223-4b3157d16c79)).
+Merged into `swarm/engine-core`.
+
+### T-015 FROZEN (`f941a204069afed6…`) — ACCEPT_WITH_NITS
+
+[T-015 re-review](0aaf1e78-54bf-4f95-b650-f3873409e005): Critical/Important closed. Implementer dispatched.
+
+### T-016 re-frozen (`a48a7e7ffe7d41e7…`) after ladder dispute fix
+
+[T-016 Test Agent](d05384d3-5e8d-42e1-8f93-f00010357c9d) `eea35ac`. Phase → `implement`. Implementer re-dispatched.
+
+### T-016 implementation verified green (`1198daa`)
+
+Orchestrator: gates ALL PASS; g35 56/56; frozen hash `a48a7e7f…` unchanged. Code + security
+reviews dispatched.
+
+### T-015 implementation verified green (`30d2f83`)
+
+Orchestrator: gates ALL PASS; g23 53/53; frozen hash `f941a204…` unchanged. Code + security
+reviews dispatched.
+
+### T-016 — done (merged)
+
+Code APPROVE_WITH_NITS ([T-016 Code Review](05b12eee-bf5c-47ae-a6ab-5c7c05d8c618));
+security PASS ([T-016 Security Review](b3e18507-96fc-456c-8579-bcd3bf4c883a)).
+Merged into `swarm/engine-core` and pushed.
+
+### T-016 code review ingested + DoD-7 composition fix
+
+[T-016 Code Review](05b12eee-bf5c-47ae-a6ab-5c7c05d8c618): APPROVE_WITH_NITS (already merged).
+Post-merge red: `dod(T-016:7)` claimed exclusive `templates/` — broke after T-014.
+Hotfix `test(T-016)` `8d01118` / merge: own three files + no `index.ts` (T-014 pattern).
+New suite hash `e50a87a3e9cc7bf3…`.
+
+### T-015 — done (merged)
+
+Code APPROVE_WITH_NITS; security PASS. DoD-7 sibling fix `6a60077` pre-merge.
+Frozen hash `a987150c86df4bc8…`. Full suite **1620/1620**.
+
+### T-017 started — range drill
+
+Worktree `.worktrees/wt-T-017` on `ticket/T-017-range-drill` from `swarm/engine-core` @ current tip.
+Phase `tests`. Publish session API in COORDINATION.md after merge.
+
+### T-017 RED landed (`6451010`)
+
+[T-017 Test Agent](f0837bc4-dbeb-4184-aea3-7da24f170fe3): spec-lint PASS; drill suite RED (missing module); baseline 1620.
+**Adjudication:** `recentTemplateIds` = most-recent-first (T-007). Other ambiguities accepted as suite-pinned.
+Test-design review dispatched.
