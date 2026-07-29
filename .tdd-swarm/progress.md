@@ -1847,3 +1847,9 @@ Merged into `swarm/engine-core`.
 
 Orchestrator: gates ALL PASS; g35 56/56; frozen hash `a48a7e7f…` unchanged. Code + security
 reviews dispatched.
+
+
+### T-015 implementation verified green (`30d2f83`)
+
+Orchestrator: gates ALL PASS; g23 53/53; frozen hash `f941a204…` unchanged. Code + security
+reviews dispatched.
