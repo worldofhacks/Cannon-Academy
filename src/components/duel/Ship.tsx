@@ -1,11 +1,21 @@
 /**
- * A ship — one pre-rendered hull sprite with cosmetic layers stacked at runtime.
+ * A ship, built from flat shapes — the duel board's own 14-layer anatomy, transcribed.
  *
- * Board 5a: production ships are ONE pre-rendered sprite per hull; board 5b stacks the onboarding
- * flag as a pennant on top. Enemy encounter overlays (crossbones, skull, fin, ghost glow) stay
- * isolated props so A-031 kind-specific reads survive the sprite pass unchanged.
+ * There is no ship sprite in either design artifact. The duel prototype composes both hulls out of
+ * positioned elements and says so in its own footnote: "Ships are grey-box stand-ins; cannonball,
+ * blast and fire are the real Kenney CC0 sprites." A-013 replaced this with pre-rendered Kenney
+ * hulls that appear in neither board; A-045 put the board back.
+ *
+ * Every coordinate below comes from `design/fixtures/ship-prototype.json`, which was lifted verbatim
+ * from the artifact markup and is asserted against this file by `__tests__/app/sprites.test.ts`. The
+ * board authors the player at 150×124, so `s = width / 150` scales the whole rig; the rival is the
+ * same geometry at 126pt wearing a different palette.
+ *
+ * React Native has no `clip-path`, which is why `Poly` exists — it takes the design's polygon
+ * percentages unchanged, so a sail outline cannot drift into "roughly a triangle" the way it did
+ * before `Poly` landed.
  */
-import { useEffect } from 'react';
+import { useEffect, useId } from 'react';
 import { Image, View } from 'react-native';
 import Animated, {
   Easing,
@@ -15,16 +25,23 @@ import Animated, {
   withSequence,
   withTiming,
 } from 'react-native-reanimated';
+import Svg, { ClipPath, Defs, G, Polygon, Rect } from 'react-native-svg';
 
 import { Poly } from '../Poly';
 import type { EnemyPresentationKind } from '../../content/schemas';
-import { DEFAULT_FLAG_ID } from '../../theme/flags';
-import { flagSpriteForId, hullSpriteForKind } from '../../theme/sprites';
+import { sprite } from '../../theme/sprites';
 import { color, motion } from '../../theme/tokens';
 import { Captain, type CaptainPose } from './Captain';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
+
+/** The board's design grid. Every number in this file is in these units, scaled by `s`. */
+const GRID_WIDTH = 150;
+
+/** Board 7a: broad vertical stripes, 7 design-px of surface then 7 of stripe. */
+const STRIPE_BAND = 7;
+const STRIPE_PERIOD = 14;
 
 export interface ShipCosmetics {
   readonly hull: string;
@@ -34,8 +51,18 @@ export interface ShipCosmetics {
   readonly pennant: string;
   readonly mast: string;
   readonly deck: string;
-  /** Persisted onboarding flag id — drives the pennant sprite (board 5b). */
-  readonly pennantFlagId?: string;
+  /**
+   * Vertical stripe colour for the topsail and mainsail — board 7a, "Sails are red-and-white
+   * striped". The jib never takes it: the board keeps that one plain "so the silhouette does not
+   * turn into noise at 26px". Omit it entirely and the sails render flat, which is how every enemy
+   * in the roster is drawn.
+   */
+  readonly sailStripe?: string;
+  /**
+   * Ragged sail edges and a jagged pennant — the rival's "tattered purple sails" read. The board
+   * draws the enemy sails with bitten-out left edges rather than the player's clean luff.
+   */
+  readonly tattered?: boolean;
 }
 
 export const PLAYER_SHIP: ShipCosmetics = {
@@ -46,18 +73,37 @@ export const PLAYER_SHIP: ShipCosmetics = {
   pennant: color.amber,
   mast: color.wood,
   deck: color.deck,
-  pennantFlagId: DEFAULT_FLAG_ID,
+  sailStripe: color.sailStripe,
 };
 
 export const RIVAL_SHIP: ShipCosmetics = {
   hull: '#4A3B5C',
   hullDeep: '#33284A',
-  sail: '#8A6FE0',
-  trim: '#6C4BD6',
+  sail: '#6C4BD6',
+  trim: '#4A2FA0',
   pennant: '#6C4BD6',
   mast: '#5C4A3A',
   deck: '#6B5A48',
+  tattered: true,
 };
+
+/** Sail outlines. The tattered set is the rival's; the clean set is the player's. */
+const SAIL = {
+  clean: {
+    topsail: '100,0 100,100 0,90 0,10',
+    mainsail: '100,0 100,100 0,92 0,8',
+  },
+  tattered: {
+    topsail: '100,0 100,100 0,88 14,58 0,30 8,10',
+    mainsail: '100,0 100,100 0,90 10,62 0,34 6,8',
+  },
+} as const;
+
+const JIB_POINTS = '100,0 100,100 0,100';
+const HULL_POINTS = '0,0 100,0 90,100 9,100';
+const PENNANT_CLEAN = '0,0 100,0 68,50 100,100 0,100';
+const PENNANT_TATTERED = '0,0 100,0 66,32 100,64 56,100 0,100';
+const BOWSPRIT_POINTS = '0,100 0,0 100,100';
 
 interface ShipProps {
   readonly cosmetics: ShipCosmetics;
@@ -84,14 +130,13 @@ export function Ship({
   ghostOpacity,
   ghostGlow,
 }: ShipProps) {
-  if (presentationKind === 'kraken') {
-    return <KrakenForm facing={facing} width={width} burning={burning} />;
-  }
   const bob = useSharedValue(0);
   const wake = useSharedValue(0);
   const luff = useSharedValue(0);
 
   useEffect(() => {
+    // Slightly different periods per ship so two ships on screen never pulse in lockstep — the
+    // thing that makes a scene read as a loop rather than as water. The board uses 3.6s and 4.4s.
     const period = facing === 'right' ? 3600 : 4400;
     bob.value = withRepeat(
       withSequence(
@@ -116,15 +161,14 @@ export function Ship({
     );
   }, [bob, wake, luff, facing]);
 
-  const s = width / 150;
-  const hullHeight = 124 * s;
-  const hullSource = hullSpriteForKind(presentationKind);
+  const s = width / GRID_WIDTH;
+  const mirrored = facing === 'left';
 
   const bobStyle = useAnimatedStyle(() => ({
     transform: [
       { translateY: -5 * bob.value },
       { rotate: `${-1.2 + 2.4 * bob.value}deg` },
-      { scaleX: facing === 'left' ? -1 : 1 },
+      { scaleX: mirrored ? -1 : 1 },
     ],
   }));
   const wakeStyle = useAnimatedStyle(() => ({
@@ -133,8 +177,15 @@ export function Ship({
   }));
   const luffStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: 1 - 0.045 * luff.value }] }));
 
+  const sailPoints = c.tattered === true ? SAIL.tattered : SAIL.clean;
+
+  if (presentationKind === 'kraken') {
+    return <KrakenForm facing={facing} width={width} burning={burning} />;
+  }
+
   const body = (
-    <Animated.View style={[{ width, height: hullHeight }, bobStyle]}>
+    <Animated.View style={[{ width, height: 124 * s }, bobStyle]}>
+      {/* wake */}
       <Animated.View
         style={[
           {
@@ -150,40 +201,206 @@ export function Ship({
         ]}
       />
 
-      {hullSource !== null ? (
-        <Image
-          source={hullSource}
-          style={{ position: 'absolute', left: 0, bottom: 0, width, height: hullHeight }}
-          resizeMode="contain"
-          accessibilityLabel="ship hull"
-        />
-      ) : null}
+      {/* mainMast, its yard, and the foreMast */}
+      <View
+        style={{
+          position: 'absolute',
+          left: 67 * s,
+          bottom: 44 * s,
+          width: 7 * s,
+          height: 68 * s,
+          borderRadius: 4,
+          backgroundColor: c.mast,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: 60 * s,
+          bottom: 94 * s,
+          width: 21 * s,
+          height: 9 * s,
+          borderRadius: 3,
+          backgroundColor: c.hullDeep,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: 107 * s,
+          bottom: 44 * s,
+          width: 5 * s,
+          height: 44 * s,
+          borderRadius: 3,
+          backgroundColor: c.mast,
+        }}
+      />
 
-      {c.pennantFlagId !== undefined ? (
-        <Animated.View
-          style={[
-            {
-              position: 'absolute',
-              left: 70 * s,
-              bottom: 110 * s,
-              width: 26 * s,
-              height: 12 * s,
-            },
-            luffStyle,
-          ]}
-        >
-          <Image
-            source={flagSpriteForId(c.pennantFlagId)}
-            style={{ width: 26 * s, height: 12 * s, tintColor: c.pennant }}
-            resizeMode="contain"
-            accessibilityLabel="ship pennant"
-          />
-        </Animated.View>
-      ) : null}
-
+      {/* pennant — the flag chosen at onboarding becomes this colour (board 5b) */}
+      <Poly
+        points={c.tattered === true ? PENNANT_TATTERED : PENNANT_CLEAN}
+        width={26 * s}
+        height={12 * s}
+        fill={c.pennant}
+        style={{ position: 'absolute', left: 70 * s, bottom: 110 * s }}
+      />
       {presentationKind === 'pirate' ? <CrossbonesFlag scale={s} /> : null}
       {presentationKind === 'skeleton' ? <SkullSails scale={s} /> : null}
 
+      {/* sails: topsail and mainsail take the stripe, the jib stays plain (board 7a) */}
+      <Animated.View style={[{ position: 'absolute', left: 32 * s, bottom: 88 * s }, luffStyle]}>
+        <Sail
+          points={sailPoints.topsail}
+          width={34 * s}
+          height={22 * s}
+          designWidth={34}
+          fill={c.sail}
+          {...(c.sailStripe !== undefined ? { stripe: c.sailStripe } : {})}
+        />
+      </Animated.View>
+      <Animated.View style={[{ position: 'absolute', left: 22 * s, bottom: 52 * s }, luffStyle]}>
+        <Sail
+          points={sailPoints.mainsail}
+          width={45 * s}
+          height={34 * s}
+          designWidth={45}
+          fill={c.sail}
+          {...(c.sailStripe !== undefined ? { stripe: c.sailStripe } : {})}
+        />
+        {/* The rival's mainsail carries a horizontal band instead of a stripe. */}
+        {c.sailStripe === undefined ? (
+          <View
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              top: 11 * s,
+              height: 6 * s,
+              backgroundColor: c.trim,
+            }}
+          />
+        ) : null}
+      </Animated.View>
+      <Animated.View style={[{ position: 'absolute', left: 88 * s, bottom: 46 * s }, luffStyle]}>
+        <Poly points={JIB_POINTS} width={26 * s} height={32 * s} fill={c.sail} />
+      </Animated.View>
+
+      {/* sternCastle at the stem, bowsprit at the bow */}
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          bottom: 30 * s,
+          width: 26 * s,
+          height: 16 * s,
+          borderTopLeftRadius: 5,
+          borderTopRightRadius: 5,
+          backgroundColor: c.hull,
+          overflow: 'hidden',
+        }}
+      >
+        <View
+          style={{
+            position: 'absolute',
+            left: 0,
+            right: 0,
+            bottom: 0,
+            height: 4 * s,
+            backgroundColor: c.hullDeep,
+          }}
+        />
+      </View>
+      <Poly
+        points={BOWSPRIT_POINTS}
+        width={16 * s}
+        height={13 * s}
+        fill={c.trim}
+        style={{ position: 'absolute', left: 134 * s, bottom: 30 * s }}
+      />
+
+      {/* deckRail, and the three railPosts standing on it */}
+      <View
+        style={{
+          position: 'absolute',
+          left: 10 * s,
+          bottom: 38 * s,
+          width: 130 * s,
+          height: 7 * s,
+          borderRadius: 4,
+          backgroundColor: c.deck,
+        }}
+      />
+      {[24, 52, 118].map((x) => (
+        <View
+          key={x}
+          style={{
+            position: 'absolute',
+            left: x * s,
+            bottom: 45 * s,
+            width: 3 * s,
+            height: 7 * s,
+            backgroundColor: c.deck,
+          }}
+        />
+      ))}
+
+      {/* hull — the design's own polygon, with the trim band, waterline and three gunports */}
+      <View style={{ position: 'absolute', left: 0, bottom: 0, width, height: 39 * s }}>
+        {/*
+          This was a `borderBottomWidth` trapezoid once and it rendered the hull UPSIDE DOWN — the
+          border trick puts the NARROW edge at the top, and a hull is a wide deck tapering to a
+          narrow keel. `Poly` transcribes the board's coordinates directly so the shape can no
+          longer drift from the design.
+        */}
+        <Poly
+          points={HULL_POINTS}
+          width={width}
+          height={39 * s}
+          fill={c.hull}
+          style={{ position: 'absolute', left: 0, bottom: 0 }}
+        />
+        <View
+          style={{
+            position: 'absolute',
+            left: 5 * s,
+            right: 5 * s,
+            top: 5 * s,
+            height: 7 * s,
+            backgroundColor: c.trim,
+          }}
+        />
+        {/* The waterline band follows the same taper — a straight bar across a tapered hull reads
+            as a stripe painted on, not as the hull's own shadowed lower strake. */}
+        <Poly
+          points={HULL_POINTS}
+          width={width}
+          height={12 * s}
+          fill={c.hullDeep}
+          style={{ position: 'absolute', left: 0, bottom: 0 }}
+        />
+        {[28, 64, 100].map((x) => (
+          <View
+            key={x}
+            style={{
+              position: 'absolute',
+              // The board's ring is a `box-shadow` spread, which sits OUTSIDE the 11px circle.
+              // RN borders are inset, so the box grows by the ring on each side and shifts back
+              // by it — same 11px hole, same 2px collar, same centre.
+              left: (x - 2) * s,
+              top: (17 - 2) * s,
+              width: 15 * s,
+              height: 15 * s,
+              borderRadius: 999,
+              backgroundColor: color.gunport,
+              borderWidth: 2 * s,
+              borderColor: c.deck,
+            }}
+          />
+        ))}
+      </View>
+
+      {/* The captain stands amidships, at the design's own offset. He is drawn after the hull so
+          he reads as standing ON the deck rather than behind the rail. */}
       {captainPose !== undefined ? (
         <View style={{ position: 'absolute', left: 40 * s, bottom: 44 * s }}>
           <Captain pose={captainPose} scale={s} />
@@ -197,10 +414,7 @@ export function Ship({
 
   if (presentationKind === 'ghost') {
     return (
-      <View
-        style={{ width, opacity: ghostOpacity ?? 0.58 }}
-        accessibilityLabel="ghost ship with glow"
-      >
+      <View style={{ width, opacity: ghostOpacity ?? 0.55 }} accessibilityLabel="ghost ship with glow">
         {ghostGlow !== undefined ? (
           <View
             style={{
@@ -221,6 +435,65 @@ export function Ship({
   }
 
   return body;
+}
+
+/**
+ * One sail. Plain when `stripe` is absent, vertically striped when it is present.
+ *
+ * The stripe cannot be a child `View` with `overflow: 'hidden'` — RN clips to the *box*, and a sail
+ * is a polygon, so the stripes would run past the leech. Clipping to the outline is the whole point,
+ * so the stripes are `Rect`s inside an SVG `ClipPath` of the same polygon.
+ *
+ * `designWidth` is the sail's width in the board's 150-grid. The viewBox is 0–100 stretched to the
+ * rendered width, so a 7-design-px band is `7 / designWidth * 100` viewBox units — which is why the
+ * stripes stay 7px wide on the 34pt topsail and the 45pt mainsail alike, instead of scaling with
+ * the sail the way a percentage would.
+ */
+function Sail({
+  points,
+  width,
+  height,
+  designWidth,
+  fill,
+  stripe,
+}: {
+  readonly points: string;
+  readonly width: number;
+  readonly height: number;
+  readonly designWidth: number;
+  readonly fill: string;
+  readonly stripe?: string;
+}) {
+  // `useId` gives each sail on screen its own clip id. Two ships share this component, and a
+  // duplicated SVG id makes the second one clip against the first one's outline.
+  const clipId = `sail-${useId().replace(/:/g, '')}`;
+
+  if (stripe === undefined) {
+    return <Poly points={points} width={width} height={height} fill={fill} />;
+  }
+
+  const period = (STRIPE_PERIOD / designWidth) * 100;
+  const band = (STRIPE_BAND / designWidth) * 100;
+  const bands = [];
+  for (let x = band; x < 100; x += period) {
+    bands.push(x);
+  }
+
+  return (
+    <Svg width={width} height={height} viewBox="0 0 100 100" preserveAspectRatio="none">
+      <Defs>
+        <ClipPath id={clipId}>
+          <Polygon points={points} />
+        </ClipPath>
+      </Defs>
+      <G clipPath={`url(#${clipId})`}>
+        <Rect x={0} y={0} width={100} height={100} fill={fill} />
+        {bands.map((x) => (
+          <Rect key={x} x={x} y={0} width={Math.min(band, 100 - x)} height={100} fill={stripe} />
+        ))}
+      </G>
+    </Svg>
+  );
 }
 
 function CrossbonesFlag({ scale: s }: { scale: number }) {
@@ -263,9 +536,39 @@ function SkullSails({ scale: s }: { scale: number }) {
           backgroundColor: color.parchment,
         }}
       />
-      <View style={{ position: 'absolute', left: 4 * s, top: 5 * s, width: 3 * s, height: 3 * s, borderRadius: 999, backgroundColor: color.inkDark }} />
-      <View style={{ position: 'absolute', right: 4 * s, top: 5 * s, width: 3 * s, height: 3 * s, borderRadius: 999, backgroundColor: color.inkDark }} />
-      <View style={{ position: 'absolute', left: 6 * s, bottom: 2 * s, width: 4 * s, height: 2 * s, borderRadius: 2, backgroundColor: color.inkDark }} />
+      <View
+        style={{
+          position: 'absolute',
+          left: 4 * s,
+          top: 5 * s,
+          width: 3 * s,
+          height: 3 * s,
+          borderRadius: 999,
+          backgroundColor: color.inkDark,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          right: 4 * s,
+          top: 5 * s,
+          width: 3 * s,
+          height: 3 * s,
+          borderRadius: 999,
+          backgroundColor: color.inkDark,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: 6 * s,
+          bottom: 2 * s,
+          width: 4 * s,
+          height: 2 * s,
+          borderRadius: 2,
+          backgroundColor: color.inkDark,
+        }}
+      />
     </View>
   );
 }
@@ -302,12 +605,10 @@ function KrakenForm({
     );
   }, [bob]);
 
-  const s = width / 150;
+  const s = width / GRID_WIDTH;
+  const mirrored = facing === 'left';
   const bobStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateY: -4 * bob.value },
-      { scaleX: facing === 'left' ? -1 : 1 },
-    ],
+    transform: [{ translateY: -4 * bob.value }, { scaleX: mirrored ? -1 : 1 }],
   }));
 
   return (
@@ -345,8 +646,14 @@ function KrakenForm({
   );
 }
 
-/** A licking flame. Used on a burning hull and as the Powder Keg's impact. */
-export function Flame({ style }: { style: { left: number; bottom: number; width: number } }) {
+/**
+ * A licking flame on a burning hull.
+ *
+ * This is the one part of the ship the board does NOT compose — it draws `fire1.png` under a
+ * `ca-flame` scale-and-rise loop, and that raster is embedded in the artifact, so it is the
+ * faithful choice rather than an exception to A-045's no-outside-art rule.
+ */
+function Flame({ style }: { style: { left: number; bottom: number; width: number } }) {
   const f = useSharedValue(0);
   useEffect(() => {
     f.value = withRepeat(
@@ -359,25 +666,7 @@ export function Flame({ style }: { style: { left: number; bottom: number; width:
   }));
   return (
     <Animated.View style={[FILL, { ...style, height: style.width }, animated]}>
-      <View
-        style={{
-          flex: 1,
-          borderRadius: 999,
-          backgroundColor: color.flame,
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-        }}
-      >
-        <View
-          style={{
-            width: '55%',
-            height: '55%',
-            borderRadius: 999,
-            backgroundColor: color.gold,
-            marginBottom: 2,
-          }}
-        />
-      </View>
+      <Image source={sprite.fire} style={{ width: style.width, height: style.width }} resizeMode="contain" />
     </Animated.View>
   );
 }

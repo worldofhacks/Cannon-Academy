@@ -1,5 +1,22 @@
 # Cannon Academy — design brief
 
+> **Status: this brief has been answered. It is kept as the record of what was asked for, not as a
+> live instruction.**
+>
+> The design work it commissioned exists, and **those two artifacts are now the only source of
+> truth** — see [`boards/README.md`](boards/README.md):
+>
+> - **Duel prototype** — `https://claude.ai/code/artifact/541ddd21-4ffd-425c-be57-8b6da70de66a`
+> - **Interface design boards** — `https://claude.ai/code/artifact/fbcdb054-e466-4f05-8175-4307a1ba7581`
+>
+> Where this brief and a board disagree, **the board wins.** The brief was written before anything
+> was drawn; it guessed at things the boards then decided. One of those guesses did real damage and
+> is corrected in place below — see the art-style bullet.
+>
+> **Do not source art from an asset pack.** The app ships nine rasters, every one byte-identical to
+> an image embedded in one of the two artifacts, and nothing else (A-045). Ships are composed
+> geometry, not sprites.
+
 **Paste everything below the line into Claude to start the design work.**
 It is written to stand alone: someone with no context on this project can act on it.
 
@@ -43,11 +60,24 @@ island's cannon and lifts the fog on the next stretch of the sea chart.
 - **React Native + Expo**, portrait-locked, phone-first. Safe areas respected.
 - **No game engine and no 3D at runtime.** Everything is plain React Native `View`s, Reanimated
   animations, pre-rendered 2D sprites, and Lottie for effects.
-- **Art style is fixed:** bright, chunky, **flat-shaded low-poly**, pre-rendered to 2D sprites
-  from free CC0 3D kits (Quaternius + Kenney pirate packs) via one locked orthographic camera.
-  Think a clean, saturated, toy-like look — not painterly, not gritty, not pixel art.
+- **Art style is fixed:** bright, chunky, flat-shaded, toy-like — clean and saturated, not
+  painterly, not gritty, not pixel art.
+
+  > **CORRECTED, A-045.** This bullet originally said the art was "pre-rendered to 2D sprites from
+  > free CC0 3D kits (Quaternius + Kenney pirate packs) via one locked orthographic camera." That
+  > sentence was a plan, not an outcome, and it outlived its usefulness: agents read it as a
+  > standing instruction to reach for the packs. A-013 did exactly that, replaced the boards'
+  > composed ships with Kenney hull PNGs that appear in neither artifact, and repainted the duel
+  > with a ship the design had never shown. **The boards are the art.** Ships, sails, hulls,
+  > pennants and rigging are composed geometry transcribed from the artifact markup; the only
+  > rasters are the nine the artifacts themselves embed.
+
 - **Grey-box art is acceptable in the design** — coloured rectangles standing in for sprites is
   fine and expected. I need the _layout, hierarchy, states, and tokens_ more than final artwork.
+
+  > **What the boards decided:** grey-box stayed. The duel prototype's own footnote reads "Ships are
+  > grey-box stand-ins; cannonball, blast and fire are the real Kenney CC0 sprites", and that split
+  > is now the shipped architecture rather than a placeholder waiting to be replaced.
 
 ## What I need from you, in priority order
 

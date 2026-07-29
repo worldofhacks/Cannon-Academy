@@ -23,16 +23,27 @@ export type RivalPresentation = {
   readonly ghostGlow?: string;
 };
 
+/**
+ * Board 7b, "Enemy roster the pack already gives you": the pirate sloop is the shell, and
+ * "everything else is a re-tint of this". So every set below shares one geometry and differs only
+ * in palette — and every one of them is `tattered`, which is the board's ragged-sail outline, and
+ * none of them carries `sailStripe`, which is the player's alone.
+ *
+ * These were invented colours until A-045. The pirate in particular rendered BROWN while the duel
+ * board's rival — the very ship the prototype shows opposite you — is the dark purple sloop below.
+ */
 const PIRATE_SHIP: ShipCosmetics = {
-  hull: '#6B4A3A',
-  hullDeep: '#4A3028',
-  sail: '#F0E0C8',
-  trim: '#1A1410',
-  pennant: '#1A1410',
+  hull: '#4A3B5C',
+  hullDeep: '#33284A',
+  sail: '#6C4BD6',
+  trim: '#4A2FA0',
+  pennant: '#6C4BD6',
   mast: '#5C4A3A',
-  deck: '#7A5A48',
+  deck: '#6B5A48',
+  tattered: true,
 };
 
+/** Board 7b: "Bone-white re-tint of the same figure… reads as silly, not scary." */
 const SKELETON_SHIP: ShipCosmetics = {
   hull: '#D8D0C4',
   hullDeep: '#A89E90',
@@ -41,18 +52,22 @@ const SKELETON_SHIP: ShipCosmetics = {
   pennant: '#E8E4DC',
   mast: '#B8AEA0',
   deck: '#CFC6BA',
+  tattered: true,
 };
 
+/** Board 7b: "Same geometry at 55% opacity, sails shifted to pale green, one radial glow." */
 const GHOST_SHIP: ShipCosmetics = {
-  hull: '#B8E8F0',
-  hullDeep: '#7EC8DC',
-  sail: '#E8FAFF',
-  trim: color.ghostGlow,
-  pennant: '#D0F8FF',
-  mast: '#9AD4E8',
-  deck: '#A8DCE8',
+  hull: '#5A7A72',
+  hullDeep: '#3E5A54',
+  sail: '#BFE8D4',
+  trim: '#8FE0AC',
+  pennant: '#8FE0AC',
+  mast: '#4A6A62',
+  deck: '#8FE0AC',
+  tattered: true,
 };
 
+/** Board 7b: the shark-man crew, "grey and blue". */
 const SHARK_SKIFF: ShipCosmetics = {
   hull: '#5A7080',
   hullDeep: '#3A5060',
@@ -61,10 +76,14 @@ const SHARK_SKIFF: ShipCosmetics = {
   pennant: '#607888',
   mast: '#4A6070',
   deck: '#6A8494',
+  tattered: true,
 };
 
-/** Documented ghost treatment from the design artifact — translucent hull with a glow wash. */
-export const GHOST_HULL_OPACITY = 0.58;
+/**
+ * Translucent hull with a glow wash. The board's roster says `.55` outright; this was 0.58 before
+ * A-045, transcribed from prose rather than from the roster entry.
+ */
+export const GHOST_HULL_OPACITY = 0.55;
 
 export function enemyPresentationFor(enemy: Enemy): RivalPresentation {
   switch (enemy.presentationKind) {

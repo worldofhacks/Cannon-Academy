@@ -101,6 +101,11 @@ export const color = {
   deck: '#E0AE6B',
   /** Gunports, boots, anything that should read as a hole. */
   gunport: '#3E2A12',
+  /**
+   * Player mainsail / topsail stripe — board 7a correction (`#D93A2E` on parchment `#FFF6E4`).
+   * The jib stays plain parchment so the silhouette still reads at 26pt.
+   */
+  sailStripe: '#D93A2E',
 
   // ── Characters. ────────────────────────────────────────────────────────────
   /** The captain's coat — also the default of the four coat swatches. */

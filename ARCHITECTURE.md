@@ -280,9 +280,25 @@ duels/{id}:   { uid, rivalId, result, seed, actions[], endedAt }   // seed + per
 
 ## 7. Art & asset pipeline
 
+> **SUPERSEDED, A-045 (2026-07-29). This section is history, not instruction.**
+>
+> The pre-render pipeline below was never completed and is no longer the plan. **The two Claude
+> Design artifacts are the only source of art** — [`design/boards/README.md`](design/boards/README.md).
+>
+> - Ships, sails, hulls, pennants and rigging are **composed geometry** transcribed from the board
+>   markup (`src/components/duel/Ship.tsx`, pinned by `design/fixtures/ship-prototype.json`).
+> - A raster ships only if it is **byte-identical to an image the artifacts embed** — nine files,
+>   enumerated in [`assets/README.md`](assets/README.md), enforced by `__tests__/app/sprites.test.ts`.
+> - `assets/source/` is decommissioned. Do not draw from it.
+>
+> This is not a stylistic preference. A-013 read §7.1 below as a standing instruction, pulled seven
+> hulls and eleven other files out of the Kenney pack, and repainted the duel with ships that appear
+> in neither board. Everything from "§7.1 Sources" to the end of §7 is retained for the licensing
+> research and the rejected-options record, both of which are still worth having.
+
 The visual style is **bright, chunky, flat-shaded low-poly**, delivered as pre-rendered 2D sprites. This section is the whole art plan; there is no in-app 3D (§3.3).
 
-### 7.1 Sources — all CC0, $0
+### 7.1 Sources — all CC0, $0 *(historical — see the note above)*
 
 | Pack                                                                 | Contents                                                                                                                                          | License |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |

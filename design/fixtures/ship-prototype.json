@@ -1,0 +1,136 @@
+{
+  "_source": "Claude Design artifact 541ddd21-4ffd-425c-be57-8b6da70de66a (\"Duel prototype\"), the authored inline styles of the two ship subtrees — not a rendered measurement.",
+  "_captured": "2026-07-29",
+  "_why": "The duel board draws both ships as composed elements: no ship raster exists in either artifact. A-013 replaced them with Kenney hull PNGs that appear in NEITHER artifact; A-045 reverted that. This fixture is what makes the revert stick — every number below is asserted against src/components/duel/Ship.tsx, so a future sprite pass fails a test instead of silently repainting the game.",
+  "_how": "The artifact bundle inlines its page as a JSON `__bundler/template` block. Extract it, then read the two subtrees whose containers carry `animation:ca-bob` and `animation:ca-bob-r`. Every value here appears verbatim in that markup; __tests__/app/sprites.test.ts re-checks that claim against the design grid.",
+
+  "designGrid": {
+    "width": 150,
+    "height": 124,
+    "note": "The player ship's authored box. Ship.tsx scales every number by `width / 150`, so the rival at 126pt is this same geometry at 0.84."
+  },
+
+  "player": {
+    "container": { "left": 4, "bottom": 26, "width": 150, "height": 124, "transformOrigin": "50% 92%" },
+    "wake": { "left": 6, "bottom": -5, "width": 142, "height": 11, "fill": "rgba(255,255,255,.6)" },
+    "pennant": {
+      "left": 70,
+      "bottom": 110,
+      "width": 26,
+      "height": 12,
+      "fill": "#F5A623",
+      "points": "0,0 100,0 68,50 100,100 0,100"
+    },
+    "mainMast": { "left": 67, "bottom": 44, "width": 7, "height": 68, "radius": 4, "fill": "#8B5A2B" },
+    "yard": { "left": 60, "bottom": 94, "width": 21, "height": 9, "radius": 3, "fill": "#A0631F" },
+    "foreMast": { "left": 107, "bottom": 44, "width": 5, "height": 44, "radius": 3, "fill": "#8B5A2B" },
+    "topsail": {
+      "left": 32,
+      "bottom": 88,
+      "width": 34,
+      "height": 22,
+      "points": "100,0 100,100 0,90 0,10",
+      "striped": true
+    },
+    "mainsail": {
+      "left": 22,
+      "bottom": 52,
+      "width": 45,
+      "height": 34,
+      "points": "100,0 100,100 0,92 0,8",
+      "striped": true
+    },
+    "jib": {
+      "left": 88,
+      "bottom": 46,
+      "width": 26,
+      "height": 32,
+      "points": "100,0 100,100 0,100",
+      "striped": false
+    },
+    "sternCastle": {
+      "left": 0,
+      "bottom": 30,
+      "width": 26,
+      "height": 16,
+      "radiusTop": 5,
+      "fill": "#C9813C",
+      "shadeHeight": 4,
+      "shade": "#A0631F"
+    },
+    "bowsprit": {
+      "left": 134,
+      "bottom": 30,
+      "width": 16,
+      "height": 13,
+      "fill": "#F5A623",
+      "points": "0,100 0,0 100,100"
+    },
+    "deckRail": { "left": 10, "bottom": 38, "width": 130, "height": 7, "radius": 4, "fill": "#E0AE6B" },
+    "railPosts": { "x": [24, 52, 118], "bottom": 45, "width": 3, "height": 7, "fill": "#E0AE6B" },
+    "hull": {
+      "left": 0,
+      "bottom": 0,
+      "width": 150,
+      "height": 39,
+      "fill": "#C9813C",
+      "points": "0,0 100,0 90,100 9,100",
+      "trim": { "inset": 5, "top": 5, "height": 7, "fill": "#F5A623" },
+      "waterline": { "height": 12, "fill": "#A0631F" },
+      "gunports": {
+        "x": [28, 64, 100],
+        "top": 17,
+        "size": 11,
+        "fill": "#3E2A12",
+        "ringWidth": 2,
+        "ring": "#E0AE6B"
+      }
+    },
+    "captain": { "left": 40, "bottom": 44, "width": 34, "height": 54 }
+  },
+
+  "rival": {
+    "_note": "The board authors the rival at its own 126x106 box with two gunports and no rail posts or bowsprit. Ship.tsx renders ONE geometry — the player's — scaled to 126pt, and carries the rival's identity in palette plus the tattered sail and jagged pennant outlines below. Documented divergence, A-045.",
+    "container": { "right": 2, "bottom": 32, "width": 126, "height": 106, "transformOrigin": "50% 92%" },
+    "wake": { "fill": "rgba(255,255,255,.45)" },
+    "pennant": { "fill": "#6C4BD6", "points": "0,0 100,0 66,32 100,64 56,100 0,100" },
+    "mast": "#5C4A3A",
+    "topsail": { "fill": "#8A6FE0", "points": "100,0 100,100 0,88 14,58 0,30 8,10" },
+    "mainsail": {
+      "fill": "#6C4BD6",
+      "points": "100,0 100,100 0,90 10,62 0,34 6,8",
+      "band": { "top": 11, "height": 6, "fill": "#4A2FA0" }
+    },
+    "jib": { "fill": "#8A6FE0", "points": "100,0 100,100 0,100" },
+    "hull": {
+      "fill": "#4A3B5C",
+      "deep": "#33284A",
+      "trim": "#6C4BD6",
+      "deck": "#6B5A48",
+      "gunport": "#1A1428"
+    }
+  },
+
+  "motion": {
+    "bob": { "ms": 3600, "riseY": 5, "rotateDeg": 1.2 },
+    "bobRival": { "ms": 4400, "riseY": 4, "dropY": 2, "rotateDeg": 1.4, "mirrored": true },
+    "wake": {
+      "ms": 2600,
+      "rivalMs": 3100,
+      "shiftX": -4,
+      "scaleX": 1.06,
+      "opacityFrom": 0.5,
+      "opacityTo": 0.8
+    },
+    "luff": { "ms": 3400, "rivalMs": 3000, "scaleXTo": 0.955, "staggerMs": [0, 200, 400] },
+    "pennant": { "ms": 1800, "rivalMs": 1500, "skewDeg": 5, "scaleXTo": 0.9 }
+  },
+
+  "sailStripe": {
+    "surface": "#FFF6E4",
+    "stripe": "#D93A2E",
+    "bandWidth": 7,
+    "periodWidth": 14,
+    "_rule": "Board 7a, 'Sails are red-and-white striped': broad vertical stripes on topsail and mainsail; the jib stays plain so the silhouette does not turn into noise at 26px."
+  }
+}
