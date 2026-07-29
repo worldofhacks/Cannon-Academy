@@ -1,5 +1,6 @@
 /**
  * A-001 — the captain store.
+ * A-041 — durable mercy / receipt fields and pure tally transition.
  *
  * Written before the implementation. These assert behaviour, not shape: the store's job is to be
  * the one place a captain exists, and every rule it enforces is a rule the game would otherwise
@@ -10,9 +11,15 @@
  */
 import { beforeEach, describe, expect, it } from 'vitest';
 
+import { emptyMercyState } from '../../src/engine/opponents/mercy';
 import { emptyMastery } from '../../src/engine/mastery';
 import { MASTERY_MIN_ACCURACY, MASTERY_RATE_DUEL, MASTERY_THRESHOLD_CORRECT } from '../../src/engine/tuning';
-import { createCaptainStore, emptyCaptain, type CaptainStore } from '../../src/stores/player';
+import {
+  applyCaptainTally,
+  createCaptainStore,
+  emptyCaptain,
+  type CaptainStore,
+} from '../../src/stores/player';
 
 let store: CaptainStore;
 beforeEach(() => {
@@ -128,5 +135,61 @@ describe('A-001 captain store', () => {
     a.mastery.add_within_10 = { ...emptyMastery, correct: 5 };
     // A shared nested object would leak one captain's progress into the next fresh install.
     expect(b.mastery.add_within_10).toBeUndefined();
+  });
+
+  it('spec(A-041:AC-1) a fresh store Captain exposes empty mercy, receipts, and sequence zero', () => {
+    const c = store.getState().captain;
+    expect(c.mercyState).toEqual(emptyMercyState);
+    expect(c.rewardReceipts).toEqual({});
+    expect(c.nextPurchaseSequence).toBe(0);
+    expect(c.mercyState).not.toBe(emptyMercyState);
+    expect(c.mercyState.recentPlayerCorrect).not.toBe(emptyMercyState.recentPlayerCorrect);
+  });
+
+  it('spec(A-041:AC-5) applyCaptainTally is the pure twin of recordDuelAnswers', () => {
+    store.getState().setGradeBand('k_1');
+    const snapshot = structuredClone(store.getState().captain);
+    const pure = applyCaptainTally(snapshot, 'add_within_10', 'range', { correct: 3, asked: 5 });
+    expect(snapshot).toEqual(store.getState().captain);
+
+    store.getState().recordRangeAnswers('add_within_10', { correct: 3, asked: 5 });
+    const viaAction = store.getState().captain;
+    expect(pure.mastery).toEqual(viaAction.mastery);
+    expect(pure.ownedCannons).toEqual(viaAction.ownedCannons);
+    expect(pure.unlockedIslands).toEqual(viaAction.unlockedIslands);
+    // Durable ledger fields are preserved through the pure transition.
+    expect(pure.mercyState).toEqual(snapshot.mercyState);
+    expect(pure.rewardReceipts).toEqual(snapshot.rewardReceipts);
+    expect(pure.nextPurchaseSequence).toBe(snapshot.nextPurchaseSequence);
+  });
+
+  it('spec(A-041:AC-6) ordinary store actions retain mercy and receipt fields', () => {
+    const duelKey = 'duel:keep-me';
+    store.getState().replaceCaptain({
+      ...store.getState().captain,
+      mercyState: {
+        recentPlayerCorrect: [true, true],
+        consecutiveLosses: 1,
+        forcedMisfiresRemaining: 0,
+      },
+      rewardReceipts: {
+        [duelKey]: {
+          key: duelKey,
+          source: 'duel',
+          seed: 9,
+          rarity: 'common',
+          coinFallback: 11,
+          grant: { kind: 'coins', amount: 11 },
+        },
+      },
+      nextPurchaseSequence: 3,
+    });
+
+    store.getState().addCoins(5);
+    store.getState().setNameAndFlag('Bess', 'flag-1');
+    const c = store.getState().captain;
+    expect(c.mercyState.recentPlayerCorrect).toEqual([true, true]);
+    expect(c.rewardReceipts[duelKey]?.coinFallback).toBe(11);
+    expect(c.nextPurchaseSequence).toBe(3);
   });
 });
