@@ -23,7 +23,7 @@ import type { IslandId } from '@content/schemas';
 
 import { Blob } from './Blob';
 import { NODE, STATIONS, islandGlyph, type Station as BoardStation } from './board';
-import { art, mapX, mapY, type MapFrame, type StationState } from './layout';
+import { art, mapX, mapY, stationPresentation, type MapFrame, type StationState } from './layout';
 import { chart } from './palette';
 import type { ChartNode } from '../../services/chart';
 import { font, MIN_TAP_TARGET } from '../../theme/tokens';
@@ -121,27 +121,30 @@ export function StationMarker({ index, node, state, frame, typeScale, requiremen
   if (station === undefined) return null;
 
   const label = node.island.displayName;
+  const presentation = stationPresentation(node, state, requirement);
   const column = LABEL_COLUMN * typeScale;
   const gap = index === 0 ? NODE.chipGap : NODE.chipGapTight;
 
   const head =
-    state === 'silhouette' ? (
+    presentation.markerHead === 'silhouette' ? (
       <SilhouetteHead size={art(frame, station.lockedSize)} label={label} typeScale={typeScale} />
-    ) : state === 'locked' ? (
+    ) : presentation.markerHead === 'locked' ? (
       <LockedHead size={art(frame, station.lockedSize)} frame={frame} />
-    ) : state === 'live' ? (
+    ) : presentation.markerHead === 'live' ? (
       <LiveHead frame={frame} glyph={islandGlyph[node.island.id]} typeScale={typeScale} />
-    ) : (
+    ) : presentation.markerHead === 'cleared' ? (
       <ClearedHead frame={frame} typeScale={typeScale} />
+    ) : (
+      <AvailableHead frame={frame} glyph={islandGlyph[node.island.id]} typeScale={typeScale} />
     );
 
   const body = (
     <View style={{ alignItems: 'center' }}>
       {head}
-      {state === 'silhouette' ? null : (
+      {presentation.markerHead === 'silhouette' ? null : (
         <View style={{ marginTop: gap * typeScale, alignItems: 'center' }}>
-          <NameChip label={label} locked={state === 'locked'} typeScale={typeScale} />
-          {state === 'live' ? <SailChip typeScale={typeScale} /> : null}
+          <NameChip label={label} locked={presentation.markerHead === 'locked'} typeScale={typeScale} />
+          {state === 'current' ? <SailChip typeScale={typeScale} /> : null}
         </View>
       )}
     </View>
@@ -151,7 +154,7 @@ export function StationMarker({ index, node, state, frame, typeScale, requiremen
   const top = mapY(frame, station.node.top);
   const box = { position: 'absolute', left, top, width: column, alignItems: 'center' } as const;
 
-  if (node.fogged) {
+  if (!presentation.tappable) {
     // A fogged node is not tappable — it is a plain View, not a disabled Pressable, so there is no
     // control here to press at all. It still SPEAKS: the requirement is what a screen reader reads
     // out, which is why it is `accessible` rather than hidden.
@@ -160,7 +163,7 @@ export function StationMarker({ index, node, state, frame, typeScale, requiremen
         <View
           accessible
           accessibilityRole="text"
-          accessibilityLabel={`${label}, in the fog. ${requirement ?? ''}`.trim()}
+          accessibilityLabel={presentation.accessibilityLabel}
           style={box}
         >
           {body}
@@ -172,19 +175,38 @@ export function StationMarker({ index, node, state, frame, typeScale, requiremen
     );
   }
 
-  const disc = art(frame, state === 'live' ? NODE.live.size : NODE.cleared.size);
+  const disc = art(frame, state === 'current' ? NODE.live.size : NODE.cleared.size);
   const slop = Math.max(0, (MIN_TAP_TARGET - disc) / 2);
 
   return (
     <Pressable
       onPress={() => onSail(node.island.id)}
       accessibilityRole="button"
-      accessibilityLabel={state === 'live' ? `Sail to ${label}` : `${label}, cleared. Sail here again`}
+      accessibilityLabel={presentation.accessibilityLabel}
       hitSlop={{ top: slop, bottom: slop, left: 0, right: 0 }}
       style={({ pressed }) => [box, pressed ? { transform: [{ translateY: 2 }] } : null]}
     >
       {body}
     </Pressable>
+  );
+}
+
+/** Available: open and tappable, but deliberately has no success-green tick. */
+function AvailableHead({ frame, glyph, typeScale }: { frame: MapFrame; glyph: string; typeScale: number }) {
+  const size = art(frame, NODE.cleared.size);
+  return (
+    <Disc size={size} fill={chart.live} shadow={chart.liveShadow} dy={art(frame, NODE.live.shadowDy)}>
+      <Text
+        style={{
+          fontFamily: font.displayBold,
+          fontSize: NODE.live.glyphSize * typeScale,
+          lineHeight: NODE.live.glyphSize * typeScale * 1.15,
+          color: chart.ink,
+        }}
+      >
+        {glyph}
+      </Text>
+    </Disc>
   );
 }
 
