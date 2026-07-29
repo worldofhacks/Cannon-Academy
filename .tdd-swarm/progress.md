@@ -1841,3 +1841,9 @@ Merged into `swarm/engine-core`.
 ### T-016 re-frozen (`a48a7e7ffe7d41e7…`) after ladder dispute fix
 
 [T-016 Test Agent](d05384d3-5e8d-42e1-8f93-f00010357c9d) `eea35ac`. Phase → `implement`. Implementer re-dispatched.
+
+
+### T-016 implementation verified green (`1198daa`)
+
+Orchestrator: gates ALL PASS; g35 56/56; frozen hash `a48a7e7f…` unchanged. Code + security
+reviews dispatched.
