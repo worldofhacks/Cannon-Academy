@@ -1551,6 +1551,13 @@ PASS. The sole concern was real: two Test Agent commits used `spec(T-013):` subj
 implement commits that touch tests, not policing Test Agent synonyms. Local gates ALL PASS
 after that fix.
 
+## T-007 code review — APPROVE_WITH_NITS
+
+[T-007 Code Review](ef18d061-3d72-41d9-a853-0c0607ccddf7): all 21 ACs / DoD items verified; gates
+re-confirmed green (1310/1310, tsc 0, frozen-tests-unmodified). One low nit: `correctIndex` via
+`findIndex` on value rather than tracked shuffle index — safe under AC-12 distinctness; no fix
+required. Security review dispatched next. T-013 code review still in flight.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
