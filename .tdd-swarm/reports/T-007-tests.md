@@ -13,7 +13,7 @@ the first suite with three live mutants, and the ticket was amended from 16 crit
 | Tests | 72 (`it` blocks), up from 57 |
 | Criterion tags | 66 `spec(T-007:AC-n)` + 8 `dod(T-007:n)` |
 | Assertion sites | 152 `expect(` call sites, many inside sweeps of 114 seeds × 15 templates |
-| Commit | `PENDING` |
+| Commit | `1389563` — `test(T-007): close the review's holes and re-tag against 19 criteria` |
 | Mutants | 53 built, 53 killed, reference clean, kill counts 1 → 44 |
 
 ---
