@@ -23,6 +23,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { Poly } from '../Poly';
 import { color, motion } from '../../theme/tokens';
 import { Captain, type CaptainPose } from './Captain';
 
@@ -242,24 +243,27 @@ export function Ship({ cosmetics: c, facing, width, burning = false, captainPose
         }}
       />
 
-      {/* hull — trapezoid via borders, with the trim band and three gunports */}
+      {/* hull — the design's own polygon, with the trim band and three gunports */}
       <View style={{ position: 'absolute', left: 0, bottom: 0, width, height: 39 * s }}>
-        {/* The border trick draws a TRIANGLE at width:0 and a trapezoid only when the centre has
-            width. `width - 2*inset` is that centre; getting this wrong renders a dinghy. */}
-        <View
-          style={{
-            position: 'absolute',
-            left: 0,
-            bottom: 0,
-            width: width - 28 * s,
-            height: 0,
-            borderBottomWidth: 39 * s,
-            borderBottomColor: c.hull,
-            borderLeftWidth: 14 * s,
-            borderRightWidth: 14 * s,
-            borderLeftColor: 'transparent',
-            borderRightColor: 'transparent',
-          }}
+        {/*
+          This was a `borderBottomWidth` trapezoid and it rendered the hull UPSIDE DOWN.
+
+          The border trick puts the NARROW edge at the top and the WIDE edge at the bottom. A hull
+          is the opposite shape: a wide deck tapering to a narrow keel. The design says so exactly —
+          `clip-path: polygon(0 0, 100% 0, 88% 100%, 10% 100%)` is full width along the top and
+          inset along the bottom.
+
+          It survived a visual review because at 150pt a symmetric trapezoid reads as "boat-ish"
+          either way up; it took someone looking at the real screen to see the boat was sitting on
+          its deck. `Poly` transcribes the design's coordinates directly, so the shape can no longer
+          drift from the board.
+        */}
+        <Poly
+          points="0,0 100,0 88,100 10,100"
+          width={width}
+          height={39 * s}
+          fill={c.hull}
+          style={{ position: 'absolute', left: 0, bottom: 0 }}
         />
         <View
           style={{
@@ -271,15 +275,14 @@ export function Ship({ cosmetics: c, facing, width, burning = false, captainPose
             backgroundColor: c.trim,
           }}
         />
-        <View
-          style={{
-            position: 'absolute',
-            left: 12 * s,
-            right: 12 * s,
-            bottom: 0,
-            height: 12 * s,
-            backgroundColor: c.hullDeep,
-          }}
+        {/* The waterline band follows the same taper — a straight bar across a tapered hull
+            reads as a stripe painted on, not as the hull's own shadowed lower strake. */}
+        <Poly
+          points="0,0 100,0 88,100 10,100"
+          width={width}
+          height={12 * s}
+          fill={c.hullDeep}
+          style={{ position: 'absolute', left: 0, bottom: 0 }}
         />
         {[28, 64, 100].map((x) => (
           <View
