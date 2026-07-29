@@ -2038,3 +2038,7 @@ ARCHITECTURE §4.3 corrected: +1 damage + presentation arc. `BASE_BALLS_PER_VOLL
 ### T-028 — done (merged) — CHOICE_COUNT single home
 
 `types.ts` imports from `@engine/tuning`. Frozen `76dafbc2a5ea4aa5…`.
+
+### T-027 — done (merged) — catalog set validation
+
+`validateCatalogs` detects dup ids, dangling refs, rank tier clashes, island cycles. Frozen `2e94841e5706c896…`.
