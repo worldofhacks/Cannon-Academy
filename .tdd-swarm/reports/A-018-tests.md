@@ -9,18 +9,41 @@
 ## AC-1 evidence
 
 The Vitest suite parses every `.ts` and `.tsx` file under `src/components/chart/` with the
-TypeScript AST, finds direct `useAnimatedStyle(...)` calls, and inspects each callback subtree for
-`CallExpression` nodes. It pins the complete currently shipped inventory to these four independently
-executed worklets:
+TypeScript AST and resolves `useAnimatedStyle(...)` calls to import declarations from
+`react-native-reanimated`. Direct named imports, named-import aliases, namespace qualification,
+default qualification, and string-literal member access are inventoried. Inline callbacks and
+identifier callbacks whose local function bodies can be resolved are inspected. The complete
+currently shipped inventory remains pinned to these four independently executed worklets:
 
 1. `src/components/chart/ChartShip.tsx::bobStyle`
 2. `src/components/chart/Fog.tsx::driftStyle`
 3. `src/components/chart/Station.tsx::ringStyle`
 4. `src/components/chart/Station.tsx::riseStyle`
 
-Any added, removed, renamed, non-callback, or helper-calling worklet fails the suite. The test also
-parses an in-memory unsafe representative (`helper()` in a callback) and proves the guard records
-that call; no source mutation or manufactured RED run was used.
+Any added, removed, renamed, uninspectable, or unsafe-helper-calling worklet fails the suite. Calls
+whose provenance proves they are Reanimated UI-runtime primitives or unshadowed worklet-safe
+ECMAScript intrinsics are allowed, so the frozen test does not impose the ticket-unstated rule of
+“zero call expressions.”
+
+Adversarial in-memory sources prove all of these through the same collector used for production:
+
+- named-import alias, namespace-qualified, and default/computed hook forms are inventoried and their
+  captured `jsLayout()` calls are rejected;
+- a locally resolved extracted callback is inspected and its captured helper rejected;
+- an unresolvable callback fails closed instead of escaping inspection;
+- a local helper shadowing an imported Reanimated primitive is rejected by declaration provenance;
+- an extracted callback using `Math.max()` and Reanimated `interpolate()` is accepted.
+
+No source mutation or manufactured RED run was used.
+
+## Test-design review resolution
+
+The two Important findings in `.tdd-swarm/reports/A-018-test-design-review.md` are addressed:
+
+1. Hook discovery now follows the actual Reanimated import declaration instead of matching the
+   literal local name `useAnimatedStyle`.
+2. Callback analysis resolves local identifier bodies and classifies calls by provenance instead of
+   requiring an inline callback with no calls.
 
 ## First-run posture
 
@@ -33,14 +56,14 @@ in the in-memory unsafe-fixture assertion; it never represented a production fai
 
 | Command | Result |
 | --- | --- |
-| `npx vitest run __tests__/app/chart-worklet-safety.test.ts` | PASS — 1 file, 6 tests |
+| `npx vitest run __tests__/app/chart-worklet-safety.test.ts` | PASS — 1 file, 12 tests |
 | `npx prettier --check __tests__/app/chart-worklet-safety.test.ts .tdd-swarm/reports/A-018-tests.md` | PASS |
 | `npx eslint __tests__/app/chart-worklet-safety.test.ts --max-warnings 0` | PASS |
 | `npx tsc --noEmit` | PASS |
-| `npx vitest run` | PASS — 41 files, 2,020 tests |
-| `.tdd-swarm/spec-lint.sh tickets/app/A-018.md` | RED (exit 1), expected outside this Test Agent's AC-1-only scope |
+| `npx vitest run` | PASS — 41 files, 2,026 tests |
+| `.tdd-swarm/spec-lint.sh tickets/app/A-018.md` | PASS — AC-1 covered; all six DoD items explicitly skipped as process evidence |
+| `.tdd-swarm/run-local-gates.sh <worktree>` | Formatting, lint, typecheck, unit, no-markers, no-focused-tests, and purity PASS; wrapper RED only on the pre-existing `frozen-tests-unmodified` history check |
 
-Spec-lint confirms `AC-1` has three tagged tests. It correctly reports no test coverage yet for
-`AC-2` through `AC-5`, and no `dod(A-018:1)` through `dod(A-018:4)` evidence. DoD-5 and DoD-6 are
-explicit `[process]` items and are skipped by the gate. Browser, iOS, controls, and release-evidence
-checks remain work for their respective verification agents.
+The wrapper’s history check reports three earlier non-test-subject commits that already changed
+tests relative to `swarm/engine-core`: `81ccba9`, `ca3c6ce`, and `f9ed263`. This Test Agent did not
+author or alter those commits. The A-018 test commits use the required `test(A-018): ...` subject.
