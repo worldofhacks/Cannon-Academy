@@ -10,13 +10,14 @@ import type { z } from 'zod';
 
 import cannonsRaw from './cannons.json';
 import crewRaw from './crew.json';
+import enemiesRaw from './enemies.json';
 import islandsRaw from './islands.json';
 import ranksRaw from './ranks.json';
-import { cannonSchema, crewSchema, islandSchema, rankSchema, skillSchema } from './schemas';
-import type { Cannon, CannonId, Crew, Island, IslandId, Rank, Skill, SkillId } from './schemas';
+import { cannonSchema, crewSchema, enemySchema, islandSchema, rankSchema, skillSchema } from './schemas';
+import type { Cannon, CannonId, Crew, Enemy, Island, IslandId, Rank, Skill, SkillId } from './schemas';
 import skillsRaw from './skills.json';
 
-type CatalogName = 'skills' | 'cannons' | 'islands' | 'ranks' | 'crew';
+type CatalogName = 'skills' | 'cannons' | 'islands' | 'ranks' | 'crew' | 'enemies';
 
 /**
  * The ratified `validateCatalogs` input shape: raw, unvalidated arrays keyed by catalog name.
@@ -28,6 +29,7 @@ interface RawCatalogs {
   islands: readonly unknown[];
   ranks: readonly unknown[];
   crew: readonly unknown[];
+  enemies: readonly unknown[];
 }
 
 /** Best-effort id extraction from an unvalidated entry, so a thrown message can name it. */
@@ -124,12 +126,14 @@ export function validateCatalogs(input: RawCatalogs): void {
   const islands = parseCatalog('islands', islandSchema, input.islands);
   const ranks = parseCatalog('ranks', rankSchema, input.ranks);
   const crew = parseCatalog('crew', crewSchema, input.crew);
+  const enemies = parseCatalog('enemies', enemySchema, input.enemies);
 
   assertUniqueIds('skills', skills);
   assertUniqueIds('cannons', cannons);
   assertUniqueIds('islands', islands);
   assertUniqueIds('ranks', ranks);
   assertUniqueIds('crew', crew);
+  assertUniqueIds('enemies', enemies);
   assertNoRankTierClash(ranks);
 
   const skillIds = new Set(skills.map((s) => s.id));
@@ -141,6 +145,27 @@ export function validateCatalogs(input: RawCatalogs): void {
       throw new Error(
         `content/cannons.json: cannon '${cannon.id}' unlock.island '${cannon.unlock.island}' is absent from islands`,
       );
+    }
+  }
+
+  const enemyByIsland = new Map<IslandId, Enemy>();
+  for (const enemy of enemies) {
+    if (enemyByIsland.has(enemy.islandId)) {
+      throw new Error(
+        `content/enemies.json: duplicate islandId '${enemy.islandId}' on enemies '${enemyByIsland.get(enemy.islandId)!.id}' and '${enemy.id}'`,
+      );
+    }
+    if (!islandIds.has(enemy.islandId)) {
+      throw new Error(
+        `content/enemies.json: enemy '${enemy.id}' islandId '${enemy.islandId}' is absent from islands`,
+      );
+    }
+    enemyByIsland.set(enemy.islandId, enemy);
+  }
+
+  for (const island of islands) {
+    if (!enemyByIsland.has(island.id)) {
+      throw new Error(`content/enemies.json: island '${island.id}' has no enemy encounter`);
     }
   }
 
@@ -169,6 +194,7 @@ export const cannons: readonly Cannon[] = parseCatalog('cannons', cannonSchema, 
 export const islands: readonly Island[] = parseCatalog('islands', islandSchema, islandsRaw);
 export const ranks: readonly Rank[] = parseCatalog('ranks', rankSchema, ranksRaw);
 export const crew: readonly Crew[] = parseCatalog('crew', crewSchema, crewRaw);
+export const enemies: readonly Enemy[] = parseCatalog('enemies', enemySchema, enemiesRaw);
 
 // --- Total lookup helpers: an entry or a thrown Error, never `undefined` --------------------
 
@@ -187,6 +213,12 @@ export function getSkill(id: SkillId): Skill {
 export function getIsland(id: IslandId): Island {
   const found = islands.find((i) => i.id === id);
   if (found === undefined) throw new Error(`getIsland: no island with id '${id}'`);
+  return found;
+}
+
+export function getEnemyForIsland(id: IslandId): Enemy {
+  const found = enemies.find((enemy) => enemy.islandId === id);
+  if (found === undefined) throw new Error(`getEnemyForIsland: no enemy for island '${id}'`);
   return found;
 }
 

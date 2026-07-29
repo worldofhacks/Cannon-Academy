@@ -23,7 +23,8 @@ import { sprite } from '../../theme/sprites';
 import { color, motion, radius, type } from '../../theme/tokens';
 import type { DuelPhase } from '../../stores/duel';
 import type { CaptainPose } from './Captain';
-import { RIVAL_SHIP, Ship, type ShipCosmetics } from './Ship';
+import { Ship, type ShipCosmetics } from './Ship';
+import type { RivalPresentation } from '../../theme/enemyPresentation';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
@@ -66,6 +67,7 @@ interface SeaStageProps {
   readonly look: CannonLook;
   readonly playerHullPct: number;
   readonly rivalHullPct: number;
+  readonly rivalPresentation: RivalPresentation;
   readonly damageToRival: number | null;
   readonly damageToPlayer: number | null;
 }
@@ -79,6 +81,7 @@ export function SeaStage({
   look,
   playerHullPct,
   rivalHullPct,
+  rivalPresentation,
   damageToRival,
   damageToPlayer,
 }: SeaStageProps) {
@@ -112,9 +115,19 @@ export function SeaStage({
           captainPose={captainPose}
         />
       </View>
-      <View style={[s.rivalSlot, { right: x(BOARD.rivalRight) }]}>
+      <View
+        style={[s.rivalSlot, { right: x(BOARD.rivalRight) }]}
+        accessibilityLabel={rivalPresentation.accessibilityLabel}
+      >
         <Ship
-          cosmetics={RIVAL_SHIP}
+          cosmetics={rivalPresentation.cosmetics ?? PLAYER_RIVAL_FALLBACK}
+          presentationKind={rivalPresentation.kind}
+          {...(rivalPresentation.ghostOpacity !== undefined
+            ? { ghostOpacity: rivalPresentation.ghostOpacity }
+            : {})}
+          {...(rivalPresentation.ghostGlow !== undefined
+            ? { ghostGlow: rivalPresentation.ghostGlow }
+            : {})}
           facing="left"
           width={126 * art}
           burning={rivalHullPct > 0 && rivalHullPct <= 0.3}
@@ -143,8 +156,11 @@ export function SeaStage({
       {rivalTurn ? (
         <>
           {/* A wash, not a curtain. The child must still see their own ship taking the hit. */}
-          <View style={s.rivalWash} pointerEvents="none" />
-          <View style={[s.rivalArrow, { right: x(BOARD.rivalArrowRight) }]}>
+          <View
+            style={[s.rivalWash, { backgroundColor: `${rivalPresentation.accent}29` }]}
+            pointerEvents="none"
+          />
+          <View style={[s.rivalArrow, { right: x(BOARD.rivalArrowRight), backgroundColor: rivalPresentation.accent }]}>
             <Text style={s.rivalArrowText}>▼</Text>
           </View>
         </>
@@ -370,6 +386,16 @@ function DamageChip({ value, side, inset }: { value: number; side: 'left' | 'rig
   );
 }
 
+const PLAYER_RIVAL_FALLBACK: ShipCosmetics = {
+  hull: '#4A3B5C',
+  hullDeep: '#33284A',
+  sail: '#8A6FE0',
+  trim: '#6C4BD6',
+  pennant: '#6C4BD6',
+  mast: '#5C4A3A',
+  deck: '#6B5A48',
+};
+
 const s = StyleSheet.create({
   stage: { overflow: 'hidden' },
   sky: { position: 'absolute', left: 0, right: 0, top: 0, backgroundColor: color.skyTop },
@@ -449,14 +475,13 @@ const s = StyleSheet.create({
   },
   damageChipText: { ...type.title, color: color.parchment },
 
-  rivalWash: { ...FILL, backgroundColor: 'rgba(76,47,160,0.16)' },
+  rivalWash: { ...FILL },
   rivalArrow: {
     position: 'absolute',
     top: 52,
     width: 26,
     height: 26,
     borderRadius: 8,
-    backgroundColor: '#6C4BD6',
     alignItems: 'center',
     justifyContent: 'center',
   },

@@ -7,6 +7,7 @@ import { recordDuelResult, recordPlayerAnswer, consumeForcedMisfire } from '@eng
 
 import { deriveRivalLoadout } from '../src/services/rivalLoadout';
 import { createRivalBot, driveRivalTurn, resolveRivalVolley } from '../src/services/rivalDriver';
+import { getEnemyForIsland } from '../src/content/index';
 import { captainStore, useCaptain } from '../src/stores/useCaptain';
 import { captainPoseForPhase } from '../src/components/duel/Captain';
 import { CannonTray } from '../src/components/duel/CannonTray';
@@ -31,6 +32,7 @@ import { trayCannons } from '../src/services/loadout';
 import { retainFirstApplied, victoryRewards } from '../src/services/victoryRewards';
 import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
+import { enemyPresentationFor } from '../src/theme/enemyPresentation';
 import { seaStageHeight, worldArtScale, worldBoardWidth } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
 import { color, radius, space } from '../src/theme/tokens';
@@ -77,6 +79,10 @@ function DuelBody() {
   const duelContext = useMemo(() => resolveDuelContext(captain), [captain]);
   const [state, dispatch] = useReducer(duelReducer, duelContext, (ctx) =>
     ctx.ok ? initialDuelStateWithContext(ctx, freshSeed(), captain) : initialDuelState(0),
+  );
+  const rival = useMemo(
+    () => enemyPresentationFor(getEnemyForIsland(state.islandId)),
+    [state.islandId],
   );
   const [appliedReward, setAppliedReward] = useState<DuelRewardOutcome | null>(null);
   const askedAt = useRef(0);
@@ -217,7 +223,7 @@ function DuelBody() {
         />
         <View style={s.hullRow}>
           <HullCard name="You" flag={color.amber} hp={state.playerHull} max={state.playerMax} />
-          <HullCard name={state.islandName} flag="#6C4BD6" hp={state.rivalHull} max={state.rivalMax} />
+          <HullCard name={rival.displayName} flag={rival.accent} hp={state.rivalHull} max={state.rivalMax} />
         </View>
       </View>
 
@@ -232,6 +238,7 @@ function DuelBody() {
             look={look}
             playerHullPct={state.playerHull / state.playerMax}
             rivalHullPct={state.rivalHull / state.rivalMax}
+            rivalPresentation={rival}
             damageToRival={state.phase === 'impact' ? (state.outcome?.damageToEnemy ?? null) : null}
             damageToPlayer={state.phase === 'rivalImpact' ? state.rivalDamage : null}
           />

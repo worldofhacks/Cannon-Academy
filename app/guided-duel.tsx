@@ -30,11 +30,15 @@ import {
 } from '../src/services/guidedDuel';
 import { trayCannons } from '../src/services/loadout';
 import { retainFirstApplied, victoryRewards } from '../src/services/victoryRewards';
+import { getEnemyForIsland } from '../src/content/index';
 import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
+import { enemyPresentationFor } from '../src/theme/enemyPresentation';
 import { seaStageHeight, worldArtScale, worldBoardWidth } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
 import { color, radius, space } from '../src/theme/tokens';
+
+const GUIDED_RIVAL = enemyPresentationFor(getEnemyForIsland('port_sumwich'));
 import { captainStore, useCaptain } from '../src/stores/useCaptain';
 
 type Beat = GuidedScreenView['phase'];
@@ -178,7 +182,7 @@ function GuidedDuelBody() {
         />
         <View style={s.hullRow}>
           <HullCard name="You" flag={color.amber} hp={view.playerHull} max={view.playerMax} />
-          <HullCard name={view.islandName} flag="#6C4BD6" hp={view.rivalHull} max={view.rivalMax} />
+          <HullCard name={GUIDED_RIVAL.displayName} flag={GUIDED_RIVAL.accent} hp={view.rivalHull} max={view.rivalMax} />
         </View>
       </View>
 
@@ -193,6 +197,7 @@ function GuidedDuelBody() {
             look={look}
             playerHullPct={view.playerHull / view.playerMax}
             rivalHullPct={view.rivalHull / view.rivalMax}
+            rivalPresentation={GUIDED_RIVAL}
             damageToRival={view.phase === 'impact' ? (view.outcome?.damageToEnemy ?? null) : null}
             damageToPlayer={view.phase === 'rivalImpact' ? view.rivalDamage : null}
           />

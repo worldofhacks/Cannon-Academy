@@ -27,6 +27,8 @@ import {
   TEMPERAMENTS,
   cannonSchema,
   crewSchema,
+  ENEMY_PRESENTATION_KINDS,
+  enemySchema,
   islandSchema,
   rankSchema,
   skillSchema,
@@ -37,6 +39,8 @@ import type {
   CannonId,
   ChestRarity,
   Crew,
+  Enemy,
+  EnemyPresentationKind,
   GradeBand,
   Island,
   IslandId,
@@ -131,6 +135,15 @@ const VALID_CREW: Record<string, unknown> = {
   id: 'gunner',
   displayName: 'Gunner',
   role: 'gunner',
+};
+
+const VALID_ENEMY: Record<string, unknown> = {
+  id: 'pirate_patrol',
+  islandId: 'port_sumwich',
+  displayName: 'Pirate Patrol',
+  faction: 'pirate',
+  presentationKind: 'pirate',
+  accessibilityLabel: 'Pirate crew on a wooden sloop with a black flag',
 };
 
 // --- AC-1: the id sets ---------------------------------------------------------------------
@@ -1181,5 +1194,34 @@ describe('T-034 Definition of Done', () => {
     // Do not split the key grammar into a sibling content module — file_scopes is schemas.ts.
     const contentTs = readdirSync(join(REPO_ROOT, 'src/content')).filter((name) => name.endsWith('.ts'));
     expect(contentTs.filter((name) => /param|ident/i.test(name))).toEqual([]);
+  });
+});
+
+// --- A-031: enemySchema ----------------------------------------------------------------------
+
+describe('A-031 enemySchema', () => {
+  it('spec(A-031:AC-1) ENEMY_PRESENTATION_KINDS lists the five encounter kinds in island order', () => {
+    expect(ENEMY_PRESENTATION_KINDS).toEqual(['pirate', 'skeleton', 'ghost', 'shark', 'kraken']);
+    const unionMatchesArray: Exact<EnemyPresentationKind, (typeof ENEMY_PRESENTATION_KINDS)[number]> = true;
+    expect(unionMatchesArray).toBe(true);
+  });
+
+  it('spec(A-031:AC-1) round-trips a valid enemy entry unchanged', () => {
+    const parsed: Enemy = enemySchema.parse(VALID_ENEMY);
+    expect(parsed).toEqual(VALID_ENEMY);
+  });
+
+  it('spec(A-031:AC-5) rejects an islandId outside IslandId', () => {
+    expect(enemySchema.safeParse(withOverrides(VALID_ENEMY, { islandId: 'atlantis' })).success).toBe(false);
+  });
+
+  it('spec(A-031:AC-5) rejects a presentationKind outside the union', () => {
+    expect(enemySchema.safeParse(withOverrides(VALID_ENEMY, { presentationKind: 'rival' })).success).toBe(
+      false,
+    );
+  });
+
+  it('spec(A-031:AC-5) rejects an enemy carrying an unknown key', () => {
+    expect(enemySchema.safeParse(withOverrides(VALID_ENEMY, { rivalKind: 'generic' })).success).toBe(false);
   });
 });

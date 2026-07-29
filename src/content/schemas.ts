@@ -62,6 +62,9 @@ export type Temperament = (typeof TEMPERAMENTS)[number];
 export const CHEST_RARITIES = ['common', 'uncommon', 'rare'] as const;
 export type ChestRarity = (typeof CHEST_RARITIES)[number];
 
+export const ENEMY_PRESENTATION_KINDS = ['pirate', 'skeleton', 'ghost', 'shark', 'kraken'] as const;
+export type EnemyPresentationKind = (typeof ENEMY_PRESENTATION_KINDS)[number];
+
 // --- Shared field schemas -------------------------------------------------------------------
 
 /** Numeric school grade: K is 0, grades 1-5 are 1-5. */
@@ -208,3 +211,18 @@ export const crewSchema = z
   .strict();
 
 export type Crew = z.infer<typeof crewSchema>;
+
+// --- enemySchema (A-031) ----------------------------------------------------------------------
+
+export const enemySchema = z
+  .object({
+    id: z.string(),
+    islandId: z.enum(ISLAND_IDS),
+    displayName: z.string(),
+    faction: z.string(),
+    presentationKind: z.enum(ENEMY_PRESENTATION_KINDS),
+    accessibilityLabel: z.string(),
+  })
+  .strict();
+
+export type Enemy = z.infer<typeof enemySchema>;
