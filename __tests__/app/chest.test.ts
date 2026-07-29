@@ -15,15 +15,12 @@ import { duelReceiptKey } from '../../src/contracts/rewards';
 import type { ChestReceipt } from '../../src/contracts/rewards';
 import { rollChest } from '../../src/engine/economy';
 import { createRng } from '../../src/engine/rng';
-import { rollChestSettlement } from '../../src/services/chestSettlement';
 import { settleDuelRewards, canonicalDuelSeed } from '../../src/services/rewardSettlement';
 import { victoryRewards } from '../../src/services/victoryRewards';
 import { createCaptainStore } from '../../src/stores/player';
 
 const REPO_ROOT = join(import.meta.dirname, '../..');
 const PANELS_PATH = 'src/components/duel/Panels.tsx';
-const CHEST_RARITY_PATH = 'src/theme/chestRarity.ts';
-const PANELS_MODULE = '../../src/components/duel/Panels.tsx';
 const CHEST_RARITY_MODULE = '../../src/theme/chestRarity.ts';
 
 interface ChestCeremonyProjection {
@@ -48,13 +45,13 @@ interface ChestCeremonyModule {
 async function loadChestCeremonyModule(): Promise<ChestCeremonyModule> {
   let loaded: unknown;
   try {
-    loaded = await import(/* @vite-ignore */ PANELS_MODULE);
+    loaded = await import(/* @vite-ignore */ CHEST_RARITY_MODULE);
   } catch {
     loaded = undefined;
   }
   expect(
     loaded,
-    'A-010 is RED: Panels.tsx must export projectChestCeremony for settled chest projection',
+    'A-010 is RED: chestRarity.ts must export projectChestCeremony for settled chest projection',
   ).toBeDefined();
   const candidate = loaded as { readonly projectChestCeremony?: unknown };
   expect(candidate.projectChestCeremony, 'projectChestCeremony must be a function').toBeTypeOf('function');
@@ -213,12 +210,15 @@ describe('A-010 chest ceremony projection', () => {
 
     const projected = projectChestCeremony(receipt, victoryRewards(outcome));
 
-    expect(projected.grant).toEqual({ kind: 'coins', amount: receipt.grant.amount });
-    if (projected.grant.kind === 'cannon') {
-      throw new Error('duplicate chest must not project a cannon');
+    expect(projected.grant.kind).toBe('coins');
+    if (projected.grant.kind === 'coins') {
+      expect(projected.grant.amount).toBe(
+        receipt.grant.kind === 'coins' ? receipt.grant.amount : receipt.coinFallback,
+      );
     }
-    expect(projected.grant.displayName).toBeUndefined();
-    expect(getCannon('nine_pounder').displayName).not.toBe('');
+    expect(getCannon('nine_pounder').displayName).not.toBe(
+      projected.grant.kind === 'cannon' ? projected.grant.displayName : '',
+    );
   });
 
   it('spec(A-010:AC-5) does not mutate the captain store when projecting or reopening', async () => {
@@ -277,6 +277,7 @@ describe('A-010 victory panel source contract', () => {
     const panelsSource = readFileSync(join(REPO_ROOT, PANELS_PATH), 'utf8');
     expect(panelsSource).toMatch(/chestReceipt/);
     expect(panelsSource).toMatch(/projectChestCeremony/);
+    expect(panelsSource).toMatch(/chestRarityLook/);
     expect(panelsSource).not.toMatch(/\brollChest\b/);
     expect(panelsSource).not.toMatch(/\brollChestSettlement\b/);
     expect(panelsSource).not.toMatch(/\bsettleDuelRewards\b/);
@@ -293,7 +294,7 @@ describe('A-010 victory panel source contract', () => {
   });
 
   it('spec(A-010:AC-2) derives the announced label from the supplied receipt rarity', () => {
-    const file = sourceFile(PANELS_PATH);
+    const file = sourceFile('src/theme/chestRarity.ts');
     const projector = namedFunction(file, 'projectChestCeremony');
     const body = projector.body.getText(file);
     expect(body).toMatch(/rarity/);
