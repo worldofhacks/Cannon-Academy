@@ -80,6 +80,15 @@ export interface DuelState {
   readonly perfects: number;
   /** Per-skill breakdown of `asked`/`right` — the reward layer's map of which meter to fill. */
   readonly skillTally: DuelSkillTally;
+  /**
+   * Template ids this duel has already served, MOST RECENT FIRST — the recency window (A-014).
+   *
+   * It lives on the state rather than inside `services/questions.ts` because the generator's
+   * window is threaded, not remembered: module-level history would make the same seed produce a
+   * different second question and a duel would stop replaying from `{seed, action log}`. The
+   * engine's own `duel/reducer.ts` carries the identical field for the identical reason.
+   */
+  readonly recentTemplateIds: readonly string[];
   readonly coins: number;
   readonly chestOpen: boolean;
 }
@@ -94,7 +103,7 @@ export type DuelAction =
   | { readonly type: 'RESET' };
 
 /**
- * Rival damage — PROVISIONAL, like `services/questions`. T-021 owns bot behaviour (accuracy bands,
+ * Rival damage — PROVISIONAL. T-021 owns bot behaviour (accuracy bands,
  * mercy tracking, forced misfires); until it lands the rival hits for a flat band so the duel can
  * be played end to end. Seeded, so replacing it changes the numbers, not the replay property.
  */
@@ -135,6 +144,7 @@ export function initialDuelState(seed: number): DuelState {
     right: 0,
     perfects: 0,
     skillTally: {},
+    recentTemplateIds: [],
     coins: 0,
     chestOpen: false,
   };
@@ -189,8 +199,20 @@ function settle(s: DuelState): DuelState {
 export function duelReducer(s: DuelState, action: DuelAction): DuelState {
   switch (action.type) {
     case 'PICK_CANNON': {
-      const [question, rng] = nextQuestion(action.cannon.skill, s.rng);
-      return { ...s, rng, phase: 'question', cannon: action.cannon, question, picked: null };
+      // The window is handed in and the drawn id prepended, so the exclusion holds across the
+      // whole duel rather than only within a single call. Unbounded on purpose: the generator
+      // reads just the leading `RECENT_TEMPLATE_WINDOW` entries, and truncating here would put a
+      // second copy of that constant in the app layer.
+      const [question, rng] = nextQuestion(action.cannon.skill, s.rng, s.recentTemplateIds);
+      return {
+        ...s,
+        rng,
+        phase: 'question',
+        cannon: action.cannon,
+        question,
+        picked: null,
+        recentTemplateIds: [question.templateId, ...s.recentTemplateIds],
+      };
     }
 
     case 'ANSWER': {

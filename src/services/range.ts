@@ -30,21 +30,12 @@
  * screen is a thin caller.
  */
 import { getIsland } from '@content/index';
-import type { CannonId, IslandId, SkillId, Template } from '@content/schemas';
-import { templateSchema } from '@content/schemas';
+import type { CannonId, IslandId, SkillId } from '@content/schemas';
 import { startDrill, type DrillSession } from '@engine/drill';
 import { emptyMastery, isMastered, meterPercent, type SkillMastery } from '@engine/mastery';
 import type { Rng } from '@engine/rng';
 
-import addWithin10Raw from '../content/templates/add_within_10.json';
-import addWithin20Raw from '../content/templates/add_within_20.json';
-import divFactsRaw from '../content/templates/div_facts.json';
-import fractionsIntRaw from '../content/templates/fractions_int.json';
-import multFactsRaw from '../content/templates/mult_facts.json';
-import multiDigitOrderOpsRaw from '../content/templates/multi_digit_order_ops.json';
-import placeValueCompareRaw from '../content/templates/place_value_compare.json';
-import subWithin20Raw from '../content/templates/sub_within_20.json';
-import twoStepAddSubRaw from '../content/templates/two_step_add_sub.json';
+import { templatesForSkill } from './templatePools';
 
 import type { Captain, CaptainStore } from '../stores/player';
 
@@ -82,46 +73,12 @@ export const RANGE_DRILL_LENGTH = 10;
 
 // ── The authored template pool ──────────────────────────────────────────────────────────────
 //
-// T-019's content registry is still backlog, so resolving a skill's pool is this module's job.
-// Two constraints shape how:
-//
-//   * STATIC imports, never `fs`. A directory read works in the node test runner and breaks
-//     under Metro on a device, where there is no filesystem to read `src/content/templates`
-//     from — the worst possible split, because every gate would stay green.
-//   * Validated through `templateSchema`, exactly as `content/index.ts` validates the catalogs.
-//     It is not ceremony: a raw JSON import types `params` as `number[]` and `Template` requires
-//     `[number, number]`, so the parse is what produces the type as well as the guarantee. A
-//     malformed template throws at import — it must fail a test, never reach a child.
-//
-// `Record<SkillId, ...>` is the safety net: add a skill to `SKILL_IDS` and this file stops
-// compiling until it has a pool, rather than throwing `NO_TEMPLATE` at a child mid-drill.
-
-function pool(skill: SkillId, raw: readonly unknown[]): readonly Template[] {
-  return raw.map((entry) => {
-    const parsed = templateSchema.safeParse(entry);
-    if (!parsed.success) {
-      throw new Error(`content/templates/${skill}.json: invalid template — ${parsed.error.message}`);
-    }
-    if (parsed.data.skill !== skill) {
-      throw new Error(
-        `content/templates/${skill}.json: template '${parsed.data.id}' declares skill '${parsed.data.skill}'`,
-      );
-    }
-    return parsed.data;
-  });
-}
-
-const TEMPLATES: Record<SkillId, readonly Template[]> = {
-  add_within_10: pool('add_within_10', addWithin10Raw),
-  add_within_20: pool('add_within_20', addWithin20Raw),
-  sub_within_20: pool('sub_within_20', subWithin20Raw),
-  place_value_compare: pool('place_value_compare', placeValueCompareRaw),
-  mult_facts: pool('mult_facts', multFactsRaw),
-  two_step_add_sub: pool('two_step_add_sub', twoStepAddSubRaw),
-  div_facts: pool('div_facts', divFactsRaw),
-  fractions_int: pool('fractions_int', fractionsIntRaw),
-  multi_digit_order_ops: pool('multi_digit_order_ops', multiDigitOrderOpsRaw),
-};
+// It used to be built here, from nine static JSON imports. A-014 put the duel on the same
+// generator, so the table moved to `services/templatePools.ts` verbatim and both callers import
+// it — two tables built from the same nine files is a drift hazard the moment a tenth skill
+// lands. The loading rules (static imports rather than `fs`, every entry validated through
+// `templateSchema`, file order preserved because `pick` indexes into it) moved with it and are
+// documented there.
 
 // ── Which drills each captain has already been paid for ─────────────────────────────────────
 //
@@ -212,7 +169,7 @@ export function openDrill(input: {
 
   return startDrill({
     skillId: input.skillId,
-    templates: TEMPLATES[input.skillId],
+    templates: templatesForSkill(input.skillId),
     mastery: masteryFor(input.captain, input.skillId),
     rng: input.rng,
     length: input.length ?? RANGE_DRILL_LENGTH,
