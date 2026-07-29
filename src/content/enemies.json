@@ -1,0 +1,42 @@
+[
+  {
+    "id": "pirate_patrol",
+    "islandId": "port_sumwich",
+    "displayName": "Pirate Patrol",
+    "faction": "pirate",
+    "presentationKind": "pirate",
+    "accessibilityLabel": "Pirate crew on a wooden sloop with a black flag"
+  },
+  {
+    "id": "bone_brigade",
+    "islandId": "isla_products",
+    "displayName": "Bone Brigade",
+    "faction": "undead",
+    "presentationKind": "skeleton",
+    "accessibilityLabel": "Skeleton crew on a rattling brig with bone-white sails"
+  },
+  {
+    "id": "wraith_vessel",
+    "islandId": "quotient_cove",
+    "displayName": "Wraith Vessel",
+    "faction": "spectral",
+    "presentationKind": "ghost",
+    "accessibilityLabel": "Translucent ghost ship glowing through the mist"
+  },
+  {
+    "id": "reef_sharks",
+    "islandId": "fraction_reef",
+    "displayName": "Reef Sharks",
+    "faction": "beast",
+    "presentationKind": "shark",
+    "accessibilityLabel": "Shark fin cutting the water beside a raider skiff"
+  },
+  {
+    "id": "grand_kraken",
+    "islandId": "grandline",
+    "displayName": "Grand Kraken",
+    "faction": "leviathan",
+    "presentationKind": "kraken",
+    "accessibilityLabel": "Friendly pink kraken tentacles rising from the deep"
+  }
+]

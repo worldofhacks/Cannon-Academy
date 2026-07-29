@@ -25,6 +25,7 @@ import Animated, {
 
 import { Poly } from '../Poly';
 import { color, motion } from '../../theme/tokens';
+import type { EnemyPresentationKind } from '../../content/schemas';
 import { Captain, type CaptainPose } from './Captain';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
@@ -69,9 +70,25 @@ interface ShipProps {
   readonly burning?: boolean;
   /** The captain's pose, if this ship has one aboard. Only the player's does. */
   readonly captainPose?: CaptainPose;
+  /** Island encounter identity — drives shape layers beyond palette alone (A-031). */
+  readonly presentationKind?: EnemyPresentationKind;
+  readonly ghostOpacity?: number;
+  readonly ghostGlow?: string;
 }
 
-export function Ship({ cosmetics: c, facing, width, burning = false, captainPose }: ShipProps) {
+export function Ship({
+  cosmetics: c,
+  facing,
+  width,
+  burning = false,
+  captainPose,
+  presentationKind,
+  ghostOpacity,
+  ghostGlow,
+}: ShipProps) {
+  if (presentationKind === 'kraken') {
+    return <KrakenForm facing={facing} width={width} burning={burning} />;
+  }
   const bob = useSharedValue(0);
   const wake = useSharedValue(0);
   const luff = useSharedValue(0);
@@ -118,7 +135,7 @@ export function Ship({ cosmetics: c, facing, width, burning = false, captainPose
   }));
   const luffStyle = useAnimatedStyle(() => ({ transform: [{ scaleX: 1 - 0.045 * luff.value }] }));
 
-  return (
+  const body = (
     <Animated.View style={[{ width, height: 124 * s }, bobStyle]}>
       {/* wake */}
       <Animated.View
@@ -173,6 +190,8 @@ export function Ship({ cosmetics: c, facing, width, burning = false, captainPose
           borderBottomRightRadius: 2,
         }}
       />
+      {presentationKind === 'pirate' ? <CrossbonesFlag scale={s} /> : null}
+      {presentationKind === 'skeleton' ? <SkullSails scale={s} /> : null}
 
       {/* sails: topsail, banded mainsail, jib */}
       <Animated.View
@@ -311,6 +330,156 @@ export function Ship({ cosmetics: c, facing, width, burning = false, captainPose
       ) : null}
 
       {burning ? <Flame style={{ left: 96 * s, bottom: 38 * s, width: 28 * s }} /> : null}
+      {presentationKind === 'shark' ? <SharkFin scale={s} /> : null}
+    </Animated.View>
+  );
+
+  if (presentationKind === 'ghost') {
+    return (
+      <View
+        style={{ width, opacity: ghostOpacity ?? 0.58 }}
+        accessibilityLabel="ghost ship with glow"
+      >
+        {ghostGlow !== undefined ? (
+          <View
+            style={{
+              position: 'absolute',
+              left: 8 * s,
+              right: 8 * s,
+              bottom: 20 * s,
+              top: 8 * s,
+              borderRadius: 999,
+              backgroundColor: ghostGlow,
+              opacity: 0.35,
+            }}
+          />
+        ) : null}
+        {body}
+      </View>
+    );
+  }
+
+  return body;
+}
+
+function CrossbonesFlag({ scale: s }: { scale: number }) {
+  return (
+    <View style={{ position: 'absolute', left: 74 * s, bottom: 112 * s, width: 18 * s, height: 18 * s }}>
+      <View
+        style={{
+          position: 'absolute',
+          left: 7 * s,
+          top: 0,
+          width: 4 * s,
+          height: 18 * s,
+          borderRadius: 2,
+          backgroundColor: color.parchment,
+        }}
+      />
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 7 * s,
+          width: 18 * s,
+          height: 4 * s,
+          borderRadius: 2,
+          backgroundColor: color.parchment,
+        }}
+      />
+    </View>
+  );
+}
+
+function SkullSails({ scale: s }: { scale: number }) {
+  return (
+    <View style={{ position: 'absolute', left: 48 * s, bottom: 72 * s, width: 16 * s, height: 16 * s }}>
+      <View
+        style={{
+          width: 16 * s,
+          height: 14 * s,
+          borderRadius: 999,
+          backgroundColor: color.parchment,
+        }}
+      />
+      <View style={{ position: 'absolute', left: 4 * s, top: 5 * s, width: 3 * s, height: 3 * s, borderRadius: 999, backgroundColor: color.inkDark }} />
+      <View style={{ position: 'absolute', right: 4 * s, top: 5 * s, width: 3 * s, height: 3 * s, borderRadius: 999, backgroundColor: color.inkDark }} />
+      <View style={{ position: 'absolute', left: 6 * s, bottom: 2 * s, width: 4 * s, height: 2 * s, borderRadius: 2, backgroundColor: color.inkDark }} />
+    </View>
+  );
+}
+
+function SharkFin({ scale: s }: { scale: number }) {
+  return (
+    <Poly
+      points="50,0 100,100 0,100"
+      width={34 * s}
+      height={22 * s}
+      fill="#607888"
+      style={{ position: 'absolute', left: 8 * s, bottom: 52 * s }}
+    />
+  );
+}
+
+function KrakenForm({
+  facing,
+  width,
+  burning,
+}: {
+  facing: 'right' | 'left';
+  width: number;
+  burning?: boolean;
+}) {
+  const bob = useSharedValue(0);
+  useEffect(() => {
+    bob.value = withRepeat(
+      withSequence(
+        withTiming(1, { duration: 2200, easing: Easing.inOut(Easing.quad) }),
+        withTiming(0, { duration: 2200, easing: Easing.inOut(Easing.quad) }),
+      ),
+      -1,
+    );
+  }, [bob]);
+
+  const s = width / 150;
+  const bobStyle = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: -4 * bob.value },
+      { scaleX: facing === 'left' ? -1 : 1 },
+    ],
+  }));
+
+  return (
+    <Animated.View style={[{ width, height: 124 * s }, bobStyle]} accessibilityLabel="kraken tentacles">
+      {[18, 52, 86].map((x, index) => (
+        <View
+          key={x}
+          style={{
+            position: 'absolute',
+            left: x * s,
+            bottom: 0,
+            width: 18 * s,
+            height: (48 + index * 8) * s,
+            borderTopLeftRadius: 999,
+            borderTopRightRadius: 999,
+            backgroundColor: index === 1 ? color.krakenDeep : color.krakenPink,
+          }}
+        />
+      ))}
+      <View
+        style={{
+          position: 'absolute',
+          left: 34 * s,
+          bottom: 36 * s,
+          width: 52 * s,
+          height: 52 * s,
+          borderRadius: 999,
+          backgroundColor: color.krakenPink,
+          borderWidth: 4 * s,
+          borderColor: color.krakenDeep,
+        }}
+      />
+      {burning ? <Flame style={{ left: 70 * s, bottom: 48 * s, width: 24 * s }} /> : null}
     </Animated.View>
   );
 }
