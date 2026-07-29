@@ -2029,3 +2029,8 @@ App track may import `@engine/tuning` for gun-deck slot count. T-030 still owns 
 
 `mercy.ts` + `bot.ts`. Frozen mercy `57ccb419d1fdd62a…`, bot `8965b4ce0319bf7e…`.
 Child-safety rival: accuracy tracks player − margin inside band; two losses arm two misfires.
+
+### T-031 — done (merged) — Perfect Shot semantics
+
+ARCHITECTURE §4.3 corrected: +1 damage + presentation arc. `BASE_BALLS_PER_VOLLEY` reclassified.
+`QUALITY_WEIGHT` bound tightened to >0.6 (value stays 0.7). Frozen `d9a938bbe96cf2af…`.
