@@ -48,12 +48,22 @@ export function maxGradeForBand(band: unknown): number {
 }
 
 /**
- * A cannon is placement-eligible when its `unlock.kind` is `starter` only (never `range` or
- * `chest` — range guns stay mastery-earned, D-6; the Nine-Pounder stays a chest reward) and it
- * is reachable at this band (`minGrade <= maxGrade`), not "outgrown".
+ * D-9 — the only direct non-starter placement grants (OWNER-RULINGS). Every other range/chest gun
+ * stays mastery-earned; these two retain their catalog `range` unlock as a second path.
  */
-function isCannonEligible(cannon: Cannon, maxGrade: number): boolean {
-  return cannon.unlock.kind === 'starter' && cannon.minGrade <= maxGrade;
+const PLACEMENT_EXCEPTIONS: Readonly<Partial<Record<CannonId, readonly GradeBand[]>>> = {
+  six_pounder: ['g2_3', 'g4_5'],
+  twelve_pounder: ['g4_5'],
+};
+
+/**
+ * A cannon is placement-eligible when it is a starter reachable at this band, or one of the two
+ * D-9 exceptions for this band. Chest and all other range guns stay mastery-earned (D-6).
+ */
+function isCannonEligible(cannon: Cannon, maxGrade: number, band: GradeBand): boolean {
+  if (cannon.minGrade > maxGrade) return false;
+  if (cannon.unlock.kind === 'starter') return true;
+  return PLACEMENT_EXCEPTIONS[cannon.id]?.includes(band) === true;
 }
 
 /**
@@ -92,7 +102,7 @@ function sortIslands(list: readonly Island[]): IslandId[] {
 export function resolvePlacement(band: GradeBand): Placement {
   const maxGrade = maxGradeForBand(band);
 
-  const unlockedCannons = sortCannons(cannons.filter((c) => isCannonEligible(c, maxGrade)));
+  const unlockedCannons = sortCannons(cannons.filter((c) => isCannonEligible(c, maxGrade, band)));
   const unlockedIslands = sortIslands(islands.filter((i) => isIslandEligible(i, maxGrade)));
   const tunedBand = BOT_ACCURACY_BAND_BY_GRADE[band];
 

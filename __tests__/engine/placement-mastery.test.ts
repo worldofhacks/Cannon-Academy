@@ -18,7 +18,7 @@ import { resolveUnlocks, type SkillMastery } from '@engine/mastery';
 import { MASTERY_THRESHOLD_CORRECT } from '@engine/tuning';
 import type { CannonId, SkillId } from '@content/schemas';
 import { SKILL_IDS } from '@content/schemas';
-import { cannons } from '@content/index';
+import { cannons, getCannon } from '@content/index';
 
 /** A mastery at exactly the threshold with perfect accuracy — clears both mastery gates. */
 const AT_THRESHOLD: SkillMastery = Object.freeze({
@@ -42,12 +42,17 @@ function allRangeCannonIds(): CannonId[] {
   return cannons.filter((c) => c.unlock.kind === 'range').map((c) => c.id);
 }
 
-describe('T-032 AC-5 — fully-mastered g4_5 earns every range gun through resolveUnlocks', () => {
-  it('spec(T-032:AC-5) dod(T-032:6) resolveUnlocks returns all eight range cannons from a starters-only placement', () => {
+describe('T-032 AC-5 — fully-mastered g4_5 earns every remaining range gun through resolveUnlocks', () => {
+  it('spec(T-032:AC-5) dod(T-032:6) resolveUnlocks returns remaining range cannons from a D-9 placement', () => {
     const P = resolvePlacement('g4_5');
+    const placementGrantedRange = ['six_pounder', 'twelve_pounder'] as const;
 
-    // Sanity: placement itself must not already own range guns (else the delta is empty — the bug).
+    // Sanity: D-9 exceptions are already owned; every other range gun stays for mastery.
     for (const id of allRangeCannonIds()) {
+      if ((placementGrantedRange as readonly string[]).includes(id)) {
+        expect(P.unlockedCannons, `placement grants D-9 exception '${id}'`).toContain(id);
+        continue;
+      }
       expect(P.unlockedCannons, `placement must leave '${id}' for mastery`).not.toContain(id);
     }
 
@@ -58,27 +63,34 @@ describe('T-032 AC-5 — fully-mastered g4_5 earns every range gun through resol
       unlockedIslands: P.unlockedIslands,
     });
 
-    const expected = allRangeCannonIds();
-    expect(expected.length, 'fixture sanity: catalog must have range cannons').toBe(8);
+    const expected = allRangeCannonIds().filter(
+      (id) => !(placementGrantedRange as readonly string[]).includes(id),
+    );
+    expect(expected.length, 'fixture sanity: catalog must have range cannons beyond D-9').toBeGreaterThan(
+      0,
+    );
     expect(sorted(newlyUnlocked)).toEqual(sorted(expected));
   });
 
-  it('spec(T-032:AC-5) returned cannons are all unlock.kind === range, cover every range id, and never re-list starters', () => {
+  it('spec(T-032:AC-5) returned cannons are all unlock.kind === range, cover remaining range ids, and never re-list starters', () => {
     const P = resolvePlacement('g4_5');
+    const placementGrantedRange = ['six_pounder', 'twelve_pounder'] as const;
     const { cannons: newlyUnlocked } = resolveUnlocks({
       mastery: masteryMapFor([...SKILL_IDS]),
       unlockedCannons: P.unlockedCannons,
       unlockedIslands: P.unlockedIslands,
     });
 
-    const expected = allRangeCannonIds();
+    const expected = allRangeCannonIds().filter(
+      (id) => !(placementGrantedRange as readonly string[]).includes(id),
+    );
     expect(sorted(newlyUnlocked)).toEqual(sorted(expected));
     for (const id of newlyUnlocked) {
       const cannon = cannons.find((c) => c.id === id);
       expect(cannon, `'${id}' must be a real catalog cannon`).toBeDefined();
       expect(cannon!.unlock.kind).toBe('range');
     }
-    for (const starter of P.unlockedCannons) {
+    for (const starter of P.unlockedCannons.filter((id) => getCannon(id).unlock.kind === 'starter')) {
       expect(newlyUnlocked, `must not re-list starter '${starter}'`).not.toContain(starter);
     }
   });

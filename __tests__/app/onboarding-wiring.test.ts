@@ -59,15 +59,11 @@ function fakeStorage(seed: Record<string, string> = {}) {
 
 /**
  * The cannons placement is allowed to grant at a band, DERIVED from the live catalog and owner
- * ruling D-6 ("placement grants ISLANDS to the band, and starter cannons only; every non-starter
- * cannon is earned"). Not a hand-copied id list and not a count: T-029 is queued to add a third
- * starter, and a literal here would turn that content change into a red test (L-012).
+ * rulings D-6 + D-9. Not a hand-copied id list: starters plus the two approved exceptions.
  */
-function expectedStarterCannons(maxGrade: number): CannonId[] {
-  return cannons
-    .filter((c) => c.unlock.kind === 'starter' && c.minGrade <= maxGrade)
-    .map((c) => c.id)
-    .sort();
+function expectedPlacementCannons(band: (typeof GRADE_BANDS)[number]): CannonId[] {
+  const placement = resolvePlacement(band);
+  return [...placement.unlockedCannons].sort();
 }
 
 const sorted = (ids: readonly CannonId[]): CannonId[] => [...ids].sort();
@@ -99,20 +95,24 @@ describe('A-005 onboarding wiring', () => {
     }
   });
 
-  it('spec(A-005:AC-1) placement grants STARTER cannons only, per owner ruling D-6', () => {
+  it('spec(A-005:AC-1) placement grants starters plus only D-9 exceptions, per owner rulings', () => {
     for (const band of GRADE_BANDS) {
       const fresh = createCaptainStore();
       commitGradeBand(fresh, band);
 
       const granted = fresh.getState().captain.ownedCannons;
-      expect(sorted(granted)).toEqual(expectedStarterCannons(resolvePlacement(band).maxGrade));
+      expect(sorted(granted)).toEqual(expectedPlacementCannons(band));
 
-      // Stated a second way, as a property: a `range` or `chest` cannon handed over at the picker
-      // is a reward granted for nothing, and it deletes the reason to practise (D-6).
       for (const id of granted) {
         const cannon = cannons.find((c) => c.id === id);
         expect(cannon, `granted unknown cannon ${id}`).toBeDefined();
-        expect(cannon?.unlock.kind, `${id} is not a starter at band ${band}`).toBe('starter');
+        const isStarter = cannon!.unlock.kind === 'starter';
+        const isException =
+          (id === 'six_pounder' && (band === 'g2_3' || band === 'g4_5')) ||
+          (id === 'twelve_pounder' && band === 'g4_5');
+        expect(isStarter || isException, `${id} is not an approved placement grant at ${band}`).toBe(
+          true,
+        );
       }
     }
   });

@@ -207,7 +207,13 @@ function GuidedDuelBody() {
           view.phase === 'perfect' ? { backgroundColor: color.gold } : null,
         ]}
       >
-        {view.phase === 'select' ? <CannonTray cannons={tray} onPick={pickCannon} /> : null}
+        {view.phase === 'select' ? (
+          <CannonTray
+            cannons={tray}
+            gradeBand={captain.gradeBand ?? 'k_1'}
+            onPick={pickCannon}
+          />
+        ) : null}
 
         {view.phase === 'question' && view.question !== null ? (
           <QuestionPanel

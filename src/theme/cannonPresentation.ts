@@ -40,6 +40,13 @@ export interface CannonLook {
   readonly spectacle: string | null;
 }
 
+/** Engine special-mechanic identity — presentation only; never read by damage (A-034). */
+export interface CannonWeaponLook {
+  readonly displayName: string | null;
+  readonly enabled: boolean;
+  readonly unavailableLabel: string | null;
+}
+
 export const cannonLook: Record<CannonId, CannonLook> = {
   swivel_gun: { glyph: '+', range: 'to 10', projectile: 'iron', arc: 'standard', spectacle: null },
   culverin: { glyph: '+', range: 'to 10', projectile: 'wobble', arc: 'high', spectacle: null },
@@ -75,6 +82,25 @@ export const cannonLook: Record<CannonId, CannonLook> = {
     arc: 'flat',
     spectacle: 'LIGHTNING',
   },
+};
+
+/** Special-weapon row on the tray — Double-Shot stays unavailable until T-022 ships. */
+export const cannonWeapon: Record<CannonId, CannonWeaponLook> = {
+  swivel_gun: { displayName: null, enabled: false, unavailableLabel: null },
+  culverin: { displayName: null, enabled: false, unavailableLabel: null },
+  saker: { displayName: null, enabled: false, unavailableLabel: null },
+  six_pounder: { displayName: null, enabled: false, unavailableLabel: null },
+  chain_shot: { displayName: null, enabled: false, unavailableLabel: null },
+  nine_pounder: { displayName: null, enabled: false, unavailableLabel: null },
+  twelve_pounder: { displayName: null, enabled: false, unavailableLabel: null },
+  mortar: { displayName: null, enabled: false, unavailableLabel: null },
+  double_broadside: {
+    displayName: 'Double-Shot',
+    enabled: false,
+    unavailableLabel: 'Double-Shot — coming later',
+  },
+  powder_keg: { displayName: null, enabled: false, unavailableLabel: null },
+  long_nine: { displayName: null, enabled: false, unavailableLabel: null },
 };
 
 /**
