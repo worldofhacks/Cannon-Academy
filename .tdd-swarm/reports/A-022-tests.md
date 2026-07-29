@@ -37,9 +37,9 @@ the projected cannon collection.
 
 | Criterion | Frozen evidence |
 |---|---|
-| AC-1 | Empty-unlock projection preserves actual coins and returns no cannons; the actual returned `VictoryPanel` JSX must place both `cannon.displayName` and the sole `NEW CANNON` badge inside its live `rewards.cannons.map` callback. Dead maps and unconditional badges fail. |
+| AC-1 | Empty-unlock projection preserves actual coins and returns no cannons; the actual returned `VictoryPanel` JSX must place both `cannon.displayName` and the sole `NEW CANNON` badge inside a `rewards.cannons.map` that is the direct JSX-expression payload. A `true ? null : map` mutation, dead maps, and unconditional badges fail. |
 | AC-2 | One deliberately reversed outcome contains every id in the real cannon catalog and must return each exact catalog object in that order; AST inspection rejects authored catalog display names in returned `VictoryPanel` JSX. |
-| AC-3 | Real `applyDuelOutcome` crosses the subtraction mastery threshold, then the same projected cannon is owned and appears `isNew` in existing `deckSlots`; one scoped AST/dataflow check follows the exact settlement binding through its matching state setter and `retainFirstApplied` into the rendered `VictoryPanel` prop. |
+| AC-3 | Real `applyDuelOutcome` crosses the subtraction mastery threshold, then the same projected cannon is owned and appears `isNew` in existing `deckSlots`; one scoped AST/dataflow check follows the exact settlement binding through its matching state setter and `retainFirstApplied` into the rendered `VictoryPanel` prop. The prop must be exactly the projection call or a direct projection alias; a `true ? fakeRewards : victoryRewards(retained)` mutation fails. |
 | AC-4 | Pure sequential behavior retains the first applied object by identity after a no-payment observation and retains `null` when no applied outcome has occurred. The scoped wiring check requires the screen to use that helper on the exact settlement result. |
 
 ## Baseline and RED evidence

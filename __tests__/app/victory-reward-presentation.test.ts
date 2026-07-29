@@ -88,14 +88,11 @@ function rewardOutcome(overrides: Partial<DuelRewardOutcome> = {}): DuelRewardOu
   };
 }
 
-function sourceFile(relativePath: string): ts.SourceFile {
-  return ts.createSourceFile(
-    relativePath,
-    readFileSync(join(REPO_ROOT, relativePath), 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
+function sourceFile(
+  relativePath: string,
+  source = readFileSync(join(REPO_ROOT, relativePath), 'utf8'),
+): ts.SourceFile {
+  return ts.createSourceFile(relativePath, source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 }
 
 function descendants(root: ts.Node): readonly ts.Node[] {
@@ -236,24 +233,11 @@ function hasLiveProjectedCannonRows(file: ts.SourceFile): boolean {
       (ts.isJsxText(node) || ts.isStringLiteralLike(node)) &&
       node.getText(file).replace(/['"]/g, '').trim() === 'NEW CANNON',
   );
-  const staticallyDead = (() => {
-    let current = map.parent;
-    while (current !== undefined && current !== returned) {
-      if (
-        ts.isBinaryExpression(current) &&
-        current.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken &&
-        isInside(map, current.right) &&
-        current.left.kind === ts.SyntaxKind.FalseKeyword
-      ) {
-        return true;
-      }
-      current = current.parent;
-    }
-    return false;
-  })();
+  const isDirectJsxPayload =
+    ts.isJsxExpression(map.parent) && map.parent.expression !== undefined && map.parent.expression === map;
 
   return (
-    !staticallyDead &&
+    isDirectJsxPayload &&
     displayNames.length === 1 &&
     newClaims.length === 1 &&
     newClaims.every((claim) => isInside(claim, callback.body))
@@ -279,35 +263,26 @@ function projectionArgument(
   ) {
     return null;
   }
-  const direct = descendants(attribute.initializer.expression).find(
-    (node): node is ts.CallExpression =>
-      ts.isCallExpression(node) && node.expression.getText(file) === 'victoryRewards',
-  );
-  if (direct !== undefined) {
-    const argument = direct.arguments[0];
+  const expression = attribute.initializer.expression;
+  if (ts.isCallExpression(expression) && expression.expression.getText(file) === 'victoryRewards') {
+    const argument = expression.arguments[0];
     return argument !== undefined && ts.isIdentifier(argument) ? argument.text : null;
   }
 
-  const aliases = descendants(attribute.initializer.expression)
-    .filter(ts.isIdentifier)
-    .map((identifier) => identifier.text);
+  if (!ts.isIdentifier(expression)) return null;
   const declaration = directVariableDeclarations(screen.body).find(
     (node): node is ts.VariableDeclaration =>
       ts.isVariableDeclaration(node) &&
       ts.isIdentifier(node.name) &&
-      aliases.includes(node.name.text) &&
+      node.name.text === expression.text &&
       node.initializer !== undefined &&
-      descendants(node.initializer).some(
-        (child) => ts.isCallExpression(child) && child.expression.getText(file) === 'victoryRewards',
-      ),
+      ts.isCallExpression(node.initializer) &&
+      node.initializer.expression.getText(file) === 'victoryRewards',
   );
   const call =
-    declaration?.initializer === undefined
-      ? undefined
-      : descendants(declaration.initializer).find(
-          (node): node is ts.CallExpression =>
-            ts.isCallExpression(node) && node.expression.getText(file) === 'victoryRewards',
-        );
+    declaration?.initializer !== undefined && ts.isCallExpression(declaration.initializer)
+      ? declaration.initializer
+      : undefined;
   const argument = call?.arguments[0];
   return argument !== undefined && ts.isIdentifier(argument) ? argument.text : null;
 }
@@ -408,6 +383,16 @@ describe('A-022 truthful victory reward projection', () => {
 
 describe('A-022 victory panel source contract', () => {
   it('spec(A-022:AC-1) puts the actual name and NEW CANNON badge only inside the live projected row iteration', () => {
+    const deadConditional = sourceFile(
+      'dead-victory-panel.tsx',
+      `function VictoryPanel({ rewards }) {
+        return <View>{true ? null : rewards.cannons.map((cannon) => (
+          <View><Text>{cannon.displayName}</Text><Text>NEW CANNON</Text></View>
+        ))}</View>;
+      }`,
+    );
+
+    expect(hasLiveProjectedCannonRows(deadConditional)).toBe(false);
     expect(hasLiveProjectedCannonRows(sourceFile(PANELS_PATH))).toBe(true);
   });
 
@@ -458,6 +443,19 @@ describe('A-022 settlement reaches presentation and the existing gun deck', () =
   });
 
   it('spec(A-022:AC-3) binds the exact settlement result through one retained identity into the rendered panel', () => {
+    const alternatePropBranch = sourceFile(
+      'alternate-reward-prop.tsx',
+      `function DuelScreen() {
+        const [retained, setRetained] = useState(null);
+        useEffect(() => {
+          const observed = applyDuelOutcome(store, state);
+          setRetained((current) => retainFirstApplied(current, observed));
+        }, []);
+        return <VictoryPanel rewards={true ? fakeRewards : victoryRewards(retained)} />;
+      }`,
+    );
+
+    expect(hasExactSettlementToPanelChain(alternatePropBranch)).toBe(false);
     expect(hasExactSettlementToPanelChain(sourceFile(DUEL_PATH))).toBe(true);
   });
 });
