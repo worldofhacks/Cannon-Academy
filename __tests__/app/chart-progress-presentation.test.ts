@@ -204,16 +204,13 @@ function opaqueSvgRectangles(file: ts.SourceFile): number {
   return count;
 }
 
-function topLevelInitializers(file: ts.SourceFile): ReadonlyMap<string, ts.Expression> {
+function allInitializers(file: ts.SourceFile): ReadonlyMap<string, ts.Expression> {
   const result = new Map<string, ts.Expression>();
-  for (const statement of file.statements) {
-    if (!ts.isVariableStatement(statement)) continue;
-    for (const declaration of statement.declarationList.declarations) {
-      if (ts.isIdentifier(declaration.name) && declaration.initializer !== undefined) {
-        result.set(declaration.name.text, declaration.initializer);
-      }
+  visit(file, (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.initializer !== undefined) {
+      result.set(node.name.text, node.initializer);
     }
-  }
+  });
   return result;
 }
 
@@ -246,6 +243,26 @@ function styleProperties(
     if (initializer === undefined) return properties;
     return styleProperties(initializer, initializers, new Set([...seen, expression.text]));
   }
+  if (ts.isPropertyAccessExpression(expression) && ts.isIdentifier(expression.expression)) {
+    const owner = initializers.get(expression.expression.text);
+    if (
+      owner !== undefined &&
+      ts.isCallExpression(owner) &&
+      ts.isPropertyAccessExpression(owner.expression) &&
+      owner.expression.name.text === 'create'
+    ) {
+      const sheet = owner.arguments[0];
+      if (sheet !== undefined && ts.isObjectLiteralExpression(sheet)) {
+        const entry = sheet.properties.find(
+          (property): property is ts.PropertyAssignment =>
+            ts.isPropertyAssignment(property) &&
+            (ts.isIdentifier(property.name) || ts.isStringLiteral(property.name)) &&
+            property.name.text === expression.name.text,
+        );
+        if (entry !== undefined) return styleProperties(entry.initializer, initializers, seen);
+      }
+    }
+  }
   if (ts.isPropertyAccessExpression(expression) && expression.name.text === 'absoluteFillObject') {
     for (const name of ['position', 'top', 'right', 'bottom', 'left']) properties.set(name, undefined);
     return properties;
@@ -272,7 +289,7 @@ function styleProperties(
 
 function opaqueAbsoluteViewWashes(file: ts.SourceFile): number {
   const nativeImports = importedJsxExports(file, 'react-native');
-  const initializers = topLevelInitializers(file);
+  const initializers = allInitializers(file);
   const animatedDefaults = new Set<string>();
   for (const statement of file.statements) {
     if (
@@ -376,17 +393,144 @@ function usesResultProperty(node: ts.Node, resultName: string, propertyName: str
   return found;
 }
 
-function containsJsxTag(node: ts.Node, tag: string): boolean {
-  let found = false;
+function countJsxTags(node: ts.Node, tag: string): number {
+  let count = 0;
   visit(node, (candidate) => {
     if (
       (ts.isJsxOpeningElement(candidate) || ts.isJsxSelfClosingElement(candidate)) &&
       jsxTagParts(candidate.tagName).at(-1) === tag
     ) {
-      found = true;
+      count += 1;
     }
   });
-  return found;
+  return count;
+}
+
+function propertyTruth(
+  expression: ts.Expression,
+  resultName: string,
+  propertyName: string,
+): boolean | undefined {
+  if (usesResultProperty(expression, resultName, propertyName)) {
+    if (ts.isPrefixUnaryExpression(expression) && expression.operator === ts.SyntaxKind.ExclamationToken) {
+      return false;
+    }
+    if (
+      ts.isPropertyAccessExpression(expression) ||
+      ts.isElementAccessExpression(expression) ||
+      ts.isParenthesizedExpression(expression)
+    ) {
+      return true;
+    }
+  }
+  return undefined;
+}
+
+function stringComparisonTruth(
+  expression: ts.Expression,
+  resultName: string,
+  propertyName: string,
+  value: string,
+): boolean | undefined {
+  if (!ts.isBinaryExpression(expression) || !usesResultProperty(expression, resultName, propertyName)) {
+    return undefined;
+  }
+  const literal = ts.isStringLiteral(expression.left)
+    ? expression.left
+    : ts.isStringLiteral(expression.right)
+      ? expression.right
+      : undefined;
+  if (literal?.text !== value) return undefined;
+  if (
+    expression.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken ||
+    expression.operatorToken.kind === ts.SyntaxKind.EqualsEqualsToken
+  ) {
+    return true;
+  }
+  if (
+    expression.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken ||
+    expression.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsToken
+  ) {
+    return false;
+  }
+  return undefined;
+}
+
+interface MarkerBindingFacts {
+  readonly accessibilityFlows: boolean;
+  readonly clearedHeadExclusive: boolean;
+  readonly pressabilityExact: boolean;
+}
+
+function markerBindingFacts(station: ts.SourceFile): MarkerBindingFacts {
+  const layoutImports = importedJsxExports(station, './layout');
+  const localNames = [...layoutImports.named.entries()]
+    .filter(([, imported]) => imported === 'stationPresentation')
+    .map(([local]) => local);
+  const marker = namedFunction(station, 'StationMarker');
+  if (marker === undefined || localNames.length !== 1) {
+    return { accessibilityFlows: false, clearedHeadExclusive: false, pressabilityExact: false };
+  }
+  const resultName = resultBindingForCall(marker, localNames);
+  if (resultName === undefined) {
+    return { accessibilityFlows: false, clearedHeadExclusive: false, pressabilityExact: false };
+  }
+
+  let accessibilityFlows = false;
+  let controlledPressables = 0;
+  let controlledClearedHeads = 0;
+  visit(marker, (node) => {
+    if (
+      ts.isJsxAttribute(node) &&
+      node.name.getText() === 'accessibilityLabel' &&
+      usesResultProperty(node, resultName, 'accessibilityLabel')
+    ) {
+      accessibilityFlows = true;
+    }
+    if (ts.isConditionalExpression(node)) {
+      const tapTruth = propertyTruth(node.condition, resultName, 'tappable');
+      if (tapTruth !== undefined) {
+        const pressBranch = tapTruth ? node.whenTrue : node.whenFalse;
+        const plainBranch = tapTruth ? node.whenFalse : node.whenTrue;
+        if (countJsxTags(plainBranch, 'Pressable') === 0) {
+          controlledPressables += countJsxTags(pressBranch, 'Pressable');
+        }
+      }
+      const clearTruth = stringComparisonTruth(node.condition, resultName, 'markerHead', 'cleared');
+      if (clearTruth !== undefined) {
+        const clearBranch = clearTruth ? node.whenTrue : node.whenFalse;
+        const otherBranch = clearTruth ? node.whenFalse : node.whenTrue;
+        if (countJsxTags(otherBranch, 'ClearedHead') === 0) {
+          controlledClearedHeads += countJsxTags(clearBranch, 'ClearedHead');
+        }
+      }
+    }
+  });
+
+  const statements = marker.body?.statements ?? [];
+  for (let index = 0; index < statements.length; index += 1) {
+    const statement = statements[index];
+    if (statement === undefined || !ts.isIfStatement(statement)) continue;
+    const truth = propertyTruth(statement.expression, resultName, 'tappable');
+    if (truth === undefined) continue;
+    const next = statements.slice(index + 1).find((candidate) => ts.isReturnStatement(candidate));
+    if (next === undefined) continue;
+    const trueBranch = statement.thenStatement;
+    const falseBranch = statement.elseStatement ?? next;
+    const pressBranch = truth ? trueBranch : falseBranch;
+    const plainBranch = truth ? falseBranch : trueBranch;
+    if (countJsxTags(plainBranch, 'Pressable') === 0) {
+      controlledPressables += countJsxTags(pressBranch, 'Pressable');
+    }
+  }
+
+  const totalPressables = countJsxTags(marker, 'Pressable');
+  const totalClearedHeads = countJsxTags(marker, 'ClearedHead');
+  return {
+    accessibilityFlows,
+    pressabilityExact: totalPressables > 0 && controlledPressables === totalPressables,
+    clearedHeadExclusive: totalClearedHeads > 0 && controlledClearedHeads === totalClearedHeads,
+  };
 }
 
 describe('A-024 chart progress presentation', () => {
@@ -508,11 +652,23 @@ describe('A-024 chart progress presentation', () => {
     );
     const rectangularView = ts.createSourceFile(
       'Rectangle.tsx',
-      `import { View as Wash } from 'react-native';
-       export const Fog = () => <Wash style={{
+      `import { StyleSheet, View as Wash } from 'react-native';
+       const styles = StyleSheet.create({ wash: {
          position: 'absolute', left: 0, right: 0, top: 10, bottom: 0,
-         backgroundColor: '#aabbcc', opacity: 0.9
-       }} />;`,
+         backgroundColor: '#aabbcc'
+       }});
+       export function Fog() {
+         const local = {
+           position: 'absolute', left: 0, right: 0, top: 10, bottom: 0,
+           backgroundColor: '#aabbcc'
+         };
+         return <>
+           <Wash style={{ position: 'absolute', left: 0, right: 0, top: 10, bottom: 0,
+             backgroundColor: '#aabbcc' }} />
+           <Wash style={local} />
+           <Wash style={styles.wash} />
+         </>;
+       }`,
       ts.ScriptTarget.ESNext,
       true,
       ts.ScriptKind.TSX,
@@ -520,7 +676,7 @@ describe('A-024 chart progress presentation', () => {
 
     expect(opaqueSvgRectangles(irregularSvg)).toBe(0);
     expect(opaqueAbsoluteViewWashes(irregularSvg)).toBe(0);
-    expect(opaqueAbsoluteViewWashes(rectangularView)).toBe(1);
+    expect(opaqueAbsoluteViewWashes(rectangularView)).toBe(3);
   });
 
   it('spec(A-024:AC-3) fogged accessibility keeps the island name and readable requirement', () => {
@@ -560,6 +716,11 @@ describe('A-024 chart progress presentation', () => {
     );
     const staleNear = chartNodes(captain({ unlockedIslands: [first], currentIsland: 'isla_products' }));
     const staleFar = chartNodes(captain({ unlockedIslands: [first], currentIsland: 'fraction_reef' }));
+    const foggedMasteredIsland = islands.find((island) => island.id === 'isla_products');
+    if (foggedMasteredIsland === undefined) throw new Error('fixture: catalog omitted isla_products');
+    const foggedMastered = chartNodes(
+      captain({ unlockedIslands: [first], mastery: masteryFor(foggedMasteredIsland.rangeSkills) }),
+    );
 
     const actual = [
       stateFor(current, first, true),
@@ -575,6 +736,7 @@ describe('A-024 chart progress presentation', () => {
     expect(stateFor(staleNear, 'isla_products', true)).toBe('locked-near');
     expect(nodeById(staleFar, 'fraction_reef')).toMatchObject({ fogged: true, isCurrent: true });
     expect(stateFor(staleFar, 'fraction_reef', true)).toBe('far-silhouette');
+    expect(stateFor(foggedMastered, 'isla_products', false)).toBe('locked-near');
   });
 
   it('spec(A-024:AC-4) possible states have distinct labels/heads and only unfogged nodes tap', () => {
@@ -644,63 +806,47 @@ describe('A-024 chart progress presentation', () => {
   });
 
   it('spec(A-024:AC-4) StationMarker dataflows presentation into label, tap branch, and tick head', () => {
-    const station = sourceFile('src/components/chart/Station.tsx');
-    const layoutImports = importedJsxExports(station, './layout');
-    const localNames = [...layoutImports.named.entries()]
-      .filter(([, imported]) => imported === 'stationPresentation')
-      .map(([local]) => local);
-    const marker = namedFunction(station, 'StationMarker');
-    expect(marker, 'StationMarker must remain an inspectable named function').toBeDefined();
-    expect(localNames, 'StationMarker must import stationPresentation from layout.ts').toHaveLength(1);
-    if (marker === undefined) return;
-    const resultName = resultBindingForCall(marker, localNames);
-    expect(resultName, 'stationPresentation return value must be retained').toBeTypeOf('string');
-    if (resultName === undefined) return;
-
-    let labelFlows = false;
-    let tappableControlsBranch = false;
-    let clearedHeadBound = false;
-    visit(marker, (node) => {
-      if (
-        ts.isJsxAttribute(node) &&
-        node.name.getText() === 'accessibilityLabel' &&
-        usesResultProperty(node, resultName, 'accessibilityLabel')
-      ) {
-        labelFlows = true;
-      }
-      if (
-        ((ts.isIfStatement(node) && usesResultProperty(node.expression, resultName, 'tappable')) ||
-          (ts.isConditionalExpression(node) && usesResultProperty(node.condition, resultName, 'tappable'))) &&
-        containsJsxTag(marker, 'Pressable')
-      ) {
-        tappableControlsBranch = true;
-      }
-      if (
-        ((ts.isIfStatement(node) && usesResultProperty(node.expression, resultName, 'markerHead')) ||
-          (ts.isConditionalExpression(node) &&
-            usesResultProperty(node.condition, resultName, 'markerHead'))) &&
-        node.getText().includes("'cleared'") &&
-        containsJsxTag(node, 'ClearedHead')
-      ) {
-        clearedHeadBound = true;
-      }
-      if (
-        ts.isSwitchStatement(node) &&
-        usesResultProperty(node.expression, resultName, 'markerHead') &&
-        node.caseBlock.clauses.some(
-          (clause) =>
-            ts.isCaseClause(clause) &&
-            ts.isStringLiteral(clause.expression) &&
-            clause.expression.text === 'cleared' &&
-            containsJsxTag(clause, 'ClearedHead'),
-        )
-      ) {
-        clearedHeadBound = true;
-      }
+    expect(markerBindingFacts(sourceFile('src/components/chart/Station.tsx'))).toEqual({
+      accessibilityFlows: true,
+      pressabilityExact: true,
+      clearedHeadExclusive: true,
     });
+  });
 
-    expect(labelFlows, 'presentation.accessibilityLabel must reach rendered accessibilityLabel').toBe(true);
-    expect(tappableControlsBranch, 'presentation.tappable must control the Pressable branch').toBe(true);
-    expect(clearedHeadBound, 'only markerHead cleared may select ClearedHead/its green tick').toBe(true);
+  it('spec(A-024:AC-4) marker guard rejects dead tap checks and duplicate available green ticks', () => {
+    const deadTapCheck = ts.createSourceFile(
+      'Dead.tsx',
+      `import { stationPresentation } from './layout';
+       export function StationMarker({ node, state, requirement, onSail }) {
+         const p = stationPresentation(node, state, requirement);
+         if (p.tappable) {}
+         return <Pressable accessibilityLabel={p.accessibilityLabel} onPress={onSail} />;
+       }`,
+      ts.ScriptTarget.ESNext,
+      true,
+      ts.ScriptKind.TSX,
+    );
+    const duplicateTick = ts.createSourceFile(
+      'Duplicate.tsx',
+      `import { stationPresentation } from './layout';
+       export function StationMarker({ node, state, requirement, onSail }) {
+         const p = stationPresentation(node, state, requirement);
+         const head = p.markerHead === 'cleared' ? <ClearedHead /> : <View />;
+         const leak = p.markerHead === 'available' ? <ClearedHead /> : null;
+         return p.tappable
+           ? <Pressable accessibilityLabel={p.accessibilityLabel} onPress={onSail}>{head}{leak}</Pressable>
+           : <View accessible accessibilityLabel={p.accessibilityLabel}>{head}</View>;
+       }`,
+      ts.ScriptTarget.ESNext,
+      true,
+      ts.ScriptKind.TSX,
+    );
+
+    expect(markerBindingFacts(deadTapCheck).pressabilityExact).toBe(false);
+    expect(markerBindingFacts(duplicateTick)).toMatchObject({
+      accessibilityFlows: true,
+      pressabilityExact: true,
+      clearedHeadExclusive: false,
+    });
   });
 });

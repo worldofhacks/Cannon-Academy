@@ -8,10 +8,11 @@ existing test file was changed.
 
 ## Meaningful RED
 
-`npx vitest run __tests__/app/chart-progress-presentation.test.ts` executes ten tests: nine fail
-against the pre-implementation tree for the intended missing behaviors, while one adversarial
-analyzer test passes by proving the fog guard allows an irregular SVG path and rejects an opaque
-absolute `View`.
+`npx vitest run __tests__/app/chart-progress-presentation.test.ts` executes eleven tests: nine fail
+against the pre-implementation tree for the intended missing behaviors, while two adversarial
+analyzer tests pass. They prove the fog guard allows an irregular SVG path while rejecting inline,
+function-local, and `StyleSheet.create` rectangle styles, and prove the marker guard rejects an
+empty tappability check plus unconditional `Pressable` and a duplicate available green tick.
 
 | Criterion | Frozen behavior | Pre-implementation failure |
 | --- | --- | --- |
@@ -37,14 +38,17 @@ errors, invalid fixtures, comments, or decoy regex matches.
 - A strict subset fixture masters every real Port Sumwich range skill except the last, preventing
   an incorrect `some(isMastered)` implementation.
 - The five-state matrix uses possible node/state pairs, then adds stale persisted `isCurrent` plus
-  forced focus on both near and far fog nodes to freeze fog precedence.
+  forced focus on both near and far fog nodes and a fully mastered-but-fogged node to freeze fog
+  precedence.
 - `stationPresentation` owns marker head, semantic accessibility label, and tappability. A
   TypeScript-AST dataflow check requires `StationMarker` to retain its return value, feed the label
-  to the rendered accessibility prop, use tappability in control flow, and select `ClearedHead`
-  only through the `markerHead === 'cleared'` branch. Available has a distinct non-cleared head.
+  to the rendered accessibility prop, return `Pressable` exactly on the tappable branch and a
+  non-Pressable otherwise, and select every `ClearedHead` only through the
+  `markerHead === 'cleared'` branch. Available has a distinct non-cleared head.
 - Fog structure is resolved from real import declarations, JSX tags, and recursively composed
-  local style objects. Filled SVG rectangles and absolutely spanning painted `View`/
-  `Animated.View` washes fail; irregular SVG paths and imported `Blob` weather remain legal.
+  inline/function-local/`StyleSheet.create` style objects. Filled SVG rectangles and absolutely
+  spanning painted `View`/`Animated.View` washes fail; irregular SVG paths and imported `Blob`
+  weather remain legal.
 
 ## Criterion mapping
 
@@ -59,7 +63,7 @@ errors, invalid fixtures, comments, or decoy regex matches.
 
 | Command | Result |
 | --- | --- |
-| `npx vitest run __tests__/app/chart-progress-presentation.test.ts` | EXPECTED RED — 1 file, 9 failed for missing A-024 behavior and 1 analyzer contract passed |
+| `npx vitest run __tests__/app/chart-progress-presentation.test.ts` | EXPECTED RED — 1 file, 9 missing-behavior failures and 2 adversarial analyzer contracts passed |
 | `npx vitest run --exclude __tests__/app/chart-progress-presentation.test.ts` | PASS — baseline 43 files, 2,034 tests |
 | `npx prettier --check __tests__/app/chart-progress-presentation.test.ts` | PASS |
 | `npx eslint __tests__/app/chart-progress-presentation.test.ts --max-warnings 0` | PASS |
