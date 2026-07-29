@@ -43,6 +43,12 @@ export interface CannonLook {
 export const cannonLook: Record<CannonId, CannonLook> = {
   swivel_gun: { glyph: '+', range: 'to 10', projectile: 'iron', arc: 'standard', spectacle: null },
   culverin: { glyph: '+', range: 'to 10', projectile: 'wobble', arc: 'high', spectacle: null },
+  /**
+   * T-029's K-1 payoff gun — the one a five-year-old earns at Port Sumwich for mastering
+   * `add_within_10`, the skill their two starter guns already fire. It reads as a starter (same
+   * glyph, same range hint) because it IS the same skill; what it adds is damage, not reach.
+   */
+  saker: { glyph: '+', range: 'to 10', projectile: 'iron', arc: 'standard', spectacle: null },
   six_pounder: { glyph: '+', range: 'to 20', projectile: 'iron', arc: 'standard', spectacle: null },
   chain_shot: { glyph: '−', range: 'to 20', projectile: 'chain', arc: 'standard', spectacle: null },
   nine_pounder: { glyph: '×', range: 'times', projectile: 'iron', arc: 'standard', spectacle: null },

@@ -27,12 +27,12 @@ ticket numbering and not tidiness.
 
 **Checklist-critical, must land:**
 
-| ticket | checklist item                                          | state                                                               |
-| ------ | ------------------------------------------------------- | ------------------------------------------------------------------- |
-| A-016  | 5 — win a real duel against a bot                       | shipped, now specified                                              |
-| A-017  | 10 — time out a question and see the misfire            | shipped, now specified                                              |
-| A-014  | 5 — the four-choice questions a child is actually asked | **not built** (all fake)                                            |
-| A-015  | 4 — an easy guided duel you win                         | **not built** (23-line stub)                                        |
+| ticket | checklist item                                          | state                                                         |
+| ------ | ------------------------------------------------------- | ------------------------------------------------------------- |
+| A-016  | 5 — win a real duel against a bot                       | shipped, now specified                                        |
+| A-017  | 10 — time out a question and see the misfire            | shipped, now specified                                        |
+| A-014  | 5 — the four-choice questions a child is actually asked | **not built** (all fake)                                      |
+| A-015  | 4 — an easy guided duel you win                         | **not built** (23-line stub)                                  |
 | A-011  | 5 — "two starter cannons that are a real choice"        | **in flight** — `TRAY_CAPACITY` unblocked; frozen suite ready |
 
 **Not checklist-critical — droppable if Friday is tight**, and PLAN.md says so itself:
@@ -95,10 +95,10 @@ work rides along for free and can be abandoned mid-wave without stalling the pat
 
 ## Wave A7
 
-| id    | title                                        | status  | deps                | model    |
-| ----- | -------------------------------------------- | ------- | ------------------- | -------- |
+| id    | title                                        | status        | deps                | model    |
+| ----- | -------------------------------------------- | ------------- | ------------------- | -------- |
 | A-014 | Retire the placeholder question generator    | review-passed | A-001, A-016, A-017 | standard |
-| A-011 | Gun deck — which three cannons sail with you | in-progress | A-001            | standard |
+| A-011 | Gun deck — which three cannons sail with you | in-progress   | A-001               | standard |
 
 ## Wave A8
 
