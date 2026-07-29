@@ -11,7 +11,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Destination } from '../../src/services/flow';
 import { resolveDestination } from '../../src/services/flow';
 import { hydrate, persist, type KeyValueStore } from '../../src/services/persistence';
-import { emptyCaptain } from '../../src/stores/player';
+import { createCaptainStore, emptyCaptain, type Captain } from '../../src/stores/player';
 
 interface LaunchGate {
   readonly acknowledged: boolean;
@@ -103,6 +103,17 @@ function typographyNumber(node: ts.JsxElement, property: 'fontSize' | 'lineHeigh
   return Number(match?.[1]);
 }
 
+function callNamed(root: ts.Node, receiver: string, method: string): ts.CallExpression[] {
+  return descendants(
+    root,
+    (node): node is ts.CallExpression =>
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.expression.getText() === receiver &&
+      node.expression.name.text === method,
+  );
+}
+
 function fakeStorage(seed: Record<string, string> = {}) {
   const data = new Map(Object.entries(seed));
   const store: KeyValueStore = {
@@ -112,6 +123,21 @@ function fakeStorage(seed: Record<string, string> = {}) {
     },
   };
   return { store, data };
+}
+
+/** A shape-valid returning captain whose resolver destination is the chart, with real progress. */
+function returningCaptain(): Captain {
+  const store = createCaptainStore();
+  const state = store.getState();
+  state.setGradeBand('k_1');
+  state.setNameAndFlag('Ada', 'flag-3');
+  state.completeOnboarding();
+  state.markGuidedDuelFought();
+  state.addCoins(37);
+  state.recordDuelResult({ won: true });
+  const captain = store.getState().captain;
+  expect(resolveDestination(captain)).toBe('chart');
+  return captain;
 }
 
 describe('A-042 launch gate and ship picker', () => {
@@ -181,17 +207,21 @@ describe('A-042 launch gate and ship picker', () => {
 
   it('spec(A-042:AC-3) synchronous double start navigates once to the captured resolver result', async () => {
     const [{ createLaunchGate }, layout] = await Promise.all([loadLaunchGate(), layoutSource()]);
-    const gate = createLaunchGate();
-    const savedDestination = resolveDestination(emptyCaptain());
-    const navigate = vi.fn();
+    const savedDestinations = [resolveDestination(emptyCaptain()), resolveDestination(returningCaptain())];
+    expect(savedDestinations).toEqual(['onboarding', 'chart']);
 
-    gate.markReady(savedDestination);
-    // Same event turn: React has no opportunity to rerender or apply a disabled prop between calls.
-    expect(gate.start(navigate)).toBe(true);
-    expect(gate.start(navigate)).toBe(false);
-    expect(navigate).toHaveBeenCalledTimes(1);
-    expect(navigate).toHaveBeenCalledWith(savedDestination);
-    expect(gate.acknowledged).toBe(true);
+    for (const savedDestination of savedDestinations) {
+      const gate = createLaunchGate();
+      const navigate = vi.fn();
+      gate.markReady(savedDestination);
+
+      // Same event turn: React cannot rerender or apply a disabled prop between these calls.
+      expect(gate.start(navigate)).toBe(true);
+      expect(gate.start(navigate)).toBe(false);
+      expect(navigate).toHaveBeenCalledTimes(1);
+      expect(navigate).toHaveBeenCalledWith(savedDestination);
+      expect(gate.acknowledged).toBe(true);
+    }
 
     // Hydration resolves once, saves that exact value, and passes the saved value to the gate.
     expect(layout).toMatch(
@@ -204,20 +234,77 @@ describe('A-042 launch gate and ship picker', () => {
     expect(layout).toMatch(
       /launchGate\.start\(\(resolvedDestination\)\s*=>\s*router\.replace\(`\/\$\{resolvedDestination\}`\)\)/,
     );
-    expect(layout.match(/router\.replace\s*\(/g) ?? []).toHaveLength(1);
     const onStart = layout.match(/onStart=\{\(\)\s*=>\s*\{([\s\S]*?)\n\s*}\}/)?.[1] ?? '';
     expect(onStart).not.toMatch(
       /resolveDestination|captain\.|['"]\/(?:onboarding|name-flag|chart|gun-deck|duel)['"]/,
     );
+
+    // Navigation is a capability boundary, not a spelling count. The sole expo-router import is
+    // the unaliased router, its sole runtime reference is the inline callback passed to
+    // launchGate.start, and no readiness effect can retain or invoke a wrapper/alias.
+    const ast = parseTsx(layout, '_layout.tsx');
+    const root = namedFunction(ast, 'RootLayout');
+    const expoImports = ast.statements.filter(
+      (statement): statement is ts.ImportDeclaration =>
+        ts.isImportDeclaration(statement) &&
+        ts.isStringLiteral(statement.moduleSpecifier) &&
+        statement.moduleSpecifier.text === 'expo-router',
+    );
+    expect(expoImports, 'one auditable expo-router capability import').toHaveLength(1);
+    const bindings = expoImports[0]?.importClause?.namedBindings;
+    expect(bindings && ts.isNamedImports(bindings), 'expo-router must use named imports').toBe(true);
+    const importedNames =
+      bindings && ts.isNamedImports(bindings)
+        ? bindings.elements.map((element) => ({
+            imported: element.propertyName?.text ?? element.name.text,
+            local: element.name.text,
+          }))
+        : [];
+    expect(importedNames).toEqual([
+      { imported: 'Stack', local: 'Stack' },
+      { imported: 'router', local: 'router' },
+    ]);
+    expect(
+      descendants(
+        ast,
+        (node): node is ts.StringLiteral => ts.isStringLiteral(node) && node.text === 'expo-router',
+      ),
+      'no second require/dynamic import can smuggle in a routing alias',
+    ).toHaveLength(1);
+
+    const starts = callNamed(root, 'launchGate', 'start');
+    const replacements = callNamed(root, 'router', 'replace');
+    expect(starts, 'root dispatches through the one-shot gate once').toHaveLength(1);
+    expect(replacements, 'root owns exactly one router.replace call').toHaveLength(1);
+    const startCallback = starts[0]?.arguments[0];
+    expect(startCallback && ts.isArrowFunction(startCallback), 'start receives an inline callback').toBe(
+      true,
+    );
+    expect(
+      startCallback ? callNamed(startCallback, 'router', 'replace') : [],
+      'the sole replace is inside launchGate.start',
+    ).toHaveLength(1);
+    expect(
+      descendants(root, (node): node is ts.Identifier => ts.isIdentifier(node) && node.text === 'router'),
+      'router cannot be destructured, retained, wrapped, or used in an effect',
+    ).toHaveLength(1);
+    for (const effect of descendants(
+      root,
+      (node): node is ts.CallExpression =>
+        ts.isCallExpression(node) && ts.isIdentifier(node.expression) && node.expression.text === 'useEffect',
+    )) {
+      expect(effect.getText(ast)).not.toMatch(/\brouter\b|\bredirect\b|\bnavigate\b/);
+    }
   });
 
   it('spec(A-042:AC-4) fresh gate resets acknowledgement while persisted captain resolves identically', async () => {
     const { createLaunchGate } = await loadLaunchGate();
     const io = fakeStorage();
-    const captain = emptyCaptain();
+    const captain = returningCaptain();
     await persist(io.store, captain);
 
     const firstDestination = resolveDestination(captain);
+    expect(firstDestination).toBe('chart');
     const first = createLaunchGate();
     first.markReady(firstDestination);
     expect(first.start(vi.fn())).toBe(true);
@@ -226,6 +313,10 @@ describe('A-042 launch gate and ship picker', () => {
     const { captain: relaunchedCaptain } = await hydrate(io.store);
     const relaunchedDestination = resolveDestination(relaunchedCaptain);
     const freshProcess = createLaunchGate();
+    expect(relaunchedCaptain).toEqual(captain);
+    expect(relaunchedCaptain.coins).toBe(37);
+    expect(relaunchedCaptain.wins).toBe(1);
+    expect(relaunchedDestination).toBe('chart');
     expect(freshProcess.acknowledged).toBe(false);
     expect(relaunchedDestination).toBe(firstDestination);
 
