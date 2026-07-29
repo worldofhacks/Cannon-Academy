@@ -1,0 +1,210 @@
+# App track — handoff, 2026-07-29 10:10
+
+**Submission target: today, ~12:00.** Read this file, then `git log --oneline -15`, before anything.
+Supersedes `STATE.md` (which is now stale — it predates the chart rebuild, D-8, A-016 and A-017).
+
+---
+
+## 1. Where the code is
+
+|                    |                                                                                                                                                                         |
+| ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Integration branch | **`app/shell`**, worktree `.worktrees/wt-app`, tip **`81ccba9`**, pushed, clean                                                                                         |
+| Tests              | **2,014 passing across 40 files**                                                                                                                                       |
+| Gates              | prettier, eslint, `tsc --noEmit` — all clean                                                                                                                            |
+| iOS worktree       | `/Users/quietguy/Documents/Dev/Gauntlet/cannon-academy-ios` (space-free path; the main repo path contains a space and iOS build scripts break on it — see `RELEASE.md`) |
+| Metro              | `npx expo start --port 8081` **from the iOS worktree**, not from `wt-app`                                                                                               |
+| Re-sync iOS        | `git fetch && git checkout --detach app/shell` in that worktree, then reload the dev client                                                                             |
+
+**Port 8081 caveat:** `.claude/launch.json` points at the iOS worktree. An agent that calls
+`preview_start` may silently attach to _that_ checkout rather than to `wt-app`. Use a different port
+if you need a second server.
+
+---
+
+## 2. What happened in the last 90 minutes
+
+Five agents were running. **All four subagents died simultaneously on a session-usage limit**
+(resets 1pm America/Chicago). Their work was salvaged from the worktrees and is all committed —
+nothing was lost, but **no agent may be resumed**. Anything further needs fresh dispatches.
+
+Landed since the last handoff:
+
+- **`543a155` — the sea chart, rendered from its board.** `Blob.tsx` draws the board's CSS
+  percentage `border-radius` as four SVG elliptical arcs, because RN's absolute-point `borderRadius`
+  cannot express it and a rounded rectangle reads as a rounded rectangle, not as land.
+- **The same commit closed the worst gap in the build.** A read-only demo-path audit found `/range`
+  had **zero inbound navigation edges** — 499 shipped, tested lines (skill picker, live mastery
+  meter, unlock celebration) that no child could reach. `/gun-deck` had none either, so a cannon
+  unlocked at the range or in a duel could never be equipped. The chart dock now `push`es both
+  (`push`, not `replace` — the range exits via `router.back()` and needs a stack entry).
+- **`8ee28eb` — four emoji glyphs and a red screen.** Bare U+2693 defaults to emoji presentation on
+  iOS, so the leave-duel anchor was a dark colour emoji on the dark `#0A4E70` chip: an invisible
+  button in every duel. Three U+25B6/U+25C0 sites had the same exposure. All four now carry U+FE0E.
+  The empty-tray guard `throw`ew — it now redirects through `resolveDestination`, which returns
+  `gun-deck` for exactly that state.
+- **`f613f52` — A-016, the duel specified at last.** 30 tests, all nine criteria, green on first run.
+  Retrospective by design: 295 lines of shipped reducer under the MVP's largest checklist item that
+  no ticket had ever specified.
+- **`51b2cdd` + `81ccba9` — A-017 and ruling D-8.**
+
+---
+
+## 3. Owner rulings made today — both already implemented
+
+### D-8: a timeout counts against nothing
+
+Ruled in session. A burned fuse charges neither `asked` nor `correct`, in the aggregate scoreboard
+and the per-skill tally alike. Recorded in `tickets/app/OWNER-RULINGS.md`; A-017's AC-1 and AC-5
+amended; implemented in `src/stores/duel.ts`.
+
+**The engine half is NOT done and is delegated.** `src/engine/drill.ts` still counts an expired
+timer (`choiceIndex: null`) as an incorrect attempt. The range lane must not drift from the duel
+lane. This was sent to the engine agent; **verify it landed.**
+
+**A test dispute was adjudicated here, and the next agent should know why.** A-016's AC-8 probe was
+authored against the pre-ruling behaviour and went red when D-8 landed. An owner decision that
+postdates a test supersedes it, so the probe was _amended, not deleted_ — `TIMEOUT` is still the
+narrowest path that could touch one counter and not the other, so a half-migration would still fail
+there. The reasoning is in a comment at the test site.
+
+### A-013 (sprite/fidelity pass): dropped
+
+Owner ruled it out of the remaining window. Goes in known limitations.
+
+---
+
+## 4. Ticket state — 17 tickets, `tickets/app/APP-TICKETS.md`
+
+| status                       | tickets                                                                                                                                                                   |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **done**                     | A-001…A-009 (spine, identity, onboarding, name/flag, chart logic, duel payout, range), A-011 (gun deck), A-014 (real questions), A-016 (duel core), A-017 (timeout + D-8) |
+| **open — the only real gap** | **A-015** guided first duel                                                                                                                                               |
+| **dropped by owner**         | A-013 sprites/fidelity                                                                                                                                                    |
+| **droppable, not started**   | A-010 chest ceremony, A-012 rank screen                                                                                                                                   |
+
+### A-015 is the one thing left worth building
+
+`app/guided-duel.tsx` is a **23-line stub** that marks the step complete and redirects to the chart.
+A child finishing onboarding is shown nothing. It is MVP checklist item 4 ("an easy guided duel you
+win") and the only place the mechanic is ever taught.
+
+- Worktree exists: `.worktrees/wt-A-015`, branch `ticket/a-015`, **currently empty** (its Test Agent
+  died before writing a line).
+- Ticket is well-formed and its Planning Decisions already name the reducer change needed:
+  `initialDuelState(seed, options?: { rivalHull?: number; hullFloor?: number })`, reducer clamps
+  player hull to `hullFloor` (default `0`), both options default to today's behaviour.
+- The engine side is ready and unused: T-018's `createScriptedOpponent`, and
+  `ONBOARDING_ENEMY_HULL = 28` is tuned so the sloop sinks in three volleys.
+- **AC-2 is the heart**: over every answer pattern — all-correct, all-wrong, all-timeout, and mixed
+  — `playerHull > 0` and `phase !== 'defeat'` after _every_ transition.
+- **Its exit must go through `resolveDestination`**, not a hardcoded `router.replace('/chart')`.
+  The current stub hardcodes it, which is precisely the "second hardcoded opinion" bug class
+  `app/index.tsx`'s header comment documents.
+
+**Fallback if the clock beats you:** PLAN.md's own cut line is "scripted-tutorial polish → a plain
+easy first duel". Keep the committed stub — it auto-advances safely — and move the guided duel to
+known limitations. Do not ship a half-built one.
+
+---
+
+## 5. THE HIGHEST-PRIORITY REMAINING TASK — device verification
+
+**Nothing has been run on a device since the chart rebuild, the glyph fixes, or D-8.**
+
+This is not optional caution. **Two launch-blocking crashes in this project shipped past 1,800+
+green tests** and were caught only by running the app:
+
+1. `Splash.tsx` called `px()` inside a `useAnimatedStyle` body — a JS closure in a worklet, which
+   crashes on the first frame. `react-native-web` does not enforce worklet boundaries, so every test
+   passed.
+2. `app/index.tsx` was a legacy title screen whose button bypassed onboarding entirely.
+
+The chart rebuild introduced **four new animations** (ring pulse, ship bob, fog drift, sail-chip
+rise) written by an agent that died before reporting. **Its worklet bodies have not been reviewed by
+anyone.** Grep every `useAnimatedStyle` in `src/components/chart/` for calls to JS helpers before
+anything else.
+
+Run the demo script in §7 end to end on the simulator. Screenshot the chart.
+
+---
+
+## 6. Known open items, ranked
+
+| #   | item                                                 | est | notes                                             |
+| --- | ---------------------------------------------------- | --- | ------------------------------------------------- |
+| 1   | **Device verification** of chart / glyphs / D-8      | 30m | see §5 — do this first                            |
+| 2   | **A-015** guided duel                                | 45m | fresh Test Agent then implementer; fallback in §4 |
+| 3   | Confirm engine agent landed **D-8's drill half**     | 5m  | `src/engine/drill.ts`                             |
+| 4   | README + known limitations                           | 20m | delegated to engine agent — verify                |
+| 5   | PR `app/shell` → `main`                              | 10m | **owner merges, never the swarm**                 |
+| 6   | Delete engine stray `.tdd-swarm/t025-stack-smoke.ts` | 1m  | untracked in `wt-app`, not ours                   |
+
+**Minor, deferred deliberately:** cold start does a redundant double redirect (root layout
+`replace` + index route `Redirect`); both consult the same resolver post-hydration and always agree.
+Collapse after submission, not before.
+
+---
+
+## 7. The demo script (from the audit — use this for the video)
+
+1. Fresh install. Splash holds until the save hydrates, then the ship-ladder grade picker — no title
+   screen, straight into play.
+2. Tap the middle ship (grades 2–3). Places the captain, silently equips both starters.
+3. Type a ship name, tap a flag, **Set sail**. Say out loud: that flag flies as your pennant in every
+   duel.
+4. Guided first duel — _if A-015 lands_. Otherwise this step auto-advances to the chart.
+5. On the chart: the fog over later islands, your ship parked at the current one, the coin pill.
+   Tap **Fight**.
+6. Volley one: tap a cannon, answer while the fuse is gold → "Perfect hit!". **Faster answers hit
+   harder** — this is the whole pedagogy.
+7. Volley two: hands off. Let the fuse burn → "Damp powder", zero self-damage, rival fires back.
+   _(Under D-8 this now genuinely costs nothing.)_
+8. Answer quickly, sink the rival, chest opens, purse counts into coins.
+9. Anchor to leave → chart: coins in the header, fog lifted off the next island.
+10. Tap **Practice**: pick a skill, meter fills live, unlock celebration at the threshold.
+11. **The closer:** swipe the app away mid-flow, relaunch. No menus, no login — lands straight back
+    on the chart with coins, mastery and fog intact.
+
+---
+
+## 8. Known limitations (draft, for the submission README)
+
+- Progress is local (AsyncStorage) and not tied to an anonymous UID. A complete injected-SDK Firebase
+  auth service exists and is fully tested (`src/services/auth.ts`) but is not wired into the boot path.
+- The duel rival deals damage from a provisional flat 7–12 band. The adaptive mercy bot is
+  implemented and tested on the engine (T-021) but not yet wired into the duel screen.
+- Only the duel screen is pinned pixel-for-pixel against design fixtures. The sea chart and gun deck
+  are transcribed from their boards; the gunnery range has no board by design (PLAN.md's day-2 cut
+  line: reuse the duel question panel); name-and-flag and duel-intro are built from the design system.
+- Duel state is deliberately never persisted: killing the app mid-duel forfeits exactly the in-flight
+  duel and relaunch lands on the chart with all pre-duel progress intact.
+- Treasure-chest ceremony (A-010) and the rank screen (A-012) are not built. Both are on PLAN.md's
+  own "cut if behind" list.
+
+---
+
+## 9. Process rules that have each been learned the hard way
+
+- **Every ticket goes through the `tdd-swarm` skill.** Two were hand-rolled; both came back wrong.
+- **Tests are frozen before implementers are dispatched**, and implementers are dispatched without
+  permission to edit test files.
+- **Re-run the gates yourself.** A DONE report is a claim, not evidence. A-011 was merged and marked
+  `review-passed` with no reviewer or security report on disk; the retrospective review found a real
+  badge bug.
+- **The browser cannot find worklet or routing bugs.** See §5.
+- **`tsc` catches what tests cannot.** The engine merge added a `saker` cannon and broke
+  `cannonLook`'s total `Record<CannonId, …>`; all 1,946 tests passed on a branch that would not
+  compile, because nothing reads the presentation map.
+- **Commit with explicit paths, never `git add -A`** — that once swept an engine-track file into an
+  app commit.
+- **Never trust a summary of repo state — verify against git.** Two agent reports this session
+  described a tree that did not exist.
+
+---
+
+## 10. Scope boundary with the engine track
+
+The app track must NOT edit `src/engine/**`, `src/content/**`, `.tdd-swarm/**`, or `tickets/T-*.md`.
+The engine agent owns those on `swarm/engine-core`. It currently owes: D-8's drill half, the README
+and known-limitations section, and opening the PR at ~11:30 (owner merges).
