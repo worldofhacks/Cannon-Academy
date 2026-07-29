@@ -8,19 +8,22 @@ existing test file was changed.
 
 ## Meaningful RED
 
-`npx vitest run __tests__/app/chart-progress-presentation.test.ts` executes eight tests and all
-eight fail against the pre-implementation tree for the intended missing behaviors:
+`npx vitest run __tests__/app/chart-progress-presentation.test.ts` executes ten tests: nine fail
+against the pre-implementation tree for the intended missing behaviors, while one adversarial
+analyzer test passes by proving the fog guard allows an irregular SVG path and rejects an opaque
+absolute `View`.
 
 | Criterion | Frozen behavior | Pre-implementation failure |
 | --- | --- | --- |
 | AC-1 | Real `resolvePlacement('g2_3')` islands with empty mastery are open, `cleared: false`, and `available` | `ChartNode.cleared` is absent and every non-focus open node collapses to `cleared` |
 | AC-2 | Every real catalog `rangeSkills` entry must pass `isMastered`; that noncurrent island alone clears | No mastery-derived `cleared` field exists |
+| AC-2 | A strict nonempty subset (every Port Sumwich skill except one) remains available | `ChartNode.cleared` is absent; the boundary cannot be represented |
 | AC-2 | A fully mastered current island still presents as `current` | Current implementation returns `live` |
-| AC-3 | Actual JSX imported from `react-native-svg` contains no `Svg`/`Rect` fog wash, while imported `Blob` weather remains | AST finds actual `<Svg>` and `<Rect>` elements |
-| AC-3 | Both fog states keep the real island display name and requirement in their accessibility label | Pure affordance seam is absent |
-| AC-4 | State derivation returns five exact, distinct states | Current outputs are `live`, `cleared`, `cleared`, `locked`, `silhouette` |
-| AC-4 | Five distinct labels; tappable is exactly true for current/available/cleared | Pure affordance seam is absent |
-| AC-4 | `StationMarker` consumes the affordance seam rather than leaving test-only dead code | AST finds no import/call |
+| AC-3 | Fog keeps irregular imported `Blob` weather and has neither an opaque SVG rectangle nor an absolute painted View wash | AST finds the current filled `<Rect>`; the synthetic guard proves an irregular `<Path>` remains allowed |
+| AC-3 | Both physically possible fog states keep the real island name and requirement in accessibility | Pure presentation seam is absent |
+| AC-4 | Five exact states plus fog-over-stale-current/focus precedence | Current outputs are `live`, `cleared`, `cleared`, `locked`, `silhouette` |
+| AC-4 | Real possible states have distinct semantic labels/heads and tappability exactly matching `!node.fogged` | Pure presentation seam is absent |
+| AC-4 | `StationMarker` dataflows the retained presentation result into the accessibility prop, tap branch, and `ClearedHead` decision | AST finds no imported/retained presentation result |
 
 The failures are assertion failures against running code or parsed production JSX—not import
 errors, invalid fixtures, comments, or decoy regex matches.
@@ -31,28 +34,32 @@ errors, invalid fixtures, comments, or decoy regex matches.
   island-id list copied into the test.
 - Mastery records are built by applying real range answers until the engine's `isMastered`
   predicate turns true; no threshold literal is duplicated.
-- The five-state selector is exercised as a pure seam with current precedence and the two board
-  station geometries (`silhouette` true/false).
-- Accessibility/tappability is a pure `stationAffordance` contract and a TypeScript-AST reachability
-  check requires `StationMarker` to import and call it.
-- Fog structure is resolved from real import declarations and real JSX tags, including aliases and
-  namespace imports. Comments, strings, unused imports, and renamed local identifiers cannot pass.
-  Edge-free `Blob` weather is explicitly retained.
+- A strict subset fixture masters every real Port Sumwich range skill except the last, preventing
+  an incorrect `some(isMastered)` implementation.
+- The five-state matrix uses possible node/state pairs, then adds stale persisted `isCurrent` plus
+  forced focus on both near and far fog nodes to freeze fog precedence.
+- `stationPresentation` owns marker head, semantic accessibility label, and tappability. A
+  TypeScript-AST dataflow check requires `StationMarker` to retain its return value, feed the label
+  to the rendered accessibility prop, use tappability in control flow, and select `ClearedHead`
+  only through the `markerHead === 'cleared'` branch. Available has a distinct non-cleared head.
+- Fog structure is resolved from real import declarations, JSX tags, and recursively composed
+  local style objects. Filled SVG rectangles and absolutely spanning painted `View`/
+  `Animated.View` washes fail; irregular SVG paths and imported `Blob` weather remain legal.
 
 ## Criterion mapping
 
 | Criterion | Tests |
 | --- | --- |
 | AC-1 | grade 2–3 placement islands stay available and uncleared before mastery |
-| AC-2 | only full range-skill mastery clears; current presentation wins |
-| AC-3 | no Svg/Rect wash with Blob retained; fog accessibility keeps name/requirement |
-| AC-4 | five exhaustive states; distinct labels and tappability; StationMarker reachability |
+| AC-2 | only full range-skill mastery clears; strict subset stays available; current wins |
+| AC-3 | semantic no-rectangle guard with irregular SVG/Blob allowed; possible fog labels retain name/requirement |
+| AC-4 | five-state plus precedence matrix; possible-state presentation; StationMarker result dataflow |
 
 ## Commands and results
 
 | Command | Result |
 | --- | --- |
-| `npx vitest run __tests__/app/chart-progress-presentation.test.ts` | EXPECTED RED — 1 file, 8 tests failed for the missing A-024 behaviors |
+| `npx vitest run __tests__/app/chart-progress-presentation.test.ts` | EXPECTED RED — 1 file, 9 failed for missing A-024 behavior and 1 analyzer contract passed |
 | `npx vitest run --exclude __tests__/app/chart-progress-presentation.test.ts` | PASS — baseline 43 files, 2,034 tests |
 | `npx prettier --check __tests__/app/chart-progress-presentation.test.ts` | PASS |
 | `npx eslint __tests__/app/chart-progress-presentation.test.ts --max-warnings 0` | PASS |
