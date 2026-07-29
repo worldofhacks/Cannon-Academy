@@ -1875,3 +1875,8 @@ Test-design review dispatched.
 
 [T-017 test-design](5aa08818-6f0c-451a-82ca-4af9beaf2fe1): I-1 closed (`NEGATIVE_INFINITY` in AC-2).
 Phase → `implement`. Implementer dispatched.
+
+### T-017 TEST_DISPUTE closed — DoD-3 header self-poison
+
+[T-017 Implementer](1b4a4546-66b3-4300-8290-8d3895f1a617): 31/32; header matched DoD-3 scanner.
+Suite fix re-frozen . Phase → implement; implementer resumed.
