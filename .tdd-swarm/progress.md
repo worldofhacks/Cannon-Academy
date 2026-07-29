@@ -1558,6 +1558,13 @@ re-confirmed green (1310/1310, tsc 0, frozen-tests-unmodified). One low nit: `co
 `findIndex` on value rather than tracked shuffle index — safe under AC-12 distinctness; no fix
 required. Security review dispatched next. T-013 code review still in flight.
 
+## T-013 code review — APPROVE_WITH_NITS
+
+[T-013 Code Review](87210f96-cac5-4edc-bb48-3c84da28c89f): all 16 ACs verified; gates re-confirmed
+(1357/1357, tsc 0, frozen-tests-unmodified PASS). Two nits, neither AC-blocking: blanket
+`getCannon` catch may mislabel errors; optional `enemyMaxHull` accepts any number. No fixes
+required. Security review dispatched. T-007 security still in flight.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
