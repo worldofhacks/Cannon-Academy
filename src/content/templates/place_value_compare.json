@@ -1,0 +1,109 @@
+[
+  {
+    "id": "place_value_compare_tens_value",
+    "skill": "place_value_compare",
+    "text": "What is the value of the tens digit in {a}?",
+    "params": {
+      "a": [10, 999]
+    },
+    "constraints": ["a >= 10", "floor(a / 10) % 10 >= 1"],
+    "answerExpr": "(floor(a / 10) % 10) * 10",
+    "distractors": [
+      "((floor(a / 10) % 10) * 10) + 1",
+      "((floor(a / 10) % 10) * 10) - 1",
+      "((floor(a / 10) % 10) * 10) + 2"
+    ],
+    "isWordProblem": true
+  },
+  {
+    "id": "place_value_compare_round_ten",
+    "skill": "place_value_compare",
+    "text": "{a} rounded to the nearest ten = ?",
+    "params": {
+      "a": [15, 990]
+    },
+    "constraints": ["a % 10 != 0", "floor((a + 5) / 10) * 10 >= 10"],
+    "answerExpr": "floor((a + 5) / 10) * 10",
+    "distractors": [
+      "(floor((a + 5) / 10) * 10) + 1",
+      "(floor((a + 5) / 10) * 10) - 1",
+      "(floor((a + 5) / 10) * 10) + 2"
+    ],
+    "isWordProblem": false
+  },
+  {
+    "id": "place_value_compare_how_many_tens",
+    "skill": "place_value_compare",
+    "text": "How many tens are in {a}?",
+    "params": {
+      "a": [10, 1000]
+    },
+    "constraints": ["a >= 10"],
+    "answerExpr": "floor(a / 10)",
+    "distractors": ["(floor(a / 10)) + 1", "(floor(a / 10)) - 1", "(floor(a / 10)) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "place_value_compare_which_greater",
+    "skill": "place_value_compare",
+    "text": "Which is greater, {a} or {b}?",
+    "params": {
+      "a": [1, 1000],
+      "b": [1, 1000]
+    },
+    "constraints": ["a != b", "max(a, b) >= 1"],
+    "answerExpr": "max(a, b)",
+    "distractors": ["(max(a, b)) + 1", "(max(a, b)) - 1", "(max(a, b)) + 2"],
+    "isWordProblem": false
+  },
+  {
+    "id": "place_value_compare_how_much_more",
+    "skill": "place_value_compare",
+    "text": "{a} is ? more than {b}",
+    "params": {
+      "a": [1, 1000],
+      "b": [0, 999]
+    },
+    "constraints": ["a > b"],
+    "answerExpr": "a - b",
+    "distractors": ["(a - b) + 1", "(a - b) - 1", "(a - b) + 2"],
+    "isWordProblem": false
+  },
+  {
+    "id": "place_value_compare_ones_digit",
+    "skill": "place_value_compare",
+    "text": "What is the ones digit in {a}?",
+    "params": {
+      "a": [0, 1000]
+    },
+    "constraints": ["a % 10 >= 1", "a % 10 <= 8"],
+    "answerExpr": "a % 10",
+    "distractors": ["(a % 10) + 1", "(a % 10) - 1", "(a % 10) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "place_value_compare_hundreds_value",
+    "skill": "place_value_compare",
+    "text": "What is the value of the hundreds digit in {a}?",
+    "params": {
+      "a": [100, 999]
+    },
+    "constraints": ["a >= 100"],
+    "answerExpr": "floor(a / 100) * 100",
+    "distractors": ["(floor(a / 100) * 100) + 1", "(floor(a / 100) * 100) - 1", "(floor(a / 100) * 100) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "place_value_compare_ships_more",
+    "skill": "place_value_compare",
+    "text": "A ship has {a} balls and a fort has {b}. How many more on the ship?",
+    "params": {
+      "a": [1, 1000],
+      "b": [0, 999]
+    },
+    "constraints": ["a > b"],
+    "answerExpr": "a - b",
+    "distractors": ["(a - b) + 1", "(a - b) - 1", "(a - b) + 2"],
+    "isWordProblem": true
+  }
+]

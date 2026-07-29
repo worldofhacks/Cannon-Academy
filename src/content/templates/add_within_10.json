@@ -1,0 +1,97 @@
+[
+  {
+    "id": "add_within_10_basic",
+    "skill": "add_within_10",
+    "text": "{a} + {b} = ?",
+    "params": {
+      "a": [0, 9],
+      "b": [0, 9]
+    },
+    "constraints": ["a + b <= 10"],
+    "answerExpr": "a + b",
+    "distractors": ["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"]
+  },
+  {
+    "id": "add_within_10_missing_addend",
+    "skill": "add_within_10",
+    "text": "{a} + ? = {c}",
+    "params": {
+      "a": [0, 9],
+      "c": [0, 10]
+    },
+    "constraints": ["c >= a", "c <= 10"],
+    "answerExpr": "c - a",
+    "distractors": ["(c - a) + 1", "(c - a) - 1", "(c - a) + 2"]
+  },
+  {
+    "id": "add_within_10_missing_first",
+    "skill": "add_within_10",
+    "text": "? + {b} = {c}",
+    "params": {
+      "b": [0, 9],
+      "c": [0, 10]
+    },
+    "constraints": ["c >= b", "c <= 10"],
+    "answerExpr": "c - b",
+    "distractors": ["(c - b) + 1", "(c - b) - 1", "(c - b) + 2"]
+  },
+  {
+    "id": "add_within_10_doubles",
+    "skill": "add_within_10",
+    "text": "{a} + {a} = ?",
+    "params": {
+      "a": [0, 5]
+    },
+    "constraints": ["a + a <= 10"],
+    "answerExpr": "a + a",
+    "distractors": ["(a + a) + 1", "(a + a) - 1", "(a + a) + 2"]
+  },
+  {
+    "id": "add_within_10_near_doubles",
+    "skill": "add_within_10",
+    "text": "{a} + {b} = ?",
+    "params": {
+      "a": [0, 4],
+      "b": [1, 5]
+    },
+    "constraints": ["b == a + 1", "a + b <= 10"],
+    "answerExpr": "a + b",
+    "distractors": ["a + b + 1", "a + b - 1", "a + b + 2"]
+  },
+  {
+    "id": "add_within_10_make_ten",
+    "skill": "add_within_10",
+    "text": "{a} + ? = 10",
+    "params": {
+      "a": [0, 10]
+    },
+    "constraints": ["a <= 10"],
+    "answerExpr": "10 - a",
+    "distractors": ["(10 - a) + 1", "(10 - a) - 1", "(10 - a) + 2"]
+  },
+  {
+    "id": "add_within_10_three_term",
+    "skill": "add_within_10",
+    "text": "{a} + {b} + {c} = ?",
+    "params": {
+      "a": [0, 5],
+      "b": [0, 5],
+      "c": [0, 5]
+    },
+    "constraints": ["a + b + c <= 10"],
+    "answerExpr": "a + b + c",
+    "distractors": ["(a + b + c) + 1", "(a + b + c) - 1", "(a + b + c) + 2"]
+  },
+  {
+    "id": "add_within_10_sum_first",
+    "skill": "add_within_10",
+    "text": "? = {a} + {b}",
+    "params": {
+      "a": [0, 9],
+      "b": [0, 9]
+    },
+    "constraints": ["a + b <= 10"],
+    "answerExpr": "a + b",
+    "distractors": ["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"]
+  }
+]

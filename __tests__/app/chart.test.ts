@@ -46,9 +46,7 @@ describe('A-007 sea chart', () => {
   });
 
   it('spec(A-007:AC-4) the captain node is marked at the current island', () => {
-    const nodes = chartNodes(
-      captain({ unlockedIslands: ['port_sumwich'], currentIsland: 'port_sumwich' }),
-    );
+    const nodes = chartNodes(captain({ unlockedIslands: ['port_sumwich'], currentIsland: 'port_sumwich' }));
     expect(nodes.filter((n) => n.isCurrent)).toHaveLength(1);
     expect(nodes.find((n) => n.isCurrent)?.island.id).toBe('port_sumwich');
   });
@@ -59,13 +57,7 @@ describe('A-007 sea chart', () => {
 
   it('spec(A-007:AC-1) nodes come back in catalog order, so the map never reshuffles', () => {
     const ids = chartNodes(captain({ unlockedIslands: ['port_sumwich'] })).map((n) => n.island.id);
-    expect(ids).toEqual([
-      'port_sumwich',
-      'isla_products',
-      'quotient_cove',
-      'fraction_reef',
-      'grandline',
-    ]);
+    expect(ids).toEqual(['port_sumwich', 'isla_products', 'quotient_cove', 'fraction_reef', 'grandline']);
   });
 
   it('spec(A-007:AC-5) a fresh captain sees every island fogged rather than an empty map', () => {
