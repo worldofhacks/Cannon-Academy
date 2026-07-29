@@ -1573,6 +1573,15 @@ content-trust notes around `__proto__` / `renderText` membership recorded in
 `.tdd-swarm/reports/T-007-security-review.md` — T-034 / catalog validation are the right homes;
 no code change for merge. Waiting on T-013 security before wave-4 integration.
 
+## T-013 security — FAIL (Important), fix dispatched
+
+[T-013 Security Review](79fb1844-ca7d-4474-8968-c2b0db05fe64): **FAIL**. Verified live:
+`islandId in ENEMY_HULL_BY_ISLAND` accepts `"constructor"` / `"__proto__"` (prototype-chain),
+producing non-numeric `enemyHull`. Fix: `Object.hasOwn`. Minor `toRivalView` loadout alias
+recorded, not a FAIL driver. Implementer re-dispatched for the one-line fix; tests stay frozen
+(AC-5 already requires rejecting unknown islands — suite covers ordinary unknowns, not this
+prototype-key case).
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
