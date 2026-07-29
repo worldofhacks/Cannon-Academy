@@ -1231,6 +1231,51 @@ this narrows the schema by accident.
 4. **Sequencing: review first, amend once.** Both reviews are now in, so the amendment round can
    proceed with full information.
 
+## T-007 round 2 — accepted, pending re-review
+
+The Test Agent killed all three review mutants and, by auditing the suite's *shape* rather than
+working from the review's list, found two more. Suite is 72 tests (was 57) over 19 criteria, 53 of
+53 mutants killed. Everything below I re-ran myself rather than taking from the report.
+
+| Claim | Verified |
+| --- | --- |
+| Frozen file SHA-256 `09b3da13…` | matches |
+| Diff vs **merge base** `a7249fef` (L-033) | exactly 2 files: the suite + its report, **0 under `src/`** |
+| RED is a module-resolution failure only | `tsc --noEmit` exit 2, one diagnostic, `TS2307` |
+| Wave 1–3 baseline intact | `Tests 1229 passed`, suite fails at the import |
+| Prettier / ESLint | exit 0 / exit 0 |
+| `spec-lint` | **PASS** after the two rulings below — 19/19 AC, DoD 1–6 tagged, DoD-7 `SKIP` |
+| DoD-7 itself ("files changed ⊆ `file_scopes`") | verified by me from the diff above, which is what `[process]` promises |
+
+**The two mutants the review missed** are worth naming because neither was a gap in the review's
+diligence — they were only visible from the suite's structure. One was a third instance of the
+`catch` shape the review found twice (AC-16 checked an error's `code` but never its type). The other
+**the amendment itself created**, which is the more interesting failure: AC-17 said keys are consumed
+in "lexicographically ascending" order without naming a collation, and AC-19 — added last round —
+made mixed-case keys legal, which is exactly where code-point order and `localeCompare` diverge. A
+`localeCompare` implementation passed all 71 tests. This is [[L-020]] precisely: the two orderings
+agree on every lowercase single letter, which is every key in the real catalog **and both keys in
+AC-17's own fixture**, so the criterion could not see its own ambiguity. Tightening a spec can open
+a hole elsewhere in it, and only a suite audited as a whole catches that.
+
+### Rulings
+
+- **A-8, collation → code point.** AC-17 now names ascending code-point order (`sort()` with no
+  comparator) and forbids `localeCompare`. Code point is `sort()`'s default and needs no locale data,
+  so it cannot drift with a platform's ICU version — the property T-024's replay proof rests on. The
+  agent had pinned this reading already, so no test changes; the criterion now states what the suite
+  measures. (I checked whether `localeCompare` actually varies by locale for identifier-shaped keys
+  and it did not across four locales — the hazard is the ambiguity, not observed platform drift.)
+- **A-9, process items → the gate skips them.** A DoD item marked `[process]` reports `SKIP` and is
+  verified by the orchestrator's diff instead of by a test. The agent was right to leave DoD-7 red
+  rather than tag it with a narrower check; see [[L-036]]. The marker is **required, not inferred**,
+  so a forgotten marker still fails. Numbering spans skipped items, so no `dod(id:n)` tag shifted —
+  confirmed by re-running the gate on T-013 and a grandfathered ticket.
+
+Open, carried to review: `composeExpected` is the suite's strongest oracle and is the agent's own
+code; a lookup-table implementation would still pass the 114-seed error sweeps; AC-5 bounds when
+`NO_TEMPLATE` must fire but never when it must not.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
