@@ -162,7 +162,7 @@ re-litigated this round; AC-2's existing non-exactness stance is unchanged.
 
 | | |
 | --- | --- |
-| Commit | _(filled after commit)_ on `ticket/T-013-duel-types` |
+| Commit | `306041c` (`306041c1667cf34839c9973c38272bf7b0b807e1`) on `ticket/T-013-duel-types` |
 | Suite SHA-256 | `737335df8969b325366fcf86259b9a27ff00019eaeb08391a8ddfdb01096ec3d` |
 
 Matrix was measured against those final post-prettier bytes. Scratchpad deleted.
