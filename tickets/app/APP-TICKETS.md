@@ -33,7 +33,7 @@ ticket numbering and not tidiness.
 | A-017  | 10 — time out a question and see the misfire            | shipped, now specified                                              |
 | A-014  | 5 — the four-choice questions a child is actually asked | **not built** (all fake)                                            |
 | A-015  | 4 — an easy guided duel you win                         | **not built** (23-line stub)                                        |
-| A-011  | 5 — "two starter cannons that are a real choice"        | one-line tray fix already applied; the deck screen is the remainder |
+| A-011  | 5 — "two starter cannons that are a real choice"        | **in flight** — `TRAY_CAPACITY` unblocked; frozen suite ready |
 
 **Not checklist-critical — droppable if Friday is tight**, and PLAN.md says so itself:
 
@@ -42,7 +42,7 @@ ticket numbering and not tidiness.
 - **A-013** (design fidelity / sprites) — "Placeholder art is explicitly fine for this checklist —
   grey boxes and coloured rectangles pass."
 - **A-012** (rank ladder) — PLAN day 4, meta, not Milestone 1.
-- **A-011** (gun deck) is also blocked on engine ticket T-030 for `TRAY_CAPACITY`.
+- **A-011** (gun deck) was blocked on `TRAY_CAPACITY`; **T-035 cleared it** — now in flight.
 
 **The critical path is a single file.** A-016 → A-017 → A-014 → A-015 all edit
 `src/stores/duel.ts`, so they cannot be parallelised — that is what forces four waves rather than
@@ -97,8 +97,8 @@ work rides along for free and can be abandoned mid-wave without stalling the pat
 
 | id    | title                                        | status  | deps                | model    |
 | ----- | -------------------------------------------- | ------- | ------------------- | -------- |
-| A-014 | Retire the placeholder question generator    | backlog | A-001, A-016, A-017 | standard |
-| A-011 | Gun deck — which three cannons sail with you | backlog | A-001               | standard |
+| A-014 | Retire the placeholder question generator    | review-passed | A-001, A-016, A-017 | standard |
+| A-011 | Gun deck — which three cannons sail with you | in-progress | A-001            | standard |
 
 ## Wave A8
 
@@ -108,9 +108,7 @@ work rides along for free and can be abandoned mid-wave without stalling the pat
 
 ## Blocked
 
-| id    | reason                                                                              | attempts | needs                                        |
-| ----- | ----------------------------------------------------------------------------------- | -------- | -------------------------------------------- |
-| A-011 | `TRAY_CAPACITY` must live in `src/engine/tuning.ts`, which app tickets may not edit | 0        | engine T-030, or a tuning-only engine ticket |
+_(none — A-011 unblocked by engine T-035 / `TRAY_CAPACITY`.)_
 
 ## Why the waves were recomputed (2026-07-29)
 

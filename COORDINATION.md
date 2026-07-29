@@ -42,8 +42,8 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 - Engine: Wave 5 — **T-014…T-020 + T-034 done** (Wave 5 complete) (templates + range drill; drill API published below).
   **T-035** shipped `TRAY_CAPACITY` — A-011 unblocked. **T-029 / D-7** shipped (`add_within_10` on Port Sumwich + `saker` range payoff; early Isla Products fog accepted). Owner ruling **D-6** on **T-032**.
   Push `swarm/engine-core` after every ticket merge.
-- App track (`app/shell`): owns presentation; currently uses a placeholder question service that
-  must not ship — real templates from T-014…T-016 replace it.
+- App track (`app/shell`): merged through engine tip (T-035 / T-029). **A-011** gun deck in flight;
+  A-014 questions are real catalog templates.
 - iOS: Simulator + Expo web demo path; TestFlight gated on Apple Developer enrollment.
 
 ## Published engine APIs (Track A → Track B)
