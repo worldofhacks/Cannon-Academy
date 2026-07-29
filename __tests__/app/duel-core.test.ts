@@ -878,7 +878,7 @@ describe('A-016 the duel itself', () => {
     // walk, and deliberately loose: it asks which phase gates each control, not how it is spelled.
     const src = await readSource('../../app/duel.tsx');
 
-    expect(src).toMatch(/phase === 'select' \?\s*<CannonTray/);
+    expect(src).toMatch(/phase === 'select' \?\s*\(?\s*<CannonTray/);
     expect(src).toMatch(/phase === 'question'[\s\S]{0,80}<QuestionPanel/);
     // The fuse is the other input in `question`, and it is the only place TIMEOUT is dispatched.
     expect(src).toMatch(/phase !== 'question'[\s\S]{0,200}TIMEOUT/);

@@ -237,8 +237,10 @@ describe('A-029 island-aware duel context', () => {
     const file = sourceFile(DUEL_PATH);
     const body = namedFunction(file, 'DuelBody').body.getText(file);
 
+    // Island name stays in the turn bar (intro / whose-turn copy). A-031 owns the rival
+    // HullCard label via enemy presentation — not a generic "Rival" and not the island name.
     expect(body).toMatch(/islandName/);
-    expect(body).toMatch(/HullCard[^]*islandName/s);
+    expect(body).toMatch(/HullCard[^]*rival\.displayName/s);
     expect(body).not.toMatch(/name="Rival"/);
     expect(body).toMatch(/turnLabel\s*\([^)]*islandName/);
   });
