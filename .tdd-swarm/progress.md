@@ -1952,3 +1952,8 @@ Test Agent amending suite.
 
 [T-020 Test Agent](36a816ca-f4ee-45bc-be6c-caf8ed762772) `357fa22`: resolveRival terminals, resolveShot oracles, rival-miss hull.
 Phase → implement. Implementer dispatched.
+
+### T-020 TEST_DISPUTE closed — AC-24 self-poison + tsc choices type
+
+[T-020 Implementer](8ce1a513-93c0-4562-9c8f-e6b596693975): 32/33; feat intact.
+Suite fix re-frozen . Implementer resumed.
