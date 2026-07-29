@@ -777,6 +777,40 @@ describe('createDuelState — determinism', () => {
     expect(first).not.toBe(second);
   });
 
+  /**
+   * Top-level `not.toBe` alone admits `{ ...cachedCore, phase }` — distinct wrappers over a
+   * shared interior. Pushing onto `first.playerLoadout` or writing through
+   * `first.templatesBySkill` must not rewrite `second`. Independence is a graph property.
+   */
+  it('spec(T-013:AC-3) keeps two constructions as independent state graphs', () => {
+    const templates: Template[] = [
+      templateSchema.parse({
+        id: 'add_within_10__a_plus_b',
+        skill: 'add_within_10',
+        text: '{a} + {b} = ?',
+        params: { a: [1, 5], b: [1, 5] },
+        answerExpr: 'a + b',
+        distractors: ['a + b + 1', 'a + b - 1', 'a * b'],
+      }),
+    ];
+    const config: DuelConfig = {
+      ...configFor('isla_products', 4242),
+      templatesBySkill: { add_within_10: templates },
+    };
+    const first = createDuelState(config);
+    const second = createDuelState(config);
+
+    expect(first).toStrictEqual(second);
+    expect(first).not.toBe(second);
+
+    (first.playerLoadout as CannonId[]).push('mortar');
+    expect(second.playerLoadout).toEqual(['swivel_gun', 'culverin']);
+    expect(second.playerLoadout).toHaveLength(2);
+
+    (first.templatesBySkill.add_within_10 as Template[])[0]!.text = 'TAMPERED VIA FIRST';
+    expect(second.templatesBySkill.add_within_10![0]!.text).toBe('{a} + {b} = ?');
+  });
+
   it('spec(T-013:AC-3) produces an rng deeply equal across two constructions', () => {
     const config = configFor('port_sumwich', 90210);
 
@@ -2058,14 +2092,15 @@ describe('DuelState readonly-ness', () => {
 });
 
 // ============================================================================================
-// AC-16 — construction copies array inputs; it does not alias them
+// AC-16 — construction deep-copies array inputs; it does not alias them
 //
 // Runtime, not type-level: `readonly` on the config and on the state cannot stop a caller who
-// still holds a mutable `CannonId[]` from pushing into it after construction. That rewrite then
-// silently lands inside a duel already in progress, and — because the state is the replay input —
-// makes the recorded duel unreproducible from its own seed. Cover every array the config carries,
-// and the nested arrays under `templatesBySkill`: copying one level and aliasing another is the
-// plausible half-fix.
+// still holds a mutable `CannonId[]` (or a `Template`) from mutating it after construction. That
+// rewrite then silently lands inside a duel already in progress, and — because the state is the
+// replay input — makes the recorded duel unreproducible from its own seed. Cover every array the
+// config carries, every nested `Template[]` under `templatesBySkill`, each `Template` object, and
+// that object's own `distractors` / `params` / `constraints`. Copying containers while sharing
+// element objects is the plausible half-fix.
 // ============================================================================================
 
 describe('createDuelState — input aliasing', () => {
@@ -2117,6 +2152,46 @@ describe('createDuelState — input aliasing', () => {
 
     expect(state.templatesBySkill.add_within_10).toHaveLength(2);
     expect(state.templatesBySkill).not.toBe(templatesBySkill);
+  });
+
+  /**
+   * `[...templates]` still shares every `Template` object with the caller. Mutating
+   * `template.text` — or a nested `params` / `distractors` / `constraints` slot — after
+   * construction must leave the state alone, and no `Template` in the state may be `===` one
+   * in the config. Round 3 measured only the container layer above this.
+   */
+  it('spec(T-013:AC-16) deep-copies every Template and its nested params, distractors, constraints', () => {
+    const template: Template = templateSchema.parse({
+      id: 'add_within_10__a_plus_b',
+      skill: 'add_within_10',
+      text: '{a} + {b} = ?',
+      params: { a: [1, 5], b: [1, 5] },
+      constraints: ['a + b <= 10'],
+      answerExpr: 'a + b',
+      distractors: ['a + b + 1', 'a + b - 1', 'a * b'],
+    });
+    const templates: Template[] = [template];
+    const templatesBySkill: Partial<Record<SkillId, Template[]>> = { add_within_10: templates };
+    const config: DuelConfig = { ...configFor('port_sumwich', 7), templatesBySkill };
+    const state = createDuelState(config);
+    const stateTemplate = state.templatesBySkill.add_within_10![0]!;
+
+    expect(stateTemplate).not.toBe(template);
+    expect(stateTemplate.distractors).not.toBe(template.distractors);
+    expect(stateTemplate.params).not.toBe(template.params);
+    expect(stateTemplate.params.a).not.toBe(template.params.a);
+    expect(stateTemplate.constraints).not.toBe(template.constraints);
+
+    template.text = 'TAMPERED BY CALLER';
+    template.distractors[0] = 'TAMPERED_DISTRACTOR';
+    const callerParamA = template.params.a as [number, number];
+    callerParamA[0] = 9;
+    template.constraints![0] = 'TAMPERED_CONSTRAINT';
+
+    expect(stateTemplate.text).toBe('{a} + {b} = ?');
+    expect(stateTemplate.distractors).toEqual(['a + b + 1', 'a + b - 1', 'a * b']);
+    expect(stateTemplate.params).toEqual({ a: [1, 5], b: [1, 5] });
+    expect(stateTemplate.constraints).toEqual(['a + b <= 10']);
   });
 });
 
