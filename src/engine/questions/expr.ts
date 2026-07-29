@@ -249,10 +249,9 @@ const MAX_NESTING_DEPTH = 64;
  * would make the same input succeed and fail on the same machine.
  *
  * 1024 is twice the required floor and stays inside the smallest measured ceiling, so the same
- * input is accepted or rejected identically everywhere, which is what AC-26 asks for. It is a
- * margin, not a proof: `checkNode`, `computeNumber` and `computeBoolean` still recurse, so this
- * constant is what keeps them safe rather than anything structural. Converting those three walks
- * to explicit-stack iteration would remove the dependence entirely; it is filed as a follow-up.
+ * input is accepted or rejected identically everywhere, which is what AC-26 asks for.
+ * T-025: `checkNode`, `computeNumber`, and `computeBoolean` walk with explicit stacks, so the
+ * bound holds by construction — evaluation never depends on the host call-stack budget.
  */
 const MAX_AST_DEPTH = 1024;
 
@@ -595,51 +594,87 @@ function hasParameter(env: Environment, name: string): boolean {
  * runs before evaluation and visits both operands of `&&` and `||`, which is what makes
  * identifier resolution and type checking survive short-circuiting (AC-23, AC-24).
  */
-function checkNode(node: Node, env: Environment): ValueType {
-  switch (node.kind) {
-    case 'number':
-      return 'number';
+function checkNode(root: Node, env: Environment): ValueType {
+  type Task =
+    { readonly tag: 'visit'; readonly node: Node } | { readonly tag: 'finish'; readonly node: Node };
+  const tasks: Task[] = [{ tag: 'visit', node: root }];
+  const types = new Map<Node, ValueType>();
 
-    case 'identifier':
-      if (!hasParameter(env, node.name)) {
-        throw unknownIdentifier(node.name);
+  while (tasks.length > 0) {
+    const task = tasks.pop()!;
+    if (task.tag === 'visit') {
+      const node = task.node;
+      tasks.push({ tag: 'finish', node });
+      switch (node.kind) {
+        case 'number':
+        case 'identifier':
+          break;
+        case 'negate':
+          tasks.push({ tag: 'visit', node: node.operand });
+          break;
+        case 'call':
+          for (let i = node.args.length - 1; i >= 0; i -= 1) {
+            tasks.push({ tag: 'visit', node: node.args[i]! });
+          }
+          break;
+        case 'binary':
+          tasks.push({ tag: 'visit', node: node.right });
+          tasks.push({ tag: 'visit', node: node.left });
+          break;
       }
-      return 'number';
-
-    case 'negate':
-      requireType(checkNode(node.operand, env), 'number', 'unary "-"');
-      return 'number';
-
-    case 'call': {
-      resolveWhitelistedCall(node.name, node.args.length);
-      for (const arg of node.args) {
-        requireType(checkNode(arg, env), 'number', `an argument of "${node.name}"`);
-      }
-      return 'number';
+      continue;
     }
 
-    case 'binary': {
-      const left = checkNode(node.left, env);
-      const right = checkNode(node.right, env);
-      const context = `operator "${node.op}"`;
-      if (isArithmeticOperator(node.op)) {
-        requireType(left, 'number', context);
-        requireType(right, 'number', context);
-        return 'number';
+    const node = task.node;
+    switch (node.kind) {
+      case 'number':
+        types.set(node, 'number');
+        break;
+      case 'identifier':
+        if (!hasParameter(env, node.name)) {
+          throw unknownIdentifier(node.name);
+        }
+        types.set(node, 'number');
+        break;
+      case 'negate':
+        requireType(types.get(node.operand)!, 'number', 'unary "-"');
+        types.set(node, 'number');
+        break;
+      case 'call': {
+        resolveWhitelistedCall(node.name, node.args.length);
+        for (const arg of node.args) {
+          requireType(types.get(arg)!, 'number', `an argument of "${node.name}"`);
+        }
+        types.set(node, 'number');
+        break;
       }
-      if (isComparisonOperator(node.op)) {
-        requireType(left, 'number', context);
-        requireType(right, 'number', context);
-        return 'boolean';
+      case 'binary': {
+        const left = types.get(node.left)!;
+        const right = types.get(node.right)!;
+        const context = `operator "${node.op}"`;
+        if (isArithmeticOperator(node.op)) {
+          requireType(left, 'number', context);
+          requireType(right, 'number', context);
+          types.set(node, 'number');
+          break;
+        }
+        if (isComparisonOperator(node.op)) {
+          requireType(left, 'number', context);
+          requireType(right, 'number', context);
+          types.set(node, 'boolean');
+          break;
+        }
+        requireType(left, 'boolean', context);
+        requireType(right, 'boolean', context);
+        types.set(node, 'boolean');
+        break;
       }
-      requireType(left, 'boolean', context);
-      requireType(right, 'boolean', context);
-      return 'boolean';
     }
   }
+
+  return types.get(root)!;
 }
 
-// ---------------------------------------------------------------------------------------------
 // Evaluation — a plain walk of the checked tree
 // ---------------------------------------------------------------------------------------------
 
@@ -721,39 +756,78 @@ function requireFinite(value: number, source: string): number {
  * a boolean-valued node cannot arrive here. They exist so that a future change which bypasses the
  * static pass fails with a typed error rather than producing `NaN`.
  */
-function computeNumber(node: Node, env: Environment): number {
-  switch (node.kind) {
-    // A literal is the one number this function does not have to check: `tokenize` rejects an
-    // unrepresentable literal at the source, so `node.value` is finite by construction. Probed
-    // rather than assumed — with the tokenise guard in place, 0 of 93 expressions placing an
-    // oversized literal in every syntactic position delivered a non-finite value here; with that
-    // guard removed, 87 of the same 93 did.
-    case 'number':
-      return node.value;
+function computeNumber(root: Node, env: Environment): number {
+  type Task =
+    { readonly tag: 'visit'; readonly node: Node } | { readonly tag: 'finish'; readonly node: Node };
+  const tasks: Task[] = [{ tag: 'visit', node: root }];
+  const values = new Map<Node, number>();
 
-    case 'identifier':
-      return requireFinite(readIdentifier(node.name, env), `parameter "${node.name}"`);
-
-    case 'negate':
-      return requireFinite(-computeNumber(node.operand, env), 'unary "-"');
-
-    case 'call': {
-      const values: number[] = [];
-      for (const arg of node.args) {
-        values.push(computeNumber(arg, env));
+  while (tasks.length > 0) {
+    const task = tasks.pop()!;
+    if (task.tag === 'visit') {
+      const node = task.node;
+      tasks.push({ tag: 'finish', node });
+      switch (node.kind) {
+        case 'number':
+        case 'identifier':
+          break;
+        case 'negate':
+          tasks.push({ tag: 'visit', node: node.operand });
+          break;
+        case 'call':
+          for (let i = node.args.length - 1; i >= 0; i -= 1) {
+            tasks.push({ tag: 'visit', node: node.args[i]! });
+          }
+          break;
+        case 'binary':
+          if (!isArithmeticOperator(node.op)) {
+            // finish will throw TYPE_MISMATCH — do not visit children (matches recursive order:
+            // recursive version only entered arithmetic branch; non-arithmetic threw without
+            // evaluating children).
+            break;
+          }
+          tasks.push({ tag: 'visit', node: node.right });
+          tasks.push({ tag: 'visit', node: node.left });
+          break;
       }
-      return requireFinite(applyWhitelistedCall(node.name, values), `function "${node.name}"`);
+      continue;
     }
 
-    case 'binary':
-      if (isArithmeticOperator(node.op)) {
-        return requireFinite(
-          applyArithmetic(node.op, computeNumber(node.left, env), computeNumber(node.right, env)),
-          `operator "${node.op}"`,
-        );
+    const node = task.node;
+    switch (node.kind) {
+      case 'number':
+        values.set(node, node.value);
+        break;
+      case 'identifier':
+        values.set(node, requireFinite(readIdentifier(node.name, env), `parameter "${node.name}"`));
+        break;
+      case 'negate':
+        values.set(node, requireFinite(-values.get(node.operand)!, 'unary "-"'));
+        break;
+      case 'call': {
+        const args: number[] = [];
+        for (const arg of node.args) {
+          args.push(values.get(arg)!);
+        }
+        values.set(node, requireFinite(applyWhitelistedCall(node.name, args), `function "${node.name}"`));
+        break;
       }
-      throw new ExprError('TYPE_MISMATCH', `operator "${node.op}" does not produce a number`);
+      case 'binary':
+        if (isArithmeticOperator(node.op)) {
+          values.set(
+            node,
+            requireFinite(
+              applyArithmetic(node.op, values.get(node.left)!, values.get(node.right)!),
+              `operator "${node.op}"`,
+            ),
+          );
+          break;
+        }
+        throw new ExprError('TYPE_MISMATCH', `operator "${node.op}" does not produce a number`);
+    }
   }
+
+  return values.get(root)!;
 }
 
 function applyWhitelistedCall(name: string, values: readonly number[]): number {
@@ -785,22 +859,63 @@ function applyWhitelistedCall(name: string, values: readonly number[]): number {
 }
 
 /** `&&` and `||` short-circuit, so an unevaluated operand cannot raise DIVISION_BY_ZERO. */
-function computeBoolean(node: Node, env: Environment): boolean {
-  if (node.kind === 'binary') {
-    if (node.op === '&&') {
-      return computeBoolean(node.left, env) ? computeBoolean(node.right, env) : false;
+function computeBoolean(root: Node, env: Environment): boolean {
+  // Frame stack preserves short-circuit: the right operand is only visited when needed.
+  type Frame =
+    | { readonly tag: 'eval'; readonly node: Node }
+    | {
+        readonly tag: 'logic';
+        readonly node: Extract<Node, { kind: 'binary' }>;
+        readonly leftDone: boolean;
+        leftValue?: boolean;
+      };
+
+  const frames: Frame[] = [{ tag: 'eval', node: root }];
+  let result: boolean | undefined;
+
+  while (frames.length > 0) {
+    const frame = frames.pop()!;
+
+    if (frame.tag === 'eval') {
+      const node = frame.node;
+      if (node.kind === 'binary') {
+        if (node.op === '&&' || node.op === '||') {
+          frames.push({ tag: 'logic', node, leftDone: false });
+          frames.push({ tag: 'eval', node: node.left });
+          continue;
+        }
+        if (isComparisonOperator(node.op)) {
+          result = applyComparison(node.op, computeNumber(node.left, env), computeNumber(node.right, env));
+          continue;
+        }
+      }
+      throw new ExprError('TYPE_MISMATCH', 'expression does not produce a boolean');
     }
-    if (node.op === '||') {
-      return computeBoolean(node.left, env) ? true : computeBoolean(node.right, env);
+
+    // logic frame
+    if (!frame.leftDone) {
+      const leftValue = result!;
+      if (frame.node.op === '&&' && !leftValue) {
+        result = false;
+        continue;
+      }
+      if (frame.node.op === '||' && leftValue) {
+        result = true;
+        continue;
+      }
+      frames.push({ tag: 'logic', node: frame.node, leftDone: true, leftValue });
+      frames.push({ tag: 'eval', node: frame.node.right });
+      continue;
     }
-    if (isComparisonOperator(node.op)) {
-      return applyComparison(node.op, computeNumber(node.left, env), computeNumber(node.right, env));
-    }
+
+    result = result!;
   }
-  throw new ExprError('TYPE_MISMATCH', 'expression does not produce a boolean');
+
+  return result!;
 }
 
 // ---------------------------------------------------------------------------------------------
+
 // Public API
 // ---------------------------------------------------------------------------------------------
 
