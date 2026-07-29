@@ -1859,3 +1859,8 @@ New suite hash `e50a87a3e9cc7bf3…`.
 
 Code APPROVE_WITH_NITS; security PASS. DoD-7 sibling fix `6a60077` pre-merge.
 Frozen hash `a987150c86df4bc8…`. Full suite **1620/1620**.
+
+### T-017 started — range drill
+
+Worktree `.worktrees/wt-T-017` on `ticket/T-017-range-drill` from `swarm/engine-core` @ current tip.
+Phase `tests`. Publish session API in COORDINATION.md after merge.
