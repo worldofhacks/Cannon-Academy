@@ -199,11 +199,11 @@ All tuning constants live in one file, `engine/tuning.ts`, exposed on the hidden
 ```
 roll = uniform(cannon.min, cannon.max) biased by answerQuality
 answerQuality ∈ [0,1] from elapsedMs vs the cannon's timer (floored at 0.35 for any correct answer)
-perfectShot (elapsed < 40% of timer) → +1 bonus ball
+perfectShot (elapsed < 40% of timer) → +1 damage, celebrated with an extra cannonball arc (presentation only)
 volatile guns: wrong answer → recoil damage to self
 ```
 
-**Enemy hull is per-island, in `tuning.ts` from day 1** (starter sloops 40–50 vs the player's 100), so the day-1 "a duel you can win" resolves in 4–6 player volleys rather than the 10+ a flat 100-hull enemy would force. Player hull is session-only and resets each duel. The floor is a pedagogical guarantee: a slow-but-correct K kid always lands ≥ a respectable mid-range volley. Damage renders as N cannonball arcs with per-ball hit/splash, so the roll reads as shot spread.
+**Enemy hull is per-island, in `tuning.ts` from day 1** (starter sloops 40–50 vs the player's 100), so the day-1 "a duel you can win" resolves in 4–6 player volleys rather than the 10+ a flat 100-hull enemy would force. Player hull is session-only and resets each duel. The floor is a pedagogical guarantee: a slow-but-correct K kid always lands ≥ a respectable mid-range volley. Damage is a scalar total; the duel view may render it as N cannonball arcs (from `BASE_BALLS_PER_VOLLEY`, plus one extra arc on a Perfect Shot) so the roll reads as shot spread — arc count is presentation and does not subdivide damage.
 
 `perfectShot` and volatile recoil are **engine behavior from day 1** (cheap, and §8 tests them); their **VFX/UI surface lands day 3**. Writing that split down here prevents a mid-build scope debate.
 
