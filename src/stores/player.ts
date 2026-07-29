@@ -24,9 +24,21 @@
 import { createStore, type StoreApi } from 'zustand/vanilla';
 
 import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
+import type { MercyState } from '@engine/opponents/mercy';
 import { applyAnswer, emptyMastery, resolveUnlocks, type SkillMastery } from '@engine/mastery';
 import { resolvePlacement } from '@engine/placement';
 import { rankTierForWins } from '@engine/ranks';
+
+import type { RewardReceipts } from '../contracts/rewards';
+
+/** Fresh mercy container — never alias `emptyMercyState` (shared nested array). */
+function freshMercyState(): MercyState {
+  return {
+    recentPlayerCorrect: [],
+    consecutiveLosses: 0,
+    forcedMisfiresRemaining: 0,
+  };
+}
 
 /** The persisted captain. Every field here survives relaunch; nothing else does. */
 export interface Captain {
@@ -47,6 +59,12 @@ export interface Captain {
   currentIsland: IslandId | null;
   hasCompletedOnboarding: boolean;
   hasFoughtGuidedDuel: boolean;
+  /** Durable rival-mercy ledger (A-041). Survives relaunch for A-030. */
+  mercyState: MercyState;
+  /** Committed reward receipts keyed by `duel:<id>` / `purchase:<seq>` (A-041). */
+  rewardReceipts: RewardReceipts;
+  /** Next Harbor purchase sequence; starts at zero (A-041). */
+  nextPurchaseSequence: number;
 }
 
 export interface CaptainState {
@@ -109,17 +127,19 @@ export function emptyCaptain(): Captain {
     currentIsland: null,
     hasCompletedOnboarding: false,
     hasFoughtGuidedDuel: false,
+    mercyState: freshMercyState(),
+    rewardReceipts: {},
+    nextPurchaseSequence: 0,
   };
 }
 
 /**
- * Folds a tally of answers into one skill's mastery, then applies whatever that unlocked.
+ * Pure captain-tally transition (A-041).
  *
- * Unlock application is a set union against what is already owned, which is what makes re-crossing
- * the threshold a no-op. Without that, every duel after the first re-grants the same cannon and
- * `ownedCannons` grows without bound.
+ * Produces the next Captain snapshot (mastery + unlocks) without mutating `captain`, so a later
+ * reward settlement can compute one snapshot and call `replaceCaptain` once.
  */
-function applyTally(
+export function applyCaptainTally(
   captain: Captain,
   skill: SkillId,
   source: 'duel' | 'range',
@@ -190,10 +210,10 @@ export function createCaptainStore(initial?: Captain): CaptainStore {
     },
 
     recordDuelAnswers: (skill, tally) =>
-      set((s) => ({ captain: applyTally(s.captain, skill, 'duel', tally) })),
+      set((s) => ({ captain: applyCaptainTally(s.captain, skill, 'duel', tally) })),
 
     recordRangeAnswers: (skill, tally) =>
-      set((s) => ({ captain: applyTally(s.captain, skill, 'range', tally) })),
+      set((s) => ({ captain: applyCaptainTally(s.captain, skill, 'range', tally) })),
 
     recordDuelResult: ({ won }) =>
       set((s) => {

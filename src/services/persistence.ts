@@ -14,7 +14,9 @@
  * one of those must resolve to a playable app: a child locked out of the game by a bad write is a
  * worse outcome than a child who lost their coins.
  */
+import { normalizeRewardReceipts } from '../contracts/rewards';
 import { emptyCaptain, type Captain } from '../stores/player';
+import type { MercyState } from '@engine/opponents/mercy';
 
 /** The two AsyncStorage methods this needs. Narrow on purpose — it is the whole test seam. */
 export interface KeyValueStore {
@@ -28,7 +30,10 @@ export const STORAGE_KEY = 'cannon-academy/captain';
  * Bumped whenever `Captain`'s shape changes incompatibly. Written from the first release, because
  * retrofitting a version onto unversioned data means guessing which shape you are looking at.
  */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
+
+/** Pre-A-041 captain envelope — migrated forward, not discarded. */
+const LEGACY_SCHEMA_VERSION = 1;
 
 export interface HydrateResult {
   readonly captain: Captain;
@@ -36,6 +41,37 @@ export interface HydrateResult {
   readonly recovered: boolean;
   /** True when stored data was discarded for being from an older schema. */
   readonly migrated: boolean;
+}
+
+function freshMercyState(): MercyState {
+  return {
+    recentPlayerCorrect: [],
+    consecutiveLosses: 0,
+    forcedMisfiresRemaining: 0,
+  };
+}
+
+function normalizeMercyState(raw: unknown): MercyState {
+  if (typeof raw !== 'object' || raw === null) return freshMercyState();
+  const m = raw as Record<string, unknown>;
+  const recentPlayerCorrect = Array.isArray(m.recentPlayerCorrect)
+    ? m.recentPlayerCorrect.filter((v): v is boolean => typeof v === 'boolean')
+    : [];
+  const consecutiveLosses =
+    typeof m.consecutiveLosses === 'number' && Number.isFinite(m.consecutiveLosses)
+      ? Math.max(0, Math.floor(m.consecutiveLosses))
+      : 0;
+  const forcedMisfiresRemaining =
+    typeof m.forcedMisfiresRemaining === 'number' && Number.isFinite(m.forcedMisfiresRemaining)
+      ? Math.max(0, Math.floor(m.forcedMisfiresRemaining))
+      : 0;
+  return { recentPlayerCorrect, consecutiveLosses, forcedMisfiresRemaining };
+}
+
+function normalizeNextPurchaseSequence(raw: unknown): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return 0;
+  const sequence = Math.floor(raw);
+  return sequence >= 0 ? sequence : 0;
 }
 
 /**
@@ -46,7 +82,7 @@ export interface HydrateResult {
  * screen, as `NaN`. Checking the shape here is what makes AC-3 hold for well-formed-but-wrong data
  * as well as for truncated data.
  */
-function isCaptain(value: unknown): value is Captain {
+function isBaseCaptain(value: unknown): value is Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'> {
   if (typeof value !== 'object' || value === null) return false;
   const c = value as Record<string, unknown>;
   return (
@@ -67,6 +103,27 @@ function isCaptain(value: unknown): value is Captain {
     typeof c.hasCompletedOnboarding === 'boolean' &&
     typeof c.hasFoughtGuidedDuel === 'boolean'
   );
+}
+
+function normalizeCaptain(raw: Record<string, unknown>): Captain {
+  const base = raw as Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'>;
+  return {
+    ...base,
+    seenCannons: Array.isArray(base.seenCannons) ? base.seenCannons : [],
+    mercyState: normalizeMercyState(raw.mercyState),
+    rewardReceipts: normalizeRewardReceipts(raw.rewardReceipts),
+    nextPurchaseSequence: normalizeNextPurchaseSequence(raw.nextPurchaseSequence),
+  };
+}
+
+function migrateLegacyCaptain(raw: Record<string, unknown>): Captain {
+  return {
+    ...(raw as Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'>),
+    seenCannons: Array.isArray(raw.seenCannons) ? (raw.seenCannons as Captain['seenCannons']) : [],
+    mercyState: freshMercyState(),
+    rewardReceipts: {},
+    nextPurchaseSequence: 0,
+  };
 }
 
 /** Reads the captain. Always resolves to a usable one; never throws. */
@@ -94,22 +151,27 @@ export async function hydrate(storage: KeyValueStore): Promise<HydrateResult> {
 
   const envelope = parsed as { version?: unknown; captain?: unknown };
 
-  // An older schema is DISCARDED, not partially applied. Merging an old captain into the new
-  // shape would leave fields at defaults that look like deliberate values — worse than a reset,
-  // because it is invisible. When a real migration is needed it goes here, explicitly, per version.
+  if (envelope.version === LEGACY_SCHEMA_VERSION) {
+    if (!isBaseCaptain(envelope.captain)) {
+      return { captain: emptyCaptain(), recovered: true, migrated: false };
+    }
+    return {
+      captain: migrateLegacyCaptain(envelope.captain as Record<string, unknown>),
+      recovered: false,
+      migrated: true,
+    };
+  }
+
+  // Unsupported schema versions are discarded explicitly, never half-applied.
   if (envelope.version !== SCHEMA_VERSION) {
     return { captain: emptyCaptain(), recovered: false, migrated: true };
   }
 
-  if (!isCaptain(envelope.captain)) {
+  if (!isBaseCaptain(envelope.captain)) {
     return { captain: emptyCaptain(), recovered: true, migrated: false };
   }
 
-  // Older saves predate A-011's seenCannons field — default rather than discard the captain.
-  const captain: Captain = {
-    ...envelope.captain,
-    seenCannons: Array.isArray(envelope.captain.seenCannons) ? envelope.captain.seenCannons : [],
-  };
+  const captain = normalizeCaptain(envelope.captain as Record<string, unknown>);
   return { captain, recovered: false, migrated: false };
 }
 
