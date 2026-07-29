@@ -82,6 +82,36 @@ async function loadDefaultName(): Promise<unknown> {
   return mod.DEFAULT_CAPTAIN_NAME;
 }
 
+const SCREEN_PATH = 'app/name-flag.tsx';
+
+/**
+ * The screen as TEXT, never as a module — importing it would pull in `react-native` and fail to
+ * parse. Same technique as `spec(A-001:AC-7)`.
+ *
+ * Returns null when the file does not exist yet, so the test can say *that* rather than die on a
+ * raw ENOENT stack that reads like a broken test instead of an unbuilt feature.
+ *
+ * Stated plainly so nobody over-trusts it, because a static check that looks stronger than it is
+ * is worse than none. What it proves: the screen commits through the store at all, and no call
+ * site can hand that store a flag which is null by construction. What it CANNOT prove: that the
+ * skip control specifically is the one wired to that commit. A screen whose Save button commits
+ * and whose Skip button only calls `router` passes this test.
+ *
+ * That last case is control flow, and reconstructing control flow from text means a heuristic —
+ * I tried a proximity window between the word "skip" and the commit, and it passed the exact
+ * screen it was written to catch. A gate that green-lights its own counterexample is worse than
+ * an honest gap, so it is not here. That case belongs to the screenshot review in the ticket's
+ * DoD, which is where this ticket already puts screen behaviour.
+ */
+async function readScreenSource(): Promise<string | null> {
+  const { readFile } = await import('node:fs/promises');
+  try {
+    return await readFile(new URL(`../../${SCREEN_PATH}`, import.meta.url), 'utf8');
+  } catch {
+    return null;
+  }
+}
+
 // ─── Colour maths, dependency-free ───────────────────────────────────────────────────────────
 
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -396,10 +426,58 @@ describe('A-006 name and flag — AC-3, a skipped or blank name still yields a c
     expect(settled.flag).not.toBeNull();
     expect(resolveDestination(settled)).not.toBe('name-flag');
   });
+
+  it('spec(A-006:AC-3) the screen actually commits on skip, with a flag that cannot be null', async () => {
+    const src = await readScreenSource();
+    expect(src, `${SCREEN_PATH} does not exist yet — AC-3's skip path has nothing to commit`).not.toBeNull();
+    const source = src as string;
+
+    // Every test above this one *simulates* the skip by calling the store the way the screen is
+    // meant to. None of them checks that the screen does. The gap is real and it is silent:
+    // `flow.ts` requires a non-empty name AND a non-null flag, so a skip button that navigates
+    // without committing — or that commits a flag still sitting at `null` — bounces the child
+    // straight back to this screen forever, with no frozen test objecting.
+
+    expect(source, 'no skip affordance on a screen AC-3 says must be skippable').toMatch(/skip/i);
+
+    const calls = [...source.matchAll(/setNameAndFlag\s*\(([^)]*)\)/g)].map((m) => m[1] ?? '');
+    // Skipping must go THROUGH the store. A skip wired only to `router` leaves the captain
+    // unnamed and unflagged, which is the loop.
+    expect(calls.length, 'the screen never calls setNameAndFlag').toBeGreaterThan(0);
+
+    for (const args of calls) {
+      const flagArg = args.split(',')[1]?.trim() ?? '';
+      expect(flagArg, `setNameAndFlag(${args}) passes no flag argument`).not.toBe('');
+      // The literal forms of "no flag". `flag: null` is exactly what `flow.ts` refuses.
+      expect(flagArg, `setNameAndFlag(${args}) commits an empty flag`).not.toMatch(
+        /^(null|undefined|''|""|``)$/,
+      );
+    }
+
+    // The harder case, and the one the reviewer flagged: `setNameAndFlag(name, flag)` reads fine
+    // as text while `flag` is a piece of state still holding `null`. So if the screen keeps any
+    // null-initialised state at all — and on this screen the flag is the only thing that would
+    // be — then every commit must defend itself with a fallback.
+    const keepsNullableState = /useState\s*(?:<[^>]*>)?\s*\(\s*(?:null|undefined)\s*\)/.test(source);
+    if (keepsNullableState) {
+      for (const args of calls) {
+        expect(
+          args,
+          `the screen holds nullable state, so setNameAndFlag(${args}) needs a ?? / || fallback`,
+        ).toMatch(/\?\?|\|\|/);
+      }
+    }
+
+    // The fallback must be one of the six, not a hex literal invented at the call site — the
+    // pennant resolver only answers to ids from this module.
+    expect(source, 'the screen does not source its flags from the shared set').toMatch(
+      /from '\.\.\/src\/theme\/flags'/,
+    );
+  });
 });
 
 describe('A-006 name and flag — AC-4, the six flags are told apart by hue', () => {
-  it('spec(A-006:AC-4) there are exactly six flags — a fixed set, not a colour picker', async () => {
+  it('spec(A-006:AC-4) dod(A-006:3) there are exactly six flags — a fixed set, not a colour picker', async () => {
     const flags = await loadFlags();
     // The DoD says fixed at six, per board 6b. Six is also what makes AC-4 achievable: an
     // arbitrary picker cannot guarantee any two captains' pennants are distinguishable.
