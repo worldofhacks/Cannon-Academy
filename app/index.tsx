@@ -1,88 +1,22 @@
-import { router } from 'expo-router';
+import { Redirect } from 'expo-router';
 
+import { resolveDestination } from '../src/services/flow';
 import { useCaptain } from '../src/stores/useCaptain';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { color, radius, space, type } from '../src/theme/tokens';
 
 /**
- * Title screen — a launcher, not the game.
+ * The entry route. It is a REDIRECT, not a screen.
  *
- * The sea chart, onboarding and the loadout are still to build; until they exist this is the
- * shortest path from a cold start to the duel, which is the only screen worth demoing.
+ * This used to be a title screen with a "Sail into a duel" button that pushed straight to
+ * `/duel`. That was written before the flow resolver existed, and it survived it — so a fresh
+ * captain could reach the duel with no grade band, no cannons and no name, and the duel's own
+ * guard threw `placement granted no cannons` on a red screen. The launcher had become a hole
+ * straight through the onboarding flow.
+ *
+ * `resolveDestination` is the single place that decides where a captain belongs (A-003). Having
+ * a second, hardcoded opinion about it here is exactly the class of bug that resolver exists to
+ * prevent, so this route now has no opinion at all.
  */
-export default function Title() {
-  const insets = useSafeAreaInsets();
-
-  // Counted, not written down. This line said "Swivel Gun and Culverin aboard" while the tray one
-  // tap later showed four guns — a hardcoded claim the app itself contradicts. Deriving it means
-  // the copy cannot drift from placement, including when T-032 changes what placement grants.
-  const armed = useCaptain((s) => s.captain.equippedCannons.length);
-
-  return (
-    <View style={[s.screen, { paddingTop: insets.top + space[7], paddingBottom: insets.bottom + space[6] }]}>
-      <View style={s.crest}>
-        <Text style={s.crestGlyph}>⚓</Text>
-      </View>
-
-      <Text style={s.kicker}>MATH ON THE HIGH SEAS</Text>
-      <Text style={s.title}>Cannon Academy</Text>
-      <Text style={s.body}>
-        Every shot is a question. Answer fast and the shot flies truer — answer slowly and it still fires.
-      </Text>
-
-      <View style={{ flex: 1 }} />
-
-      {/* `Link asChild` clones the child and replaces its `style` prop, which silently drops a
-          function-valued style — the button rendered with no fill at all. An imperative push keeps
-          the pressed state working. */}
-      <Pressable
-        onPress={() => router.push('/duel')}
-        accessibilityRole="button"
-        style={({ pressed }) => [s.primary, pressed && s.pressed]}
-      >
-        <Text style={s.primaryText}>Sail into a duel</Text>
-      </Pressable>
-      <Text style={s.foot}>
-        Port Sumwich · {armed} cannon{armed === 1 ? '' : 's'} aboard
-      </Text>
-    </View>
-  );
+export default function Index() {
+  const captain = useCaptain((s) => s.captain);
+  return <Redirect href={`/${resolveDestination(captain)}`} />;
 }
-
-const s = StyleSheet.create({
-  screen: { flex: 1, backgroundColor: color.deepSea, paddingHorizontal: space[5], alignItems: 'center' },
-  crest: {
-    width: 88,
-    height: 88,
-    borderRadius: radius.panel,
-    backgroundColor: color.surfaceRaised,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: space[5],
-  },
-  crestGlyph: { fontSize: 44, color: color.gold },
-  kicker: { ...type.eyebrow, color: color.amber },
-  title: { ...type.display, color: color.parchment, marginTop: space[2], textAlign: 'center' },
-  body: {
-    ...type.body,
-    color: color.inkMuted,
-    textAlign: 'center',
-    marginTop: space[3],
-    maxWidth: 300,
-  },
-  primary: {
-    alignSelf: 'stretch',
-    height: 64,
-    borderRadius: radius.card,
-    backgroundColor: color.amber,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderBottomWidth: 4,
-    borderBottomColor: color.goldDeep,
-  },
-  pressed: { transform: [{ translateY: 3 }], borderBottomWidth: 1 },
-  primaryText: { ...type.display, fontSize: 20, lineHeight: 24, color: color.inkDark },
-  foot: { ...type.caption, color: color.inkSoft, marginTop: space[3] },
-});
