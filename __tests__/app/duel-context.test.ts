@@ -11,8 +11,8 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { getCannon, getIsland, islands } from '@content/index';
-import type { IslandId } from '@content/schemas';
+import { cannons, getCannon, getIsland, islands } from '@content/index';
+import type { GradeBand, IslandId } from '@content/schemas';
 import { ENEMY_HULL_BY_ISLAND } from '@engine/tuning';
 
 import { emptyCaptain, type Captain } from '../../src/stores/player';
@@ -51,14 +51,33 @@ type DuelStoreApi = {
 
 const RELIABLE_STARTER = getCannon('swivel_gun');
 
+function bandForIsland(islandId: IslandId): GradeBand {
+  const island = getIsland(islandId);
+  const needed = cannons
+    .filter((cannon) => island.rangeSkills.includes(cannon.skill))
+    .reduce((max, cannon) => Math.max(max, cannon.minGrade), 0);
+  if (needed >= 4) return 'g4_5';
+  if (needed >= 2) return 'g2_3';
+  return 'k_1';
+}
+
 function captain(over: Partial<Captain> = {}): Captain {
+  const currentIsland = over.currentIsland ?? 'port_sumwich';
+  let gradeBand = over.gradeBand;
+  if (gradeBand === undefined) {
+    if (currentIsland === null || !Object.hasOwn(ENEMY_HULL_BY_ISLAND, currentIsland)) {
+      gradeBand = 'g2_3';
+    } else {
+      gradeBand = bandForIsland(currentIsland);
+    }
+  }
   return {
     ...emptyCaptain(),
-    gradeBand: 'g2_3',
+    gradeBand,
     unlockedIslands: ['port_sumwich', 'isla_products', 'quotient_cove', 'fraction_reef', 'grandline'],
     equippedCannons: ['swivel_gun', 'six_pounder', 'culverin'],
     ownedCannons: ['swivel_gun', 'six_pounder', 'culverin'],
-    currentIsland: 'port_sumwich',
+    currentIsland,
     hasCompletedOnboarding: true,
     ...over,
   };
