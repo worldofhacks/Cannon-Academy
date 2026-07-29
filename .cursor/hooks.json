@@ -12,6 +12,11 @@
         "command": "node .cursor/hooks/swarm-guard.cjs",
         "failClosed": true
       }
+    ],
+    "afterShellExecution": [
+      {
+        "command": "node .claude/hooks/doc-align-counter.cjs"
+      }
     ]
   }
 }

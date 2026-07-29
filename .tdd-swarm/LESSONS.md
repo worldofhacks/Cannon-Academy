@@ -841,3 +841,33 @@ imagination.
 - **Reviewers also correct the author's arithmetic.** The T-013 report's "30 `@ts-expect-error`
   directives" was 25 active ones plus five in prose, and its "exactly 8 edit sites" for a new phase
   and event was too low. Counts in a report are claims; treat them as such.
+
+---
+
+## L-035 — Documentation drifts silently, so it needs a regression suite (Phase 5)
+
+**Pattern:** Across this run, documentation drifted six distinguishable ways, and **not one of them
+failed anything**. `README` claimed "Repo scaffold: Not started" at 776 passing tests, then
+"waves 1–2 merged" after wave 3 merged. `TICKETS.md` accumulated five status cells disagreeing with
+their own ticket files. `ARCHITECTURE` §4.4 listed the content catalogs but omitted `skills.json`,
+which ships and which §4.1 requires. `PLAN` asserted "15–25 templates per skill" in one section and a
+"≥8 floor" in another. `progress.md`, the resume point after compaction, fell two full rounds behind.
+Every one was found by a human asking "are the docs current?", never by a gate.
+
+**Why:** code that goes stale stops compiling; prose that goes stale keeps reading fine. There is no
+failing signal, so the only detection is a re-read — and nobody re-reads a document that looks
+finished. The drift is also **asymmetric**: it accrues fastest exactly where the same fact is stored
+twice, because updating one copy feels complete.
+
+**What to do instead:** treat documentation claims as testable assertions and give them a gate.
+`.tdd-swarm/doc-align.sh` checks the six classes above mechanically; the `doc-align` skill carries
+the judgment a script cannot — separating a **stale** doc from one **blocked on a decision**
+(`.tdd-swarm/known-stale.md`, where each entry names the ticket that unblocks it and the gate flags
+the entry once that ticket closes).
+
+Two design points that made it work. First, **prefer claims the repo can verify** — a file list, a
+test count, an exported symbol — over claims only a human can check; "you are here" is true the day
+it is written and false forever after. Second, **scheduled is not orphaned**: the symbol check
+flagged three event names absent from `src/` on its first run, all owned by a ticket in a paused
+wave. Docs legitimately run ahead of code mid-build; docs that outlive a deleted symbol do not. A
+drift detector that cannot tell those apart gets muted, and a muted gate is worse than none.
