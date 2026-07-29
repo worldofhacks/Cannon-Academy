@@ -1784,3 +1784,21 @@ Phase reopened to `tests`; Test Agent fixing contract + adding AC-7 preflight (r
 [T-032 test-design review](08ef7c4b-d2da-41a7-ba08-26b11084ef5b): no Critical/Important.
 Suites encode D-6 starters-only + mastery composition; correctly RED (29 fail). Phase → `implement`.
 Frozen hashes: placement `b07759c1b3a850e7989dc8950e04a426c46af0260125285cbca79cf52a4d66fa`, mastery `f90cc07904d61d40cefe5c2ce11e054213b46dd983fde74a889bc56466122f8f`. Implementer dispatched.
+
+
+### T-014 re-frozen (`63628812983a2e2b…`) after AC-7 dispute fix
+
+[T-014 Test Agent](bb6cbd48-bc07-4cd2-88c9-705344157053) commit `a0cbaeb`: near_doubles third
+distractor → `a + b + 2` (ladder 0/1000); AC-7 preflight added. Orchestrator deleted untracked
+`_ladder-measure.test.ts`. Phase → `implement`. Hash `63628812983a2e2b0414e4f5f1dfc65fd8f4afbf787e63a3517eeff1892a6864`.
+
+### T-016 FROZEN (`026215158d38c033…`) — ACCEPT
+
+[T-016 re-review](3f400934-f8fc-4e1a-b15b-c515f2727e37): prior Critical/Important closed on
+`2929435`. Phase → `implement`. Hash `026215158d38c0338542bb901dfa7703e8f961aec34e1182d817a0d0d2d5115c`.
+
+### T-032 implementation verified green
+
+[T-032 Implementer](5508089d-1026-4f34-a62f-f3acac7054c3) `ff66b32`: starters-only. Gates ALL
+PASS, **1456/1456**, frozen hashes unchanged. Code + security review dispatched next; then
+merge + push per ticket policy.
