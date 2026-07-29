@@ -1,9 +1,8 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+
+import { useCaptain } from '../src/stores/useCaptain';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-
-import { resolvePlacement } from '@engine/placement';
 
 import { color, radius, space, type } from '../src/theme/tokens';
 
@@ -19,7 +18,7 @@ export default function Title() {
   // Counted, not written down. This line said "Swivel Gun and Culverin aboard" while the tray one
   // tap later showed four guns — a hardcoded claim the app itself contradicts. Deriving it means
   // the copy cannot drift from placement, including when T-032 changes what placement grants.
-  const armed = useMemo(() => resolvePlacement('k_1').unlockedCannons.length, []);
+  const armed = useCaptain((s) => s.captain.equippedCannons.length);
 
   return (
     <View style={[s.screen, { paddingTop: insets.top + space[7], paddingBottom: insets.bottom + space[6] }]}>
