@@ -39,11 +39,9 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 
 ## Current state at the time of writing
 
-- Engine: Wave 5 — **T-014…T-020 + T-034 done** (Wave 5 complete) (templates + range drill; drill API published below).
-  **T-035** shipped `TRAY_CAPACITY` — A-011 unblocked. **T-029 / D-7** shipped (`add_within_10` on Port Sumwich + `saker` range payoff; early Isla Products fog accepted). Owner ruling **D-6** on **T-032**.
+- Engine: **T-029 / D-7**, **T-035** (`TRAY_CAPACITY`), and **T-036 / D-8** (timeout charges nothing on the range) shipped on `swarm/engine-core`. Owner ruling **D-6** on **T-032**.
   Push `swarm/engine-core` after every ticket merge.
-- App track (`app/shell`): owns presentation; currently uses a placeholder question service that
-  must not ship — real templates from T-014…T-016 replace it.
+- App track (`app/shell`): presentation + A-011 gun deck; mirrors D-8 under A-017 in `duel.ts`.
 - iOS: Simulator + Expo web demo path; TestFlight gated on Apple Developer enrollment.
 
 ## Published engine APIs (Track A → Track B)
@@ -55,7 +53,7 @@ Source: `src/engine/drill.ts` (merged on `swarm/engine-core`).
 ```ts
 export interface DrillAnswer {
   readonly templateId: string;
-  readonly choiceIndex: number | null; // null = timed out (counts as miss)
+  readonly choiceIndex: number | null; // null = timed out (D-8 / T-036: charges nothing)
   readonly correct: boolean;
   readonly elapsedMs: number;
 }
@@ -92,7 +90,7 @@ export function answerDrill(
 Notes for Track B (`app/range.tsx`):
 
 - Mastery fills via `applyAnswer(..., 'range', ...)` at full rate; caller runs `resolveUnlocks`.
-- Timeout = `choiceIndex === null` (miss, not skip). No `Date` / `Math.random` in the engine.
+- Timeout = `choiceIndex === null` — **D-8 / T-036**: charges neither mastery attempts nor correct; does not advance `answered`; same question stays current (retry in place). App duel lane mirrors under A-017. No `Date` / `Math.random` in the engine.
 - Session is plain JSON (interrupt/restore safe). Post-complete `answerDrill` throws.
 - Inject a skill's template pool; do not edit `src/engine/**` from the app track.
 
