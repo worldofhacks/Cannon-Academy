@@ -4,7 +4,8 @@
 `TICKETS.md` explicitly excludes. Numbered `A-` so it cannot collide with the engine track's
 `T-` series or with the concurrent engine agent's files.
 
-**17 tickets · 8 waves · 89 acceptance criteria.** Nine tickets are `review-passed`; eight remain.
+**17 feature tickets · 8 feature waves · 89 feature acceptance criteria, plus 2 release-verification
+tickets.** `HANDOFF.md` supersedes the historical status prose below.
 
 > **Phase 0 note.** The app layer has no component-test harness, so screen _geometry_ cannot be
 > frozen-tested the way engine logic is. Every ticket below therefore splits its criteria: logic
@@ -109,6 +110,16 @@ work rides along for free and can be abandoned mid-wave without stalling the pat
 ## Blocked
 
 _(none — A-011 unblocked by engine T-035 / `TRAY_CAPACITY`.)_
+
+## Release verification waves — 2026-07-29
+
+These release-only tickets were added from `HANDOFF.md` §5–§6. They do not reopen A-007 or add
+features; they freeze the two deadline-critical claims the earlier build had not yet proven.
+
+| id    | title                                                | status  | deps         | model    |
+| ----- | ---------------------------------------------------- | ------- | ------------ | -------- |
+| A-018 | Rebuilt chart is safe and visible on web and iOS     | backlog | A-007, A-017 | capable  |
+| A-019 | Public Expo web build with working direct deep links | backlog | A-018        | standard |
 
 ## Why the waves were recomputed (2026-07-29)
 
