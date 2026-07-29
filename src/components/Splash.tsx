@@ -40,7 +40,6 @@ export function Splash({
   onStart: () => void;
 }) {
   const window = useLayout();
-  // Art/type scale off a phone-width stage, not the full desktop viewport.
   const stageWidth = Math.min(window.width, STAGE_MAX_WIDTH);
   const L = computeLayout(stageWidth, window.height);
   const px = L.a;
@@ -59,20 +58,14 @@ export function Splash({
     );
   }, [bob]);
 
-  // Hoisted OUT of the worklet on purpose. `useAnimatedStyle` runs on the UI runtime, which
-  // cannot synchronously call a JS closure — and `px` is one. Calling it inside crashed the app
-  // on its very first frame with "[Worklets] Tried to synchronously call a Remote Function".
-  // react-native-web does not enforce worklet boundaries, so this was invisible until a device.
   const bobRise = px(5);
   const bobStyle = useAnimatedStyle(() => ({
     transform: [{ translateY: -bobRise * bob.value }, { rotate: `${-1.2 + 2.4 * bob.value}deg` }],
   }));
 
-  const art = (
-    <View style={[s.stage, { width: stageWidth }]}>
-      {/* sea */}
+  const scenery = (
+    <>
       <View style={[s.sea, { height: px(210), borderTopWidth: px(5) }]} />
-      {/* the dashed swell — 26pt on, 26pt off */}
       <View style={[s.swell, { bottom: px(150), height: px(4) }]}>
         {Array.from({ length: Math.ceil(stageWidth / px(52)) + 1 }, (_, i) => (
           <View
@@ -89,7 +82,6 @@ export function Splash({
         ))}
       </View>
 
-      {/* wordmark — never equal fontSize/lineHeight; no adjustsFontSizeToFit (web can shrink to 0). */}
       <View
         style={[
           s.title,
@@ -138,7 +130,6 @@ export function Splash({
         />
       </View>
 
-      {/* the ship, bobbing */}
       <Animated.View
         style={[
           {
@@ -211,32 +202,34 @@ export function Splash({
           style={{ position: 'absolute', left: 0, bottom: 0 }}
         />
       </Animated.View>
-    </View>
+    </>
   );
 
   if (!ready) {
     return (
       <View style={s.screen}>
-        {art}
-        <View style={[s.loader, { bottom: px(64), gap: px(12) }]}>
-          <View style={{ flexDirection: 'row', gap: px(8) }}>
-            {[0, 180, 360].map((delay) => (
-              <PulseDot key={delay} delay={delay} size={px(14)} />
-            ))}
+        <View style={[s.stage, { width: stageWidth }]}>
+          {scenery}
+          <View style={[s.loader, { bottom: px(64), gap: px(12) }]}>
+            <View style={{ flexDirection: 'row', gap: px(8) }}>
+              {[0, 180, 360].map((delay) => (
+                <PulseDot key={delay} delay={delay} size={px(14)} />
+              ))}
+            </View>
+            <Text
+              style={[
+                s.hoisting,
+                {
+                  fontFamily: bodyFace,
+                  fontSize: tx(12),
+                  lineHeight: tx(16),
+                  letterSpacing: tx(12) * 0.08,
+                },
+              ]}
+            >
+              HOISTING THE SAILS
+            </Text>
           </View>
-          <Text
-            style={[
-              s.hoisting,
-              {
-                fontFamily: bodyFace,
-                fontSize: tx(12),
-                lineHeight: tx(16),
-                letterSpacing: tx(12) * 0.08,
-              },
-            ]}
-          >
-            HOISTING THE SAILS
-          </Text>
         </View>
       </View>
     );
@@ -244,18 +237,20 @@ export function Splash({
 
   return (
     <View style={s.screen}>
-      {art}
-      <View style={[s.loader, { bottom: px(64) }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="SET SAIL"
-          onPress={onStart}
-          style={({ pressed }) => [s.start, { minHeight: Math.max(px(64), 64) }, pressed && s.startPressed]}
-        >
-          <Text style={[s.startLabel, { fontFamily: displayFace, fontSize: tx(18), lineHeight: tx(24) }]}>
-            {['SET', 'SAIL'].join(' ')}
-          </Text>
-        </Pressable>
+      <View style={[s.stage, { width: stageWidth }]}>
+        {scenery}
+        <View style={[s.loader, { bottom: px(64) }]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="SET SAIL"
+            onPress={onStart}
+            style={({ pressed }) => [s.start, { minHeight: Math.max(px(64), 64) }, pressed && s.startPressed]}
+          >
+            <Text style={[s.startLabel, { fontFamily: displayFace, fontSize: tx(18), lineHeight: tx(24) }]}>
+              {['SET', 'SAIL'].join(' ')}
+            </Text>
+          </Pressable>
+        </View>
       </View>
     </View>
   );
@@ -290,7 +285,7 @@ const s = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'center',
   },
-  stage: { flex: 1, alignSelf: 'center', maxWidth: '100%' },
+  stage: { height: '100%', maxWidth: '100%', position: 'relative' },
   sea: {
     position: 'absolute',
     left: 0,
