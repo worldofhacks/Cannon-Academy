@@ -1,9 +1,10 @@
 /**
  * Grade-band placement — turns the onboarding grade picker's answer into a starting game state.
  *
- * One pure function, called once at onboarding (T-011). It pre-unlocks the islands and cannons
- * up to the player's declared band and sets a starting bot accuracy band, so a 5th grader begins
- * at multiplication, not `3 + 4` (PLAN.md §Sea chart).
+ * One pure function, called once at onboarding (T-011 / T-032). It pre-unlocks islands up to the
+ * player's declared band and starter cannons only (owner ruling D-6); range/chest guns are earned
+ * through their declared unlocks. Sets a starting bot accuracy band so a 5th grader begins at
+ * multiplication, not `3 + 4` (PLAN.md §Sea chart).
  *
  * Asymmetric stakes (ticket dispatch): placing a child too LOW is merely boring and recoverable.
  * Placing them too HIGH makes their first duel unwinnable. The eligibility rule below is
@@ -37,12 +38,12 @@ const MAX_GRADE_BY_BAND: Readonly<Record<GradeBand, number>> = {
 };
 
 /**
- * A cannon is placement-eligible when its `unlock.kind` is `starter` or `range` (never `chest` —
- * the Nine-Pounder stays a reward, ticket Planning Decisions) and it is reachable at this band
- * (`minGrade <= maxGrade`), not "outgrown".
+ * A cannon is placement-eligible when its `unlock.kind` is `starter` only (never `range` or
+ * `chest` — range guns stay mastery-earned, D-6; the Nine-Pounder stays a chest reward) and it
+ * is reachable at this band (`minGrade <= maxGrade`), not "outgrown".
  */
 function isCannonEligible(cannon: Cannon, maxGrade: number): boolean {
-  return cannon.unlock.kind !== 'chest' && cannon.minGrade <= maxGrade;
+  return cannon.unlock.kind === 'starter' && cannon.minGrade <= maxGrade;
 }
 
 /**
