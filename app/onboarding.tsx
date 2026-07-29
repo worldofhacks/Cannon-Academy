@@ -109,7 +109,14 @@ export default function Onboarding() {
             </View>
 
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[s.problem, { fontSize: tx(34), lineHeight: tx(34) }]}>{b.problem}</Text>
+              <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.8}
+                style={[s.problem, { fontSize: tx(34), lineHeight: tx(40) }]}
+              >
+                {b.problem}
+              </Text>
               <View style={[s.meta, { gap: px(6), marginTop: px(8) }]}>
                 <View style={{ flexDirection: 'row', gap: px(3) }}>
                   {[0, 1, 2].map((i) => (
@@ -124,7 +131,12 @@ export default function Onboarding() {
                     />
                   ))}
                 </View>
-                <Text style={[s.bandLabel, { fontSize: tx(11), letterSpacing: tx(11) * 0.05 }]}>
+                <Text
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
+                  minimumFontScale={0.8}
+                  style={[s.bandLabel, { fontSize: tx(11), letterSpacing: tx(11) * 0.05 }]}
+                >
                   {b.label}
                 </Text>
               </View>

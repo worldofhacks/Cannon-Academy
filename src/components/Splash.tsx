@@ -10,7 +10,7 @@
  * either a white rectangle or it is this.
  */
 import { useEffect } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -25,7 +25,7 @@ import { useLayout } from '../theme/useLayout';
 import { color } from '../theme/tokens';
 import { Poly } from './Poly';
 
-export function Splash() {
+export function Splash({ ready, onStart }: { ready: boolean; onStart: () => void }) {
   const L = useLayout();
   const { width } = L;
   // The ship and the sea are art — they scale. The wordmark and the loader label are type.
@@ -52,8 +52,8 @@ export function Splash() {
     transform: [{ translateY: -bobRise * bob.value }, { rotate: `${-1.2 + 2.4 * bob.value}deg` }],
   }));
 
-  return (
-    <View style={s.screen}>
+  const art = (
+    <>
       {/* sea */}
       <View style={[s.sea, { height: px(210), borderTopWidth: px(5) }]} />
       {/* the dashed swell — 26pt on, 26pt off */}
@@ -161,17 +161,42 @@ export function Splash() {
           style={{ position: 'absolute', left: 0, bottom: 0 }}
         />
       </Animated.View>
+    </>
+  );
 
-      {/* loader */}
-      <View style={[s.loader, { bottom: px(64), gap: px(12) }]}>
-        <View style={{ flexDirection: 'row', gap: px(8) }}>
-          {[0, 180, 360].map((delay) => (
-            <PulseDot key={delay} delay={delay} size={px(14)} />
-          ))}
+  if (!ready) {
+    return (
+      <View style={s.screen}>
+        {art}
+        {/* loader */}
+        <View style={[s.loader, { bottom: px(64), gap: px(12) }]}>
+          <View style={{ flexDirection: 'row', gap: px(8) }}>
+            {[0, 180, 360].map((delay) => (
+              <PulseDot key={delay} delay={delay} size={px(14)} />
+            ))}
+          </View>
+          <Text style={[s.hoisting, { fontSize: tx(12), letterSpacing: tx(12) * 0.1 }]}>
+            HOISTING THE SAILS
+          </Text>
         </View>
-        <Text style={[s.hoisting, { fontSize: tx(12), letterSpacing: tx(12) * 0.1 }]}>
-          HOISTING THE SAILS
-        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={s.screen}>
+      {art}
+      <View style={[s.loader, { bottom: px(64) }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="SET SAIL"
+          onPress={onStart}
+          style={({ pressed }) => [s.start, { minHeight: px(64) }, pressed && s.startPressed]}
+        >
+          <Text style={[s.startLabel, { fontSize: tx(18), lineHeight: tx(24) }]}>
+            {['SET', 'SAIL'].join(' ')}
+          </Text>
+        </Pressable>
       </View>
     </View>
   );
@@ -215,4 +240,16 @@ const s = StyleSheet.create({
   wordmark: { fontFamily: 'Baloo2_800ExtraBold', color: color.parchment },
   loader: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   hoisting: { fontFamily: 'Nunito_800ExtraBold', color: color.chipInk },
+  start: {
+    minWidth: 160,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+    borderRadius: 32,
+    backgroundColor: color.amber,
+    borderBottomWidth: 4,
+    borderBottomColor: color.woodDeep,
+  },
+  startPressed: { transform: [{ translateY: 3 }], borderBottomWidth: 1 },
+  startLabel: { fontFamily: 'Baloo2_800ExtraBold', color: color.inkDark },
 });
