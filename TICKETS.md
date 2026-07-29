@@ -96,7 +96,7 @@ blocks the merge; both should close before wave 4 dispatches.
 | id    | title                                                                            | status        | deps                              | branch                            | model    | issue                                                                                |
 | ----- | -------------------------------------------------------------------------------- | ------------- | --------------------------------- | --------------------------------- | -------- | ------------------------------------------------------------------------------------ |
 | T-007 | Question generator — selection, rejection sampling, render, four-choice assembly | review-passed | T-001, T-002, T-003, T-004, T-005 | `ticket/T-007-question-generator` | capable  | frozen `1a586570…`; impl `a358270`; code APPROVE_WITH_NITS; security PASS_WITH_NOTES |
-| T-013 | Duel state, events, action log, and initial-state construction                   | in-progress   | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | **tests frozen** `767fc8da…` — Composer ACCEPT round 5; implementer dispatched       |
+| T-013 | Duel state, events, action log, and initial-state construction                   | review-passed | T-001, T-003, T-004, T-006, T-008 | `ticket/T-013-duel-types`         | standard | frozen `767fc8da…`; impl `f4adb7b`+`f99b25f`; code APPROVE_WITH_NITS; security PASS |
 
 ## Wave 5 — template content, drill, opponents, the duel machine
 

@@ -1665,3 +1665,14 @@ fixed: the root lint gate was linting `.worktrees/*/` (L-029's blast radius), an
 matched the worktrees' `node_modules` **symlink**. Lessons added this session: **L-031, L-032, L-033,
 L-034**, plus a note that the `SWARM_ORCHESTRATOR=1` bypass is anchored to the first token, so a
 misplaced one is indistinguishable from a real policy hit.
+
+
+## T-013 — review-passed
+
+Code: APPROVE_WITH_NITS ([T-013 Code Review](87210f96-cac5-4edc-bb48-3c84da28c89f)).
+Security: **PASS** after Important FAIL fix (`f99b25f` — `Object.hasOwn` for `islandId`).
+Live re-probe 5/5; frozen suite still `767fc8da…`; gates 1357/1357, tsc 0.
+Evidence: `.tdd-swarm/reports/T-013-security-review.md`.
+
+**Wave 4 both tickets review-passed.** Next: integration merge into `swarm/engine-core`
+(T-007 `a358270`, T-013 `f99b25f`) via independent Integration Agent.
