@@ -1744,3 +1744,12 @@ clean RED); baseline 1438 green. Test-design review dispatched (Composer).
   dispatched. Rationale: `tickets/app/OWNER-RULINGS.md` on `app/shell`.
 - **frozen-tests-unmodified:** allow `test|style|spec|freeze`; on `swarm/engine-core` compare
   `main..HEAD` with `--no-merges` (was vacuously green via empty `swarm/engine-core..HEAD`).
+
+
+### Wave 5 template suites — status pulse
+
+| Ticket | Tests commit | Orchestrator verify | Next |
+| --- | --- | --- | --- |
+| T-014 | `f509c7c` (47 fail / 7 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438 | test-design review dispatched |
+| T-015 | `ef6353f` (22 fail / 3 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438 | test-design review dispatched |
+| T-016 | `953bc7d` | review **REJECT** (AC-12 independence, dead-param ``, div structural constraints) | Test Agent fix re-dispatched |
