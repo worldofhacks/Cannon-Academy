@@ -46,7 +46,9 @@ import type {
 import {
   cannons,
   crew,
+  enemies,
   getCannon,
+  getEnemyForIsland,
   getIsland,
   getRankByTier,
   getSkill,
@@ -279,6 +281,7 @@ interface RawCatalogs {
   islands: unknown[];
   ranks: unknown[];
   crew: unknown[];
+  enemies: unknown[];
 }
 
 const rawCatalogs = (): RawCatalogs => ({
@@ -287,6 +290,7 @@ const rawCatalogs = (): RawCatalogs => ({
   islands: structuredClone(islands) as unknown[],
   ranks: structuredClone(ranks) as unknown[],
   crew: structuredClone(crew) as unknown[],
+  enemies: structuredClone(enemies) as unknown[],
 });
 
 /** AC-12 pins behaviour, not the signature; the call shape is documented in the file header. */
@@ -310,6 +314,7 @@ const CONTENT_FILES = [
   'islands.json',
   'ranks.json',
   'crew.json',
+  'enemies.json',
 ] as const;
 
 // --- AC-1: the module loads, exports readonly arrays, every entry passes its schema -------------
@@ -1149,5 +1154,51 @@ describe('T-027 — validateCatalogs set-level corruption', () => {
 
   it('dod(T-027:4) local gates are the merge authority', () => {
     expect(typeof validateCatalogs).toBe('function');
+  });
+});
+
+// --- A-031: enemies catalog — one validated encounter per island -----------------------------
+
+describe('A-031 — enemies catalog covers every island exactly once', () => {
+  it('spec(A-031:AC-1) importing enemies through @content/index throws nothing', async () => {
+    const mod = await import('@content/index');
+    expect(mod.enemies).toBeDefined();
+    expect(mod.getEnemyForIsland).toBeTypeOf('function');
+  });
+
+  it('spec(A-031:AC-1) every island resolves a distinct enemy with presentation kind', () => {
+    expect(enemies.length).toBe(ISLAND_IDS.length);
+
+    const byIsland = new Map(enemies.map((enemy) => [enemy.islandId, enemy]));
+    for (const islandId of ISLAND_IDS) {
+      const enemy = getEnemyForIsland(islandId);
+      expect(byIsland.get(islandId)).toEqual(enemy);
+      expect(enemy.displayName.trim()).not.toBe('');
+      expect(enemy.faction.trim()).not.toBe('');
+      expect(enemy.accessibilityLabel.trim()).not.toBe('');
+    }
+  });
+
+  it('spec(A-031:AC-2) island order maps pirate → skeleton → ghost → shark → kraken', () => {
+    const ordered = [...islands].sort((a, b) => a.order - b.order);
+    expect(ordered.map((island) => getEnemyForIsland(island.id).presentationKind)).toEqual([
+      'pirate',
+      'skeleton',
+      'ghost',
+      'shark',
+      'kraken',
+    ]);
+  });
+
+  it('spec(A-031:AC-5) validateCatalogs rejects a missing island enemy and names the island', () => {
+    const raw = rawCatalogs();
+    raw.enemies = raw.enemies.filter((entry) => (entry as { islandId?: string }).islandId !== 'grandline');
+    expect(() => validate(raw)).toThrow(Error);
+    expect(() => validate(raw)).toThrow(/grandline|enem/i);
+  });
+
+  it('spec(A-031:AC-5) getEnemyForIsland throws for unknown ids instead of returning a generic rival', () => {
+    expect(() => getEnemyForIsland('ghost_gun' as IslandId)).toThrow(Error);
+    expect(() => getEnemyForIsland('ghost_gun' as IslandId)).toThrow(/ghost_gun/);
   });
 });
