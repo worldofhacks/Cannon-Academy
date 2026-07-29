@@ -41,11 +41,19 @@ export default function GunDeck() {
   const [pending, setPending] = useState<Extract<SelectResult, { kind: 'full' }> | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
 
-  // Opening the deck marks every owned gun as seen — the "new" badge is per-cannon and must not
-  // come back on the next launch for guns the child already inspected.
-  useEffect(() => {
-    captainStore.getState().markCannonsSeen(captain.ownedCannons);
-  }, [captain.ownedCannons]);
+  // LEAVING the deck marks every owned gun as seen — not opening it. The mount version of this
+  // effect wiped the badge in the very visit it was meant to survive: first paint showed NEW,
+  // the post-paint effect unioned everything into `seenCannons`, and the store subscription
+  // re-rendered the badge away before a child could register it (A-011 retro review, Important).
+  // The cleanup reads the store at departure time, so the badge lives for the whole visit and
+  // stays dead on the next launch for guns the child actually inspected.
+  useEffect(
+    () => () => {
+      const s = captainStore.getState();
+      s.markCannonsSeen(s.captain.ownedCannons);
+    },
+    [],
+  );
 
   const slots = useMemo(() => deckSlots(captain, draft), [captain, draft]);
 
