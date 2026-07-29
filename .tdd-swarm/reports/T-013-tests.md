@@ -1,8 +1,8 @@
 # T-013 — Duel state types & initial-state constructor — TEST AGENT REPORT
 
-**Round 4**, deliberately narrow: tighten AC-3 and AC-16 only after Composer re-review
-rejected round 3 (`c5e80f2b…`, 126 tests). Both review mutants were re-verified live at
-126/126 against those bytes before editing. No restructure.
+**Round 5**, deliberately narrow: tighten AC-3 and AC-16 only after Composer re-review
+rejected round 4 (`737335df…`, 128 tests). All three review mutants were re-verified live
+at 128/128 against those bytes before editing (parent also verified). No restructure.
 
 ## 0. Unit assertion (L-031)
 
@@ -16,8 +16,8 @@ Asserted before any measurement, from an explicit `cd` into the worktree:
 
 | File integrity | SHA-256 of `__tests__/engine/duel/types.test.ts` |
 | --- | --- |
-| **Starting** (expected `c5e80f2b…`) | `c5e80f2b28bd58ade1ef1e32c780c402c326ff411c583c7b59150b84181c970c` ✅ matches |
-| **Ending** (after prettier; unchanged by it) | `737335df8969b325366fcf86259b9a27ff00019eaeb08391a8ddfdb01096ec3d` |
+| **Starting** (expected `737335df…`) | `737335df8969b325366fcf86259b9a27ff00019eaeb08391a8ddfdb01096ec3d` ✅ matches |
+| **Ending** (after prettier; unchanged by it) | `767fc8daf622fac13081d4f1fb7147818e2401cb7afc6464292d0db12656de05` |
 
 `src/engine/duel/types.ts` is still absent.
 
@@ -27,12 +27,16 @@ Asserted before any measurement, from an explicit `cd` into the worktree:
 
 **DONE**
 
-AC-3 now requires independent state graphs (not only top-level `not.toBe`); AC-16 now
-requires deep-copy of every `Template` and its nested `params` / `distractors` /
-`constraints`. Both review mutants that passed 126/126 against the old suite are killed;
-the memoised same-ref control still dies; the reference sentinel passes 128/128 with
-`tsc` exit 0; RED tally remains **88**; spec-lint is green at 16 ACs with DoD-9 SKIP;
-wave 1–3 baseline is still 1229 passed.
+AC-3 now walks the whole independence graph (reference inequality **and** a mutation probe
+for every mutable interior named by the amended criterion). AC-16 now asserts `not.toBe` for
+**every** `params` key's range array and mutates a key that is not the sole identity probe
+(`params.b`). All three review mutants that passed 128/128 against the old suite are killed;
+shared-core / shallow-Template / memoised controls stay dead; half-fixes one layer over
+(shared `bySkill` only; aliased `constraints` after full params copy) also die; the
+reference sentinel passes 128/128 with `tsc` exit 0; RED tally remains **88**; spec-lint is
+green at 16 ACs with DoD-9 SKIP; wave 1–3 baseline is still 1229 passed.
+
+No further surviving half-fix found while writing beyond the known `startsWith` residual.
 
 ---
 
@@ -40,36 +44,39 @@ wave 1–3 baseline is still 1229 passed.
 
 | Change | Location | Tests |
 | --- | --- | --- |
-| **AC-3** — independent state graphs: after two constructions, `first.playerLoadout.push` and a nested write through `first.templatesBySkill[…][0].text` must not change `second` | new `it` in the existing AC-3 describe; prior deep-equality / `not.toBe` / rng tests untouched | +1 |
-| **AC-16** — deep-copy each `Template` and nested `params` / `distractors` / `constraints`; mutate caller-held `text` + nested slots after construction; assert no `Template` (nor nested arrays/records) is `===` the config's | new `it` in the existing AC-16 describe; three container-copy tests kept | +1 |
+| **AC-3** — for `playerLoadout`, `rivalLoadout`, `templatesBySkill` (+ nested `Template[]` / Template), `actionLog`, `recentTemplateIds`, `tally`, `tally.bySkill`, and `rng`: `first.X !== second.X`, then mutate through `first` and assert `second` unchanged | existing independent-graphs `it` expanded in place | 0 net |
+| **AC-16** — loop `Object.keys(params)` for every range-array `not.toBe`; mutate `params.b` (not only `params.a`) after construction | existing Template deep-copy `it` tightened in place | 0 net |
 
 No restructure, no re-tagging, no `Object.freeze` tests (declined, locked). DoD-9 left alone.
 
 **Recount from the committed file:**
 
-| Metric | Round 3 | **Round 4** |
+| Metric | Round 4 | **Round 5** |
 | --- | --- | --- |
-| `it()` blocks | 126 | **128** |
-| `spec(T-013:AC-n)` tags | 120 | **122** (AC-3 → 5, AC-16 → 4) |
+| `it()` blocks | 128 | **128** |
+| `spec(T-013:AC-n)` tags | 122 | **122** (AC-3 → 5, AC-16 → 4) |
 | Active `@ts-expect-error` | 34 | **34** (no new type probes) |
 
 ---
 
 ## 3. Liveness proofs (required method)
 
-Harness under `scratchpad/T-013-review3/` (deleted before commit). Absolute `MUTANT_IMPL`
-paths; sentinel proven green first (L-028). Against the **old** suite bytes (`c5e80f2b…`):
+Harness under `scratchpad/T-013-review4/` (deleted before commit). Absolute `MUTANT_IMPL`
+paths; sentinel proven green first (L-028). Against the **old** suite bytes (`737335df…`):
 
-| Wrong implementation | Old suite (126 tests) | New suite (128 tests) |
+| Wrong implementation | Old suite (128 tests) | New suite (128 tests) |
 | --- | --- | --- |
-| **Shallow Template[]** (`[...templates]`, shared `Template` refs) | **126/126** | **KILLED** — AC-16 Template deep-copy (+ AC-3 nested write, same shared Template objects) |
-| **Shared-core wrapper** (`WeakMap` core + `{ ...cached, phase }`) | **126/126** (`not.toBe` green; `playerLoadout.push` rewrites second) | **KILLED** — AC-3 independent graphs only (1 fail / 127 pass) after giving it a correct deep Template copy so AC-16 is not a confounder |
-| **Memoised** (same top-level ref) | **KILLED** by AC-3 `not.toBe` | still **KILLED** by AC-3 `not.toBe` (+ independence) |
-| Half-fix: `{ ...template }` shares nested fields | behavioural pass on old | **KILLED** by AC-16 nested `not.toBe` / mutation |
-| Half-fix: new Template + distractors/constraints, shared `params` | behavioural pass on old | **KILLED** by AC-16 `params` identity |
-| Correct reference | 126/126 | **128/128**, `tsc` 0 |
+| **share-interior-singletons** (module-level shared `tally` / `actionLog` / `recentTemplateIds`) | **128/128** | **KILLED** — AC-3 `actionLog`/`recentTemplateIds`/`tally` identity (+ mutation) |
+| **share-params-b-array** (deep Template copy; aliases `params.b`) | **128/128** | **KILLED** — AC-16 `params.b must be a new range array` |
+| **share-rng-object** (`Map`-memoised same `rng` object) | **128/128** | **KILLED** — AC-3 `rng` `not.toBe` (+ state mutation) |
+| **shared-core-wrapper** (round-3; stays dead) | **KILLED** (1 fail) | still **KILLED** |
+| **shallow-template-objects** (round-3; stays dead) | **KILLED** | still **KILLED** (AC-3 Template identity + AC-16) |
+| **memoised-same-ref** | **KILLED** | still **KILLED** |
+| Half-fix: new `tally` each call, shared `bySkill` | would pass tally-only identity | **KILLED** — AC-3 `tally.bySkill` `not.toBe` |
+| Half-fix: copy every `params` key, alias `constraints` | would pass params-only loop | **KILLED** — AC-16 `constraints` `not.toBe` |
+| Correct reference | 128/128 | **128/128**, `tsc` 0 |
 
-A test I did not watch fail against a wrong implementation is not evidence. Both review
+A test I did not watch fail against a wrong implementation is not evidence. All three review
 mutants were watched pass the old suite, then watched fail the new one; the reference was
 watched pass both.
 
@@ -97,7 +104,7 @@ itself. Exit codes taken without a pipe (L-036).
 | `TS2322` | 51 | `Type 'true' is not assignable to type 'false'` |
 | `TS2578` | 34 | Unused `@ts-expect-error` |
 
-Unchanged from rounds 2–3 — both additions are runtime assertions. **Implementer's target
+Unchanged from rounds 2–4 — both tightenings are runtime assertions. **Implementer's target
 remains 88 → 0.**
 
 `npx tsc --noEmit` against the scratchpad reference (aliased `@engine/duel/types`) → **exit 0**.
@@ -117,7 +124,7 @@ remains 88 → 0.**
 
 ## 6. Re-measured mutation matrix (final committed bytes)
 
-Against post-prettier suite hash `737335df…`. Scoring: KILLED only on a named failing
+Against post-prettier suite hash `767fc8da…`. Scoring: KILLED only on a named failing
 test or a `tsc` error located in the test file. Sentinel must survive first.
 
 **Behavioural (vitest):**
@@ -125,13 +132,14 @@ test or a `tsc` error located in the test file. Sentinel must survive first.
 | Mutant | Result | Killed by |
 | --- | --- | --- |
 | SENTINEL-reference | SURVIVED | — |
-| shallow-template-objects | KILLED | AC-16 deep-copy; AC-3 nested write |
-| shared-core-wrapper | KILLED | AC-3 independent graphs (`playerLoadout.push`) |
-| memoised-createDuelState | KILLED | AC-3 `not.toBe` (+ independence) |
-| alias-all-loadouts | KILLED | AC-16 ×3 containers (+ deep-copy / AC-3) |
-| alias-nested-template-arrays | KILLED | AC-16 nested arrays (+ deep-copy / AC-3) |
-| spread-template-share-nested | KILLED | AC-16 nested field identity |
-| spread-template-share-params | KILLED | AC-16 `params` identity |
+| share-interior-singletons | KILLED | AC-3 graph walk (`actionLog`/`tally`/`recent` identity) |
+| share-params-b-array | KILLED | AC-16 every-params-key (`params.b`) |
+| share-rng-object | KILLED | AC-3 `rng` identity (+ mutation) |
+| share-byskill-only (half-fix) | KILLED | AC-3 `tally.bySkill` identity |
+| share-params-constraints (half-fix) | KILLED | AC-16 `constraints` identity |
+| shared-core-wrapper | KILLED | AC-3 graph walk (`playerLoadout` identity) |
+| shallow-template-objects | KILLED | AC-3 Template identity; AC-16 deep-copy |
+| memoised-createDuelState | KILLED | AC-2 / AC-3 (same top-level ref) |
 | startsWith-terminal-phase | **SURVIVED** | equivalent over the closed eight-phase domain |
 
 **Type-level (`tsc` with aliased impl):**
@@ -142,27 +150,23 @@ test or a `tsc` error located in the test file. Sentinel must survive first.
 | optional-debug-on-cannon-selected | ERRORS in test file | AC-13 Exact probe |
 | mutable-duelcore-seed | ERRORS in test file | AC-14 readonly probes |
 
-Round-3's five forward-compat / equivalent controls remain the residual story for
-`startsWith` (live only if a phase named `draw` / `disconnected` / `victoryLap` lands, and
-AC-1 goes red first). Optional `doubleShot?` / extra `DuelConfig` field controls were not
-re-litigated this round; AC-2's existing non-exactness stance is unchanged.
+Round-3/4's `startsWith` residual is unchanged: live only if a phase named `draw` /
+`disconnected` / `victoryLap` lands, and AC-1 goes red first.
 
 ---
 
-## 7. What I could not do / did not do
+## 7. Residuals / concerns
 
-- Did not restructure or re-tag the round-3 suite beyond the two tightenings.
-- Did not add `Object.freeze` tests (declined, locked).
-- Did not leave the scratchpad behind.
-- Did not invent new acceptance criteria; ticket amendments stayed at 16.
+- **`startsWith('vic') \|\| startsWith('def')`** remains an equivalent mutant on the closed
+  eight-phase set. Not escalated: same residual as rounds 3–4; fixing it would mean a
+  positive enumeration of the six non-terminals or a future open-ended phase list.
+- No new half-fix discovered that passes the tightened suite. The bySkill-only and
+  constraints-alias probes were written specifically to check one layer over the three
+  review mutants; both die.
 
 ---
 
-## 8. Commit
+## 8. Scratchpad cleanup
 
-| | |
-| --- | --- |
-| Commit | `306041c` (`306041c1667cf34839c9973c38272bf7b0b807e1`) on `ticket/T-013-duel-types` |
-| Suite SHA-256 | `737335df8969b325366fcf86259b9a27ff00019eaeb08391a8ddfdb01096ec3d` |
-
-Matrix was measured against those final post-prettier bytes. Scratchpad deleted.
+Deleted before commit: `scratchpad/T-013-review4/` (and no `scratchpad/t013-round5/` was
+created). Suite + this report are the only deliverables.

@@ -779,8 +779,10 @@ describe('createDuelState — determinism', () => {
 
   /**
    * Top-level `not.toBe` alone admits `{ ...cachedCore, phase }` — distinct wrappers over a
-   * shared interior. Pushing onto `first.playerLoadout` or writing through
-   * `first.templatesBySkill` must not rewrite `second`. Independence is a graph property.
+   * shared interior. Copying only the fields a prior suite mutated (loadouts / nested
+   * template text) admits module-level singleton `tally`/`actionLog`/`recentTemplateIds` and
+   * a Map-memoised `rng`. Independence is a graph property: every mutable interior must be a
+   * distinct reference, and mutating one construction must not rewrite the other.
    */
   it('spec(T-013:AC-3) keeps two constructions as independent state graphs', () => {
     const templates: Template[] = [
@@ -803,12 +805,50 @@ describe('createDuelState — determinism', () => {
     expect(first).toStrictEqual(second);
     expect(first).not.toBe(second);
 
+    expect(first.playerLoadout).not.toBe(second.playerLoadout);
+    expect(first.rivalLoadout).not.toBe(second.rivalLoadout);
+    expect(first.templatesBySkill).not.toBe(second.templatesBySkill);
+    expect(first.templatesBySkill.add_within_10).not.toBe(second.templatesBySkill.add_within_10);
+    expect(first.templatesBySkill.add_within_10![0]).not.toBe(second.templatesBySkill.add_within_10![0]);
+    expect(first.actionLog).not.toBe(second.actionLog);
+    expect(first.recentTemplateIds).not.toBe(second.recentTemplateIds);
+    expect(first.tally).not.toBe(second.tally);
+    expect(first.tally.bySkill).not.toBe(second.tally.bySkill);
+    expect(first.rng).not.toBe(second.rng);
+
     (first.playerLoadout as CannonId[]).push('mortar');
     expect(second.playerLoadout).toEqual(['swivel_gun', 'culverin']);
     expect(second.playerLoadout).toHaveLength(2);
 
+    (first.rivalLoadout as CannonId[]).push('powder_keg');
+    expect(second.rivalLoadout).toEqual(['six_pounder', 'mortar', 'long_nine']);
+    expect(second.rivalLoadout).toHaveLength(3);
+
     (first.templatesBySkill.add_within_10 as Template[])[0]!.text = 'TAMPERED VIA FIRST';
     expect(second.templatesBySkill.add_within_10![0]!.text).toBe('{a} + {b} = ?');
+
+    (first.actionLog as ActionLogEntry[]).push({
+      actor: 'player',
+      cannonId: 'swivel_gun',
+      correct: true,
+      elapsedMs: 1,
+    });
+    expect(second.actionLog).toEqual([]);
+
+    (first.recentTemplateIds as string[]).push('tampered_template_id');
+    expect(second.recentTemplateIds).toEqual([]);
+
+    (first.tally as { correctAnswers: number }).correctAnswers = 99;
+    (first.tally.bySkill as Record<string, { correct: number; attempts: number }>).add_within_10 = {
+      correct: 1,
+      attempts: 1,
+    };
+    expect(second.tally.correctAnswers).toBe(0);
+    expect(second.tally.bySkill).toEqual({});
+
+    (first.rng as { state: number }).state = 0xdeadbeef;
+    expect(second.rng.state).not.toBe(0xdeadbeef);
+    expect(second.rng).toStrictEqual(createRng(4242));
   });
 
   it('spec(T-013:AC-3) produces an rng deeply equal across two constructions', () => {
@@ -2158,7 +2198,9 @@ describe('createDuelState — input aliasing', () => {
    * `[...templates]` still shares every `Template` object with the caller. Mutating
    * `template.text` — or a nested `params` / `distractors` / `constraints` slot — after
    * construction must leave the state alone, and no `Template` in the state may be `===` one
-   * in the config. Round 3 measured only the container layer above this.
+   * in the config. Asserting only `params.a` identity admits a copy that aliases `params.b`
+   * (and the same "probe one key, share the rest" half-fix on any multi-slot nested record).
+   * Round 3 measured only the container layer above this; round 4 measured one params key.
    */
   it('spec(T-013:AC-16) deep-copies every Template and its nested params, distractors, constraints', () => {
     const template: Template = templateSchema.parse({
@@ -2179,13 +2221,19 @@ describe('createDuelState — input aliasing', () => {
     expect(stateTemplate).not.toBe(template);
     expect(stateTemplate.distractors).not.toBe(template.distractors);
     expect(stateTemplate.params).not.toBe(template.params);
-    expect(stateTemplate.params.a).not.toBe(template.params.a);
+    for (const key of Object.keys(template.params)) {
+      expect(stateTemplate.params[key], `params.${key} must be a new range array`).not.toBe(
+        template.params[key],
+      );
+    }
     expect(stateTemplate.constraints).not.toBe(template.constraints);
 
     template.text = 'TAMPERED BY CALLER';
     template.distractors[0] = 'TAMPERED_DISTRACTOR';
-    const callerParamA = template.params.a as [number, number];
-    callerParamA[0] = 9;
+    // Mutate a params key that is not the sole identity probe — `a` is asserted above via the
+    // every-key loop; rewriting `b` is what kills an alias that only copied `a`.
+    const callerParamB = template.params.b as [number, number];
+    callerParamB[0] = 9;
     template.constraints![0] = 'TAMPERED_CONSTRAINT';
 
     expect(stateTemplate.text).toBe('{a} + {b} = ?');
