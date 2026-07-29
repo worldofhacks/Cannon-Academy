@@ -27,12 +27,20 @@ import { PLAYER_SHIP, RIVAL_SHIP, Ship } from './Ship';
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
 
-const STAGE_HEIGHT = 176;
-const SEA_HEIGHT = 58;
+/**
+ * The board draws the stage at 176pt of a 667pt screen and the sea band at 58 of that 176 — a
+ * third. Both are now proportions rather than constants, because the vertical range across the
+ * phones we support is 640pt to 932pt and a flat 176 wastes a Pro Max while crowding an SE.
+ */
+const SEA_BAND_RATIO = 58 / 176;
 
 interface SeaStageProps {
   readonly phase: DuelPhase;
   readonly captainPose: CaptainPose;
+  /** Computed by `seaStageHeight()` from the real screen, not a constant. */
+  readonly height: number;
+  /** Illustration scale. Ships grow on a bigger phone; the HUD above them does not. */
+  readonly art: number;
   readonly look: CannonLook;
   readonly playerHullPct: number;
   readonly rivalHullPct: number;
@@ -43,6 +51,8 @@ interface SeaStageProps {
 export function SeaStage({
   phase,
   captainPose,
+  height,
+  art,
   look,
   playerHullPct,
   rivalHullPct,
@@ -50,20 +60,21 @@ export function SeaStage({
   damageToPlayer,
 }: SeaStageProps) {
   const rivalTurn = phase === 'watch' || phase === 'rivalFly' || phase === 'rivalImpact';
+  const seaHeight = Math.round(height * SEA_BAND_RATIO);
 
   return (
-    <View style={s.stage}>
-      <View style={s.sky} />
+    <View style={[s.stage, { height }]}>
+      <View style={[s.sky, { bottom: seaHeight }]} />
       <View style={[s.cloud, { left: 32, top: 16, width: 58, height: 16, opacity: 0.85 }]} />
       <View style={[s.cloud, { left: 52, top: 8, width: 34, height: 14, opacity: 0.85 }]} />
       <View style={[s.cloud, { right: 26, top: 30, width: 44, height: 13, opacity: 0.7 }]} />
-      <View style={s.sea} />
+      <View style={[s.sea, { height: seaHeight }]} />
 
       <View style={s.playerSlot}>
         <Ship
           cosmetics={PLAYER_SHIP}
           facing="right"
-          width={150}
+          width={150 * art}
           burning={playerHullPct <= 0.3}
           captainPose={captainPose}
         />
@@ -72,7 +83,7 @@ export function SeaStage({
         <Ship
           cosmetics={RIVAL_SHIP}
           facing="left"
-          width={126}
+          width={126 * art}
           burning={rivalHullPct > 0 && rivalHullPct <= 0.3}
         />
       </View>
@@ -312,15 +323,14 @@ function DamageChip({ value, side }: { value: number; side: 'left' | 'right' }) 
 }
 
 const s = StyleSheet.create({
-  stage: { height: STAGE_HEIGHT, overflow: 'hidden' },
-  sky: { position: 'absolute', left: 0, right: 0, top: 0, bottom: SEA_HEIGHT, backgroundColor: color.skyTop },
+  stage: { overflow: 'hidden' },
+  sky: { position: 'absolute', left: 0, right: 0, top: 0, backgroundColor: color.skyTop },
   cloud: { position: 'absolute', borderRadius: 999, backgroundColor: color.white },
   sea: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    height: SEA_HEIGHT,
     backgroundColor: color.sea,
     borderTopWidth: 5,
     borderTopColor: color.seaFoam,

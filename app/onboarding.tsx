@@ -1,12 +1,13 @@
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { GradeBand } from '@content/schemas';
 
 import { Poly } from '../src/components/Poly';
-import { color, REFERENCE_VIEWPORT, space, type } from '../src/theme/tokens';
+import { useLayout } from '../src/theme/responsive';
+import { color, space, type } from '../src/theme/tokens';
 
 /**
  * Board 1a — "Which ship is yours?", the ship-size ladder. The board's recommended shape, over
@@ -55,9 +56,9 @@ const BANDS: readonly Band[] = [
 
 export default function Onboarding() {
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
-  const k = width / REFERENCE_VIEWPORT.width;
-  const px = (n: number) => n * k;
+  const L = useLayout();
+  const px = L.a;
+  const tx = L.t;
 
   const [chosen, setChosen] = useState<GradeBand | null>(null);
 
@@ -65,10 +66,14 @@ export default function Onboarding() {
     <View
       style={[
         s.screen,
-        { paddingTop: insets.top + px(14), paddingBottom: insets.bottom + px(14), paddingHorizontal: px(12) },
+        {
+          paddingTop: insets.top + px(14),
+          paddingBottom: insets.bottom + px(14),
+          paddingHorizontal: L.gutter,
+        },
       ]}
     >
-      <Text style={[s.title, { fontSize: px(23), lineHeight: px(26) }]}>Which ship is yours?</Text>
+      <Text style={[s.title, { fontSize: tx(23), lineHeight: tx(26) }]}>Which ship is yours?</Text>
 
       {BANDS.map((b) => {
         const selected = chosen === b.band;
@@ -98,7 +103,7 @@ export default function Onboarding() {
             </View>
 
             <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[s.problem, { fontSize: px(34), lineHeight: px(34) }]}>{b.problem}</Text>
+              <Text style={[s.problem, { fontSize: tx(34), lineHeight: tx(34) }]}>{b.problem}</Text>
               <View style={[s.meta, { gap: px(6), marginTop: px(8) }]}>
                 <View style={{ flexDirection: 'row', gap: px(3) }}>
                   {[0, 1, 2].map((i) => (
@@ -113,7 +118,7 @@ export default function Onboarding() {
                     />
                   ))}
                 </View>
-                <Text style={[s.bandLabel, { fontSize: px(11), letterSpacing: px(11) * 0.05 }]}>
+                <Text style={[s.bandLabel, { fontSize: tx(11), letterSpacing: tx(11) * 0.05 }]}>
                   {b.label}
                 </Text>
               </View>
@@ -123,7 +128,7 @@ export default function Onboarding() {
       })}
 
       {/* The board's note to the adult, not to the child. */}
-      <Text style={[s.grownups, { fontSize: px(12) }]}>Grown-ups: pick the hardest one they can read.</Text>
+      <Text style={[s.grownups, { fontSize: tx(12) }]}>Grown-ups: pick the hardest one they can read.</Text>
     </View>
   );
 }

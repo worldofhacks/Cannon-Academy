@@ -21,6 +21,7 @@ import {
 import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
 import { cannonLook } from '../src/theme/cannonPresentation';
+import { seaStageHeight, useLayout } from '../src/theme/responsive';
 import { color, radius, space } from '../src/theme/tokens';
 import { duelReducer, initialDuelState, PHASE_DURATION_MS, type DuelPhase } from '../src/stores/duel';
 
@@ -39,6 +40,7 @@ import { duelReducer, initialDuelState, PHASE_DURATION_MS, type DuelPhase } from
  */
 export default function DuelScreen() {
   const insets = useSafeAreaInsets();
+  const L = useLayout();
   const [state, dispatch] = useReducer(duelReducer, 0, () => initialDuelState(2026));
   const askedAt = useRef(0);
 
@@ -84,7 +86,7 @@ export default function DuelScreen() {
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
-      <View style={s.hud}>
+      <View style={[s.hud, { paddingHorizontal: L.gutter }]}>
         <TurnBar
           label={turnLabel(state.phase)}
           turn={state.turn}
@@ -98,6 +100,8 @@ export default function DuelScreen() {
       </View>
 
       <SeaStage
+        height={seaStageHeight(L)}
+        art={L.art}
         phase={state.phase}
         captainPose={captainPoseForPhase(state.phase, state.outcome?.perfectShot === true)}
         look={look}

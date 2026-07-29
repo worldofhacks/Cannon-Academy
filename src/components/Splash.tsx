@@ -21,15 +21,16 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { color, REFERENCE_VIEWPORT } from '../theme/tokens';
+import { useLayout } from '../theme/responsive';
+import { color } from '../theme/tokens';
 import { Poly } from './Poly';
 
-/** The board is drawn at 375pt wide; everything scales off that so the layout holds on any phone. */
-const REF_W = REFERENCE_VIEWPORT.width;
-
-export function Splash({ width }: { width: number }) {
-  const k = width / REF_W;
-  const px = (n: number) => n * k;
+export function Splash() {
+  const L = useLayout();
+  const { width } = L;
+  // The ship and the sea are art — they scale. The wordmark and the loader label are type.
+  const px = L.a;
+  const tx = L.t;
 
   const bob = useSharedValue(0);
   useEffect(() => {
@@ -69,8 +70,8 @@ export function Splash({ width }: { width: number }) {
 
       {/* wordmark */}
       <View style={[s.title, { top: px(150) }]}>
-        <Text style={[s.kicker, { fontSize: px(15), letterSpacing: px(15) * 0.24 }]}>CANNON</Text>
-        <Text style={[s.wordmark, { fontSize: px(46), lineHeight: px(46) }]}>ACADEMY</Text>
+        <Text style={[s.kicker, { fontSize: tx(15), letterSpacing: tx(15) * 0.24 }]}>CANNON</Text>
+        <Text style={[s.wordmark, { fontSize: tx(46), lineHeight: tx(46) }]}>ACADEMY</Text>
         <View
           style={{
             width: px(120),
@@ -163,7 +164,7 @@ export function Splash({ width }: { width: number }) {
             <PulseDot key={delay} delay={delay} size={px(14)} />
           ))}
         </View>
-        <Text style={[s.hoisting, { fontSize: px(12), letterSpacing: px(12) * 0.1 }]}>
+        <Text style={[s.hoisting, { fontSize: tx(12), letterSpacing: tx(12) * 0.1 }]}>
           HOISTING THE SAILS
         </Text>
       </View>
