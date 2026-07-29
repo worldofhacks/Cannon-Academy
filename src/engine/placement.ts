@@ -1,9 +1,10 @@
 /**
  * Grade-band placement — turns the onboarding grade picker's answer into a starting game state.
  *
- * One pure function, called once at onboarding (T-011). It pre-unlocks the islands and cannons
- * up to the player's declared band and sets a starting bot accuracy band, so a 5th grader begins
- * at multiplication, not `3 + 4` (PLAN.md §Sea chart).
+ * One pure function, called once at onboarding (T-011 / T-032). It pre-unlocks islands up to the
+ * player's declared band and starter cannons only (owner ruling D-6); range/chest guns are earned
+ * through their declared unlocks. Sets a starting bot accuracy band so a 5th grader begins at
+ * multiplication, not `3 + 4` (PLAN.md §Sea chart).
  *
  * Asymmetric stakes (ticket dispatch): placing a child too LOW is merely boring and recoverable.
  * Placing them too HIGH makes their first duel unwinnable. The eligibility rule below is
