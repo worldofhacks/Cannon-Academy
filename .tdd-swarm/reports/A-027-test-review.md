@@ -4,30 +4,21 @@
 
 No Critical or Important findings remain.
 
-The amended suite now covers the previously missing enforcement path and removes the prior
-contract ambiguity:
+The frozen AC-5 fixture is now catalog-derived from an island that genuinely trains the selected
+skill. With the current catalog it resolves to `port_sumwich` / `two_step_add_sub`
+(`minGrade: 2`), which is correctly above the K-1 ceiling of 1. AC-2 therefore includes every
+eligible grade-0/1 Port Sumwich skill while AC-5 rejects only the genuinely above-ceiling skill;
+the criteria no longer contradict.
 
-- `__tests__/app/range-band.test.ts:77-87` proves `openDrill` itself refuses an authored
-  above-ceiling K-1 skill, so a correct filtered picker cannot hide an unsafe serving path.
-- `tickets/app/A-027.md:40-42,54-56` explicitly locks synchronous `RangeError` refusal for
-  missing, invalid, and above-ceiling grade/skill input. The assertions at
-  `__tests__/app/range-band.test.ts:62-87` now test that stable error class without constraining
-  incidental message prose.
-- `__tests__/engine/mastery.test.ts:434-449` exercises the production player-store tally path,
-  proving K-1 mastery grants Saker while Isla Products remains closed. This complements the
-  direct resolver boundary test.
+The scoped tests are complete without material overconstraint:
 
-AC-1 through AC-5 are covered at their relevant engine, service, and store boundaries. The
-all-band/all-island filtered-list sweep checks catalog-derived boundary behavior and order;
-the K-1 denied and g2_3 allowed cases bracket island progression; preservation is asserted for
-an existing higher-band unlock; and the established T-010 resolver tests continue to cover
-idempotent delta/set-union semantics.
+- AC-1 preserves attempt/correct/mastery/completion/current state on timeout.
+- AC-2 sweeps every declared band and every catalog island, asserting the exact filtered catalog
+  order and ceiling.
+- AC-3 covers both the resolver boundary and the production player-store tally path.
+- AC-4 proves an eligible successor still opens while a pre-existing higher-band island survives.
+- AC-5 covers missing, runtime-corrupt, and genuine above-ceiling input using only the ticket-locked
+  synchronous `RangeError` class, without pinning incidental message text or a fallback choice.
 
-The `[process]` DoD labels correctly keep T-036 integration verification and freeze/gate evidence
-out of behavioral spec-lint coverage. No additional A-027 test tag is needed for those markers.
-
-## Frozen-test dispute resolution
-
-The original AC-5 denial fixture incorrectly used `add_within_20`, whose grade-1 minimum is
-within the K-1 ceiling. It now derives a genuinely above-ceiling skill and its training island
-from the catalog, keeping AC-5 consistent with AC-2.
+Existing mastery tests retain the relevant purity and idempotent-delta coverage. The `[process]`
+DoD labels also remain correctly outside behavioral spec-lint requirements.
