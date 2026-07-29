@@ -46,9 +46,10 @@ const PUBLIC_KEYS = [
   'EXPO_PUBLIC_FIREBASE_APP_ID',
 ] as const;
 
-const completeEnv = Object.fromEntries(
-  PUBLIC_KEYS.map((key, index) => [key, `public-${index}`]),
-) as Record<(typeof PUBLIC_KEYS)[number], string>;
+const completeEnv = Object.fromEntries(PUBLIC_KEYS.map((key, index) => [key, `public-${index}`])) as Record<
+  (typeof PUBLIC_KEYS)[number],
+  string
+>;
 
 const FIRESTORE_ALREADY_INITIALIZED_MESSAGE =
   'initializeFirestore() has already been called with different options. To avoid this error, ' +
@@ -207,10 +208,7 @@ function fakeSdk(options: FakeSdkOptions = {}) {
     initializeFirestore(appArg: unknown, settings: unknown): unknown {
       events.push('initializeFirestore');
       args.initializeFirestore.push({ app: appArg, settings });
-      const error = plannedError(
-        options.initializeFirestoreError,
-        args.initializeFirestore.length,
-      );
+      const error = plannedError(options.initializeFirestoreError, args.initializeFirestore.length);
       if (error !== undefined) throw error;
       return initializedDb;
     },
@@ -339,9 +337,7 @@ function expectDenyAllRules(
   expect(source.match(/{/g)).toHaveLength(source.match(/}/g)?.length ?? 0);
 
   const allowTokens = source.match(/\ballow\b/g) ?? [];
-  const clauses = [
-    ...source.matchAll(/\ballow\s+([^:;{}]+)\s*:\s*if\s+([^;{}]+)\s*;/g),
-  ];
+  const clauses = [...source.matchAll(/\ballow\s+([^:;{}]+)\s*:\s*if\s+([^;{}]+)\s*;/g)];
   expect(clauses.length, 'deny-all rules must contain an explicit allow clause').toBeGreaterThan(0);
   expect(clauses, 'every allow token must be a complete, inspectable clause').toHaveLength(
     allowTokens.length,
@@ -397,9 +393,10 @@ describe('A-025 Firebase client boundary', () => {
         reason: 'missing-config',
       });
       for (const invalidValue of ['', '   \t']) {
-        expect(
-          boundary.parseFirebaseConfig({ ...completeEnv, [key]: invalidValue }),
-        ).toEqual({ enabled: false, reason: 'missing-config' });
+        expect(boundary.parseFirebaseConfig({ ...completeEnv, [key]: invalidValue })).toEqual({
+          enabled: false,
+          reason: 'missing-config',
+        });
       }
     }
     expect(
@@ -440,9 +437,7 @@ describe('A-025 Firebase client boundary', () => {
         code: 'auth/invalid-api-key',
       });
       const fake =
-        platform === 'web'
-          ? fakeSdk({ getAuthError: invalid })
-          : fakeSdk({ initializeAuthError: invalid });
+        platform === 'web' ? fakeSdk({ getAuthError: invalid }) : fakeSdk({ initializeAuthError: invalid });
       let result: unknown;
 
       expect(() => {
@@ -472,9 +467,7 @@ describe('A-025 Firebase client boundary', () => {
         code: 'auth/invalid-api-key',
       });
       const fake =
-        platform === 'web'
-          ? fakeSdk({ getAuthError: invalid })
-          : fakeSdk({ initializeAuthError: invalid });
+        platform === 'web' ? fakeSdk({ getAuthError: invalid }) : fakeSdk({ initializeAuthError: invalid });
       mockAmbientSdk(fake, platform, asyncStorage);
       const logs = captureConsole();
 
@@ -532,9 +525,9 @@ describe('A-025 Firebase client boundary', () => {
       expect(fake.args.initializeAuth).toHaveLength(1);
       expect(fake.args.initializeAuth[0]?.app).toBe(fake.app);
       expect(fake.args.initializeAuth[0]?.options).toEqual({ persistence: fake.persistence });
-      expect(
-        (fake.args.initializeAuth[0]?.options as { persistence: unknown }).persistence,
-      ).toBe(fake.persistence);
+      expect((fake.args.initializeAuth[0]?.options as { persistence: unknown }).persistence).toBe(
+        fake.persistence,
+      );
       expect(fake.args.getAuth).toHaveLength(0);
     },
   );
@@ -651,17 +644,14 @@ describe('A-025 Firebase client boundary', () => {
 
   it('spec(A-025:AC-3) propagates the same Firestore code when the installed already-initialized message does not match', async () => {
     const boundary = await firebaseBoundary();
-    const sameCodeDifferentCondition = Object.assign(
-      new Error(FIRESTORE_STARTED_ELSEWHERE_MESSAGE),
-      { code: 'failed-precondition' },
-    );
+    const sameCodeDifferentCondition = Object.assign(new Error(FIRESTORE_STARTED_ELSEWHERE_MESSAGE), {
+      code: 'failed-precondition',
+    });
     const brokenFirestore = fakeSdk({
       initializeFirestoreError: sameCodeDifferentCondition,
     });
 
-    expect(() => createClient(boundary, brokenFirestore, 'web')).toThrow(
-      sameCodeDifferentCondition,
-    );
+    expect(() => createClient(boundary, brokenFirestore, 'web')).toThrow(sameCodeDifferentCondition);
     expect(brokenFirestore.args.getFirestore).toHaveLength(0);
   });
 
@@ -701,9 +691,7 @@ describe('A-025 Firebase client boundary', () => {
     ]);
     expect(fake.args.getFirestore).toHaveLength(0);
     expect(fake.events.indexOf('initializeFirestore')).toBeGreaterThan(-1);
-    expect(fake.events.indexOf('initializeFirestore')).toBeLessThan(
-      fake.events.indexOf('getStorage'),
-    );
+    expect(fake.events.indexOf('initializeFirestore')).toBeLessThan(fake.events.indexOf('getStorage'));
   });
 
   it('spec(A-025:AC-4) dod(A-025:2) exports typed nullable Auth, Firestore, and Storage clients beside the factory', async () => {
