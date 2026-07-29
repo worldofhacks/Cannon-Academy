@@ -1920,3 +1920,8 @@ Same class as T-017. Suite fix `e6ec871` re-frozen `344d3091662158cd…` (22/22 
 
 [T-018 Implementer](49df958f-6ce0-4b10-b8be-6dd7882f3119): 1674/1674; scripted 22/22; gates PASS.
 Code + security review dispatched.
+
+### T-018 security PASS_WITH_NOTES
+
+[T-018 Security Review](ca6e58f0-68e3-4d6c-b6a3-f51d6b3de0c9): clean opponent seam; minor caller-trust notes.
+Awaiting code review before merge.
