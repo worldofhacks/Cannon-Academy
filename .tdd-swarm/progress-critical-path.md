@@ -25,7 +25,7 @@ Integration branch: `app/shell` @ `22bb3ef` (start)
 | --- | --- |
 | A-015 guided duel | agent 72777f41 |
 | A-012 rank ladder | **merged** (`d6f4dcd`) |
-| A-033 harbor store | agent 4be9efd2 |
+| A-033 harbor store | **merged** |
 
 ## Wave 2 (after A-039 + A-041 merge)
 
