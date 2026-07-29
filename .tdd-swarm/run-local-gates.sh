@@ -24,8 +24,13 @@ run "lint"      npx eslint . --max-warnings 0
 run "typecheck" npx tsc --noEmit
 run "unit"      npx vitest run
 
-# No new TODO/FIXME/HACK in tracked source.
-if grep -rnE '(TODO|FIXME|HACK)' src __tests__ 2>/dev/null | grep -v '^\s*$' > /tmp/_todos; then
+# No new TODO/FIXME/HACK in tracked source. The marker must look like a marker: the bare word
+# matched prose about markers, so a test asserting the suite carries "no-TODO markers" failed this
+# gate on its own description. That is the false positive L-002 warns about — a gate red for a
+# reason nobody believes is a gate everyone learns to skip, and this one was red in a worktree while
+# green at the root, where the file mentioning it did not yet exist. Requiring the canonical `:` or
+# `(owner)` form costs the un-punctuated `// TODO fix this`, which is the cheaper miss.
+if grep -rnE '(^|[^A-Za-z0-9_-])(TODO|FIXME|HACK)(\(|:)' src __tests__ 2>/dev/null | grep -v '^\s*$' > /tmp/_todos; then
   echo "  FAIL  no-todos"; sed 's/^/        /' /tmp/_todos; FAIL=1
 else
   echo "  PASS  no-todos"

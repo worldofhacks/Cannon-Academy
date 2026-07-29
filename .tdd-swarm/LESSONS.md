@@ -975,3 +975,61 @@ it is written and false forever after. Second, **scheduled is not orphaned**: th
 flagged three event names absent from `src/` on its first run, all owned by a ticket in a paused
 wave. Docs legitimately run ahead of code mid-build; docs that outlive a deleted symbol do not. A
 drift detector that cannot tell those apart gets muted, and a muted gate is worse than none.
+
+## L-038
+
+**A suite tests the failure paths its fixtures can reach, and every fixture here was valid.**
+
+T-007's round-2 suite was 72 tests over 21 criteria, 53 of 53 mutants killed, cross-model reviewed
+once already. It was rejected for a mutant a competent engineer writes by default: a generator that
+calls `evaluateNumber` / `evaluatePredicate` / `buildDistractors` and does not translate their
+`ExprError`s. It **passed all 72 tests and typechecked clean**, while breaking the ticket's own DoD-5
+promise that every failure path throws a typed `QuestionGenerationError` with a `code`.
+
+**Why:** the contract said "every failure path", and the suite exercised the failure paths it had
+fixtures for — an unsatisfiable constraint, an unrenderable token, an empty pool. Not one fixture
+carried a malformed _expression_, so the entire class was invisible, and no amount of mutation
+scoring found it, because a mutation matrix scores mutants against the fixtures that exist
+([[L-034]]). The reachability came from a schema gap of exactly [[L-009]]'s shape: `answerExpr` is
+`z.string()`, so `"a +"` is schema-valid and arrives at the generator unchallenged.
+
+Two adjacent holes surfaced in the same review, both the same error in different clothes. AC-5
+required `NO_TEMPLATE` when the pool is empty but never forbade it otherwise, so throwing it eagerly
+satisfied the criterion — **a criterion that names only the failure case constrains nothing about the
+success case**. And failure _precedence_ was unpinned, so two implementations could report different
+codes for one template and both be defensible.
+
+**What to do instead:** for any contract quantified over "every failure path", enumerate the paths
+from the **module's inputs** — every field an implementation evaluates, parses, or indexes — rather
+than from the criteria already written. Then ask of each one: what is the malformed value here, and
+which fixture carries it? Where a contract is a prohibition, write the negative half explicitly.
+Cross-model review earned its cost twice here: the same authoring model wrote both the suite and its
+mutants, so the blind spot was shared, and only a reader working from the _inputs_ rather than the
+suite could see it.
+
+## L-039
+
+**A requirement nobody can satisfy is a requirement everybody quietly reinterprets.**
+
+Two of these landed in one review. T-007's DoD said "files changed are exactly those in
+`file_scopes`" — **unsatisfiable as written**, since every branch necessarily also changes its test
+file and its report, neither of which is in `file_scopes`. I had been verifying the sensible reading
+(implementation ⊆ `file_scopes`, tests ⊆ `test_scopes`, report exempt) and reporting the checkbox
+green, without noticing the checkbox said something else. Separately, `run-local-gates.sh` matched a
+bare `(TODO|FIXME|HACK)`, so a test asserting the suite carries "no-TODO markers" **failed the gate
+on its own description**.
+
+**Why:** both were invisible from where I was standing. The gate's false positive could not appear at
+the repo root, because the file containing the phrase only exists in a worktree — I ran the gate at
+the root, saw green, and carried that green forward as if it described the worktrees ([[L-027]] again,
+the measurement described the tree it was taken in). And an unsatisfiable requirement produces no
+error, only a quiet drift between what a check says and what its verifier does, which is [[L-002]]'s
+failure mode with the roles reversed: not a gate people ignore, but a gate whose keeper has silently
+substituted a better rule.
+
+**What to do instead:** when you verify a `[process]` item by hand, verify it **against its literal
+wording**, and if the literal wording is not what you checked, fix the wording rather than your
+habit. For pattern-matching gates, require the marker to look like a marker (`TODO:`, `FIXME(owner):`)
+so prose _about_ markers cannot trip it, and accept the narrower miss — an ambiguous red costs more
+than an un-punctuated `// TODO fix this` slipping past. And run every gate in a tree where the files
+under test actually exist.
