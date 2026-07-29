@@ -140,3 +140,20 @@ mastery from two places:
   call within the ruling.
 
 The lanes must not drift: a timeout is free in both, or the ruling is not implemented.
+
+---
+
+## D-9 — Older bands receive one age-appropriate range cannon at placement (2026-07-29)
+
+**Owner authorization.** While directing the one-hour demo-readiness pass, the owner explicitly
+authorized the orchestrator to make the remaining product decisions and required the player's own
+cannons to expose different difficulties and weapons immediately.
+
+**Supersession of D-6, narrowly scoped.** K-1 still receives only the two catalog starters.
+Grades 2–3 additionally receive the Six-Pounder, and grades 4–5 additionally receive the
+Twelve-Pounder. These are the only non-starter placement grants.
+
+Both cannons retain their catalog `range` unlock for players who did not receive them at placement.
+They therefore have two intentional, band-specific acquisition paths; every other range cannon
+remains mastery-earned, and the Nine-Pounder remains chest-only. A-032 owns the complete
+band-by-cannon policy audit and A-034 owns the placement/presentation change.
