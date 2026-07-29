@@ -4,7 +4,7 @@
 `TICKETS.md` explicitly excludes. Numbered `A-` so it cannot collide with the engine track's
 `T-` series or with the concurrent engine agent's files.
 
-**13 tickets · 5 waves · 92 acceptance criteria.**
+**15 tickets · 5 waves · 92 acceptance criteria.**
 
 > **Phase 0 note.** The app layer has no component-test harness, so screen _geometry_ cannot be
 > frozen-tested the way engine logic is. Every ticket below therefore splits its criteria: logic
@@ -49,3 +49,14 @@
 | A-011 | Gun deck — which three cannons sail with you                     | backlog | A-001 | standard |
 | A-012 | Rank ladder and progress — what the meta actually shows          | backlog | A-008 | cheap    |
 | A-013 | Design fidelity — the shipped sprites, and a diff that proves it | backlog | A-007 | standard |
+
+## Wave A4 (added after the plan review gap)
+
+| id    | title                                                        | status  | deps                | model    |
+| ----- | ------------------------------------------------------------ | ------- | ------------------- | -------- |
+| A-014 | Retire the placeholder question generator                    | backlog | A-001               | standard |
+| A-015 | The guided first duel — where a five-year-old learns to play | backlog | A-001, A-003, A-008 | standard |
+
+> **Both were missed by the original plan.** A-014 because the engine generator landed after the
+> plan was written; A-015 because it existed only as a destination string in A-003. The adversarial
+> plan review the skill prescribes was not run — this is precisely what it exists to catch.
