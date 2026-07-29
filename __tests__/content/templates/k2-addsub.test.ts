@@ -392,7 +392,7 @@ describe('authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS �
     }
   });
 
-  it("spec(T-014:AC-7) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples per template", () => {
+  it('spec(T-014:AC-7) REQUIRED_TEMPLATES preflight: ladder fills on fewer than 250 of 1000 samples per template', () => {
     // Freezes the authoring contract against the AC-7 collision class (e.g. near_doubles
     // declaring both a+b-1 and a+a under b == a + 1) before JSON is ever copied.
     const failures: string[] = [];
@@ -453,9 +453,7 @@ describe('AC-2 — skill matches file, ids are prefixed and globally unique', ()
     ({ file, skill }) => {
       for (const template of loadSkillFile(file)) {
         expect(template.skill, `${template.id}.skill`).toBe(skill);
-        expect(template.id.startsWith(`${skill}_`), `${template.id} must start with '${skill}_'`).toBe(
-          true,
-        );
+        expect(template.id.startsWith(`${skill}_`), `${template.id} must start with '${skill}_'`).toBe(true);
       }
     },
   );
@@ -547,9 +545,7 @@ describe('AC-5/6/7 — 1,000 seeded generations per template (ARCHITECTURE.md §
           }
           const [lo, hi] = range;
           if (value < lo || value > hi) {
-            failures.push(
-              `${template.id} seed=${seed}: param '${name}'=${value} outside [${lo}, ${hi}]`,
-            );
+            failures.push(`${template.id} seed=${seed}: param '${name}'=${value} outside [${lo}, ${hi}]`);
           }
         }
 
@@ -657,7 +653,9 @@ describe('AC-5/6/7 — 1,000 seeded generations per template (ARCHITECTURE.md §
 
 describe('AC-8 — hand-computed spot checks pin arithmetic independently of the evaluator', () => {
   it('spec(T-014:AC-8) every required template has a literal spot check, and no shipped template is missing one', () => {
-    const loadedIds = loadAllTemplates().map((t) => t.id).sort();
+    const loadedIds = loadAllTemplates()
+      .map((t) => t.id)
+      .sort();
     const checkIds = SPOT_CHECKS.map((c) => c.id).sort();
     expect(loadedIds).toEqual(checkIds);
     expect(SPOT_CHECKS).toHaveLength(REQUIRED_TEMPLATES.length);
