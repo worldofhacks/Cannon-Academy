@@ -16,6 +16,7 @@ import {
   COINS_PER_ACCURACY_PERCENT,
   COINS_PER_PERFECT_SHOT,
   COINS_WIN_BASE,
+  HARBOR_CHEST_PRICE,
   DISTRACTOR_ABS_FLOOR,
   DISTRACTOR_MAX_RATIO,
   DOUBLE_SHOT_TIMER_FACTOR,
@@ -242,6 +243,7 @@ const REQUIRED_EXPORTS = [
   'COINS_LOSS_BASE',
   'COINS_PER_ACCURACY_PERCENT',
   'COINS_PER_PERFECT_SHOT',
+  'HARBOR_CHEST_PRICE',
   'CHEST_RARITY_WEIGHTS',
   'CHEST_COIN_RANGE_BY_RARITY',
   // Opponents
@@ -273,6 +275,7 @@ const INTEGER_CONSTANTS = [
   'BOT_ACCURACY_WINDOW',
   'MERCY_LOSS_STREAK_TRIGGER',
   'MERCY_FORCED_MISFIRES',
+  'HARBOR_CHEST_PRICE',
 ] as const;
 
 /** Collect every finite-number leaf reachable from the module namespace, with its path. */
@@ -819,6 +822,17 @@ describe('T-004 tuning — chest rarity', () => {
 });
 
 // =======================================================================================
+describe('A-033 harbor store price', () => {
+  // spec(A-033:AC-1)
+  it('spec(A-033:AC-1) pins HARBOR_CHEST_PRICE at 50 — above common chest drops, roughly one strong win', () => {
+    expect(HARBOR_CHEST_PRICE).toBe(50);
+    expect(Number.isInteger(HARBOR_CHEST_PRICE)).toBe(true);
+    expect(HARBOR_CHEST_PRICE).toBeGreaterThan(CHEST_COIN_RANGE_BY_RARITY.common.max);
+    expect(HARBOR_CHEST_PRICE).toBeGreaterThan(0);
+  });
+});
+
+// =======================================================================================
 describe('T-004 tuning — opponents and mercy', () => {
   // spec(T-004:AC-8)
   it('makes BOT_ACCURACY_WINDOW an integer of at least 1', () => {
@@ -1209,8 +1223,8 @@ describe('T-004 tuning — numeric sanity across the whole surface', () => {
       expect(Object.hasOwn(namespace, name), `missing export ${name}`).toBe(true);
       expect(namespace[name], `${name} must not be undefined`).toBeDefined();
     }
-    // 3 duel + 5 damage + 2 double-shot + 6 questions + 5 mastery + 6 economy + 5 opponents.
-    expect(REQUIRED_EXPORTS).toHaveLength(32);
+    // 3 duel + 5 damage + 2 double-shot + 6 questions + 5 mastery + 7 economy + 5 opponents.
+    expect(REQUIRED_EXPORTS).toHaveLength(33);
   });
 
   // spec(T-004:AC-10)
