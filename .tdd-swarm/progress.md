@@ -1914,4 +1914,4 @@ Test-design review dispatched.
 
 ### T-018 TEST_DISPUTE closed — DoD-3 header self-poison
 
-Same class as T-017. Suite fix re-frozen . Implementer resumed ([T-018 Implementer](49df958f-6ce0-4b10-b8be-6dd7882f3119)).
+Same class as T-017. Suite fix `e6ec871` re-frozen `344d3091662158cd…` (22/22 with feat). Implementer resumed.
