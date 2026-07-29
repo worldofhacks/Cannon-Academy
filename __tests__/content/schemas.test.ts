@@ -1045,9 +1045,7 @@ function loadShippedTemplates(): Template[] {
       const parsed = templateSchema.safeParse(entry);
       expect(
         parsed.success,
-        parsed.success
-          ? undefined
-          : `${file}: ${JSON.stringify(parsed.error.issues)}`,
+        parsed.success ? undefined : `${file}: ${JSON.stringify(parsed.error.issues)}`,
       ).toBe(true);
       if (parsed.success) loaded.push(parsed.data);
     }
@@ -1078,9 +1076,7 @@ describe('T-034 — template param keys match the expression-identifier grammar'
     (key) => {
       const result = templateSchema.safeParse(templateWithParamKey(key));
 
-      expect(result.success, `key ${JSON.stringify(key)} must fail under the narrowed schema`).toBe(
-        false,
-      );
+      expect(result.success, `key ${JSON.stringify(key)} must fail under the narrowed schema`).toBe(false);
       if (result.success) return;
       expect(
         issuesNameKey(result.error.issues, key),
