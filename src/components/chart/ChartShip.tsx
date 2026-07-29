@@ -11,7 +11,7 @@
  * shadow; it is a second boat.
  */
 import { useEffect } from 'react';
-import { Image, Text, View, type ImageSourcePropType } from 'react-native';
+import { Image, Text, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -24,6 +24,7 @@ import Animated, {
 import { SHIP, type Station } from './board';
 import { art, mapX, mapY, type MapFrame } from './layout';
 import { chart } from './palette';
+import { sprite } from '../../theme/sprites';
 import { font } from '../../theme/tokens';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
@@ -31,16 +32,8 @@ const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as c
 
 /**
  * The board's own sprite, at the size the board draws it (66×113 natural, 42pt wide).
- *
- * It belongs in `src/theme/sprites.ts` with the other eight rasters, and should move there the
- * moment that file is in scope — this ticket may only write `app/chart.tsx` and
- * `src/components/chart/**`, and a chart that draws no ship because of a file boundary would be
- * the wrong trade. `require` is React Native's documented form for a static asset; the lint
- * exemption is the file-local equivalent of the one `sprites.ts` already carries in the config.
+ * Referenced through the typed manifest so a missing file is a compile error.
  */
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const SHIP_SPRITE = require('../../../assets/sprites/ship-01.png') as ImageSourcePropType;
-
 const ROTATE = SHIP.bob.rotateDeg;
 
 export function ChartShip({
@@ -107,7 +100,7 @@ export function ChartShip({
           }}
         />
         <Animated.View style={[FILL, bobStyle]}>
-          <Image source={SHIP_SPRITE} style={{ width, height }} resizeMode="contain" />
+          <Image source={sprite.ship01} style={{ width, height }} resizeMode="contain" />
         </Animated.View>
       </View>
 
