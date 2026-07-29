@@ -930,6 +930,22 @@ comment. The vocabulary mismatch compounds it: even at `FAIL`, tag names the gat
   `SPEC-LINT RED`, because `cmd | tail` reports `tail`'s status. I nearly recorded a working gate
   as broken. [[L-027]] in miniature: the measurement described the pipeline, not the thing measured.
 
+**Then enforcement immediately found the other half of the problem.** A Definition-of-Done list
+mixes requirements on the **module** with requirements on the **process**, and only the first kind
+can be honestly asserted from a unit test. T-007's DoD-7 is "files changed are exactly those in
+`file_scopes`" — a claim about a branch diff. The Test Agent refused to tag it, and was right to:
+the nearest thing a test can see (that a directory contains no unexpected module) would have
+reported the item covered while enforcing something much narrower. It chose a red gate over a green
+whose label overstated it, which is the judgment this lesson asks for, applied against the gate I
+had just tightened.
+
+The fix is for the gate to know the difference rather than for anyone to fake a test. A DoD item
+marked `[process]` now reports `SKIP` and is verified by the orchestrator's own diff against the
+merge base. **The marker is required, not inferred** — an unmarked item is still enforced — so
+forgetting it fails loudly instead of silently exempting a real requirement. Numbering is taken
+over all DoD lines including skipped ones, so item numbers stay stable and existing `dod(id:n)`
+tags do not shift.
+
 ---
 
 ## L-035 — Documentation drifts silently, so it needs a regression suite (Phase 5)

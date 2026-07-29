@@ -20,7 +20,21 @@ ACS=$(grep -oE '\*\*AC-[0-9]+\*\*' "$TICKET" | tr -d '*' | sort -u)
 # not number, so it was invisible to this gate until now (LESSONS.md L-032): 14 assertions
 # in T-013 cited dod(...) and could have been deleted without the gate noticing.
 # Every DoD line must be cited by >=1 test tagged dod(<id>:<n>), numbered in file order.
-DOD_COUNT=$(sed -n '/^## Definition of Done/,/^## /p' "$TICKET" | grep -cE '^- \[ \]|^- \[x\]')
+# Items are held in file order so their numbers are stable, including the ones this gate skips.
+DOD_LINES=()
+while IFS= read -r dod_line; do
+  DOD_LINES+=("$dod_line")
+done < <(sed -n '/^## Definition of Done/,/^## /p' "$TICKET" | grep -E '^- \[ \]|^- \[x\]')
+DOD_COUNT=${#DOD_LINES[@]}
+
+# A DoD list mixes requirements on the MODULE with requirements on the PROCESS, and only the
+# first kind can be honestly asserted from a unit test. "Files changed are exactly those in
+# file_scopes" is a claim about a branch diff; the nearest thing a test can see is much narrower,
+# so tagging it would report the item covered while enforcing something else — L-036's failure
+# mode one level up, a green whose label overstates it. Items marked `[process]` are verified by
+# the orchestrator's own diff and gate runs, and are reported here as SKIP rather than demanded
+# from a test. The marker is deliberately explicit: an unmarked item is enforced, so forgetting
+# the marker fails loudly instead of silently exempting a real requirement.
 
 # Tickets merged before DoD coverage was enforced. They are WARN-only so the baseline stays
 # green (LESSONS.md L-002 — an ambiguously red gate teaches everyone to ignore it); every
@@ -51,6 +65,13 @@ done
 if [ "${DOD_COUNT:-0}" -gt 0 ]; then
   i=1
   while [ "$i" -le "$DOD_COUNT" ]; do
+    case "${DOD_LINES[$((i - 1))]}" in
+    *'[process]'*)
+      printf '  SKIP  DoD-%s is a process item, verified by the orchestrator\n' "$i"
+      i=$((i + 1))
+      continue
+      ;;
+    esac
     if grep -rqF "dod($ID:$i)" __tests__ 2>/dev/null; then
       n=$(grep -roF "dod($ID:$i)" __tests__ 2>/dev/null | wc -l | tr -d ' ')
       printf '  PASS  DoD-%s -> %s test(s)\n' "$i" "$n"
