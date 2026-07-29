@@ -274,6 +274,18 @@ export const DOCK = {
   primaryIconSize: 20,
   secondaryTextSize: 18,
   secondaryIconSize: 19,
+  /**
+   * Label size on a hub control — NOT a board measurement, and the only value in this file that is
+   * not one.
+   *
+   * The board's dock carries two wide buttons and sets their labels at 19/18pt beside an icon. A-038
+   * put FIVE controls in that row for demo reachability, and five 64pt targets consume the whole
+   * 351pt inner width, so an icon-beside-19pt-label cannot fit and truncated to "Har…" / "Fi…".
+   * Stacking the label under the icon fits, at the size below — chosen so the longest label
+   * ("Practice") clears the square with margin. If the dock ever returns to the board's two
+   * controls, delete this and use `primaryTextSize`/`secondaryTextSize` again (A-048).
+   */
+  controlLabelSize: 10.5,
 } as const;
 
 /**

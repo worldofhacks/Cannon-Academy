@@ -140,7 +140,31 @@ export function ChartDock({
           </View>
         </View>
 
-        <View style={{ flexDirection: 'row', gap: DOCK.gap * typeScale, marginTop: DOCK.gap * typeScale }}>
+        {/*
+          Five square targets, at the geometry `flow.ts` already computed — NOT `flex: 1` with a
+          `minWidth`, which is what overflowed the band.
+
+          The arithmetic: the 64pt tap-target floor across five controls needs 322.5pt, and a 375pt
+          phone leaves 351 inside the dock's 12pt inset. That fits with 7.1pt gaps — which is
+          precisely what `chartHubControlLayout` derives — but the row was drawn with `DOCK.gap`
+          (10), needing 362.5, and `minWidth` stops flex from shrinking anything. So the last button
+          hung off the screen and every label truncated to "Har…", "G…", "Fi…".
+
+          The gap is read back off the controls' own x positions instead of being re-derived here, so
+          the two can never drift: one owner for the geometry, one consumer.
+
+          The labels STAY. A-038 froze a visible-label contract on these buttons — a demo viewer has
+          to see where each one goes — so the fix is to stack the label under the icon instead of
+          beside it. Side by side, an icon plus "Practice" needs well over 64pt and truncates; in a
+          column both fit inside the square with room to spare (A-048).
+        */}
+        <View
+          style={{
+            flexDirection: 'row',
+            gap: controlGap(controls),
+            marginTop: DOCK.gap * typeScale,
+          }}
+        >
           {controls.map((control) => {
             const disabled = fogged && control.id === 'duel';
             const primary = control.id === 'duel';
@@ -154,41 +178,29 @@ export function ChartDock({
                 accessibilityLabel={control.accessibilityLabel}
                 style={({ pressed }) => [
                   {
-                    flex: 1,
-                    minWidth: control.width,
-                    minHeight: control.height,
+                    width: control.width,
                     height: control.height,
                     borderRadius: DOCK.buttonRadius * typeScale,
                     backgroundColor: primary ? chart.gold : chart.white,
                     borderBottomWidth: DOCK.buttonShadowDy * typeScale,
                     borderBottomColor: primary ? chart.liveShadow : chart.purseShadow,
-                    flexDirection: 'row',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 6 * typeScale,
+                    gap: 2 * typeScale,
                     opacity: disabled ? 0.45 : 1,
-                    paddingHorizontal: 8 * typeScale,
+                    paddingHorizontal: 2 * typeScale,
                   },
                   pressed ? { transform: [{ translateY: 2 }], borderBottomWidth: 1 } : null,
                 ]}
               >
-                {control.id === 'duel' ? (
-                  <Text style={{ fontSize: DOCK.primaryIconSize * typeScale, lineHeight: DOCK.primaryIconSize * typeScale * 1.2, color: chart.ink }}>
-                    {FIGHT_ICON}
-                  </Text>
-                ) : control.id === 'range' ? (
-                  <Text style={{ fontSize: DOCK.secondaryIconSize * typeScale, lineHeight: DOCK.secondaryIconSize * typeScale * 1.2, color: chart.inkMuted }}>
-                    {RANGE_ICON}
-                  </Text>
-                ) : control.id === 'gun-deck' ? (
-                  <CannonMark size={DOCK.primaryIconSize * typeScale} ink={chart.inkMuted} />
-                ) : null}
+                <DockIcon id={control.id} primary={primary} typeScale={typeScale} />
                 <Text
                   numberOfLines={1}
+                  adjustsFontSizeToFit
                   style={{
                     fontFamily: font.displayBold,
-                    fontSize: (primary ? DOCK.primaryTextSize : DOCK.secondaryTextSize) * typeScale,
-                    lineHeight: (primary ? DOCK.primaryTextSize : DOCK.secondaryTextSize) * typeScale * 1.2,
+                    fontSize: DOCK.controlLabelSize * typeScale,
+                    lineHeight: DOCK.controlLabelSize * typeScale * 1.15,
                     color: primary ? chart.ink : chart.inkMuted,
                   }}
                 >
@@ -201,6 +213,98 @@ export function ChartDock({
       </View>
       {/* The dock is the last thing on the screen, so it is what has to hold the home indicator. */}
       <View style={{ height: insetBottom, backgroundColor: chart.parchment }} />
+    </View>
+  );
+}
+
+/**
+ * The gap between two adjacent controls, read back off the geometry that positioned them.
+ *
+ * `chartHubControlLayout` spaces five fixed-width targets across the dock's inner width; recomputing
+ * that spacing here would be a second opinion about the same number, and the overflow this file just
+ * fixed was exactly that — two owners disagreeing by 2.9pt each, five times over.
+ */
+function controlGap(controls: readonly HubControl[]): number {
+  const [first, second] = controls;
+  if (first === undefined || second === undefined) return 0;
+  return Math.max(0, second.x - (first.x + first.width));
+}
+
+/**
+ * The mark on a dock button. Icons, not words — see the row above.
+ *
+ * `harbor` and `rank` previously had no branch here at all, so they rendered as empty tiles once the
+ * labels came off. Both are drawn from Views for the same reason `CannonMark` is: every glyph that
+ * reads as "coins" or "ladder" is emoji-capable, and an emoji ignores `color` on iOS, so a muted
+ * mark would come back full-colour and out of palette.
+ */
+function DockIcon({
+  id,
+  primary,
+  typeScale,
+}: {
+  readonly id: HubControl['id'];
+  readonly primary: boolean;
+  readonly typeScale: number;
+}) {
+  const ink = primary ? chart.ink : chart.inkMuted;
+  const size = (primary ? DOCK.primaryIconSize : DOCK.secondaryIconSize) * typeScale;
+
+  switch (id) {
+    case 'duel':
+      return <Text style={{ fontSize: size, lineHeight: size * 1.2, color: ink }}>{FIGHT_ICON}</Text>;
+    case 'range':
+      return <Text style={{ fontSize: size, lineHeight: size * 1.2, color: ink }}>{RANGE_ICON}</Text>;
+    case 'gun-deck':
+      return <CannonMark size={size} ink={ink} />;
+    case 'harbor':
+      return <CoinStackMark size={size} ink={ink} />;
+    case 'rank':
+      return <LadderMark size={size} ink={ink} />;
+  }
+}
+
+/** Three stacked coins — the harbour is where coins are spent. */
+function CoinStackMark({ size, ink }: { size: number; ink: string }) {
+  const coin = size * 0.32;
+  return (
+    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
+      {[0, 1, 2].map((i) => (
+        <View
+          key={i}
+          style={{
+            width: size * (0.9 - i * 0.12),
+            height: coin,
+            borderRadius: 999,
+            backgroundColor: ink,
+            marginTop: i === 0 ? 0 : -coin * 0.34,
+            opacity: 1 - i * 0.18,
+          }}
+        />
+      ))}
+    </View>
+  );
+}
+
+/** Three ascending bars — the rank ladder climbs. */
+function LadderMark({ size, ink }: { size: number; ink: string }) {
+  const bar = size * 0.24;
+  return (
+    <View
+      style={{
+        width: size,
+        height: size,
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+      }}
+    >
+      {[0.45, 0.72, 1].map((h) => (
+        <View
+          key={h}
+          style={{ width: bar, height: size * h, borderRadius: bar * 0.35, backgroundColor: ink }}
+        />
+      ))}
     </View>
   );
 }
