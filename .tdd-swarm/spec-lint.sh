@@ -88,7 +88,7 @@ fi
 # Reverse direction: a test file with no criterion citation at all.
 while IFS= read -r f; do
   [ "$f" = "$EXEMPT" ] && continue
-  if ! grep -qE 'spec\(T-[0-9]+:AC-[0-9]+\)|dod\(T-[0-9]+:[0-9]+\)' "$f"; then
+  if ! grep -qE 'spec\([TA]-[0-9]+:AC-[0-9]+\)|dod\([TA]-[0-9]+:[0-9]+\)' "$f"; then
     printf '  FAIL  %s cites no acceptance criterion\n' "$f"
     FAIL=1
   fi
