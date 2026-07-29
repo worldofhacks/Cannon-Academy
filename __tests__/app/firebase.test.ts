@@ -9,6 +9,11 @@ import type { FirebaseStorage } from 'firebase/storage';
 import { afterEach, describe, expect, expectTypeOf, it, vi } from 'vitest';
 
 type FirebaseBoundaryModule = typeof import('../../src/services/firebase');
+type FirebaseClientDependencies = Parameters<FirebaseBoundaryModule['createFirebaseClient']>[0];
+type InjectedAsyncStorage = FirebaseClientDependencies['asyncStorage'];
+type PersistenceStorageArgument = Parameters<
+  FirebaseClientDependencies['sdk']['getReactNativePersistence']
+>[0];
 
 type FirebaseClientConfig = {
   apiKey: string;
@@ -279,9 +284,6 @@ function mockAmbientSdk(
     getReactNativePersistence: fake.sdk.getReactNativePersistence,
     initializeAuth: fake.sdk.initializeAuth,
   }));
-  vi.doMock('firebase/auth/react-native', () => ({
-    getReactNativePersistence: fake.sdk.getReactNativePersistence,
-  }));
   vi.doMock('firebase/firestore', () => ({
     getFirestore: fake.sdk.getFirestore,
     initializeFirestore: fake.sdk.initializeFirestore,
@@ -353,7 +355,6 @@ afterEach(() => {
   for (const moduleId of [
     'firebase/app',
     'firebase/auth',
-    'firebase/auth/react-native',
     'firebase/firestore',
     'firebase/storage',
     '@react-native-async-storage/async-storage',
@@ -700,6 +701,8 @@ describe('A-025 Firebase client boundary', () => {
     expectTypeOf(boundary.auth).toEqualTypeOf<Auth | null>();
     expectTypeOf(boundary.db).toEqualTypeOf<Firestore | null>();
     expectTypeOf(boundary.storage).toEqualTypeOf<FirebaseStorage | null>();
+    expectTypeOf<InjectedAsyncStorage>().toBeUnknown();
+    expectTypeOf<PersistenceStorageArgument>().toBeUnknown();
     expect(boundary.createFirebaseClient).toBeTypeOf('function');
     expect(boundary.parseFirebaseConfig).toBeTypeOf('function');
     expect(boundary).toHaveProperty('auth');
