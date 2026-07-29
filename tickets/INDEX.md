@@ -24,7 +24,7 @@ README, HANDOFF, or STATE — those documents link here.
 | A-007 | app | Sea chart — the hub the whole loop routes through | review-passed | A3 | A-001, A-003 | ticket/a-007 | [A-007](app/A-007.md) |
 | A-008 | app | The duel earns something — coins, mastery and wins persist | review-passed | A4 | A-001, A-007 | ticket/a-008 | [A-008](app/A-008.md) |
 | A-009 | app | Gunnery range — the drill that makes mastery real | review-passed | A4 | A-001, A-007 | ticket/a-009 | [A-009](app/A-009.md) |
-| A-010 | app | Chest ceremony — the real rarity roll, not a hardcoded reward | backlog | G4 | A-008, A-032 | ticket/a-010 | [A-010](app/A-010.md) |
+| A-010 | app | Chest ceremony — the real rarity roll, not a hardcoded reward | review-passed | G4 | A-008, A-032 | ticket/a-010 | [A-010](app/A-010.md) |
 | A-011 | app | Gun deck — which three cannons sail with you | review-passed | A7 | A-001 | ticket/a-011 | [A-011](app/A-011.md) |
 | A-012 | app | Rank ladder and progress — what the meta actually shows | backlog | G1 | A-008 | ticket/a-012 | [A-012](app/A-012.md) |
 | A-013 | app | Design fidelity — the shipped sprites, and a diff that proves it | backlog | A6 | A-007 | ticket/a-013 | [A-013](app/A-013.md) |
@@ -44,7 +44,7 @@ README, HANDOFF, or STATE — those documents link here.
 | A-027 | app | Band-safe progression — practice never jumps a child into harder content | review-passed | G1 | A-009, T-036 | ticket/a-027-band-safe-progression | [A-027](app/A-027.md) |
 | A-028 | app | Training choice — easier practice remains available and difficulty is legible | review-passed | G2 | A-027 | ticket/a-028-training-choice | [A-028](app/A-028.md) |
 | A-029 | app | Island-aware duel context — five levels no longer fight like Port Sumwich | review-passed | G2 | A-016, A-039 | ticket/a-029-duel-context | [A-029](app/A-029.md) |
-| A-030 | app | Real rival bridge — use the seeded bot and mercy system already built | backlog | G3 | A-027, A-029, A-039, A-041 | ticket/a-030-opponent-bridge | [A-030](app/A-030.md) |
+| A-030 | app | Real rival bridge — use the seeded bot and mercy system already built | review-passed | G3 | A-027, A-029, A-039, A-041 | ticket/a-030-opponent-bridge | [A-030](app/A-030.md) |
 | A-031 | app | Enemy encounters — pirate, skeleton, ghost, shark, and kraken | backlog | G4 | A-030 | ticket/a-031-enemy-variety | [A-031](app/A-031.md) |
 | A-032 | app | Real chest settlement — every catalog cannon has an attainable path | review-passed | G3 | A-008, A-039, A-041 | ticket/a-032-chest-acquisition | [A-032](app/A-032.md) |
 | A-033 | app | Harbor store — spend coins without buying past learning | backlog | G4 | A-032 | ticket/a-033-harbor-store | [A-033](app/A-033.md) |
