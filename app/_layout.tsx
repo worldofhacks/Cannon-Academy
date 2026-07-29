@@ -13,8 +13,20 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { Splash } from '../src/components/Splash';
 import { resolveDestination, type Destination } from '../src/services/flow';
+import { createLaunchGate } from '../src/services/launchGate';
 import { hydrate, persist } from '../src/services/persistence';
 import { captainStore } from '../src/stores/useCaptain';
+
+const ignorePendingStart = () => undefined;
+
+function PendingLaunchShell({ ready }: { ready: boolean }) {
+  return (
+    <SafeAreaProvider>
+      <StatusBar style="light" />
+      <Splash ready={ready} onStart={ignorePendingStart} />
+    </SafeAreaProvider>
+  );
+}
 
 /**
  * Root layout.
@@ -52,6 +64,8 @@ export default function RootLayout() {
   // `null` means "not read yet", which is what the splash waits on. It is deliberately not
   // seeded with a default: a default would be a routing decision taken before the read.
   const [destination, setDestination] = useState<Destination | null>(null);
+  const [launchGate] = useState(createLaunchGate);
+  const [launchAcknowledged, setLaunchAcknowledged] = useState(launchGate.acknowledged);
 
   useEffect(() => {
     let live = true;
@@ -68,7 +82,8 @@ export default function RootLayout() {
       unsubscribe = captainStore.subscribe((s) => {
         void persist(AsyncStorage, s.captain);
       });
-      setDestination(resolveDestination(captain));
+      const resolvedDestination = resolveDestination(captain);
+      setDestination(resolvedDestination);
     })();
 
     return () => {
@@ -77,20 +92,23 @@ export default function RootLayout() {
     };
   }, []);
 
-  useEffect(() => {
-    if (destination === null) return;
-    // `replace`, not `push`: the entry route must not stay on the back stack, or the hardware
-    // back button walks a returning captain back to a screen they already finished with.
-    router.replace(`/${destination}`);
-  }, [destination]);
-
   // Board 4a: the hold is either a white rectangle or it is the splash. `useWindowDimensions`
   // rather than a constant, because the splash scales off the design's 375pt reference width.
-  if (!fontsLoaded || destination === null) {
+  if (!fontsLoaded || destination === null)
+    return <PendingLaunchShell ready={fontsLoaded && destination !== null} />;
+  launchGate.markReady(destination);
+  if (!launchAcknowledged) {
     return (
       <SafeAreaProvider>
         <StatusBar style="light" />
-        <Splash />
+        <Splash
+          ready={fontsLoaded && destination !== null}
+          onStart={() => {
+            if (launchGate.start((resolvedDestination) => router.replace(`/${resolvedDestination}`))) {
+              setLaunchAcknowledged(launchGate.acknowledged);
+            }
+          }}
+        />
       </SafeAreaProvider>
     );
   }
