@@ -75,10 +75,18 @@ describe('A-027 band-safe gunnery range', () => {
   );
 
   it('spec(A-027:AC-5) synchronously refuses an explicitly requested skill above the K-1 ceiling', () => {
+    const maxGrade = MAX_GRADE_BY_BAND.k_1;
+    const island = islands.find((candidate) =>
+      candidate.rangeSkills.some((skillId) => getSkill(skillId).minGrade > maxGrade),
+    );
+    const skillId = island?.rangeSkills.find((candidate) => getSkill(candidate).minGrade > maxGrade);
+    expect(island, 'catalog must contain an island with content above the K-1 ceiling').toBeDefined();
+    expect(skillId, 'catalog must contain a skill above the K-1 ceiling').toBeDefined();
+
     expect(() =>
       openDrill({
-        islandId: 'port_sumwich',
-        skillId: 'add_within_20',
+        islandId: island!.id,
+        skillId: skillId!,
         captain: captain('k_1'),
         rng: createRng(29),
         length: 1,

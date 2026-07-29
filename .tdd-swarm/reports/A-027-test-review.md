@@ -25,3 +25,9 @@ idempotent delta/set-union semantics.
 
 The `[process]` DoD labels correctly keep T-036 integration verification and freeze/gate evidence
 out of behavioral spec-lint coverage. No additional A-027 test tag is needed for those markers.
+
+## Frozen-test dispute resolution
+
+The original AC-5 denial fixture incorrectly used `add_within_20`, whose grade-1 minimum is
+within the K-1 ceiling. It now derives a genuinely above-ceiling skill and its training island
+from the catalog, keeping AC-5 consistent with AC-2.
