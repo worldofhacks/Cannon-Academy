@@ -23,7 +23,7 @@ Integration branch: `app/shell` @ `22bb3ef` (start)
 
 | Ticket | Status |
 | --- | --- |
-| A-015 guided duel | agent 72777f41 |
+| A-015 guided duel | **merged** |
 | A-012 rank ladder | **merged** (`d6f4dcd`) |
 | A-033 harbor store | **merged** |
 
