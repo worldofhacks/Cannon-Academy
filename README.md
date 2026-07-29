@@ -4,7 +4,10 @@
 
 Turn-based naval duels: pick a cannon, answer its math question during the reload, and a correct answer fires the volley. Answer speed aims the shot. Harder cannons demand harder problems and hit harder. Master a skill at an island's gunnery range to unlock its cannon and sail on.
 
-Solo build · 5-day Gauntlet timebox · **submission Saturday 2026-08-01**.
+Solo build on a five-day Gauntlet timebox (opened 2026-07-28). **Current product and ticket
+truth live on `app/shell`:** [`README.md`](https://github.com/worldofhacks/Cannon-Academy/blob/app/shell/README.md),
+[`tickets/INDEX.md`](https://github.com/worldofhacks/Cannon-Academy/blob/app/shell/tickets/INDEX.md),
+live web <https://cannon-academy.expo.app>. This engine-checkout README is a thin run pointer.
 
 ---
 
