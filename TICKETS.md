@@ -118,11 +118,11 @@ Cross-ticket probe green (T-007 × T-013). Evidence: `.tdd-swarm/reports/wave4-i
 
 ## Wave 6 — golden gate, mercy bot, machine extension
 
-| id    | title                                                            | status  | deps                                            | branch                                  | model    | issue |
-| ----- | ---------------------------------------------------------------- | ------- | ----------------------------------------------- | --------------------------------------- | -------- | ----- |
-| T-019 | Template registry and the catalog-wide golden conformance suite  | backlog | T-003, T-005, T-006, T-007, T-014, T-015, T-016 | `ticket/T-019-template-registry-golden` | standard | —     |
-| T-021 | Banded bot opponent and built-in mercy                           | backlog | T-001, T-003, T-004, T-006, T-013, T-018        | `ticket/T-021-bot-and-mercy`            | capable  | —     |
-| T-022 | Double-Shot — opt into a shortened timer for a multi-volley turn | backlog | T-004, T-013, T-020                             | `ticket/T-022-double-shot`              | capable  | —     |
+| id    | title                                                            | status  | deps                                            | branch                                  | model    | issue                                                                        |
+| ----- | ---------------------------------------------------------------- | ------- | ----------------------------------------------- | --------------------------------------- | -------- | ---------------------------------------------------------------------------- |
+| T-019 | Template registry and the catalog-wide golden conformance suite  | backlog | T-003, T-005, T-006, T-007, T-014, T-015, T-016 | `ticket/T-019-template-registry-golden` | standard | —                                                                            |
+| T-021 | Banded bot opponent and built-in mercy                           | done    | T-001, T-003, T-004, T-006, T-013, T-018        | `ticket/T-021-bot-and-mercy`            | capable  | frozen `57ccb419d1fdd62a`/`8965b4ce0319bf7e…`; mercy+bot; child-safety rival |
+| T-022 | Double-Shot — opt into a shortened timer for a multi-volley turn | backlog | T-004, T-013, T-020                             | `ticket/T-022-double-shot`              | capable  | —                                                                            |
 
 ## Wave 7 — proofs over the finished machine
 

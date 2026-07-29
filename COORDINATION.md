@@ -165,3 +165,10 @@ Notes for Track B:
 
 `src/engine/tuning.ts` exports `TRAY_CAPACITY = 3`. App gun deck (A-011) must import this — no UI literal.
 Loadout _selection_ rules remain T-030 (`src/engine/loadout.ts`, still backlog).
+
+### T-021 — Mercy + banded bot (`@engine/opponents`)
+
+`mercy.ts`: `MercyState`, `emptyMercyState`, `recordPlayerAnswer`, `recordDuelResult`,
+`playerRecentAccuracy`, `targetBotAccuracy`, `consumeForcedMisfire`.
+`bot.ts`: `createBotOpponent({ id, loadout, accuracy, forcedMisfires, rng })` → `Opponent`.
+Store owns MercyState between duels; pass `targetBotAccuracy` + `forcedMisfiresRemaining` into the bot at duel start.

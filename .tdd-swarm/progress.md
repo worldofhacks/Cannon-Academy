@@ -2024,3 +2024,8 @@ Merged + pushed. Engine Wave 5 tickets (T-014…T-020, T-032, T-034) done. **T-0
 
 Split from T-030: `TRAY_CAPACITY = 3` in `tuning.ts`. Frozen `b994d1f714e4b150…`.
 App track may import `@engine/tuning` for gun-deck slot count. T-030 still owns loadout rules.
+
+### T-021 — done (merged) — banded bot + mercy
+
+`mercy.ts` + `bot.ts`. Frozen mercy `57ccb419d1fdd62a…`, bot `8965b4ce0319bf7e…`.
+Child-safety rival: accuracy tracks player − margin inside band; two losses arm two misfires.
