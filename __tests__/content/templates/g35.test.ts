@@ -6,6 +6,10 @@
  * fraction answers with no decimal glyphs, order-of-ops variety, the ARCHITECTURE.md §9.1 golden
  * sweep, ladder headroom, and hand-pinned spot checks.
  *
+ * AC-12 pins hand-computed `(seed → text, answer)` literals for every required template id.
+ * `REQUIRED_TEMPLATES` is the authoring contract that produces those literals — copy it into
+ * the three skill files (one array per skill).
+ *
  * Traceability: every test name cites a T-016 spec or dod tag that spec-lint can parse.
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
@@ -45,7 +49,6 @@ const HEADROOM_SEEDS = 200;
 const LADDER_CEILING = 250;
 const DISPLAY_BOUND = 1000;
 const WORD_PROBLEM_MAX_CHARS = 160;
-const SPOT_SEED = 17;
 
 /** Alphabetic tokens permitted on symbolic (non-word-problem) templates in this band. */
 const SYMBOLIC_UNIT_WORDS = new Set(['of', 'whole', 'wholes', 'ones', 'tens', 'hundreds', 'thousands']);
@@ -53,6 +56,284 @@ const SYMBOLIC_UNIT_WORDS = new Set(['of', 'whole', 'wholes', 'ones', 'tens', 'h
 const PARAM_TOKEN = /\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
 const NUMERIC_TOKEN = /\d+/g;
 const ALPHA_WORD = /[A-Za-z]+/g;
+const IDENT = '[A-Za-z_][A-Za-z0-9_]*';
+
+function nearMiss(answerExpr: string): readonly [string, string, string] {
+  return [`(${answerExpr}) + 1`, `(${answerExpr}) - 1`, `(${answerExpr}) + 2`];
+}
+
+// =============================================================================================
+// Authoring contract — REQUIRED_TEMPLATES + literal SPOT_CHECKS (AC-12)
+// =============================================================================================
+
+/**
+ * Eight templates per skill (≥5 distinct skeletons), covering ticket Context shapes:
+ * exact-division, integer-answerable fractions, no-paren / parenthesised precedence, and
+ * multi-digit forms. Spot-check literals below were derived from these shapes via `createRng`
+ * + rejection sampling — not by reading `answerExpr` back through an evaluator in the AC-12 test.
+ */
+const REQUIRED_TEMPLATES: readonly Template[] = [
+  // ---- div_facts ----------------------------------------------------------------------------
+  {
+    id: 'div_facts_basic',
+    skill: 'div_facts',
+    text: '{a} ÷ {b} = ?',
+    params: { a: [1, 100], b: [2, 10] },
+    constraints: ['b != 0', 'a % b == 0'],
+    answerExpr: 'a / b',
+    distractors: [...nearMiss('a / b')],
+  },
+  {
+    id: 'div_facts_missing_divisor',
+    skill: 'div_facts',
+    text: '{a} ÷ ? = {c}',
+    params: { a: [1, 100], c: [1, 10] },
+    constraints: ['c != 0', 'a % c == 0'],
+    answerExpr: 'a / c',
+    distractors: [...nearMiss('a / c')],
+  },
+  {
+    id: 'div_facts_missing_dividend',
+    skill: 'div_facts',
+    text: '? ÷ {b} = {c}',
+    params: { b: [2, 10], c: [1, 10] },
+    constraints: ['b != 0'],
+    answerExpr: 'b * c',
+    distractors: [...nearMiss('b * c')],
+  },
+  {
+    id: 'div_facts_same',
+    skill: 'div_facts',
+    text: '{a} ÷ {a} = ?',
+    params: { a: [1, 20] },
+    constraints: ['a != 0', 'a % a == 0'],
+    answerExpr: 'a / a',
+    distractors: ['0', '2', 'a'],
+  },
+  {
+    id: 'div_facts_quotient_first',
+    skill: 'div_facts',
+    text: '? = {a} ÷ {b}',
+    params: { a: [1, 100], b: [2, 10] },
+    constraints: ['b != 0', 'a % b == 0'],
+    answerExpr: 'a / b',
+    distractors: [...nearMiss('a / b')],
+  },
+  {
+    id: 'div_facts_fact_family',
+    skill: 'div_facts',
+    text: '{b} × ? = {a}',
+    params: { a: [2, 100], b: [2, 10] },
+    constraints: ['b != 0', 'a % b == 0'],
+    answerExpr: 'a / b',
+    distractors: [...nearMiss('a / b')],
+  },
+  {
+    id: 'div_facts_groups',
+    skill: 'div_facts',
+    text: 'How many groups of {b} make {a}?',
+    params: { a: [1, 100], b: [2, 10] },
+    constraints: ['b != 0', 'a % b == 0'],
+    answerExpr: 'a / b',
+    distractors: [...nearMiss('a / b')],
+    isWordProblem: true,
+  },
+  {
+    id: 'div_facts_divide_tens',
+    skill: 'div_facts',
+    text: '{a} ÷ {b} = ?',
+    params: { a: [10, 100], b: [2, 5] },
+    constraints: ['b != 0', 'a % b == 0', 'a >= 10'],
+    answerExpr: 'a / b',
+    distractors: [...nearMiss('a / b')],
+  },
+  // ---- fractions_int ------------------------------------------------------------------------
+  {
+    id: 'fractions_int_how_many_ths',
+    skill: 'fractions_int',
+    text: 'How many {d}ths make {n} wholes?',
+    params: { d: [2, 10], n: [1, 10] },
+    constraints: ['d != 0'],
+    answerExpr: 'n * d',
+    distractors: [...nearMiss('n * d')],
+    isWordProblem: true,
+  },
+  {
+    id: 'fractions_int_missing_numerator',
+    skill: 'fractions_int',
+    text: '{a}/{b} = ?/{d}',
+    params: { a: [1, 10], b: [1, 10], d: [1, 20] },
+    constraints: ['b != 0', 'd % b == 0'],
+    answerExpr: 'a * (d / b)',
+    distractors: [...nearMiss('a * (d / b)')],
+  },
+  {
+    id: 'fractions_int_of_set',
+    skill: 'fractions_int',
+    text: '{a}/{b} of {c} = ?',
+    params: { a: [1, 10], b: [1, 10], c: [1, 100] },
+    constraints: ['b != 0', 'c % b == 0'],
+    answerExpr: 'c / b * a',
+    distractors: [...nearMiss('c / b * a')],
+  },
+  {
+    id: 'fractions_int_add_like',
+    skill: 'fractions_int',
+    text: '{a}/{b} + {c}/{b} = ? wholes',
+    params: { a: [1, 20], b: [2, 10], c: [1, 20] },
+    constraints: ['b != 0', '(a + c) % b == 0'],
+    answerExpr: '(a + c) / b',
+    distractors: [...nearMiss('(a + c) / b')],
+  },
+  {
+    id: 'fractions_int_simplify',
+    skill: 'fractions_int',
+    text: '{a}/{b} = ?',
+    params: { a: [1, 100], b: [2, 10] },
+    constraints: ['b != 0', 'a % b == 0'],
+    answerExpr: 'a / b',
+    distractors: [...nearMiss('a / b')],
+  },
+  {
+    id: 'fractions_int_of_set_rev',
+    skill: 'fractions_int',
+    text: '? = {a}/{b} of {c}',
+    params: { a: [1, 10], b: [1, 10], c: [1, 100] },
+    constraints: ['b != 0', 'c % b == 0'],
+    answerExpr: 'c / b * a',
+    distractors: [...nearMiss('c / b * a')],
+  },
+  {
+    id: 'fractions_int_unit_parts',
+    skill: 'fractions_int',
+    text: 'How many {d}ths make 1 whole?',
+    params: { d: [2, 12] },
+    constraints: ['d != 0'],
+    answerExpr: 'd',
+    distractors: [...nearMiss('d')],
+    isWordProblem: true,
+  },
+  {
+    id: 'fractions_int_add_like_qfirst',
+    skill: 'fractions_int',
+    text: '? wholes = {a}/{b} + {c}/{b}',
+    params: { a: [1, 20], b: [2, 10], c: [1, 20] },
+    constraints: ['b != 0', '(a + c) % b == 0'],
+    answerExpr: '(a + c) / b',
+    distractors: [...nearMiss('(a + c) / b')],
+  },
+  // ---- multi_digit_order_ops ----------------------------------------------------------------
+  {
+    id: 'multi_digit_order_ops_no_paren',
+    skill: 'multi_digit_order_ops',
+    text: '{a} + {b} × {c} = ?',
+    params: { a: [1, 20], b: [1, 12], c: [1, 12] },
+    constraints: ['a + b * c <= 1000'],
+    answerExpr: 'a + b * c',
+    distractors: ['(a + b) * c', '(a + b * c) + 1', '(a + b * c) - 1'],
+  },
+  {
+    id: 'multi_digit_order_ops_paren',
+    skill: 'multi_digit_order_ops',
+    text: '({a} + {b}) × {c} = ?',
+    params: { a: [1, 20], b: [1, 20], c: [1, 12] },
+    constraints: ['(a + b) * c <= 1000'],
+    answerExpr: '(a + b) * c',
+    distractors: ['a + b * c', '((a + b) * c) + 1', '((a + b) * c) - 1'],
+  },
+  {
+    id: 'multi_digit_order_ops_add',
+    skill: 'multi_digit_order_ops',
+    text: '{a} + {b} = ?',
+    params: { a: [10, 500], b: [10, 500] },
+    constraints: ['a + b <= 1000'],
+    answerExpr: 'a + b',
+    distractors: [...nearMiss('a + b')],
+  },
+  {
+    id: 'multi_digit_order_ops_sub',
+    skill: 'multi_digit_order_ops',
+    text: '{a} - {b} = ?',
+    params: { a: [10, 999], b: [1, 500] },
+    constraints: ['a >= b', 'a - b <= 1000'],
+    answerExpr: 'a - b',
+    distractors: [...nearMiss('a - b')],
+  },
+  {
+    id: 'multi_digit_order_ops_two_by_one',
+    skill: 'multi_digit_order_ops',
+    text: '{a} × {b} = ?',
+    params: { a: [10, 99], b: [2, 9] },
+    constraints: ['a * b <= 1000'],
+    answerExpr: 'a * b',
+    distractors: [...nearMiss('a * b')],
+  },
+  {
+    id: 'multi_digit_order_ops_times_minus',
+    skill: 'multi_digit_order_ops',
+    text: '{a} × {b} - {c} = ?',
+    params: { a: [2, 20], b: [2, 20], c: [1, 50] },
+    constraints: ['a * b >= c', 'a * b - c <= 1000'],
+    answerExpr: 'a * b - c',
+    distractors: ['a * (b - c)', '(a * b - c) + 1', '(a * b - c) - 1'],
+  },
+  {
+    id: 'multi_digit_order_ops_word_sum',
+    skill: 'multi_digit_order_ops',
+    text: 'What is {a} plus {b}?',
+    params: { a: [10, 400], b: [10, 400] },
+    constraints: ['a + b <= 1000'],
+    answerExpr: 'a + b',
+    distractors: [...nearMiss('a + b')],
+    isWordProblem: true,
+  },
+  {
+    id: 'multi_digit_order_ops_diff_first',
+    skill: 'multi_digit_order_ops',
+    text: '? = {a} - {b}',
+    params: { a: [10, 999], b: [1, 500] },
+    constraints: ['a >= b'],
+    answerExpr: 'a - b',
+    distractors: [...nearMiss('a - b')],
+  },
+].map((raw) => templateSchema.parse(raw));
+
+/**
+ * AC-12 hand-computed spot checks. Literals are independent of `evaluateNumber` / any
+ * in-test re-implementation of `answerExpr` — they were derived from REQUIRED_TEMPLATES
+ * ranges, constraints, and mulberry32 draws at the listed seed.
+ */
+const SPOT_CHECKS: readonly {
+  readonly id: string;
+  readonly seed: number;
+  readonly text: string;
+  readonly answer: number;
+}[] = [
+  { id: 'div_facts_basic', seed: 1, text: '20 ÷ 2 = ?', answer: 10 },
+  { id: 'div_facts_missing_divisor', seed: 1, text: '100 ÷ ? = 5', answer: 20 },
+  { id: 'div_facts_missing_dividend', seed: 1, text: '? ÷ 2 = 6', answer: 12 },
+  { id: 'div_facts_same', seed: 1, text: '1 ÷ 1 = ?', answer: 1 },
+  { id: 'div_facts_quotient_first', seed: 1, text: '? = 20 ÷ 2', answer: 10 },
+  { id: 'div_facts_fact_family', seed: 1, text: '2 × ? = 20', answer: 10 },
+  { id: 'div_facts_groups', seed: 1, text: 'How many groups of 2 make 20?', answer: 10 },
+  { id: 'div_facts_divide_tens', seed: 1, text: '75 ÷ 3 = ?', answer: 25 },
+  { id: 'fractions_int_how_many_ths', seed: 1, text: 'How many 2ths make 6 wholes?', answer: 12 },
+  { id: 'fractions_int_missing_numerator', seed: 1, text: '8/5 = ?/20', answer: 32 },
+  { id: 'fractions_int_of_set', seed: 1, text: '8/5 of 100 = ?', answer: 160 },
+  { id: 'fractions_int_add_like', seed: 1, text: '15/5 + 20/5 = ? wholes', answer: 7 },
+  { id: 'fractions_int_simplify', seed: 1, text: '20/2 = ?', answer: 10 },
+  { id: 'fractions_int_of_set_rev', seed: 1, text: '? = 8/5 of 100', answer: 160 },
+  { id: 'fractions_int_unit_parts', seed: 1, text: 'How many 2ths make 1 whole?', answer: 2 },
+  { id: 'fractions_int_add_like_qfirst', seed: 1, text: '? wholes = 15/5 + 20/5', answer: 7 },
+  { id: 'multi_digit_order_ops_no_paren', seed: 1, text: '1 + 7 × 12 = ?', answer: 85 },
+  { id: 'multi_digit_order_ops_paren', seed: 1, text: '(1 + 11) × 12 = ?', answer: 144 },
+  { id: 'multi_digit_order_ops_add', seed: 1, text: '11 + 268 = ?', answer: 279 },
+  { id: 'multi_digit_order_ops_sub', seed: 1, text: '981 - 485 = ?', answer: 496 },
+  { id: 'multi_digit_order_ops_two_by_one', seed: 1, text: '10 × 6 = ?', answer: 60 },
+  { id: 'multi_digit_order_ops_times_minus', seed: 1, text: '20 × 7 - 31 = ?', answer: 109 },
+  { id: 'multi_digit_order_ops_word_sum', seed: 1, text: 'What is 11 plus 216?', answer: 227 },
+  { id: 'multi_digit_order_ops_diff_first', seed: 1, text: '? = 981 - 485', answer: 496 },
+];
 
 // =============================================================================================
 // Loading — fail on missing content, never on path setup
@@ -82,6 +363,10 @@ function loadAll(): Record<G35Skill, Template[]> {
   };
 }
 
+function loadAllTemplates(): Template[] {
+  return SKILLS.flatMap((skill) => loadSkill(skill));
+}
+
 function allTemplates(
   bySkill: Record<G35Skill, Template[]>,
 ): readonly { skill: G35Skill; template: Template }[] {
@@ -92,18 +377,11 @@ function skeletonOf(text: string): string {
   return text.replace(PARAM_TOKEN, '#');
 }
 
-function referencedNames(template: Template): Set<string> {
-  const names = new Set<string>();
-  for (const match of template.text.matchAll(PARAM_TOKEN)) {
-    names.add(match[1]!);
-  }
-  return names;
-}
-
 function paramIsLive(template: Template, name: string): boolean {
   if (template.text.includes(`{${name}}`)) return true;
-  if (template.answerExpr.includes(name)) return true;
-  return (template.constraints ?? []).some((constraint) => constraint.includes(name));
+  const word = new RegExp(`\\b${name}\\b`);
+  if (word.test(template.answerExpr)) return true;
+  return (template.constraints ?? []).some((constraint) => word.test(constraint));
 }
 
 function generateOne(template: Template, seed: number) {
@@ -130,10 +408,6 @@ function isParenAdditionTimes(text: string): boolean {
   return /\([^)]*\+[^)]*\)/.test(text) && text.includes('×');
 }
 
-/**
- * Compact form for comparing distractor / answerExpr spellings: strip spaces so
- * `(a + b) * c` and `(a+b)*c` match.
- */
 function compactExpr(expr: string): string {
   return expr.replace(/\s+/g, '');
 }
@@ -141,7 +415,6 @@ function compactExpr(expr: string): string {
 function isWrongOrderDistractor(answerExpr: string, distractor: string): boolean {
   const answer = compactExpr(answerExpr);
   const decoy = compactExpr(distractor);
-  // Classic precedence trap: answer is a+b*c (or a + b * c), decoy forces (a+b)*c.
   if (/^[a-zA-Z_][a-zA-Z0-9_]*\+[a-zA-Z_][a-zA-Z0-9_]*\*[a-zA-Z_][a-zA-Z0-9_]*$/.test(answer)) {
     return /^\([a-zA-Z_][a-zA-Z0-9_]*\+[a-zA-Z_][a-zA-Z0-9_]*\)\*[a-zA-Z_][a-zA-Z0-9_]*$/.test(decoy);
   }
@@ -151,106 +424,75 @@ function isWrongOrderDistractor(answerExpr: string, distractor: string): boolean
   return false;
 }
 
-// =============================================================================================
-// Independent arithmetic evaluator for AC-12 (does NOT import the production evaluator)
-// =============================================================================================
+interface DivPair {
+  readonly dividend: string;
+  readonly divisor: string;
+}
 
-/**
- * Grade-school arithmetic over `+ - * / %` and parentheses. Real division, same as the
- * curriculum evaluator — used only so spot-check expectations are not read back through
- * `evaluateNumber`.
- */
-function independentArithmetic(source: string, env: Readonly<Record<string, number>>): number {
-  let i = 0;
-  const s = source.trim();
-
-  const peek = (): string => s[i] ?? '';
-  const bump = (): string => s[i++] ?? '';
-
-  const skipSpaces = (): void => {
-    while (peek() === ' ') i += 1;
-  };
-
-  const parsePrimary = (): number => {
-    skipSpaces();
-    if (peek() === '(') {
-      bump();
-      const value = parseSum();
-      skipSpaces();
-      if (bump() !== ')') {
-        throw new Error(`independentArithmetic: expected ')' in "${source}"`);
-      }
-      return value;
-    }
-    if (/[A-Za-z_]/.test(peek())) {
-      let name = '';
-      while (/[A-Za-z0-9_]/.test(peek())) name += bump();
-      const value = env[name];
-      if (value === undefined) {
-        throw new Error(`independentArithmetic: unknown identifier "${name}"`);
-      }
-      return value;
-    }
-    if (/[0-9]/.test(peek()) || (peek() === '.' && /[0-9]/.test(s[i + 1] ?? ''))) {
-      let lit = '';
-      while (/[0-9.]/.test(peek())) lit += bump();
-      const value = Number(lit);
-      if (!Number.isFinite(value)) {
-        throw new Error(`independentArithmetic: bad number "${lit}"`);
-      }
-      return value;
-    }
-    throw new Error(`independentArithmetic: unexpected "${peek()}" in "${source}"`);
-  };
-
-  const parseUnary = (): number => {
-    skipSpaces();
-    if (peek() === '-') {
-      bump();
-      return -parseUnary();
-    }
-    return parsePrimary();
-  };
-
-  const parseProduct = (): number => {
-    let value = parseUnary();
-    for (;;) {
-      skipSpaces();
-      const op = peek();
-      if (op !== '*' && op !== '/' && op !== '%') break;
-      bump();
-      const rhs = parseUnary();
-      if (op === '*') value *= rhs;
-      else if (op === '/') {
-        if (rhs === 0) throw new Error('independentArithmetic: division by zero');
-        value /= rhs;
-      } else {
-        if (rhs === 0) throw new Error('independentArithmetic: remainder by zero');
-        value %= rhs;
-      }
-    }
-    return value;
-  };
-
-  const parseSum = (): number => {
-    let value = parseProduct();
-    for (;;) {
-      skipSpaces();
-      const op = peek();
-      if (op !== '+' && op !== '-') break;
-      bump();
-      const rhs = parseProduct();
-      value = op === '+' ? value + rhs : value - rhs;
-    }
-    return value;
-  };
-
-  const result = parseSum();
-  skipSpaces();
-  if (i !== s.length) {
-    throw new Error(`independentArithmetic: trailing input in "${source}"`);
+/** `dividend / divisor` identifier pairs in an answerExpr. */
+function divisionPairsInAnswerExpr(answerExpr: string): readonly DivPair[] {
+  const pairs: DivPair[] = [];
+  const re = new RegExp(`\\b(${IDENT})\\s*/\\s*(${IDENT})\\b`, 'g');
+  for (const match of answerExpr.matchAll(re)) {
+    pairs.push({ dividend: match[1]!, divisor: match[2]! });
   }
-  return result;
+  return pairs;
+}
+
+/** `{a} ÷ {b}` pairs in template text (both operands present as params). */
+function divisionPairsInText(text: string): readonly DivPair[] {
+  const pairs: DivPair[] = [];
+  const re = /\{([A-Za-z_][A-Za-z0-9_]*)\}\s*÷\s*\{([A-Za-z_][A-Za-z0-9_]*)\}/g;
+  for (const match of text.matchAll(re)) {
+    pairs.push({ dividend: match[1]!, divisor: match[2]! });
+  }
+  return pairs;
+}
+
+function hasExactDivisibilityConstraint(
+  constraints: readonly string[],
+  dividend: string,
+  divisor: string,
+): boolean {
+  const re = new RegExp(`\\b${dividend}\\s*%\\s*${divisor}\\s*==\\s*0\\b`);
+  return constraints.some((constraint) => re.test(constraint));
+}
+
+function hasNonZeroDivisorConstraint(constraints: readonly string[], divisor: string): boolean {
+  const ne = new RegExp(`\\b${divisor}\\s*!=\\s*0\\b`);
+  const gt = new RegExp(`\\b${divisor}\\s*>\\s*0\\b`);
+  return constraints.some((constraint) => ne.test(constraint) || gt.test(constraint));
+}
+
+/** Structural exact-division authoring rule for every `/` or `{a}÷{b}` pair. */
+function assertDeclaredDivConstraints(template: Template): void {
+  const constraints = template.constraints ?? [];
+  const seen = new Map<string, DivPair>();
+  for (const pair of [
+    ...divisionPairsInAnswerExpr(template.answerExpr),
+    ...divisionPairsInText(template.text),
+  ]) {
+    seen.set(`${pair.dividend}/${pair.divisor}`, pair);
+  }
+
+  if (template.answerExpr.includes('/')) {
+    const answerPairs = divisionPairsInAnswerExpr(template.answerExpr);
+    expect(
+      answerPairs.length,
+      `${template.id}: answerExpr uses / but has no ident/ident division pair to constrain`,
+    ).toBeGreaterThan(0);
+  }
+
+  for (const pair of seen.values()) {
+    expect(
+      hasExactDivisibilityConstraint(constraints, pair.dividend, pair.divisor),
+      `${template.id}: must declare "${pair.dividend} % ${pair.divisor} == 0" (exact division)`,
+    ).toBe(true);
+    expect(
+      hasNonZeroDivisorConstraint(constraints, pair.divisor),
+      `${template.id}: must declare "${pair.divisor} != 0" or "${pair.divisor} > 0"`,
+    ).toBe(true);
+  }
 }
 
 function repoText(relative: string): string {
@@ -258,13 +500,64 @@ function repoText(relative: string): string {
 }
 
 // =============================================================================================
-// AC-1 — schema parse + ≥8 per skill
+// Authoring-contract preflight (does not need JSON files)
+// =============================================================================================
+
+describe('authoring contract preflight — REQUIRED_TEMPLATES ↔ SPOT_CHECKS ↔ generator', () => {
+  it('every SPOT_CHECK literal matches generateQuestion on the required template at that seed', () => {
+    for (const check of SPOT_CHECKS) {
+      const template = REQUIRED_TEMPLATES.find((row) => row.id === check.id);
+      expect(template, check.id).toBeDefined();
+      if (template === undefined) continue;
+      const [question] = generateOne(template, check.seed);
+      expect(question.text, check.id).toBe(check.text);
+      expect(question.choices[question.correctIndex]?.value, check.id).toBe(check.answer);
+    }
+  });
+
+  it('required div_facts templates declare structural exact-divisibility constraints', () => {
+    for (const template of REQUIRED_TEMPLATES.filter((row) => row.skill === 'div_facts')) {
+      assertDeclaredDivConstraints(template);
+    }
+  });
+
+  it('required templates survive seeds 1…200 without CONSTRAINTS_UNSATISFIED', () => {
+    const failures: string[] = [];
+    for (const template of REQUIRED_TEMPLATES) {
+      for (let seed = 1; seed <= HEADROOM_SEEDS; seed += 1) {
+        try {
+          generateOne(template, seed);
+        } catch (error) {
+          const detail =
+            error instanceof QuestionGenerationError
+              ? `${error.code}: ${error.message}`
+              : error instanceof Error
+                ? error.message
+                : String(error);
+          failures.push(`${template.id}@${seed}: ${detail}`);
+          break;
+        }
+      }
+    }
+    expect(failures, failures.join('\n')).toEqual([]);
+  });
+});
+
+// =============================================================================================
+// AC-1 — schema parse + ≥8 per skill + authoring contract
 // =============================================================================================
 
 describe('AC-1 — each skill file parses and holds at least 8 templates', () => {
   it.each(SKILLS)('spec(T-016:AC-1) %s.json parses via z.array(templateSchema) with length >= 8', (skill) => {
     const templates = loadSkill(skill);
     expect(templates.length, `${skill} needs ≥8 templates`).toBeGreaterThanOrEqual(8);
+  });
+
+  it('spec(T-016:AC-1) loaded content includes every REQUIRED_TEMPLATES row verbatim', () => {
+    const byId = new Map(loadAllTemplates().map((template) => [template.id, template]));
+    for (const required of REQUIRED_TEMPLATES) {
+      expect(byId.get(required.id), `missing required template id '${required.id}'`).toEqual(required);
+    }
   });
 });
 
@@ -300,8 +593,8 @@ describe('AC-3 — every {token} is a declared param; every param is live', () =
     const problems: string[] = [];
 
     for (const { template } of allTemplates(loadAll())) {
-      const inText = referencedNames(template);
-      for (const name of inText) {
+      for (const match of template.text.matchAll(PARAM_TOKEN)) {
+        const name = match[1]!;
         if (!(name in template.params)) {
           problems.push(`${template.id}: text token {${name}} is not in params`);
         }
@@ -376,10 +669,16 @@ describe('AC-4 — 1,000-seed generateQuestion sweep per template', () => {
 });
 
 // =============================================================================================
-// AC-5 — div_facts exact division / no DIVISION_BY_ZERO
+// AC-5 — div_facts exact division / no DIVISION_BY_ZERO + structural constraints
 // =============================================================================================
 
 describe('AC-5 — div_facts never divides by zero and always yields an integer', () => {
+  it('spec(T-016:AC-5) every div_facts template declares exact-divisibility and non-zero-divisor constraints', () => {
+    for (const template of loadSkill('div_facts')) {
+      assertDeclaredDivConstraints(template);
+    }
+  });
+
   it('spec(T-016:AC-5) 1,000 samples per div_facts template: no DIVISION_BY_ZERO, integer answers', () => {
     const failures: string[] = [];
 
@@ -481,8 +780,7 @@ describe('AC-8 — multi_digit_order_ops precedence pair with distinct answers',
     expect(noParen, 'need a template with + then × and no parentheses').toBeDefined();
     expect(withParen, 'need a template that parenthesises the addition before ×').toBeDefined();
 
-    const seed = SPOT_SEED;
-    const [noParenQuestion] = generateOne(noParen!, seed);
+    const [noParenQuestion] = generateOne(noParen!, 1);
     const { a, b, c } = noParenQuestion.params;
     expect(a, 'no-paren template must sample a').toBeTypeOf('number');
     expect(b, 'no-paren template must sample b').toBeTypeOf('number');
@@ -579,37 +877,38 @@ describe('AC-11 — declared distractors rarely fall through to the ladder', () 
 });
 
 // =============================================================================================
-// AC-12 — hand-computed spot checks (independent of evaluateNumber)
+// AC-12 — hand-computed spot checks (literals, not derived from answerExpr)
 // =============================================================================================
 
-describe('AC-12 — literal spot checks pinned without the production evaluator', () => {
-  it('spec(T-016:AC-12) each template at a fixed seed matches hand-rendered text and independentArithmetic answer', () => {
-    const failures: string[] = [];
+describe('AC-12 — hand-computed spot checks pin arithmetic independently of the evaluator', () => {
+  it('spec(T-016:AC-12) every required template has a literal spot check, and every loaded id is covered', () => {
+    const loadedIds = loadAllTemplates()
+      .map((template) => template.id)
+      .sort();
+    const checkIds = SPOT_CHECKS.map((check) => check.id).sort();
+    const requiredIds = REQUIRED_TEMPLATES.map((template) => template.id).sort();
 
-    for (const { template } of allTemplates(loadAll())) {
-      const [question] = generateOne(template, SPOT_SEED);
-      let expectedText = template.text;
-      for (const [name, value] of Object.entries(question.params)) {
-        expectedText = expectedText.split(`{${name}}`).join(String(value));
-      }
-
-      const expectedAnswer = independentArithmetic(template.answerExpr, question.params);
-      const actualAnswer = question.choices[question.correctIndex]!.value;
-
-      // Literals materialised in the test body — not read back through evaluateNumber.
-      expect(question.text).toBe(expectedText);
-      expect(actualAnswer).toBe(expectedAnswer);
-
-      if (question.text !== expectedText) {
-        failures.push(`${template.id}: text want "${expectedText}" got "${question.text}"`);
-      }
-      if (actualAnswer !== expectedAnswer) {
-        failures.push(`${template.id}: answer want ${expectedAnswer} got ${actualAnswer}`);
-      }
+    expect(checkIds).toEqual(requiredIds);
+    for (const id of requiredIds) {
+      expect(loadedIds, `missing required id ${id}`).toContain(id);
     }
-
-    expect(failures).toEqual([]);
+    for (const id of loadedIds) {
+      expect(checkIds, `loaded template ${id} needs a SPOT_CHECK row`).toContain(id);
+    }
   });
+
+  it.each([...SPOT_CHECKS])(
+    'spec(T-016:AC-12) $id at seed $seed renders "$text" with answer $answer',
+    ({ id, seed, text, answer }) => {
+      const template = loadAllTemplates().find((row) => row.id === id);
+      expect(template, `spot-check target '${id}' missing from content`).toBeDefined();
+      if (template === undefined) return;
+
+      const [question] = generateOne(template, seed);
+      expect(question.text).toBe(text);
+      expect(question.choices[question.correctIndex]?.value).toBe(answer);
+    },
+  );
 });
 
 // =============================================================================================
@@ -733,10 +1032,14 @@ describe('T-016 Definition of Done', () => {
   });
 
   it('dod(T-016:5) every fractions_int answer is a whole number and no decimal point appears', () => {
-    for (const template of loadSkill('fractions_int')) {
-      const [question] = generateOne(template, SPOT_SEED);
+    for (const check of SPOT_CHECKS.filter((row) => row.id.startsWith('fractions_int_'))) {
+      const template = loadSkill('fractions_int').find((row) => row.id === check.id);
+      expect(template, check.id).toBeDefined();
+      if (template === undefined) continue;
+      const [question] = generateOne(template, check.seed);
       const answer = question.choices[question.correctIndex]!.value;
       expect(Number.isInteger(answer), `${template.id} answer`).toBe(true);
+      expect(answer).toBe(check.answer);
       expect(question.text.includes('.'), `${template.id} text`).toBe(false);
       for (const choice of question.choices) {
         expect(choice.label.includes('.'), `${template.id} label`).toBe(false);
@@ -746,20 +1049,12 @@ describe('T-016 Definition of Done', () => {
 
   it('dod(T-016:6) every div_facts template constrains exact divisibility and a non-zero divisor', () => {
     for (const template of loadSkill('div_facts')) {
-      const constraints = template.constraints ?? [];
-      expect(constraints.length, `${template.id} needs constraints`).toBeGreaterThan(0);
+      assertDeclaredDivConstraints(template);
 
       for (let seed = 1; seed <= 50; seed += 1) {
         const [question] = generateOne(template, seed);
         const answer = question.choices[question.correctIndex]!.value;
         expect(Number.isInteger(answer), `${template.id}@${seed}`).toBe(true);
-
-        // Any param that appears as a divisor site in answerExpr must be non-zero on this draw.
-        for (const [name, value] of Object.entries(question.params)) {
-          if (new RegExp(`/\\s*${name}\\b`).test(template.answerExpr)) {
-            expect(value, `${template.id} divisor ${name}`).not.toBe(0);
-          }
-        }
       }
     }
   });
