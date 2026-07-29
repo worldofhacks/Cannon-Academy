@@ -1896,3 +1896,7 @@ Awaiting code review before merge.
 Code APPROVE_WITH_NITS ([T-017 Code Review](a5eee8d1-26b4-4eaf-8e84-7720bde32663));
 security PASS_WITH_NOTES ([T-017 Security Review](36aa48d2-6c7d-453e-80f9-11f79d5b8a1f)).
 Session API published in COORDINATION.md. Merged + pushed.
+
+### T-018 started — onboarding rival
+
+Worktree `.worktrees/wt-T-018` from post-T-017 tip. Phase `tests`.
