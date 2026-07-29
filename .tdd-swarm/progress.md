@@ -1753,3 +1753,11 @@ clean RED); baseline 1438 green. Test-design review dispatched (Composer).
 | T-014 | `f509c7c` (47 fail / 7 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438 | test-design review dispatched |
 | T-015 | `ef6353f` (22 fail / 3 pass, clean missing-JSON RED) | spec-lint PASS, baseline 1438 | test-design review dispatched |
 | T-016 | `953bc7d` | review **REJECT** (AC-12 independence, dead-param ``, div structural constraints) | Test Agent fix re-dispatched |
+
+
+### T-014 FROZEN () — ACCEPT_WITH_NITS
+
+[T-014 test-design review](1a72715b-da51-4076-a7aa-d3d4f1deac2c): no Critical. Important nits recorded
+(exact-24 deep-freeze beyond ≥8 wording; AC-8 preflight uses generator; no AC-7 preflight on
+REQUIRED_TEMPLATES) — accepted for content-as-data ticket (T-006 precedent). Phase → .
+Implementer dispatched.
