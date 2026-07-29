@@ -1231,6 +1231,106 @@ this narrows the schema by accident.
 4. **Sequencing: review first, amend once.** Both reviews are now in, so the amendment round can
    proceed with full information.
 
+## T-007 round 2 — accepted, pending re-review
+
+The Test Agent killed all three review mutants and, by auditing the suite's _shape_ rather than
+working from the review's list, found two more. Suite is 72 tests (was 57) over 19 criteria, 53 of
+53 mutants killed. Everything below I re-ran myself rather than taking from the report.
+
+| Claim                                          | Verified                                                                      |
+| ---------------------------------------------- | ----------------------------------------------------------------------------- |
+| Frozen file SHA-256 `09b3da13…`                | matches                                                                       |
+| Diff vs **merge base** `a7249fef` (L-033)      | exactly 2 files: the suite + its report, **0 under `src/`**                   |
+| RED is a module-resolution failure only        | `tsc --noEmit` exit 2, one diagnostic, `TS2307`                               |
+| Wave 1–3 baseline intact                       | `Tests 1229 passed`, suite fails at the import                                |
+| Prettier / ESLint                              | exit 0 / exit 0                                                               |
+| `spec-lint`                                    | **PASS** after the two rulings below — 19/19 AC, DoD 1–6 tagged, DoD-7 `SKIP` |
+| DoD-7 itself ("files changed ⊆ `file_scopes`") | verified by me from the diff above, which is what `[process]` promises        |
+
+**The two mutants the review missed** are worth naming because neither was a gap in the review's
+diligence — they were only visible from the suite's structure. One was a third instance of the
+`catch` shape the review found twice (AC-16 checked an error's `code` but never its type). The other
+**the amendment itself created**, which is the more interesting failure: AC-17 said keys are consumed
+in "lexicographically ascending" order without naming a collation, and AC-19 — added last round —
+made mixed-case keys legal, which is exactly where code-point order and `localeCompare` diverge. A
+`localeCompare` implementation passed all 71 tests. This is [[L-020]] precisely: the two orderings
+agree on every lowercase single letter, which is every key in the real catalog **and both keys in
+AC-17's own fixture**, so the criterion could not see its own ambiguity. Tightening a spec can open
+a hole elsewhere in it, and only a suite audited as a whole catches that.
+
+### Rulings
+
+- **A-8, collation → code point.** AC-17 now names ascending code-point order (`sort()` with no
+  comparator) and forbids `localeCompare`. Code point is `sort()`'s default and needs no locale data,
+  so it cannot drift with a platform's ICU version — the property T-024's replay proof rests on. The
+  agent had pinned this reading already, so no test changes; the criterion now states what the suite
+  measures. (I checked whether `localeCompare` actually varies by locale for identifier-shaped keys
+  and it did not across four locales — the hazard is the ambiguity, not observed platform drift.)
+- **A-9, process items → the gate skips them.** A DoD item marked `[process]` reports `SKIP` and is
+  verified by the orchestrator's diff instead of by a test. The agent was right to leave DoD-7 red
+  rather than tag it with a narrower check; see [[L-036]]. The marker is **required, not inferred**,
+  so a forgotten marker still fails. Numbering spans skipped items, so no `dod(id:n)` tag shifted —
+  confirmed by re-running the gate on T-013 and a grandfathered ticket.
+
+Open, carried to review: `composeExpected` is the suite's strongest oracle and is the agent's own
+code; a lookup-table implementation would still pass the 114-seed error sweeps; AC-5 bounds when
+`NO_TEMPLATE` must fire but never when it must not.
+
+## T-013 round 2 — accepted, one criterion added, needs a short round 3
+
+Both contract holes closed. The agent did the thing that makes a kill trustworthy: it **built each
+mutant first and confirmed it was live** — mutable `DuelCore.seed` and a variant-only `debug?: string`
+each produced 0 tsc errors and 100/100 passing against the old suite — then killed them, at 10 and 1
+tsc errors. Suite is 122 tests (was 100), 45 of 45 mutants killed, 5 of 5 negative controls surviving.
+Re-verified by me, not taken from the report:
+
+| Claim                                                  | Verified                                            |
+| ------------------------------------------------------ | --------------------------------------------------- |
+| Frozen file SHA-256 `154ebee1…`                        | matches                                             |
+| Diff vs merge base `a7249fef`                          | exactly 2 files: suite + report, **0 under `src/`** |
+| RED is 88 errors: 3 `TS2307`, 51 `TS2322`, 34 `TS2578` | matches exactly, **0 outside the suite**            |
+| Wave 1–3 baseline                                      | `Tests 1229 passed`                                 |
+| Prettier / ESLint / `spec-lint` (pre-amendment)        | 0 / 0 / PASS at 15 AC + 9 DoD                       |
+| DoD-9 ("files changed ⊆ `file_scopes`")                | verified by me from the diff above                  |
+
+Two pieces of self-correction are worth more than the mutant counts. The agent **retracted its own
+round-1 claim** that positive `Exact<>` probes go vacuous in RED: measured, `Exact<any, X>` is
+`false`, those 51 `TS2322`s are probes _firing_, and **the implementer's target is 88 → 0**, not
+merely clearing the 3 import errors. And it reported one mutant it **could not** kill as genuinely
+equivalent rather than claiming it — `isTerminalPhase` via `startsWith('v') || startsWith('d')` is
+identical over the closed eight-phase domain, and becomes a bug only if a phase like `draw` is added,
+at which point AC-1 fails first. Both are [[L-027]] honoured rather than cited.
+
+It also avoided a trap that would have manufactured a false defect: `Exact<Readonly<T>, T>` is a
+false negative on every variant, because the variants are intersections and `Readonly<A & B>` is a
+flattened mapped type while `A & B` is not. Written that way, AC-14 would have been unsatisfiable.
+
+### Rulings on the three escalations
+
+- **Config-array aliasing → new AC-16.** Accepted as the one finding that earns a criterion.
+  `state.playerLoadout` was the caller's array, and callers hold a mutable `CannonId[]`; a push
+  anywhere in the app rewrites a duel in flight and makes it unreproducible from its own seed. The
+  aliasing is on the **caller's** side, so `readonly` cannot reach it and no engine test was looking.
+  This is [[L-012]] at the value level: a modifier says the field cannot be reassigned, never that
+  the object it points at belongs to the duel. Count verified 15 → **16**, gate correctly RED on
+  AC-16 ([[L-026]]).
+- **Memoised construction → a clause on AC-3, not a criterion.** Every field is readonly, so a
+  shared cached state is confusion rather than corruption. AC-3 now also demands the two calls not
+  return the same reference.
+- **Runtime freezing → declined, and recorded as a locked decision** so it is not re-raised.
+  `Object.freeze` would sit on T-020's per-event hot path; T-024's invariant checker is the right
+  home. AC-16 is the deliberate exception, and for the one reason freezing could not have helped
+  anyway — it guards a reference the caller owns.
+- **DoD-9 marked `[process]`, for consistency with T-007.** The two agents made opposite calls on the
+  same item: T-007's declined to tag it, T-013's tagged it with a directory check. The directory
+  assertion is useful and stays in the suite, but it constrains `src/engine/duel/`'s contents rather
+  than the branch diff, so the gate no longer credits it. DoD-2 and DoD-3 stay enforced — both assert
+  something real and neither name overclaims, and DoD-3's tag-numbering check is the test that would
+  have caught round 1's own bug.
+
+**Round 3 is two tests wide:** cover AC-16, add the reference clause to AC-3. Everything else is
+frozen-ready.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
