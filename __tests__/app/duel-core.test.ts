@@ -63,12 +63,7 @@ import { GRADE_BANDS } from '@content/schemas';
 import { resolveShot } from '@engine/duel/damage';
 import { computeCoinPayout } from '@engine/economy';
 import { createRng, nextFloat } from '@engine/rng';
-import {
-  CHOICE_COUNT,
-  ENEMY_HULL_BY_ISLAND,
-  PERFECT_SHOT_TIMER_FRACTION,
-  PLAYER_HULL,
-} from '@engine/tuning';
+import { CHOICE_COUNT, ENEMY_HULL_BY_ISLAND, PERFECT_SHOT_TIMER_FRACTION, PLAYER_HULL } from '@engine/tuning';
 
 import { trayCannons } from '../../src/services/loadout';
 import { nextQuestion, type DuelQuestion } from '../../src/services/questions';
@@ -155,10 +150,7 @@ const RECOIL_GUN = requireCannon(
 
 /** Template ids per skill, so "drawn for that cannon's skill" is checkable against the pools. */
 const TEMPLATE_IDS_BY_SKILL: ReadonlyMap<SkillId, ReadonlySet<string>> = new Map(
-  Object.entries(TEMPLATE_POOLS).map(([skill, pool]) => [
-    skill as SkillId,
-    new Set(pool.map((t) => t.id)),
-  ]),
+  Object.entries(TEMPLATE_POOLS).map(([skill, pool]) => [skill as SkillId, new Set(pool.map((t) => t.id))]),
 );
 
 /** Fixed seeds. Everything in this file is a function of these and of `elapsedMs`. */
@@ -839,9 +831,7 @@ describe('A-016 the duel itself', () => {
       // the unguarded `PICK_CANNON`/`OPEN_CHEST`/`RESET` would otherwise escape every phase and
       // make this criterion unfailable.
       const escapes = screenActions(sample).filter((a) => duelReducer(sample, a).phase !== phase);
-      expect(escapes.length, `phase '${phase}' has no beat and no input that leaves it`).toBeGreaterThan(
-        0,
-      );
+      expect(escapes.length, `phase '${phase}' has no beat and no input that leaves it`).toBeGreaterThan(0);
       inputDriven.push(phase);
     }
 
@@ -1081,18 +1071,32 @@ describe('A-016 the duel itself', () => {
     expect(finals.some((s) => s.asked > s.right)).toBe(true);
   });
 
-  it('spec(A-016:AC-8) a burned fuse counts as asked in both places and correct in neither', () => {
-    // The narrowest way the two totals can diverge: a path that touches one counter and not the
-    // other. `TIMEOUT` is that path — it is asked, and it is not wrong.
+  it('spec(A-016:AC-8) a burned fuse charges neither counter, and the two still agree', () => {
+    // ADJUDICATED TEST DISPUTE, 2026-07-29. This test was authored asserting that `TIMEOUT`
+    // charges `asked` in both the scoreboard and the per-skill tally — which is what the reducer
+    // did at the time, and it was the narrowest probe available for AC-8's real claim.
+    //
+    // The owner then ruled D-8 (`tickets/app/OWNER-RULINGS.md`): a timeout counts against
+    // NOTHING. A-017 pins that directly. The two suites collided here, and the orchestrator
+    // adjudicated in favour of the ruling — an owner decision that postdates a test supersedes
+    // it; it does not make the test wrong to have written.
+    //
+    // AC-8's actual criterion is untouched by the ruling and is what this still asserts: the
+    // per-skill tally and the scoreboard can never tell a child two different stories. Under
+    // D-8 they agree by both staying put, rather than by both advancing. The probe is kept
+    // rather than deleted because `TIMEOUT` is still the narrowest path that COULD touch one
+    // counter and not the other — an implementation that skipped the tally but kept the
+    // scoreboard increment (or the reverse) would fail here, which is exactly the half-migration
+    // the ruling could have produced.
     for (const cannon of [RELIABLE_STARTER, VOLATILE_STARTER, RECOIL_GUN]) {
       const armed = askedWith(WALK_SEEDS[1] ?? 1, cannon);
       const burned = duelReducer(armed, { type: 'TIMEOUT' });
       const entry = burned.skillTally[cannon.skill];
 
-      expect(burned.asked).toBe(armed.asked + 1);
+      expect(burned.asked).toBe(armed.asked);
       expect(burned.right).toBe(armed.right);
-      expect(entry?.asked).toBe((armed.skillTally[cannon.skill]?.asked ?? 0) + 1);
-      expect(entry?.correct).toBe(armed.skillTally[cannon.skill]?.correct ?? 0);
+      expect(entry?.asked).toBe(armed.skillTally[cannon.skill]?.asked);
+      expect(entry?.correct).toBe(armed.skillTally[cannon.skill]?.correct);
 
       const entries = Object.values(burned.skillTally).filter((t) => t !== undefined);
       expect(entries.reduce((n, t) => n + t.asked, 0)).toBe(burned.asked);

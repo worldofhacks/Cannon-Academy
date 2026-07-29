@@ -245,17 +245,19 @@ export function duelReducer(s: DuelState, action: DuelAction): DuelState {
 
     case 'TIMEOUT': {
       if (s.phase !== 'question' || s.cannon === null) return s;
-      // A burned fuse costs nothing but the turn. It counts as asked so accuracy stays honest,
-      // and it is not a wrong answer, so no recoil — the gun never fired. It counts as asked in
-      // the per-skill tally for the same reason: the two must always sum to the same total, or
-      // the mastery meter and the scoreboard tell a child two different stories.
-      return {
-        ...s,
-        phase: 'timeout',
-        picked: null,
-        asked: s.asked + 1,
-        skillTally: tallyAnswer(s.skillTally, s.cannon.skill, false),
-      };
+      // A burned fuse costs the turn and NOTHING else — owner ruling D-8.
+      //
+      // This used to count as `asked` in both the scoreboard and the per-skill tally, on the
+      // argument that accuracy should stay honest and the two totals must always agree. The
+      // second half of that is still true and still holds: a timeout now counts in NEITHER, so
+      // they still sum to the same total. What changed is the first half. Kindergartners time
+      // out because they are five, not because they are wrong, and a 20-second fuse against a
+      // slow reader was a systematic accuracy penalty on reading speed — in a game whose stated
+      // pedagogy is that fluency shapes the QUALITY of an action and never PERMISSION to act.
+      // Charging it could fill a child's meter and still refuse them the cannon.
+      //
+      // The panel already told them "Nothing lost." This makes that true.
+      return { ...s, phase: 'timeout', picked: null };
     }
 
     case 'ADVANCE': {
