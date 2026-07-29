@@ -1470,6 +1470,14 @@ report only, sole `TS2307`, baseline 1229, `spec-lint` 21/21 with DoD-7 SKIP. Su
 `cause === undefined` on every AC-11 seed and matches frozen-evaluator `code`/`message` on AC-20/21.
 Agent reported m3 81/81 → 4 fails (AC-11 ×3 + AC-21 ×1); assertion shapes confirm that kill path.
 
+## T-013 round 4 — accepted, pending re-review
+
+Deep-copy / independent-graph tightenings landed. Re-verified: hash `737335df…`, 128 tests,
+merge-base diff = suite + report only, RED still 88 (3/51/34), baseline 1229, `spec-lint` 16/16
+with DoD-9 SKIP. New tests cover AC-3 graph independence (`playerLoadout.push` + nested
+`templatesBySkill[…][0].text`) and AC-16 deep-copy of `Template` plus nested `params` /
+`distractors` / `constraints` with `not.toBe` on those references.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
