@@ -43,7 +43,7 @@ import type { Cannon } from '@content/schemas';
 //      damage roll. `BASE_BALLS_PER_VOLLEY` is a PRESENTATION constant the damage computation
 //      must ignore — damage does not subdivide across balls. Asserted structurally below by
 //      re-importing the module against a mutated `BASE_BALLS_PER_VOLLEY` and requiring every
-//      damage field to be unchanged. (ARCHITECTURE.md §4.3 still reads "+1 bonus ball"; that
+//      damage field to be unchanged. (ARCHITECTURE.md §4.3 corrected by T-031 to "+1 damage"; that
 //      wording is wrong and is being corrected by T-031.)
 //   2. THE FLOOR CONSTRAINS THE ROLL OUTCOME, NOT JUST THE QUALITY INPUT. AC-15 is the frozen
 //      proof of ARCHITECTURE.md:206. An earlier draft blended quality with the uniform draw and
