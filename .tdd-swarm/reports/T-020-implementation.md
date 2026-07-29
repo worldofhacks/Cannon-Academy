@@ -1,11 +1,12 @@
 # T-020 — Implementation Report
 
-**Status:** BLOCKED(TEST_DISPUTE)
+**Status:** BLOCKED(TEST_DISPUTE) — cross-ticket `dod(T-013:9)` after prior AC-24/tsc disputes closed
 **Branch:** `ticket/T-020-duel-reducer`
 **Phase:** `implement`
 **Active ticket:** `T-020`
-**Files changed:** `src/engine/duel/reducer.ts` (added) — exactly `file_scopes`, plus this report.
-**Suite untouched:** `__tests__/engine/duel/reducer.test.ts` SHA-256 `bcfd707f197df84c3853932b0ebd55dde29b1102ac60a95e7652aa4d46d1f9e9` (preserved).
+**Feat commit (kept):** `6ef7aaf` — `feat(T-020): duel reducer pure state machine`
+**Suite fix commit (orchestrator):** `bd8bc4d` — AC-24 needle split + `snapshotArrays` type
+**Production file:** `src/engine/duel/reducer.ts` only (`file_scopes`)
 
 ## Unit assertion
 
@@ -14,93 +15,65 @@
 | Branch | `ticket/T-020-duel-reducer` |
 | Phase | `implement` |
 | Active ticket | `T-020` |
-| Frozen suite SHA-256 | `bcfd707f…d1f9e9` (prefix `bcfd707f` ✓) |
-| Production file | `src/engine/duel/reducer.ts` only |
+| Frozen suite SHA-256 (post-dispute fix) | `80c4cdb1367a39155689ec037a8cca9430849971cedb40db4b6175cc169236ca` |
+| Feat SHA | `6ef7aaf` preserved |
 
 ## What was built
 
-`duelReducer(state, event): DuelState` — pure synchronous transition table:
+`duelReducer(state, event): DuelState` — pure transition table per ticket + adjudications
+(`bySkill`, rival volatile recoil → `enemyHull`, enemy-first terminals, `===` no-ops,
+`resolveShot` only, most-recent-first `recentTemplateIds`).
 
-| from | event | to | notes |
-| ---- | ----- | -- | ----- |
-| `countdown` | `ANIMATION_DONE` | `playerChoose` | `turnToken++` |
-| `playerChoose` | `CANNON_SELECTED` | `reload` | loadout check; `generateQuestion`; most-recent-first `recentTemplateIds` |
-| `reload` | `ANSWER_CHOSEN` / `TIMER_EXPIRED` | `resolvePlayer` | `resolveShot`; hull clamp at apply; player tally + **`bySkill`** |
-| `resolvePlayer` | `ANIMATION_DONE` | `victory` \| `defeat` \| `rivalTurn` | enemy-first terminal order |
-| `rivalTurn` | `RIVAL_ACTION` | `resolveRival` | rival → player via `damageToEnemy`; volatile recoil → `enemyHull` |
-| `resolveRival` | `ANIMATION_DONE` | `victory` \| `defeat` \| `playerChoose` | `volleyNumber++`, `turnToken++` on continue |
-| terminals | _any_ | no-op | same object reference |
-
-Adjudications honoured: `DuelTally.bySkill` updates on every player answer; rival `damageToSelf` decrements `enemyHull`; terminal order enemy-first.
-
-## Gate results
+## Gate results (after dispute closure)
 
 | Gate | Exit | Result |
 | ---- | ---- | ------ |
-| `prettier --check src/engine/duel/reducer.ts` | 0 | clean |
-| `eslint src/engine/duel/reducer.ts` | 0 | clean |
-| `tsc --noEmit` | **2** | **FAIL** — frozen suite type error (below) |
-| `vitest run __tests__/engine/duel/reducer.test.ts` | 1 | **32 / 33** (AC-24 only) |
-| `vitest run` (full) | not claimed | blocked by suite defects |
+| `prettier --check .` | 0 | clean (extra blank line in `tickets/T-020.md` removed) |
+| `eslint . --max-warnings 0` | 0 | clean |
+| `tsc --noEmit` | 0 | clean |
+| `vitest run __tests__/engine/duel/reducer.test.ts` | 0 | **33 / 33** |
 | `.tdd-swarm/spec-lint.sh tickets/T-020.md` | 0 | SPEC-LINT PASS |
-| `.tdd-swarm/run-local-gates.sh` | blocked | depends on tsc + vitest |
+| `vitest run` (full) | **1** | **1706 / 1707** — sole failure is `dod(T-013:9)` |
+| `.tdd-swarm/run-local-gates.sh` | blocked | unit gate red on T-013 |
 
-Behavioural ACs **AC-1…AC-23** all green under the frozen suite. Only the structural self-check **AC-24** fails, and `tsc` fails on a suite type annotation — neither is reachable from production `reducer.ts`.
+T-020 behavioural + structural ACs are all green. Full-repo gates cannot pass while T-013’s directory-scope DoD forbids `reducer.ts`.
 
 ---
 
-## BLOCKED(TEST_DISPUTE) — evidence
+## BLOCKED(TEST_DISPUTE) — `dod(T-013:9)` vs T-020 deliverable
 
-### Dispute 1 — AC-24 self-referential assertion (blocks vitest)
-
-**File:** `__tests__/engine/duel/reducer.test.ts:1112`
+**File:** `__tests__/engine/duel/types.test.ts:2393–2399`
 
 ```ts
-expect(OWN_SOURCE.includes('DUEL_PHASES.map')).toBe(false);
+const permitted = ['damage.ts', 'types.ts'];
+// …
+expect(unexpected, 'T-013 declares only src/engine/duel/types.ts in its file_scopes').toEqual([]);
 ```
 
-`OWN_SOURCE` is the test file itself (`readFileSync(import.meta.url)`). The **only** occurrence of the substring `DUEL_PHASES.map` in that file is this assertion’s string literal. Therefore `includes(...)` is always `true` and the expectation always fails — independent of any production code.
-
-**Proof:**
-
-- Grep of the suite finds a single hit: line 1112 (the assertion).
-- Failure message: `expected true to be false` at line 1112.
-- Same suite already avoids this class of bug elsewhere via string-splitting (`FOCUSED_TEST_PATTERN`, `DEFERRED_WORK_MARKERS`).
-
-**Suggested fix (test designer / do not apply in implement phase):** split the needle, e.g.
+**Failure:** `unexpected === ['reducer.ts']` — exactly the file T-020 DoD / `dod(T-020:8)` requires:
 
 ```ts
-expect(OWN_SOURCE.includes(['DUEL_PHASES', '.map'].join(''))).toBe(false);
+expect(present).toEqual(['damage.ts', 'reducer.ts', 'types.ts']);
 ```
 
-or assert absence of a derivation pattern that does not appear in the assertion text.
+**Why this is a suite defect, not an implementer miss:**
 
-### Dispute 2 — suite fails `tsc --noEmit` (blocks local gates)
+- T-013 already grandfathered T-008’s `damage.ts` in the same list.
+- T-020’s `file_scopes` is `src/engine/duel/reducer.ts`; omitting it fails T-020; adding it fails T-013.
+- Implement phase must not edit `__tests__/**` (including T-013’s frozen suite).
 
-**File:** `__tests__/engine/duel/reducer.test.ts:354`
+**Suggested fix (test designer / orchestrator — same pattern as T-008):**
 
 ```ts
-readonly choices: readonly Question['choices'] | undefined;
+const permitted = ['damage.ts', 'types.ts', 'reducer.ts'];
 ```
 
-`tsc` error:
-
-```
-error TS1354: 'readonly' type modifier is only permitted on array and tuple literal types.
-```
-
-`Question['choices']` is already an array type; wrapping a union `T | undefined` with the `readonly` modifier is illegal under this TS config. Pre-existing in the frozen suite; not introduced by `reducer.ts`.
-
-**Suggested fix:**
-
-```ts
-readonly choices: Question['choices'] | undefined;
-```
+with a comment that `reducer.ts` is T-020’s frozen module.
 
 ---
 
 ## Residual notes
 
-- Implementation does not touch `src/stores/duel.ts` or `__tests__/**`.
-- No `Math.random` / `Date` / `await` / React in the reducer.
-- Ready to green immediately once the two suite defects above are patched without changing behavioural oracles (suite hash will change — expected for a test-designer fix).
+- Prior disputes (AC-24 self-poison; `readonly` on `choices` union) closed in `bd8bc4d`.
+- No edits to `__tests__/` from this implementer after feat.
+- Ready to mark DONE the moment `dod(T-013:9)` permits `reducer.ts`.
