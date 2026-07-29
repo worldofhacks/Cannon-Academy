@@ -1936,3 +1936,9 @@ Opponent API published in COORDINATION.md. Merged + pushed.
 
 Worktree `.worktrees/wt-T-020` from post-T-018 tip. Phase `tests`.
 Do not edit `src/stores/duel.ts`. Publish state/event shape in COORDINATION.md on merge.
+
+### T-020 RED landed (`d43dfd7`)
+
+[T-020 Test Agent](36a816ca-f4ee-45bc-be6c-caf8ed762772): AC-1…24 suite; RED missing reducer; baseline 1674.
+Adjudications: bySkill required in impl; rival recoil symmetric; enemy-first tie-break.
+Test-design review dispatched.
