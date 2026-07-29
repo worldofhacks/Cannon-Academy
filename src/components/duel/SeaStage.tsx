@@ -21,6 +21,7 @@ import { ARC_PEAK, type CannonLook } from '../../theme/cannonPresentation';
 import { sprite } from '../../theme/sprites';
 import { color, motion, radius, type } from '../../theme/tokens';
 import type { DuelPhase } from '../../stores/duel';
+import type { CaptainPose } from './Captain';
 import { PLAYER_SHIP, RIVAL_SHIP, Ship } from './Ship';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
@@ -31,6 +32,7 @@ const SEA_HEIGHT = 58;
 
 interface SeaStageProps {
   readonly phase: DuelPhase;
+  readonly captainPose: CaptainPose;
   readonly look: CannonLook;
   readonly playerHullPct: number;
   readonly rivalHullPct: number;
@@ -40,6 +42,7 @@ interface SeaStageProps {
 
 export function SeaStage({
   phase,
+  captainPose,
   look,
   playerHullPct,
   rivalHullPct,
@@ -57,7 +60,13 @@ export function SeaStage({
       <View style={s.sea} />
 
       <View style={s.playerSlot}>
-        <Ship cosmetics={PLAYER_SHIP} facing="right" width={150} burning={playerHullPct <= 0.3} />
+        <Ship
+          cosmetics={PLAYER_SHIP}
+          facing="right"
+          width={150}
+          burning={playerHullPct <= 0.3}
+          captainPose={captainPose}
+        />
       </View>
       <View style={s.rivalSlot}>
         <Ship

@@ -77,12 +77,42 @@ export const cannonLook: Record<CannonId, CannonLook> = {
  */
 export const temperLook: Record<
   Temperament,
-  { readonly color: string; readonly glyph: string; readonly word: string }
+  {
+    readonly color: string;
+    readonly glyph: string;
+    readonly word: string;
+    /**
+     * The badge outline, as SVG points in a 0–100 viewBox. These are the design's own `clip-path`
+     * polygons, digit for digit — a hexagon for steady, a twelve-point burst for risky. `null`
+     * means a circle.
+     *
+     * The shape is not decoration: it is the only temperament cue that survives colour-blindness,
+     * and it is why a child can tell the risky gun from the steady one at a glance.
+     */
+    readonly points: string | null;
+  }
 > = {
-  reliable: { color: color.success, glyph: '=', word: 'steady' },
-  standard: { color: color.sea, glyph: '~', word: 'normal' },
-  volatile: { color: '#D93A2E', glyph: '!', word: 'risky' },
+  reliable: {
+    color: color.success,
+    glyph: '=',
+    word: 'steady',
+    points: '50,0 100,25 100,75 50,100 0,75 0,25',
+  },
+  standard: { color: color.sea, glyph: '~', word: 'normal', points: null },
+  volatile: {
+    color: '#D93A2E',
+    glyph: '!',
+    word: 'risky',
+    points: '50,0 62,30 93,22 80,50 98,74 66,74 50,100 34,74 2,74 20,50 7,22 38,30',
+  },
 };
+
+/**
+ * The damage band track is drawn as ten discrete segments, not a smooth bar — the design's
+ * `repeating-linear-gradient` with a 2px parchment divider every 10%. Ten segments against a
+ * fixed 0–40 ruler is what lets a child compare two guns by counting rather than by reading.
+ */
+export const DAMAGE_BAND_SEGMENTS = 10;
 
 /**
  * Damage-band scale for the tray's band meter. The widest cannon in the catalog is the Long Nine at

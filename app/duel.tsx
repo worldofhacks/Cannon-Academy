@@ -3,9 +3,10 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
-import { getCannon } from '@content/index';
+import { cannons as catalog, getCannon } from '@content/index';
 import { resolvePlacement } from '@engine/placement';
 
+import { captainPoseForPhase } from '../src/components/duel/Captain';
 import { CannonTray } from '../src/components/duel/CannonTray';
 import { HullCard, TurnBar } from '../src/components/duel/Hud';
 import {
@@ -41,9 +42,14 @@ export default function DuelScreen() {
   const [state, dispatch] = useReducer(duelReducer, 0, () => initialDuelState(2026));
   const askedAt = useRef(0);
 
-  // The tray is the player's actual arsenal, not a hardcoded three. A K-1 captain sees what
-  // placement gave them; when T-032 settles how mastery grants cannons, this line is unchanged.
-  const tray = useMemo(() => resolvePlacement('k_1').unlockedCannons.map(getCannon), []);
+  // The tray is the player's actual arsenal, not a hardcoded three — but in CATALOG order, not
+  // placement order. Placement returns a set, not a sequence, and the catalog is ordered
+  // gentlest-first, so a K-1 captain meets the Swivel Gun before the Culverin. That is the
+  // design's ordering and also the right one to put in front of a five-year-old.
+  const tray = useMemo(() => {
+    const owned = new Set(resolvePlacement('k_1').unlockedCannons);
+    return catalog.filter((c) => owned.has(c.id)).map((c) => getCannon(c.id));
+  }, []);
 
   // `tray[0]` is a total lookup, not an optimistic one: placement always grants at least one
   // cannon, and if that ever stops being true the duel is unplayable and should say so loudly
@@ -93,6 +99,7 @@ export default function DuelScreen() {
 
       <SeaStage
         phase={state.phase}
+        captainPose={captainPoseForPhase(state.phase, state.outcome?.perfectShot === true)}
         look={look}
         playerHullPct={state.playerHull / state.playerMax}
         rivalHullPct={state.rivalHull / state.rivalMax}

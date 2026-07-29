@@ -24,6 +24,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { color, motion } from '../../theme/tokens';
+import { Captain, type CaptainPose } from './Captain';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
@@ -65,9 +66,11 @@ interface ShipProps {
   readonly width: number;
   /** Below 30% hull the ship burns. The boards' low-hull read — never hide it behind a cosmetic. */
   readonly burning?: boolean;
+  /** The captain's pose, if this ship has one aboard. Only the player's does. */
+  readonly captainPose?: CaptainPose;
 }
 
-export function Ship({ cosmetics: c, facing, width, burning = false }: ShipProps) {
+export function Ship({ cosmetics: c, facing, width, burning = false, captainPose }: ShipProps) {
   const bob = useSharedValue(0);
   const wake = useSharedValue(0);
   const luff = useSharedValue(0);
@@ -295,6 +298,14 @@ export function Ship({ cosmetics: c, facing, width, burning = false }: ShipProps
           />
         ))}
       </View>
+
+      {/* The captain stands amidships, at the design's own offset. He is drawn after the hull so
+          he reads as standing ON the deck rather than behind the rail. */}
+      {captainPose !== undefined ? (
+        <View style={{ position: 'absolute', left: 40 * s, bottom: 44 * s }}>
+          <Captain pose={captainPose} scale={s} />
+        </View>
+      ) : null}
 
       {burning ? <Flame style={{ left: 96 * s, bottom: 38 * s, width: 28 * s }} /> : null}
     </Animated.View>
