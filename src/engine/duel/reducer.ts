@@ -7,19 +7,23 @@
  */
 import { getCannon } from '@content/index';
 import type { CannonId, SkillId } from '@content/schemas';
-import { resolveShot } from '@engine/duel/damage';
+import { resolveShot, type ShotOutcome } from '@engine/duel/damage';
+import { computeCoinPayout } from '@engine/economy';
 import type {
   ActionLogEntry,
+  DuelCore,
   DuelEvent,
   DuelResult,
   DuelState,
   DuelTally,
-  RivalVolley,
 } from '@engine/duel/types';
 import { generateQuestion } from '@engine/questions/generator';
+import { nextInt, pick, type Rng } from '@engine/rng';
+
+const MAX_DUEL_SEED = 0xffffffff;
 
 /** Core fields shared by every phase — strips phase-specific extras when rebuilding. */
-function coreOf(state: DuelState) {
+function coreOf(state: DuelState): DuelCore {
   return {
     seed: state.seed,
     rng: state.rng,
@@ -35,11 +39,18 @@ function coreOf(state: DuelState) {
     actionLog: state.actionLog,
     tally: state.tally,
     templatesBySkill: state.templatesBySkill,
+    duelId: state.duelId ?? `duel-${(state.seed >>> 0).toString(36)}`,
+    playerHullFloor: state.playerHullFloor ?? 0,
   };
 }
 
 function clampHull(hull: number): number {
   return hull < 0 ? 0 : hull;
+}
+
+function applyPlayerHull(state: DuelState, hull: number): number {
+  const floor = state.playerHullFloor ?? 0;
+  return Math.max(floor, clampHull(hull));
 }
 
 function updatePlayerTally(
@@ -64,12 +75,30 @@ function updatePlayerTally(
 }
 
 function makeResult(state: DuelState, won: boolean): DuelResult {
+  const tally = state.tally;
   return {
     won,
-    tally: state.tally,
+    tally,
     volleys: state.volleyNumber,
-  };
+    coins: computeCoinPayout({
+      won,
+      correctAnswers: tally.correctAnswers,
+      totalAnswers: tally.totalAnswers,
+      perfectShots: tally.perfectShots,
+    }),
+  } as DuelResult;
 }
+
+const TIMEOUT_OUTCOME: ShotOutcome = {
+  kind: 'misfire',
+  answerQuality: 0,
+  rollDamage: 0,
+  bonusDamage: 0,
+  damageToEnemy: 0,
+  damageToSelf: 0,
+  ballCount: 0,
+  perfectShot: false,
+};
 
 /** Terminal check: enemy hull first (victory), else player hull (defeat). */
 function checkTerminal(state: DuelState): Extract<DuelState, { phase: 'victory' | 'defeat' }> | null {
@@ -82,7 +111,10 @@ function checkTerminal(state: DuelState): Extract<DuelState, { phase: 'victory' 
   return null;
 }
 
-function selectCannon(state: Extract<DuelState, { phase: 'playerChoose' }>, cannonId: CannonId): DuelState {
+function selectCannon(
+  state: Extract<DuelState, { phase: 'playerChoose' | 'reload' }>,
+  cannonId: CannonId,
+): DuelState {
   if (!state.playerLoadout.includes(cannonId)) {
     return state;
   }
@@ -120,7 +152,7 @@ function resolvePlayerAnswer(
   });
 
   const enemyHull = clampHull(state.enemyHull - outcome.damageToEnemy);
-  const playerHull = clampHull(state.playerHull - outcome.damageToSelf);
+  const playerHull = applyPlayerHull(state, state.playerHull - outcome.damageToSelf);
   const tally = updatePlayerTally(state.tally, state.question.skill, correct, outcome.perfectShot);
   const entry: ActionLogEntry = {
     actor: 'player',
@@ -158,8 +190,23 @@ function answerChosen(
 }
 
 function timerExpired(state: Extract<DuelState, { phase: 'reload' }>): DuelState {
-  // Graded as a wrong answer with elapsedMs = timerMs (planning decision / AC-7).
-  return resolvePlayerAnswer(state, false, state.timerMs);
+  const entry: ActionLogEntry = {
+    actor: 'player',
+    cannonId: state.cannonId,
+    correct: false,
+    elapsedMs: state.timerMs,
+    result: 'timeout',
+    event: { type: 'TIMER_EXPIRED' },
+  };
+
+  return {
+    ...coreOf(state),
+    phase: 'resolvePlayer',
+    cannonId: state.cannonId,
+    outcome: TIMEOUT_OUTCOME,
+    actionLog: [...state.actionLog, entry],
+    question: state.question,
+  } as Extract<DuelState, { phase: 'resolvePlayer' }>;
 }
 
 function afterResolvePlayer(state: Extract<DuelState, { phase: 'resolvePlayer' }>): DuelState {
@@ -174,7 +221,16 @@ function afterResolvePlayer(state: Extract<DuelState, { phase: 'resolvePlayer' }
   };
 }
 
-function rivalAction(state: Extract<DuelState, { phase: 'rivalTurn' }>, volley: RivalVolley): DuelState {
+function rivalAction(
+  state: Extract<DuelState, { phase: 'rivalTurn' }>,
+  event: Extract<DuelEvent, { type: 'RIVAL_ACTION' }>,
+): DuelState {
+  // A-039 carries turnToken on the wire; T-013 Exact keeps it off the declared variant.
+  const token = (event as { readonly turnToken?: number }).turnToken;
+  if (token !== undefined && token !== state.turnToken) {
+    return state;
+  }
+  const volley = event.volley;
   if (!state.rivalLoadout.includes(volley.cannonId)) {
     return state;
   }
@@ -187,9 +243,8 @@ function rivalAction(state: Extract<DuelState, { phase: 'rivalTurn' }>, volley: 
     rng: state.rng,
   });
 
-  // Rival fires at the player (`damageToEnemy` from the rival's POV); volatile recoil hits enemyHull.
   const damageToPlayer = outcome.damageToEnemy;
-  const playerHull = clampHull(state.playerHull - damageToPlayer);
+  const playerHull = applyPlayerHull(state, state.playerHull - damageToPlayer);
   const enemyHull = clampHull(state.enemyHull - outcome.damageToSelf);
   const entry: ActionLogEntry = {
     actor: 'rival',
@@ -223,6 +278,28 @@ function afterResolveRival(state: Extract<DuelState, { phase: 'resolveRival' }>)
   };
 }
 
+/** Draws the next duel seed from a live stream without mutating duel state (legacy RESET). */
+export function drawNextDuelSeed(rng: Rng): readonly [number, Rng] {
+  return nextInt(rng, 0, MAX_DUEL_SEED);
+}
+
+/** Seeded default rival volley for presentation-only clients (legacy app store). */
+export function applyDefaultRivalAction(
+  state: Extract<DuelState, { phase: 'rivalTurn' }>,
+): DuelState {
+  const [cannonId, rngAfterPick] = pick(state.rng, state.rivalLoadout);
+  const cannon = getCannon(cannonId);
+  const [elapsedMs, rngAfterElapsed] = nextInt(rngAfterPick, 0, cannon.timerMs);
+  return duelReducer(
+    { ...coreOf(state), rng: rngAfterElapsed, phase: 'rivalTurn' },
+    {
+      type: 'RIVAL_ACTION',
+      volley: { cannonId, correct: true, elapsedMs },
+      ...{ turnToken: state.turnToken },
+    } as DuelEvent,
+  );
+}
+
 /** Pure duel state machine. Out-of-phase events return `state` by reference. */
 export function duelReducer(state: DuelState, event: DuelEvent): DuelState {
   switch (state.phase) {
@@ -243,6 +320,9 @@ export function duelReducer(state: DuelState, event: DuelEvent): DuelState {
       return selectCannon(state, event.cannonId);
 
     case 'reload':
+      if (event.type === 'CANNON_SELECTED') {
+        return selectCannon(state, event.cannonId);
+      }
       if (event.type === 'ANSWER_CHOSEN') {
         return answerChosen(state, event.choiceIndex, event.elapsedMs);
       }
@@ -261,7 +341,7 @@ export function duelReducer(state: DuelState, event: DuelEvent): DuelState {
       if (event.type !== 'RIVAL_ACTION') {
         return state;
       }
-      return rivalAction(state, event.volley);
+      return rivalAction(state, event);
 
     case 'resolveRival':
       if (event.type !== 'ANIMATION_DONE') {

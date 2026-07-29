@@ -1,31 +1,14 @@
 /**
  * What a finished duel is worth, applied to the captain exactly once.
  *
- * A-008. Before this file, `computeCoinPayout` ran at the end of every duel, `VictoryPanel`
- * rendered the number, the screen unmounted, and the number was gone. Mastery was never touched
- * and wins were never counted. This module is the join between the duel reducer and the captain
- * store — the thing that turns the duel from a demo into a loop.
- *
- * Two rules govern it:
- *
- *  1. **It prices nothing itself.** Coins come from `state.coins`, which the reducer got from
- *     `computeCoinPayout`; the mastery rate comes from the store's `recordDuelAnswers`; the rank
- *     tier comes from `recordDuelResult` via `rankTierForWins`. No rate, threshold or payout
- *     literal appears below. A captain credited a different number than the one a child just read
- *     off the victory screen is the worst possible version of this bug, and taking the screen's
- *     own number is what makes that unrepresentable.
- *  2. **It pays exactly once per duel** (AC-6). React re-renders, effects fire twice under
- *     StrictMode, and a terminal phase can be observed many times — anything applied per
- *     OBSERVATION pays repeatedly. See the ledger note below for why the identity is `duelId` and
- *     why the ledger is scoped to the store.
- *
- * No React import: this is the logic, and it is frozen-tested headless. `app/duel.tsx` is one
- * effect calling `applyDuelOutcome`.
+ * A-008 / A-039. Projection reads the canonical engine terminal; settlement remains a separate
+ * ledgered apply step. This module prices nothing itself.
  */
 import type { CannonId, IslandId, SkillId } from '@content/schemas';
+import type { DuelState as EngineDuelState } from '@engine/duel/types';
 
-import type { DuelState } from '../stores/duel';
 import type { CaptainStore } from '../stores/player';
+import type { DuelState } from '../stores/duel';
 
 /** Everything the screen needs to announce, plus whether any of it actually happened. */
 export interface DuelRewardOutcome {
@@ -40,6 +23,23 @@ export interface DuelRewardOutcome {
   readonly rankTier: number;
   readonly rankedUp: boolean;
 }
+
+export type DuelRewardProjection = {
+  readonly won: boolean;
+  readonly coins: number;
+  readonly skillTally: EngineDuelState['tally']['bySkill'];
+  readonly rankInput: { readonly won: boolean };
+};
+
+/** Settlement view projected by the live store / adapter. */
+export type DuelSettlementView = {
+  readonly phase: string;
+  readonly duelId: string;
+  readonly coins: number;
+  readonly skillTally: Readonly<
+    Partial<Record<SkillId, { readonly correct: number; readonly asked: number }>>
+  >;
+};
 
 /**
  * Which duels each captain has already been paid for.
@@ -79,12 +79,25 @@ function granted<T>(before: readonly T[], after: readonly T[]): readonly T[] {
 }
 
 /**
+ * Pure projection of a canonical engine terminal (A-039 AC-7). Observation-only: never settles.
+ */
+export function projectDuelRewards(terminal: EngineDuelState): DuelRewardProjection {
+  if (terminal.phase !== 'victory' && terminal.phase !== 'defeat') {
+    throw new Error(`projectDuelRewards: expected terminal phase, received ${terminal.phase}`);
+  }
+  const result = terminal.result as typeof terminal.result & { readonly coins: number };
+  return {
+    won: result.won,
+    coins: result.coins,
+    skillTally: result.tally.bySkill,
+    rankInput: { won: result.won },
+  };
+}
+
+/**
  * Applies a finished duel to the captain: coins, per-skill mastery, the win, and whatever those
  * unlocked. Safe to call on any state at any time — an unfinished duel and an already-settled one
  * both return `applied: false` and change nothing.
- *
- * An unfinished duel is NOT recorded as settled: the screen may well observe a duel mid-flight,
- * and consuming the duel's one payment there would mean it finishes and pays nothing.
  */
 export function applyDuelOutcome(store: CaptainStore, duel: DuelState): DuelRewardOutcome {
   const before = store.getState().captain;
@@ -98,19 +111,14 @@ export function applyDuelOutcome(store: CaptainStore, duel: DuelState): DuelRewa
   const actions = store.getState();
 
   // Mastery first, so the unlocks it triggers are already applied when the delta is read below.
-  // Practice counts whether or not the duel was won, and `asked` carries the wrong answers with
-  // it — crediting only the corrects would inflate accuracy and hollow out the mastery gate.
   for (const [skill, tally] of Object.entries(duel.skillTally)) {
     if (tally === undefined) continue;
     actions.recordDuelAnswers(skill as SkillId, tally);
   }
 
-  // The purse the panel showed. `settle()` priced it with `computeCoinPayout`; re-pricing it here
-  // is how the screen and the wallet start disagreeing.
+  // The purse the panel showed — never re-priced here.
   actions.addCoins(duel.coins);
 
-  // A loss still goes through here: `recordDuelResult` re-derives the tier from the win count,
-  // and since wins never decrease, a loss cannot drop a rank.
   actions.recordDuelResult({ won });
 
   const after = store.getState().captain;
