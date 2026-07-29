@@ -15,14 +15,15 @@ Status: **TESTS_WRITTEN / RED**
 | AC-1 | Pure `questionTypographyFor` export; compact 14-character boundary retains 44/50 display type; 15 characters fit; sentence-like prompts fit; all 72 authored templates are classified from their longest rendered form; AST proves `QuestionPanel` calls the classifier with `question.text`. |
 | AC-2 | Longest authored prompt receives 2–3 bounded lines, native shrinking, a 22–32pt fitted face with an effective ≥16.5pt floor, and ≤38pt line height; AST proves the same classifier result supplies the exact visible question-row Text's style, `numberOfLines`, `adjustsFontSizeToFit`, and `minimumFontScale`; the fixed 56pt one-line row becomes a bounded 56–100pt `minHeight`. |
 | AC-3 | AST proves the question header's `accessibilityLabel` is the original `question.text`. |
-| AC-4 | Live-return AST structure pins the tuning-driven fuse, two rows partitioning choices 0–3 exactly once, the actual `Choice`/`Pressable` style path, and existing flex/minimum-tap-target styles without depending on comments or raw source spelling. |
+| AC-4 | Live-return AST structure pins the tuning-driven fuse, requires the outer and inner choice maps to be the sole direct rendered expressions of the grid and row, partitions choices 0–3 exactly once, follows the actual `Choice`/`Pressable` style path, and preserves existing flex/minimum-tap-target styles without depending on comments or raw source spelling. |
 
 The AST checks resolve the named import (including an alias), require a top-level live component
 binding of `questionTypographyFor(question.text)`, identify exactly the direct header `Text` inside
 the direct returned `View` styled `s.questionRow`, require its sole rendered expression to be
 `question.text`, and require active props to read from that exact binding. Mutation fixtures prove
 that a fully compliant dead header cannot hide an unsafe visible header, and that source preserved
-only in a comment cannot hide a removed live grid.
+only in a comment cannot hide a removed live grid. A third fixture proves that a complete grid
+under `{false && …}` is not mistaken for the live rendered grid.
 
 ## RED evidence
 
@@ -36,7 +37,7 @@ Result:
 
 ```text
 Test Files  1 failed (1)
-Tests       9 failed | 3 passed (12)
+Tests       9 failed | 4 passed (13)
 ```
 
 The nine expected failures are feature failures:
@@ -47,7 +48,7 @@ The nine expected failures are feature failures:
 4. `questionRow` still has the clipping `height: 56`.
 5. The rendered header has no full `accessibilityLabel`.
 
-The AC-4 fuse/grid regression guard and both adversarial mutation fixtures pass against the
+The AC-4 fuse/grid regression guard and all three adversarial mutation fixtures pass against the
 untouched baseline. The typography module is guarded at runtime so its absence produces assertions
 rather than a test-collection import error, and all source-contract tests still execute in RED.
 
@@ -64,7 +65,7 @@ file changed.
 | ESLint (`--max-warnings 0`) | PASS |
 | TypeScript (`tsc --noEmit`) | PASS |
 | `git diff --check` | PASS |
-| `.tdd-swarm/spec-lint.sh tickets/app/A-023.md` | PASS — AC-1 5, AC-2 4, AC-3 1, AC-4 2 |
+| `.tdd-swarm/spec-lint.sh tickets/app/A-023.md` | PASS — AC-1 5, AC-2 4, AC-3 1, AC-4 3 |
 
 Native 360×640 and iPhone screenshots remain release evidence per the ticket; no Node source test
 claims to measure pixels.

@@ -360,37 +360,42 @@ function returnedJsxFromCallback(
   return ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression) ? expression : undefined;
 }
 
+function soleDirectJsxExpression(element: ts.JsxElement): ts.Expression | undefined {
+  const meaningful = element.children.filter(
+    (child) => !(ts.isJsxText(child) && child.text.trim().length === 0),
+  );
+  const onlyChild = meaningful[0];
+  if (
+    meaningful.length !== 1 ||
+    onlyChild === undefined ||
+    !ts.isJsxExpression(onlyChild) ||
+    onlyChild.expression === undefined
+  ) {
+    return undefined;
+  }
+  return unwrapExpression(onlyChild.expression);
+}
+
 function liveChoiceGrid(panel: ts.FunctionDeclaration): boolean {
   const root = returnedJsxElement(panel);
   if (root === undefined) return false;
   const grid = directStyledChild(root, 'View', ['s', 'grid']);
   if (grid === undefined) return false;
 
-  const outerMaps = descendants(grid, ts.isCallExpression).filter((call) => {
-    if (
-      !ts.isPropertyAccessExpression(call.expression) ||
-      call.expression.name.text !== 'map' ||
-      call.arguments.length === 0
-    ) {
-      return false;
-    }
-    const callback = call.arguments[0]!;
-    if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) return false;
-    const returned = returnedJsxFromCallback(callback);
-    return (
-      returned !== undefined &&
-      ts.isJsxElement(returned) &&
-      returned.openingElement.tagName.getText() === 'View' &&
-      appliesStylePath(jsxExpression(jsxAttribute(returned.openingElement, 'style')), ['s', 'gridRow'])
-    );
-  });
-  if (outerMaps.length !== 1) return false;
-
-  const outerMap = outerMaps[0]!;
-  const rowsExpression = resolvePanelExpression(
-    panel,
-    (outerMap.expression as ts.PropertyAccessExpression).expression,
-  );
+  const outerExpression = soleDirectJsxExpression(grid);
+  if (outerExpression === undefined || !ts.isCallExpression(outerExpression)) {
+    return false;
+  }
+  const outerCallee = outerExpression.expression;
+  if (
+    !ts.isPropertyAccessExpression(outerCallee) ||
+    outerCallee.name.text !== 'map' ||
+    outerExpression.arguments.length === 0
+  ) {
+    return false;
+  }
+  const outerMap = outerExpression;
+  const rowsExpression = resolvePanelExpression(panel, outerCallee.expression);
   if (!ts.isArrayLiteralExpression(rowsExpression) || rowsExpression.elements.length !== 2) return false;
   const rowIndices = rowsExpression.elements.map((row) =>
     ts.isSpreadElement(row) ? undefined : choiceIndices(panel, row),
@@ -404,17 +409,27 @@ function liveChoiceGrid(panel: ts.FunctionDeclaration): boolean {
   const rowParameter = outerCallback.parameters[0]?.name;
   if (rowParameter === undefined || !ts.isIdentifier(rowParameter)) return false;
   const rowJsx = returnedJsxFromCallback(outerCallback);
-  if (rowJsx === undefined || !ts.isJsxElement(rowJsx)) return false;
+  if (
+    rowJsx === undefined ||
+    !ts.isJsxElement(rowJsx) ||
+    rowJsx.openingElement.tagName.getText() !== 'View' ||
+    !appliesStylePath(jsxExpression(jsxAttribute(rowJsx.openingElement, 'style')), ['s', 'gridRow'])
+  ) {
+    return false;
+  }
 
-  const innerMaps = descendants(rowJsx, ts.isCallExpression).filter(
-    (call) =>
-      ts.isPropertyAccessExpression(call.expression) &&
-      call.expression.name.text === 'map' &&
-      ts.isIdentifier(call.expression.expression) &&
-      call.expression.expression.text === rowParameter.text,
-  );
-  if (innerMaps.length !== 1) return false;
-  const innerCallback = innerMaps[0]!.arguments[0];
+  const innerExpression = soleDirectJsxExpression(rowJsx);
+  if (
+    innerExpression === undefined ||
+    !ts.isCallExpression(innerExpression) ||
+    !ts.isPropertyAccessExpression(innerExpression.expression) ||
+    innerExpression.expression.name.text !== 'map' ||
+    !ts.isIdentifier(innerExpression.expression.expression) ||
+    innerExpression.expression.expression.text !== rowParameter.text
+  ) {
+    return false;
+  }
+  const innerCallback = innerExpression.arguments[0];
   if (
     innerCallback === undefined ||
     (!ts.isArrowFunction(innerCallback) && !ts.isFunctionExpression(innerCallback))
@@ -726,6 +741,27 @@ describe('A-023 QuestionPanel source contract', () => {
           <View style={s.wrap}>
             {/* question.choices.slice(0, 2); question.choices.slice(2, 4);
                 <View style={s.grid}><View style={s.gridRow}><Choice value={value} /></View></View> */}
+          </View>
+        );
+      }
+    `);
+
+    expect(liveChoiceGrid(panelFunction(mutated))).toBe(false);
+  });
+
+  it('spec(A-023:AC-4) rejects a complete two-row grid hidden behind a false rendered branch', () => {
+    const mutated = parseSourceText(`
+      function QuestionPanel({ question }) {
+        return (
+          <View style={s.wrap}>
+            <View style={s.grid}>
+              {false &&
+                [question.choices.slice(0, 2), question.choices.slice(2, 4)].map((row) => (
+                  <View style={s.gridRow}>
+                    {row.map((value) => <Choice value={value} />)}
+                  </View>
+                ))}
+            </View>
           </View>
         );
       }
