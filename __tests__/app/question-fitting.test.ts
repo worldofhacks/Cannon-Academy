@@ -75,13 +75,11 @@ function expectedKind(prompt: string): TreatmentKind {
 }
 
 function parseSource(path: string): ts.SourceFile {
-  return ts.createSourceFile(
-    path,
-    readFileSync(path, 'utf8'),
-    ts.ScriptTarget.Latest,
-    true,
-    ts.ScriptKind.TSX,
-  );
+  return parseSourceText(readFileSync(path, 'utf8'), path);
+}
+
+function parseSourceText(text: string, path = 'fixture.tsx'): ts.SourceFile {
+  return ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 }
 
 function descendants<T extends ts.Node>(
@@ -113,6 +111,20 @@ function isPath(expression: ts.Expression, expected: readonly string[]): boolean
   );
 }
 
+function unwrapExpression(expression: ts.Expression): ts.Expression {
+  let current = expression;
+  while (
+    ts.isParenthesizedExpression(current) ||
+    ts.isAsExpression(current) ||
+    ts.isTypeAssertionExpression(current) ||
+    ts.isSatisfiesExpression(current) ||
+    ts.isNonNullExpression(current)
+  ) {
+    current = current.expression;
+  }
+  return current;
+}
+
 function jsxAttribute(element: ts.JsxOpeningLikeElement, name: string): ts.JsxAttribute | undefined {
   return element.attributes.properties.find(
     (property): property is ts.JsxAttribute =>
@@ -126,17 +138,34 @@ function jsxExpression(attribute: ts.JsxAttribute | undefined): ts.Expression | 
   return initializer.expression;
 }
 
-function containsPath(root: ts.Node, expected: readonly string[]): boolean {
-  return descendants(root, ts.isPropertyAccessExpression).some((expression) => isPath(expression, expected));
+function appliesStylePath(expression: ts.Expression | undefined, expected: readonly string[]): boolean {
+  if (expression === undefined) return false;
+  const unwrapped = unwrapExpression(expression);
+  if (isPath(unwrapped, expected)) return true;
+  if (ts.isArrayLiteralExpression(unwrapped)) {
+    return unwrapped.elements.some(
+      (element) => !ts.isSpreadElement(element) && appliesStylePath(element, expected),
+    );
+  }
+  if (ts.isArrowFunction(unwrapped) || ts.isFunctionExpression(unwrapped)) {
+    if (!ts.isBlock(unwrapped.body)) return appliesStylePath(unwrapped.body, expected);
+    const returned = unwrapped.body.statements.find(ts.isReturnStatement)?.expression;
+    return appliesStylePath(returned, expected);
+  }
+  return false;
+}
+
+function functionNamed(source: ts.SourceFile, name: string): ts.FunctionDeclaration {
+  const found = source.statements.find(
+    (statement): statement is ts.FunctionDeclaration =>
+      ts.isFunctionDeclaration(statement) && statement.name?.text === name,
+  );
+  if (found === undefined) throw new Error(`${name} function declaration not found`);
+  return found;
 }
 
 function panelFunction(source: ts.SourceFile): ts.FunctionDeclaration {
-  const found = source.statements.find(
-    (statement): statement is ts.FunctionDeclaration =>
-      ts.isFunctionDeclaration(statement) && statement.name?.text === 'QuestionPanel',
-  );
-  if (found === undefined) throw new Error('QuestionPanel function declaration not found');
-  return found;
+  return functionNamed(source, 'QuestionPanel');
 }
 
 function importedLocalName(
@@ -163,30 +192,71 @@ function importedLocalName(
 }
 
 function classifiedBinding(panel: ts.FunctionDeclaration, classifierName: string): string | undefined {
-  for (const declaration of descendants(panel, ts.isVariableDeclaration)) {
-    if (!ts.isIdentifier(declaration.name) || declaration.initializer === undefined) continue;
-    const calls = descendants(declaration.initializer, ts.isCallExpression);
-    const appliesQuestionText = calls.some(
-      (call) =>
-        ts.isIdentifier(call.expression) &&
-        call.expression.text === classifierName &&
-        call.arguments.length === 1 &&
-        isPath(call.arguments[0]!, ['question', 'text']),
-    );
-    if (appliesQuestionText) return declaration.name.text;
+  for (const statement of panel.body?.statements ?? []) {
+    if (!ts.isVariableStatement(statement)) continue;
+    for (const declaration of statement.declarationList.declarations) {
+      if (!ts.isIdentifier(declaration.name) || declaration.initializer === undefined) continue;
+      const initializer = unwrapExpression(declaration.initializer);
+      if (
+        ts.isCallExpression(initializer) &&
+        ts.isIdentifier(initializer.expression) &&
+        initializer.expression.text === classifierName &&
+        initializer.arguments.length === 1 &&
+        isPath(initializer.arguments[0]!, ['question', 'text'])
+      ) {
+        return declaration.name.text;
+      }
+    }
   }
   return undefined;
 }
 
+function returnedJsxElement(fn: ts.FunctionDeclaration): ts.JsxElement | undefined {
+  const returned = fn.body?.statements.find(ts.isReturnStatement)?.expression;
+  if (returned === undefined) return undefined;
+  const expression = unwrapExpression(returned);
+  return ts.isJsxElement(expression) ? expression : undefined;
+}
+
+function directJsxElements(element: ts.JsxElement): readonly ts.JsxElement[] {
+  return element.children.filter(ts.isJsxElement);
+}
+
+function directStyledChild(
+  parent: ts.JsxElement,
+  tag: string,
+  stylePath: readonly string[],
+): ts.JsxElement | undefined {
+  const matches = directJsxElements(parent).filter(
+    (child) =>
+      child.openingElement.tagName.getText() === tag &&
+      appliesStylePath(jsxExpression(jsxAttribute(child.openingElement, 'style')), stylePath),
+  );
+  return matches.length === 1 ? matches[0] : undefined;
+}
+
 function questionTextElement(panel: ts.FunctionDeclaration): ts.JsxOpeningLikeElement | undefined {
-  return descendants(
-    panel,
-    (node): node is ts.JsxElement =>
-      ts.isJsxElement(node) && node.openingElement.tagName.getText() === 'Text',
-  )
-    .filter((element) => containsPath(element, ['question', 'text']))
-    .map((element) => element.openingElement)
-    .find((opening) => jsxAttribute(opening, 'accessibilityRole')?.initializer?.getText() === '"header"');
+  const root = returnedJsxElement(panel);
+  if (root === undefined) return undefined;
+  const row = directStyledChild(root, 'View', ['s', 'questionRow']);
+  if (row === undefined) return undefined;
+  const texts = directJsxElements(row).filter(
+    (child) =>
+      child.openingElement.tagName.getText() === 'Text' &&
+      jsxAttribute(child.openingElement, 'accessibilityRole')?.initializer?.getText() === '"header"',
+  );
+  if (texts.length !== 1) return undefined;
+
+  const meaningfulChildren = texts[0]!.children.filter(
+    (child) => !(ts.isJsxText(child) && child.text.trim().length === 0),
+  );
+  const onlyChild = meaningfulChildren[0];
+  if (meaningfulChildren.length !== 1 || onlyChild === undefined || !ts.isJsxExpression(onlyChild)) {
+    return undefined;
+  }
+  const rendered = onlyChild.expression;
+  if (rendered === undefined || !isPath(rendered, ['question', 'text'])) return undefined;
+  return texts[0]!.openingElement;
 }
 
 function styleObject(source: ts.SourceFile, name: string): ts.ObjectLiteralExpression {
@@ -224,8 +294,231 @@ function numericLiteral(expression: ts.Expression | undefined): number | undefin
   return Number(expression.text);
 }
 
-function normalizedText(node: ts.Node): string {
-  return node.getText().replace(/\s+/g, '');
+function directVariableInitializer(panel: ts.FunctionDeclaration, name: string): ts.Expression | undefined {
+  for (const statement of panel.body?.statements ?? []) {
+    if (!ts.isVariableStatement(statement)) continue;
+    const found = statement.declarationList.declarations.find(
+      (declaration) => ts.isIdentifier(declaration.name) && declaration.name.text === name,
+    );
+    if (found?.initializer !== undefined) return found.initializer;
+  }
+  return undefined;
+}
+
+function resolvePanelExpression(panel: ts.FunctionDeclaration, expression: ts.Expression): ts.Expression {
+  const unwrapped = unwrapExpression(expression);
+  if (!ts.isIdentifier(unwrapped)) return unwrapped;
+  const initializer = directVariableInitializer(panel, unwrapped.text);
+  return initializer === undefined ? unwrapped : resolvePanelExpression(panel, initializer);
+}
+
+function numericArgument(expression: ts.Expression | undefined): number | undefined {
+  return numericLiteral(expression === undefined ? undefined : unwrapExpression(expression));
+}
+
+function choiceIndices(
+  panel: ts.FunctionDeclaration,
+  expression: ts.Expression,
+): readonly number[] | undefined {
+  const resolved = resolvePanelExpression(panel, expression);
+  if (
+    ts.isCallExpression(resolved) &&
+    ts.isPropertyAccessExpression(resolved.expression) &&
+    resolved.expression.name.text === 'slice' &&
+    isPath(resolved.expression.expression, ['question', 'choices'])
+  ) {
+    const start = numericArgument(resolved.arguments[0]) ?? 0;
+    const end = numericArgument(resolved.arguments[1]) ?? 4;
+    if (start < 0 || end < start || end > 4) return undefined;
+    return Array.from({ length: end - start }, (_unused, index) => start + index);
+  }
+  if (ts.isArrayLiteralExpression(resolved)) {
+    const indices: number[] = [];
+    for (const element of resolved.elements) {
+      if (!ts.isElementAccessExpression(element) || !isPath(element.expression, ['question', 'choices'])) {
+        return undefined;
+      }
+      const index = numericArgument(element.argumentExpression);
+      if (index === undefined) return undefined;
+      indices.push(index);
+    }
+    return indices;
+  }
+  return undefined;
+}
+
+function returnedJsxFromCallback(
+  callback: ts.ArrowFunction | ts.FunctionExpression,
+): ts.JsxElement | ts.JsxSelfClosingElement | undefined {
+  if (!ts.isBlock(callback.body)) {
+    const body = unwrapExpression(callback.body);
+    return ts.isJsxElement(body) || ts.isJsxSelfClosingElement(body) ? body : undefined;
+  }
+  const returned = callback.body.statements.find(ts.isReturnStatement)?.expression;
+  if (returned === undefined) return undefined;
+  const expression = unwrapExpression(returned);
+  return ts.isJsxElement(expression) || ts.isJsxSelfClosingElement(expression) ? expression : undefined;
+}
+
+function liveChoiceGrid(panel: ts.FunctionDeclaration): boolean {
+  const root = returnedJsxElement(panel);
+  if (root === undefined) return false;
+  const grid = directStyledChild(root, 'View', ['s', 'grid']);
+  if (grid === undefined) return false;
+
+  const outerMaps = descendants(grid, ts.isCallExpression).filter((call) => {
+    if (
+      !ts.isPropertyAccessExpression(call.expression) ||
+      call.expression.name.text !== 'map' ||
+      call.arguments.length === 0
+    ) {
+      return false;
+    }
+    const callback = call.arguments[0]!;
+    if (!ts.isArrowFunction(callback) && !ts.isFunctionExpression(callback)) return false;
+    const returned = returnedJsxFromCallback(callback);
+    return (
+      returned !== undefined &&
+      ts.isJsxElement(returned) &&
+      returned.openingElement.tagName.getText() === 'View' &&
+      appliesStylePath(jsxExpression(jsxAttribute(returned.openingElement, 'style')), ['s', 'gridRow'])
+    );
+  });
+  if (outerMaps.length !== 1) return false;
+
+  const outerMap = outerMaps[0]!;
+  const rowsExpression = resolvePanelExpression(
+    panel,
+    (outerMap.expression as ts.PropertyAccessExpression).expression,
+  );
+  if (!ts.isArrayLiteralExpression(rowsExpression) || rowsExpression.elements.length !== 2) return false;
+  const rowIndices = rowsExpression.elements.map((row) =>
+    ts.isSpreadElement(row) ? undefined : choiceIndices(panel, row),
+  );
+  if (rowIndices.some((indices) => indices === undefined || indices.length !== 2)) return false;
+  const flattened = rowIndices.flatMap((indices) => indices ?? []).sort((left, right) => left - right);
+  if (flattened.join(',') !== '0,1,2,3') return false;
+
+  const outerCallback = outerMap.arguments[0]!;
+  if (!ts.isArrowFunction(outerCallback) && !ts.isFunctionExpression(outerCallback)) return false;
+  const rowParameter = outerCallback.parameters[0]?.name;
+  if (rowParameter === undefined || !ts.isIdentifier(rowParameter)) return false;
+  const rowJsx = returnedJsxFromCallback(outerCallback);
+  if (rowJsx === undefined || !ts.isJsxElement(rowJsx)) return false;
+
+  const innerMaps = descendants(rowJsx, ts.isCallExpression).filter(
+    (call) =>
+      ts.isPropertyAccessExpression(call.expression) &&
+      call.expression.name.text === 'map' &&
+      ts.isIdentifier(call.expression.expression) &&
+      call.expression.expression.text === rowParameter.text,
+  );
+  if (innerMaps.length !== 1) return false;
+  const innerCallback = innerMaps[0]!.arguments[0];
+  if (
+    innerCallback === undefined ||
+    (!ts.isArrowFunction(innerCallback) && !ts.isFunctionExpression(innerCallback))
+  ) {
+    return false;
+  }
+  const valueParameter = innerCallback.parameters[0]?.name;
+  if (valueParameter === undefined || !ts.isIdentifier(valueParameter)) return false;
+  const choice = returnedJsxFromCallback(innerCallback);
+  if (choice === undefined || !ts.isJsxSelfClosingElement(choice) || choice.tagName.getText() !== 'Choice') {
+    return false;
+  }
+  const value = jsxExpression(jsxAttribute(choice, 'value'));
+  return value !== undefined && ts.isIdentifier(value) && value.text === valueParameter.text;
+}
+
+function liveFuse(panel: ts.FunctionDeclaration): boolean {
+  const root = returnedJsxElement(panel);
+  if (root === undefined) return false;
+  const track = directStyledChild(root, 'View', ['s', 'fuseTrack']);
+  if (track === undefined) return false;
+
+  type RenderedChild = ts.JsxElement | ts.JsxSelfClosingElement;
+  const renderedChildren: readonly RenderedChild[] = track.children.filter(
+    (child): child is RenderedChild => ts.isJsxElement(child) || ts.isJsxSelfClosingElement(child),
+  );
+  const openingOf = (child: RenderedChild): ts.JsxOpeningLikeElement =>
+    ts.isJsxElement(child) ? child.openingElement : child;
+  const styledChild = (tag: string, stylePath: readonly string[]): RenderedChild | undefined => {
+    const matches = renderedChildren.filter((child) => {
+      const opening = openingOf(child);
+      return (
+        opening.tagName.getText() === tag &&
+        appliesStylePath(jsxExpression(jsxAttribute(opening, 'style')), stylePath)
+      );
+    });
+    return matches.length === 1 ? matches[0] : undefined;
+  };
+
+  const spent = styledChild('View', ['s', 'fuseSpent']);
+  const gold = styledChild('View', ['s', 'fuseGold']);
+  const burn = styledChild('Animated.View', ['s', 'fuseBurn']);
+  if (spent === undefined || gold === undefined || burn === undefined) return false;
+
+  const inlineFlex = (element: RenderedChild): ts.Expression | undefined => {
+    const style = jsxExpression(jsxAttribute(openingOf(element), 'style'));
+    const array = style === undefined ? undefined : unwrapExpression(style);
+    if (array === undefined || !ts.isArrayLiteralExpression(array)) return undefined;
+    const object = array.elements.find(ts.isObjectLiteralExpression);
+    return object === undefined ? undefined : objectProperty(object, 'flex');
+  };
+
+  const spentFlex = inlineFlex(spent);
+  const goldFlex = inlineFlex(gold);
+  const spentUsesTuning =
+    spentFlex !== undefined &&
+    ts.isBinaryExpression(spentFlex) &&
+    spentFlex.operatorToken.kind === ts.SyntaxKind.MinusToken &&
+    numericLiteral(spentFlex.left) === 1 &&
+    ts.isIdentifier(spentFlex.right) &&
+    spentFlex.right.text === 'PERFECT_SHOT_TIMER_FRACTION';
+  const goldUsesTuning =
+    goldFlex !== undefined && ts.isIdentifier(goldFlex) && goldFlex.text === 'PERFECT_SHOT_TIMER_FRACTION';
+  const burnUsesLiveWidth = appliesStylePath(jsxExpression(jsxAttribute(openingOf(burn), 'style')), [
+    'burnStyle',
+  ]);
+  return spentUsesTuning && goldUsesTuning && burnUsesLiveWidth;
+}
+
+function liveChoiceTapPath(source: ts.SourceFile): boolean {
+  const choice = functionNamed(source, 'Choice');
+  const root = returnedJsxElement(choice);
+  if (
+    root === undefined ||
+    root.openingElement.tagName.getText() !== 'Animated.View' ||
+    !appliesStylePath(jsxExpression(jsxAttribute(root.openingElement, 'style')), ['s', 'choiceCell'])
+  ) {
+    return false;
+  }
+  const pressables = directJsxElements(root).filter(
+    (element) => element.openingElement.tagName.getText() === 'Pressable',
+  );
+  return (
+    pressables.length === 1 &&
+    appliesStylePath(jsxExpression(jsxAttribute(pressables[0]!.openingElement, 'style')), ['s', 'choice'])
+  );
+}
+
+function completeQuestionWiring(source: ts.SourceFile): boolean {
+  const panel = panelFunction(source);
+  const classifier = importedLocalName(source, 'theme/questionTypography', 'questionTypographyFor');
+  if (classifier === undefined) return false;
+  const binding = classifiedBinding(panel, classifier);
+  if (binding === undefined) return false;
+  const text = questionTextElement(panel);
+  if (text === undefined) return false;
+  const style = jsxExpression(jsxAttribute(text, 'style'));
+  if (!appliesStylePath(style, [binding, 'style'])) return false;
+  for (const property of ['numberOfLines', 'adjustsFontSizeToFit', 'minimumFontScale'] as const) {
+    const applied = jsxExpression(jsxAttribute(text, property));
+    if (applied === undefined || !isPath(applied, [binding, property])) return false;
+  }
+  const label = jsxExpression(jsxAttribute(text, 'accessibilityLabel'));
+  return label !== undefined && isPath(label, ['question', 'text']);
 }
 
 describe('A-023 question typography classifier', () => {
@@ -300,11 +593,14 @@ describe('A-023 question typography classifier', () => {
     expect(fitted.numberOfLines).toBeGreaterThanOrEqual(2);
     expect(fitted.numberOfLines).toBeLessThanOrEqual(3);
     expect(fitted.adjustsFontSizeToFit).toBe(true);
-    expect(fitted.minimumFontScale).toBeGreaterThanOrEqual(0.6);
+    expect(fitted.minimumFontScale).toBeGreaterThanOrEqual(0.75);
     expect(fitted.minimumFontScale).toBeLessThan(1);
-    expect(fitted.style.fontSize).toBeGreaterThanOrEqual(20);
-    expect(fitted.style.fontSize).toBeLessThan(44);
+    expect(fitted.style.fontSize).toBeGreaterThanOrEqual(22);
+    expect(fitted.style.fontSize).toBeLessThanOrEqual(32);
     expect(fitted.style.lineHeight).toBeGreaterThanOrEqual(fitted.style.fontSize);
+    expect(fitted.style.lineHeight).toBeLessThanOrEqual(38);
+    expect(fitted.style.lineHeight - fitted.style.fontSize).toBeLessThanOrEqual(8);
+    expect(fitted.style.fontSize * fitted.minimumFontScale).toBeGreaterThanOrEqual(16.5);
   });
 });
 
@@ -338,7 +634,10 @@ describe('A-023 QuestionPanel source contract', () => {
     const style = jsxExpression(jsxAttribute(text, 'style'));
     expect(style, 'question Text must have a style expression').toBeDefined();
     if (style !== undefined) {
-      expect(containsPath(style, [binding, 'style']), 'classified style is not applied to Text').toBe(true);
+      expect(
+        appliesStylePath(style, [binding, 'style']),
+        'classified style is not actively applied to Text',
+      ).toBe(true);
     }
 
     for (const property of ['numberOfLines', 'adjustsFontSizeToFit', 'minimumFontScale'] as const) {
@@ -357,7 +656,9 @@ describe('A-023 QuestionPanel source contract', () => {
       objectProperty(row, 'height'),
       'questionRow must not retain a fixed height while prompts become multiline',
     ).toBeUndefined();
-    expect(numericLiteral(objectProperty(row, 'minHeight'))).toBeGreaterThanOrEqual(56);
+    const minHeight = numericLiteral(objectProperty(row, 'minHeight'));
+    expect(minHeight).toBeGreaterThanOrEqual(56);
+    expect(minHeight).toBeLessThanOrEqual(100);
   });
 
   it('spec(A-023:AC-3) exposes the original full question.text as the header accessibilityLabel', () => {
@@ -370,19 +671,15 @@ describe('A-023 QuestionPanel source contract', () => {
   });
 
   it('spec(A-023:AC-4) retains the fuse rule and the two-by-two four-choice grid', () => {
-    const panelText = normalizedText(panel);
-
-    expect(panelText).toContain('question.choices.slice(0,2)');
-    expect(panelText).toContain('question.choices.slice(2,4)');
-    expect(panelText).toContain('1-PERFECT_SHOT_TIMER_FRACTION');
-    expect(panelText).toContain('flex:PERFECT_SHOT_TIMER_FRACTION');
-
     const fuseTrack = styleObject(source, 'fuseTrack');
     const grid = styleObject(source, 'grid');
     const gridRow = styleObject(source, 'gridRow');
     const choiceCell = styleObject(source, 'choiceCell');
     const choice = styleObject(source, 'choice');
 
+    expect(liveFuse(panel), 'the live returned fuse must stay tuning-driven').toBe(true);
+    expect(liveChoiceGrid(panel), 'the live grid must render choices 0–3 once in two rows').toBe(true);
+    expect(liveChoiceTapPath(source), 'the rendered Choice/Pressable must apply its fill styles').toBe(true);
     expect(numericLiteral(objectProperty(fuseTrack, 'height'))).toBe(18);
     expect(numericLiteral(objectProperty(grid, 'flex'))).toBe(1);
     expect(numericLiteral(objectProperty(gridRow, 'flex'))).toBe(1);
@@ -390,5 +687,50 @@ describe('A-023 QuestionPanel source contract', () => {
     expect(numericLiteral(objectProperty(choiceCell, 'flex'))).toBe(1);
     expect(numericLiteral(objectProperty(choiceCell, 'minHeight'))).toBeGreaterThanOrEqual(64);
     expect(numericLiteral(objectProperty(choice, 'flex'))).toBe(1);
+  });
+
+  it('spec(A-023:AC-2) rejects a fully fitted dead header beside an unsafe visible question row', () => {
+    const mutated = parseSourceText(`
+      import { questionTypographyFor as fit } from '../../theme/questionTypography';
+      function QuestionPanel({ question }) {
+        const treatment = fit(question.text);
+        return (
+          <View style={s.wrap}>
+            <View style={s.questionRow}>
+              <Text accessibilityRole="header">{question.text}</Text>
+            </View>
+            {false ? (
+              <Text
+                accessibilityRole="header"
+                accessibilityLabel={question.text}
+                style={treatment.style}
+                numberOfLines={treatment.numberOfLines}
+                adjustsFontSizeToFit={treatment.adjustsFontSizeToFit}
+                minimumFontScale={treatment.minimumFontScale}
+              >
+                {question.text}
+              </Text>
+            ) : null}
+          </View>
+        );
+      }
+    `);
+
+    expect(completeQuestionWiring(mutated)).toBe(false);
+  });
+
+  it('spec(A-023:AC-4) rejects a removed live grid even when its old source survives in a comment', () => {
+    const mutated = parseSourceText(`
+      function QuestionPanel({ question }) {
+        return (
+          <View style={s.wrap}>
+            {/* question.choices.slice(0, 2); question.choices.slice(2, 4);
+                <View style={s.grid}><View style={s.gridRow}><Choice value={value} /></View></View> */}
+          </View>
+        );
+      }
+    `);
+
+    expect(liveChoiceGrid(panelFunction(mutated))).toBe(false);
   });
 });
