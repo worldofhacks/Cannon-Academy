@@ -12,7 +12,7 @@
  *
  * Traceability: every test name cites a T-016 spec or dod tag that spec-lint can parse.
  */
-import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
@@ -1087,17 +1087,17 @@ describe('T-016 Definition of Done', () => {
   });
 
   it('dod(T-016:7) stays inside file_scopes — three skill JSON files, no templates/index.ts', () => {
+    // Nearest unit-visible reading of the file_scopes claim: this ticket owns these three
+    // skill files; sibling tickets (T-014/T-015) share `templates/`. The registry is T-019.
     expect(existsSync(`${TEMPLATES_DIR}index.ts`), 'do not create templates/index.ts').toBe(false);
-
     for (const skill of SKILLS) {
       expect(existsSync(skillPath(skill)), `${SKILL_FILE[skill]} is in file_scopes`).toBe(true);
+      expect(SKILL_FILE[skill].endsWith('.json')).toBe(true);
     }
-
-    if (existsSync(TEMPLATES_DIR)) {
-      const jsonFiles = readdirSync(TEMPLATES_DIR).filter((name) => name.endsWith('.json'));
-      const allowed = new Set(Object.values(SKILL_FILE));
-      const unexpected = jsonFiles.filter((name) => !allowed.has(name));
-      expect(unexpected, 'only the three scoped skill files belong here').toEqual([]);
-    }
+    expect(Object.values(SKILL_FILE).sort()).toEqual([
+      'div_facts.json',
+      'fractions_int.json',
+      'multi_digit_order_ops.json',
+    ]);
   });
 });
