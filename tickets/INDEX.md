@@ -53,7 +53,7 @@ README, HANDOFF, or STATE — those documents link here.
 | A-036 | app | Documentation reconciliation — current behavior, backend, and limits agree | backlog | D6 | A-010, A-012, A-015, A-026, A-028, A-031, A-033, A-034, A-035, A-038, A-039, A-040, A-041 | ticket/a-036-doc-reconciliation | [A-036](app/A-036.md) |
 | A-037 | app | Release proof — native demo flow and production redeploy | backlog | D7 | A-036, A-038 | ticket/a-037-demo-release | [A-037](app/A-037.md) |
 | A-038 | app | Demo navigation — every built screen is reachable from the chart | backlog | G5 | A-010, A-012, A-015, A-028, A-031, A-033, A-034 | ticket/a-038-demo-navigation | [A-038](app/A-038.md) |
-| A-039 | app | Canonical duel core — one rules machine with a presentation adapter | backlog | G1 | A-016, T-020, T-021, T-036 | ticket/a-039-canonical-duel-core | [A-039](app/A-039.md) |
+| A-039 | app | Canonical duel core — one rules machine with a presentation adapter | review-passed | G1 | A-016, T-020, T-021, T-036 | ticket/a-039-canonical-duel-core | [A-039](app/A-039.md) |
 | A-040 | app | Cloud-safe profile sync — one local-first dispatcher and owner-only schema | backlog | D4 | A-026, A-030, A-032, A-041 | ticket/a-040-profile-sync | [A-040](app/A-040.md) |
 | A-041 | app | Durable captain contract — mercy and reward receipts survive relaunch | review-passed | G2 | A-027 | ticket/a-041-durable-captain | [A-041](app/A-041.md) |
 | A-042 | app | Demo launch gate and unclipped ship picker | review-passed | RELEASE-HOTFIX | A-005, A-025 | ticket/a-042-launch-picker | [A-042](app/A-042.md) |
