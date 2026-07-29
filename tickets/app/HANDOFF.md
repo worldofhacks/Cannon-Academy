@@ -1,3 +1,104 @@
+# App track — handoff
+
+Verification date: 2026-07-29 (afternoon, America/Chicago).
+
+**Supersedes** older noon-deadline and agent-recovery snapshots in git history.
+
+Live ticket lifecycle: [`tickets/INDEX.md`](../INDEX.md) only. Do not treat wave tables in
+`APP-TICKETS.md` or `STATE.md` as current.
+
+---
+
+## 1. Where the code and deploy are
+
+|                          |                                                                                              |
+| ------------------------ | -------------------------------------------------------------------------------------------- |
+| Integration branch       | `app/shell` (worktree `.worktrees/wt-app`)                                                   |
+| Engine branch            | `swarm/engine-core`                                                                          |
+| Described docs tip       | whatever `git rev-parse --short HEAD` prints in this worktree after the A-044 commit         |
+| Deployed web bundle      | **`28f4ccc`** (may lag docs HEAD)                                                            |
+| Production alias         | <https://cannon-academy.expo.app>                                                            |
+| Immutable deploy (A-042) | <https://cannon-academy--wejre1bucz.expo.app>                                                |
+| Preceding rollback       | <https://cannon-academy--2f4tf1erk3.expo.app>                                                |
+| GitHub                   | <https://github.com/worldofhacks/Cannon-Academy>                                             |
+| GitLab                   | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy>                                |
+| Owner PR                 | <https://github.com/worldofhacks/Cannon-Academy/pull/2> (`app/shell` → `main`, do not merge) |
+
+Mirror tip check (re-run before claiming “pushed”):
+
+```bash
+git ls-remote origin refs/heads/app/shell refs/heads/swarm/engine-core refs/heads/main
+git ls-remote gitlab refs/heads/app/shell refs/heads/swarm/engine-core refs/heads/main
+```
+
+On 2026-07-29 pre-doc-push, both remotes had `app/shell` at `4740d3d`, `swarm/engine-core` at
+`91c013c`, GitHub `main` at `aea6fe2`, GitLab `main` at `b498a96`. Re-inspect after every push.
+
+iOS space-free worktree: `/Users/quietguy/Documents/Dev/Gauntlet/cannon-academy-ios` — see
+[`RELEASE.md`](../../RELEASE.md).
+
+---
+
+## 2. Canonical ticket frontier
+
+```bash
+node scripts/docs/build-ticket-index.mjs --check
+# or open tickets/INDEX.md
+```
+
+Doc baseline tickets: **A-035** (index generator) then **A-044** (this reviewer baseline).  
+**A-036** stays backlog until its feature dependencies finish — do not run it in parallel with
+A-044-style landing edits.
+
+Near-term product frontier (confirm statuses in INDEX, not here): band-safe training (A-027),
+canonical duel core (A-039), responsive surfaces (A-043), Firebase session (A-026), guided duel
+depth (A-015), harbor/ranks (A-010 / A-012).
+
+---
+
+## 3. Known limitations (honest)
+
+- Guided duel route exists; teaching depth is incomplete (A-015).
+- Mercy/adaptive bot not wired into the live app rival path (A-030).
+- No harbor or ranks screens.
+- Firebase client + deny-all rules exist; anonymous boot and profile sync are **not** on the
+  play path; AsyncStorage is authoritative.
+- Tablet/desktop layout contract open (A-043).
+- Headless Vitest only — UI crashes have shipped past green suites before; smoke the running app.
+
+D-8 is implemented on `app/shell`: duel timeouts and range `answerDrill(..., null)` charge neither
+`asked` nor `correct` (T-036 + A-017).
+
+---
+
+## 4. Exact next commands
+
+```bash
+# gates
+npx prettier --check .
+npx eslint . --max-warnings 0
+npx tsc --noEmit
+npx vitest run
+node scripts/docs/build-ticket-index.mjs --check
+
+# web / local
+npx expo start
+# or open https://cannon-academy.expo.app
+
+# after an accepted app/shell commit
+git push origin app/shell
+git push gitlab app/shell
+```
+
+Promote/rollback: [`RELEASE.md`](../../RELEASE.md). Reviewer landing: [`README.md`](../../README.md).
+
+---
+
+## Historical snapshot (superseded — 2026-07-29 10:35)
+
+> Retired ops narrative retained for incident and schedule archaeology. Not current.
+> Live handoff is the section above this marker.
+
 # App track — handoff, 2026-07-29 10:35
 
 **Submission target: today, ~12:00.** Read this file, then `git log --oneline -15`, before anything.

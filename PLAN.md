@@ -1,3 +1,8 @@
+> **Historical / planning document (A-044).** This file records the original pitch, schedule, and
+> MVP intent. It is **not** live ticket status and may describe features that are not shipped.
+> Current behavior: [`README.md`](README.md). Deploy/runbook: [`RELEASE.md`](RELEASE.md). Live
+> tickets: [`tickets/INDEX.md`](tickets/INDEX.md). Final post-feature reconciliation remains **A-036**.
+
 # Cannon Academy — K-5 Math Duels on the High Seas
 
 v3 final · turn-based pirate concept, locked after differentiation review · July 27, 2026 · MVP day 2, submission day 5

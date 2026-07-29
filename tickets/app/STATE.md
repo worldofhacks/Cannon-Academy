@@ -1,3 +1,7 @@
+> **Retired status file (A-044).** Superseded first by HANDOFF, then by [`../INDEX.md`](../INDEX.md)
+> for ticket lifecycle and [`../../README.md`](../../README.md) for product truth. Retained as a
+> historical day-3 narrative only.
+
 # App track — resume point
 
 **Updated 2026-07-29 (day 3 of 5, submission Sat 2026-08-01).**

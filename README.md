@@ -1,96 +1,147 @@
 # Cannon Academy
 
-**Math on the High Seas** — a K-5 educational game where solving math powers every action on your ship.
+**Math on the High Seas** — a K–5 game where solving math powers every action on your ship.
 
-Turn-based naval duels: pick a cannon, answer its math question during the reload, and a correct answer fires the volley. Answer speed aims the shot. Harder cannons demand harder problems and hit harder. Master a skill at an island's gunnery range to unlock its cannon and sail on. You're a young captain — the pirates, ghost ships, and krakens are the enemy.
+Turn-based naval duels: pick a cannon, answer its math question during the reload, and a correct
+answer fires the volley. Answer speed aims the shot. Harder cannons demand harder problems and hit
+harder. Master a skill at an island's gunnery range to unlock its cannon and sail on.
 
-Solo build, 5-day timebox. **Day 1 is Tuesday July 28, 2026. Submission is Saturday August 1.**
+**Play the live web build:** <https://cannon-academy.expo.app>
 
 ---
 
-## Status
+## Start here
 
-Planning is complete and adversarially reviewed. Two design decisions are open and owner-blocked —
-**T-029** (does a K-1 captain get a third starter cannon) and **T-032** (placement pre-grants the
-cannons mastery is meant to award). Neither blocks code; both change content.
+| Need                                   | Go to                                                         |
+| -------------------------------------- | ------------------------------------------------------------- |
+| Live app (EAS Hosting)                 | <https://cannon-academy.expo.app>                             |
+| Ticket status (canonical)              | [`tickets/INDEX.md`](tickets/INDEX.md)                        |
+| Architecture / target design           | [`ARCHITECTURE.md`](ARCHITECTURE.md)                          |
+| Build, deploy, rollback                | [`RELEASE.md`](RELEASE.md)                                    |
+| Dated ops snapshot                     | [`tickets/app/HANDOFF.md`](tickets/app/HANDOFF.md)            |
+| Original pitch & schedule (historical) | [`PLAN.md`](PLAN.md)                                          |
+| GitHub mirror                          | <https://github.com/worldofhacks/Cannon-Academy>              |
+| GitLab mirror                          | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy> |
 
-| Artifact                                            | State                                                                            |
-| --------------------------------------------------- | -------------------------------------------------------------------------------- |
-| Concept, name, differentiation                      | Locked (`PLAN.md`)                                                               |
-| Game design + 5-day schedule                        | Locked (`PLAN.md`)                                                               |
-| Technical architecture                              | Locked (`ARCHITECTURE.md`)                                                       |
-| UI approach + art pipeline                          | Locked (`ARCHITECTURE.md` §3.6, §7)                                              |
-| Adversarial review (schedule / technical / design)  | Complete — findings folded in                                                    |
-| Repo scaffold                                       | Complete (Vitest + TS strict + lint gates)                                       |
-| Engine core (`src/engine/`, `src/content/`)         | Waves 1–3 merged — 1,229 tests. Wave 4 at the freeze gate (engine track)         |
-| App shell (`app/`, `src/components/`, `src/theme/`) | Duel screen playable end to end against the real engine (app track, `app/shell`) |
-| Design system                                       | Tokens, type scale and sprites transcribed from the Claude Design boards         |
+Integration branch: **`app/shell`**. Engine track: **`swarm/engine-core`**. Neither repository is a
+full mirror of the other: GitHub `main` and GitLab `main` intentionally differ, and GitHub
+[PR #2](https://github.com/worldofhacks/Cannon-Academy/pull/2) (`app/shell` → `main`) stays open for
+**owner review only** — do not merge it from an agent session.
 
-## Documents
+The production web bundle currently served at the alias was built from commit **`28f4ccc`**. Local
+`app/shell` may be ahead with documentation and later tickets; that does not mean `app/shell` is on
+`main`.
 
-- **`PLAN.md`** — the pitch, game design (duel loop, armory, mastery, economy, encounters), the 2-day MVP milestone with its definition of done, the day-by-day schedule, risks, and the competitive/similarity audit. Read this for _what_ we're building.
-- **`ARCHITECTURE.md`** — every stack layer with options considered, the decision, and revisit conditions; UI structure and design tokens; the art pipeline; the engine design (question templates, duel state machine, damage model); backend schema and known React Native gotchas; testing, builds, project structure. Read this for _how_.
+---
 
-## The decisions, at a glance
+## What ships today
 
-|                  |                                                                                                           |
-| ---------------- | --------------------------------------------------------------------------------------------------------- |
-| **Genre**        | Turn-based naval duel, question-gated volleys                                                             |
-| **Platform**     | Expo SDK 57 / RN 0.86 / TypeScript strict, portrait-locked                                                |
-| **Dev loop**     | **Development build, not Expo Go** (App Store Expo Go is SDK 54) — Android dev client first               |
-| **Rendering**    | Plain RN Views + Reanimated 4.5 + pre-rendered sprites + Lottie — no game engine, no 3D runtime           |
-| **Art**          | Free CC0 low-poly packs rendered to 2D sprites in Blender from one locked camera                          |
-| **State**        | Zustand + pure reducers; `src/engine/` has zero React imports                                             |
-| **Answer input** | Four-choice taps, universally (mobile smoothness, K-friendly, one input for every skill)                  |
-| **Backend**      | Firebase JS SDK v12+ — anonymous auth + Firestore, local-first sync                                       |
-| **Placement**    | Grade picker at onboarding (K-1 / 2-3 / 4-5) pre-unlocks content to band                                  |
-| **Opponents**    | Bots behind one `Opponent` interface — the seam a remote player fills later                               |
-| **Distribution** | Android APK via Firebase App Distribution + web build (committed); TestFlight if Apple activates (upside) |
+Verified against routes and engine content on `app/shell` (2026-07-29):
 
-## MVP definition of done (end of day 2)
+- **Playable loop:** splash → grade picker → captain name/flag → sea chart → duel → coins →
+  gunnery range → mastery unlock → gun deck (equip) → duel again.
+- **Routes:** `/`, `/onboarding`, `/name-flag`, `/chart`, `/duel`, `/guided-duel`, `/gun-deck`,
+  `/range`.
+- **Catalog:** 9 skills, 72 question templates, 11 cannons, 5 islands.
+- **Engine:** pure TypeScript duel reducer, damage, mastery, drill, placement, economy; Vitest in a
+  `node` environment (headless logic — not component rendering).
+- **Timeouts (D-8):** free in both lanes — duel store and `answerDrill(..., null)` / T-036. A
+  timeout does not charge mastery.
+- **Tray:** `TRAY_CAPACITY = 3` with gun-deck loadout.
 
-Everything here must be green. Nothing here may slip. Grey-box art passes; sound is banned until day 3.
+Run the suite locally rather than trusting a copied total:
 
-- [ ] Fresh install → grade picker → name/flag
-- [ ] Guided first duel, winnable, cannot hurt you
-- [ ] Sea chart → win a real duel vs a bot (four-choice answers, speed-aimed volleys, two starter cannons that are a genuine choice)
-- [ ] Coins paid on victory
-- [ ] Practice drill fills a mastery meter
-- [ ] Meter crossing unlocks the next cannon
-- [ ] Lose a duel: small purse, rank intact, hull reset
-- [ ] Time out a question: misfire, duel continues
-- [ ] Kill the app mid-duel → relaunch lands safely on the map, progress intact
-- [ ] Normal close/reopen: progress persisted, **same anonymous UID**
+```bash
+npx vitest run
+```
 
-**Cut in this order if behind:** chest ceremony → plain coin payout · second island → day 3 · Firestore sync → day 4 · scripted tutorial → plain easy first duel.
+---
 
-## Pre-flight (before writing code)
+## Current limitations (not shipped)
 
-1. ~~**Pay the Apple Developer $99**~~ — paid and enrolled 2026-07-28; awaiting activation (24–48h). TestFlight stays blocked until App Store Connect shows the team. See `RELEASE.md` for the three paths to a phone and which one is safe for a Saturday demo. Android + web remain the committed path either way.
-2. **Kick off the EAS dev-client build for Android** — 90-minute timebox. Expo Go is _not_ the dev loop for this project (see below). Simulator/emulator is the fallback and blocks no JS work. iOS Simulator is already building and running locally.
-3. **Create the Firebase project** — anonymous auth enabled; grab the web config.
-4. **Download the art packs** (free, CC0, no account needed): [Quaternius Pirate Kit](https://quaternius.com/packs/piratekit.html), [Kenney Pirate Kit](https://kenney.nl/assets/pirate-kit), [Kenney Pirate Pack 2D](https://kenney.nl/assets/pirate-pack) (the parachute).
-5. Confirm `npm`, Node LTS, Blender 5.1, and an EAS account are ready.
+Do not treat design text, service seams, or green unit tests as product completion.
 
-## Day 1 targets
+| Area                                      | State                                                       | Owning work  |
+| ----------------------------------------- | ----------------------------------------------------------- | ------------ |
+| Guided first duel                         | Reachable stub; teaching hold/depth incomplete              | A-015        |
+| Mercy / adaptive bot                      | Engine opponents exist; not wired as the live duel rival UX | A-030        |
+| Harbor / spend coins                      | Not built                                                   | A-010, A-033 |
+| Ranks / meta screen                       | Not built                                                   | A-012, A-038 |
+| Island & rival variety                    | Thin vs PLAN encounters                                     | A-029, A-031 |
+| Training choice / difficulty labels       | Partial; band-safety and UX still open                      | A-027, A-028 |
+| Firebase anonymous boot session           | Client exports exist; **not** mounted in `app/_layout.tsx`  | A-026        |
+| Firestore profile sync / Storage gameplay | Not used; local AsyncStorage remains authoritative          | A-040        |
+| Tablet / desktop responsiveness           | Open                                                        | A-043        |
+| Harbor chest / acquisition polish         | Open                                                        | A-032, A-041 |
 
-Scaffold with portrait lock, safe areas, and `theme/` tokens · question-template engine with four-choice output and golden tests · duel state machine as a pure reducer · duel screen (cannon select, timer, 2×2 answer grid at ≥64pt, speed-biased damage, hull bars) · victory, defeat, and timeout flows · local persistence with hydration gating · Firebase auth with `initializeAuth` persistence · `dev.tsx` tuning sliders + "grant progressed captain" button.
+Final cross-doc reconciliation after those features land is **A-036** (still backlog). This README
+is the A-044 reviewer baseline, not an evergreen claim.
 
-Grey-box art. No sound, no screen shake. Juice starts day 3.
+---
 
-## Traps already identified — don't rediscover them
+## Hosting and backend (separate facts)
 
-- **Expo Go won't work.** The iOS App Store build is 54.0.2 (Sept 2025) and supports SDK 54, not 57; Expo now calls it "an educational tool." Use a development build — one 15-minute EAS build, then the loop is identical.
-- **`initializeAuth` + `getReactNativePersistence(AsyncStorage)` is mandatory.** The Firebase JS SDK defaults to in-memory auth on RN and will mint a new anonymous UID on every cold start — silently forking cloud identity while local progress looks fine.
-- **Gate the root layout on Zustand's `hasHydrated`.** AsyncStorage rehydration is async; an ungated redirect fires against empty state.
-- **The leaderboard is a separate public `leaderboard/{uid}` mirror**, not a query over `users` — rules aren't filters, and world-readable `users` would expose every child's profile. `rankTier` is numeric so the ladder sorts.
-- **Pin `firebase@^12`** and skip the obsolete `unstable_enablePackageExports=false` Metro workaround.
-- **`lottie-react-native` on web needs `@lottiefiles/dotlottie-react`** or the export fails to resolve.
-- **Bot promises need a turn token** — discard resolutions whose token no longer matches the current turn.
-- **Don't buy the voxel pirate pack.** monogon's is CC BY-**ND** — NoDerivatives forbids pre-rendering it to sprites. The free CC0 packs have no such restriction.
+**Web production = EAS Hosting only**
 
-Full context for each is in `ARCHITECTURE.md`.
+| URL                                           | Role                                                                   |
+| --------------------------------------------- | ---------------------------------------------------------------------- |
+| <https://cannon-academy.expo.app>             | Production alias                                                       |
+| <https://cannon-academy--wejre1bucz.expo.app> | Immutable A-042 deployment (`28f4ccc`) — probed HTTP 200 on 2026-07-29 |
+| <https://cannon-academy--2f4tf1erk3.expo.app> | Preceding immutable rollback target — probed HTTP 200 on 2026-07-29    |
 
-## Credits
+Firebase is **not** a second web host (`firebase.json` has rules only, no `hosting` block).
+Railway is not part of this architecture. Promote/rollback commands live in [`RELEASE.md`](RELEASE.md).
 
-All art is CC0 (public domain) from [Quaternius](https://quaternius.com/) and [Kenney](https://kenney.nl/) — no attribution required, but both deserve it anyway.
+**Firebase — four different states**
+
+1. **Client exports** — `src/services/firebase.ts`, `src/services/auth.ts`; six public
+   `EXPO_PUBLIC_FIREBASE_*` names in `.env.example`; values live in ignored `.env.local` / EAS env.
+2. **Provisioned project** — project id `cannon-academy`; Firestore permanent location `nam5`;
+   default Storage bucket `cannon-academy.firebasestorage.app` in `us-central1`; shipped
+   `firestore.rules` / `storage.rules` are deny-all; Blaze billing is active for Storage.
+3. **Anonymous boot session** — **not wired** into app startup.
+4. **Profile sync / Storage gameplay** — **not used**. Local play and AsyncStorage remain
+   authoritative.
+
+---
+
+## Quick start (local Expo)
+
+```bash
+npm install
+npx expo start
+```
+
+iOS Simulator note: the repo path contains a space and breaks some Xcode script phases. Use the
+space-free worktree documented in [`RELEASE.md`](RELEASE.md).
+
+```bash
+npx expo run:ios --device "iPhone 17 Pro"   # from the space-free worktree
+```
+
+Development builds are required (App Store Expo Go is an older SDK).
+
+---
+
+## Repository mirrors (inspected 2026-07-29)
+
+| Remote          | URL                                                           | `app/shell`              | `swarm/engine-core` | `main`    |
+| --------------- | ------------------------------------------------------------- | ------------------------ | ------------------- | --------- |
+| GitHub `origin` | <https://github.com/worldofhacks/Cannon-Academy>              | `4740d3d` at probe time* | `91c013c`           | `aea6fe2` |
+| GitLab `gitlab` | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy> | `4740d3d` at probe time* | `91c013c`           | `b498a96` |
+
+\*Push `app/shell` after this documentation commit before treating the tip as mirrored. The
+deployed web bundle remains `28f4ccc` until a new EAS promote.
+
+---
+
+## Documents — what is current vs historical
+
+| Document                                                                                                            | Role                                                          |
+| ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- |
+| `tickets/INDEX.md`                                                                                                  | **Only** live cross-track ticket status (generated)           |
+| `README.md` / `RELEASE.md` / `tickets/app/HANDOFF.md`                                                               | Current reviewer / ops surfaces                               |
+| `PLAN.md`, `ARCHITECTURE.md`, `COORDINATION.md`, `TICKETS.md`, `tickets/app/APP-TICKETS.md`, `tickets/app/STATE.md` | Historical or target-design — see banners at top of each file |
+
+Asset and design-board provenance notes: [`assets/README.md`](assets/README.md),
+[`design/boards/README.md`](design/boards/README.md).

@@ -1,9 +1,51 @@
-# Getting Cannon Academy onto a phone
+# Release runbook — phone builds and EAS Hosting
 
-Three paths, in the order they become available. The first works today; the third is the one
-that survives the demo.
+Current reviewer landing: [`README.md`](README.md). Ticket status: [`tickets/INDEX.md`](tickets/INDEX.md).
 
-## 0. Constraint you will hit before any of them
+**Web production is EAS Hosting only** at <https://cannon-academy.expo.app>. Firebase is the
+backend boundary (Auth/Firestore/Storage client + rules), not a web host. Railway is unused.
+
+---
+
+## A. EAS Hosting (web)
+
+| URL                                           | Role                                            | Evidence                   |
+| --------------------------------------------- | ----------------------------------------------- | -------------------------- |
+| <https://cannon-academy.expo.app>             | Production alias                                | HTTP 200 probed 2026-07-29 |
+| <https://cannon-academy--wejre1bucz.expo.app> | Immutable deployment for code `28f4ccc` (A-042) | HTTP 200 probed 2026-07-29 |
+| <https://cannon-academy--2f4tf1erk3.expo.app> | Preceding immutable rollback target             | HTTP 200 probed 2026-07-29 |
+
+Deployments are immutable. Promote or roll back by reassigning the production alias.
+
+```bash
+# export + deploy a new immutable preview URL
+npx expo export --platform web
+eas deploy
+
+# promote that deployment (or any known id) to the production alias
+eas deploy --prod
+# or:
+eas deploy:alias --prod --id=<deploymentId>
+
+# roll production back to the previous immutable deployment
+eas deploy:alias --prod --id=2f4tf1erk3
+```
+
+Do not document Firebase Hosting or a second production web target. `firebase.json` ships
+Firestore/Storage rules only.
+
+**Firebase env (no secrets in git):** six `EXPO_PUBLIC_FIREBASE_*` names in `.env.example`; real
+values in ignored `.env.local` and EAS preview/production environments. Client exports exist;
+anonymous boot and profile sync are separate product tickets — local AsyncStorage remains
+authoritative for play.
+
+---
+
+## B. Getting the app onto a phone
+
+Three paths, in the order they become available.
+
+### 0. Constraint you will hit before any of them
 
 **The repo path contains a space** (`.../Gauntlet/Math Game/...`) and iOS build scripts break on
 it. Xcode generates script phases of the form:
@@ -34,7 +76,7 @@ CocoaPods also needs a UTF-8 locale or it reads the path as ASCII-8BIT and crash
 export LANG=en_US.UTF-8 LC_ALL=en_US.UTF-8
 ```
 
-## 1. Simulator — works now, no account
+### 1. Simulator — works now, no account
 
 ```bash
 npx expo run:ios --device "iPhone 17 Pro"
@@ -44,7 +86,7 @@ Builds, installs and launches. This is the loop for development. It cannot run o
 phone, and Expo Go is not an option — the App Store build of Expo Go is SDK 54 and this project
 is SDK 57.
 
-## 2. USB device build — works now, free provisioning, expires in 7 days
+### 2. USB device build — works now, free provisioning, expires in 7 days
 
 Puts the app on a real iPhone **without** the paid account. Xcode signs it with a personal team
 certificate.
@@ -58,7 +100,7 @@ certificate.
 The app stops launching after **7 days** and has to be rebuilt. Fine for a demo you drive
 yourself; not fine for handing the phone to someone next week.
 
-## 3. TestFlight — needs the paid account active
+### 3. TestFlight — needs the paid account active
 
 Enrollment was paid on **2026-07-28**. Activation takes 24–48h, and nothing below works until
 App Store Connect shows the team.
@@ -87,8 +129,8 @@ eas submit --platform ios --profile production
 5. TestFlight processing takes 5–30 minutes. Internal testers on the team need no review;
    external testers need a Beta App Review pass, which is not same-day.
 
-**Budget the review.** If the demo is Saturday 2026-08-01, an external-tester TestFlight link is
-not a safe plan. Internal testers are, and so is path 2.
+**Budget the review.** An external-tester TestFlight link is not a safe same-week plan. Internal
+testers are, and so is path 2.
 
 ## Android
 

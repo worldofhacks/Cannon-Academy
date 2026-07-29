@@ -1,3 +1,7 @@
+> **Historical app ticket ledger (A-044).** Counts, wave tables, and checklists below are snapshots
+> and may contradict frontmatter. Live status: [`../INDEX.md`](../INDEX.md) only. Current product:
+> [`../../README.md`](../../README.md).
+
 # App tickets — Cannon Academy player spine, screens, and flow
 
 **Scope:** `app/**`, `src/components/**`, `src/stores/**`, `src/services/**` — the layer

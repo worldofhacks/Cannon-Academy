@@ -1,3 +1,13 @@
+> **Historical / target-design document (A-044).** Stack decisions and engine design here are the
+> contract intent; screens, services, and dependencies named below may be **target design** rather
+> than current code. Shipped routes and limitations: [`README.md`](README.md). Live tickets:
+> [`tickets/INDEX.md`](tickets/INDEX.md). Deploy: [`RELEASE.md`](RELEASE.md). Web production is EAS
+> Hosting at <https://cannon-academy.expo.app> (not Firebase Hosting).
+>
+> **Not current architecture unless code exists:** `/harbor`, `/ranks`, `/dev`, Lottie-driven FX,
+> live Firebase Auth boot in `app/_layout.tsx`, Firestore gameplay sync, and a second Firebase
+> Hosting web target. Owning backlog tickets live in INDEX.
+
 # Cannon Academy — Architecture
 
 _K-5 math duels on the high seas. Turn-based naval combat where correct answers fire cannons and answer speed aims the shot._

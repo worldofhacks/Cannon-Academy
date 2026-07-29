@@ -1,24 +1,13 @@
-# Screen boards — the seven designed screens
+# Screen boards
 
-`Cannon Academy Design Boards.dc.html` contains SEVEN full phone screens, each marked with a
-`data-screen-label` attribute. Enumerate them with:
+The design reference originally lived in a Claude Design export named
+`Cannon Academy Design Boards.dc.html` with seven `data-screen-label` screens (Splash, Duel intro,
+Gun deck, Sea chart, Gunnery range, Name and flag, Guided first duel).
 
-```js
-[...document.querySelectorAll('[data-screen-label]')].map((e) => e.getAttribute('data-screen-label'));
-// → Splash, Duel intro, Gun deck, Sea chart, Gunnery range, Name and flag, Guided first duel
-```
+**That `.dc.html` artifact is absent from this repository** (verified 2026-07-29). Reviewers cannot
+open it here. Geometry that was transcribed earlier may still exist as committed React Native
+layouts and as `design/fixtures/duel-375.json`; those fixtures are not a substitute for the missing
+board file.
 
-**This was missed until 2026-07-29.** The splash was transcribed from board 4a and the grade picker
-from 1a, but nobody enumerated `data-screen-label`, so the sea chart and gunnery range were
-IMPROVISED and the remaining four were stubbed. Every screen ticket must start here.
-
-Extract one screen's resolved geometry with:
-
-```js
-[...document.querySelectorAll('[data-screen-label]')].find(
-  (e) => e.getAttribute('data-screen-label') === 'Sea chart',
-).outerHTML;
-```
-
-The renderer resolves inline styles to computed values, so what comes back is measured, not
-authored — `rgb(223, 241, 251)` and `top: 26px`, not a token name.
+Do not instruct agents to open a board file that is not in the tree. Current product routes:
+[`../../README.md`](../../README.md).

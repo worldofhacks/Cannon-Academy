@@ -1,3 +1,9 @@
+> **Historical track-contract document (A-044).** Interface ownership below still matters; the
+> “current state at time of writing” and any drill note that a timeout `choiceIndex === null`
+> **counts as a miss** are superseded by **D-8 / T-036** (timeout is free in `src/engine/drill.ts`
+> and the duel store). Live tickets: [`tickets/INDEX.md`](tickets/INDEX.md). Current product truth:
+> [`README.md`](README.md).
+
 # Two-track coordination — engine swarm vs app shell
 
 Two agents are working this repo concurrently. This file is the contract between them.
@@ -55,7 +61,7 @@ Source: `src/engine/drill.ts` (merged on `swarm/engine-core`).
 ```ts
 export interface DrillAnswer {
   readonly templateId: string;
-  readonly choiceIndex: number | null; // null = timed out (counts as miss)
+  readonly choiceIndex: number | null; // null = timed out (D-8 / T-036: free — not a miss)
   readonly correct: boolean;
   readonly elapsedMs: number;
 }
@@ -92,7 +98,8 @@ export function answerDrill(
 Notes for Track B (`app/range.tsx`):
 
 - Mastery fills via `applyAnswer(..., 'range', ...)` at full rate; caller runs `resolveUnlocks`.
-- Timeout = `choiceIndex === null` (miss, not skip). No `Date` / `Math.random` in the engine.
+- Timeout = `choiceIndex === null` (D-8 / T-036: logged only, free — not a miss). No `Date` /
+  `Math.random` in the engine.
 - Session is plain JSON (interrupt/restore safe). Post-complete `answerDrill` throws.
 - Inject a skill's template pool; do not edit `src/engine/**` from the app track.
 

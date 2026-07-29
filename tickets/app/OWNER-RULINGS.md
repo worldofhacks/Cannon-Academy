@@ -134,10 +134,9 @@ act. A reading-speed penalty on unlocks violated that.
 mastery from two places:
 
 - **Duel lane** (`src/stores/duel.ts` `TIMEOUT` case) — app track, implemented under A-017.
-- **Range lane** (`src/engine/drill.ts`, where `choiceIndex: null` is "counted as an incorrect
-  attempt") — engine track, delegated under this ruling. The drill must not charge an expired
-  timer against mastery; whether the drill serves a replacement question is the engine's design
-  call within the ruling.
+- **Range lane** (`src/engine/drill.ts`, `choiceIndex: null`) — engine track under **T-036**.
+  Implemented on `swarm/engine-core` and integrated into `app/shell`: a timeout is logged only,
+  mastery/`answered` do not advance, and the same question is kept for retry.
 
 The lanes must not drift: a timeout is free in both, or the ruling is not implemented.
 
@@ -149,11 +148,13 @@ The lanes must not drift: a timeout is free in both, or the ruling is not implem
 authorized the orchestrator to make the remaining product decisions and required the player's own
 cannons to expose different difficulties and weapons immediately.
 
-**Supersession of D-6, narrowly scoped.** K-1 still receives only the two catalog starters.
-Grades 2–3 additionally receive the Six-Pounder, and grades 4–5 additionally receive the
-Twelve-Pounder. These are the only non-starter placement grants.
+**Narrow supersession of D-6.** D-6 still holds for K-1: placement grants the two catalog starters
+only. D-9 adds the only approved exceptions — grades 2–3 also receive the Six-Pounder, and grades
+4–5 also receive the Twelve-Pounder. No other non-starter may be placement-granted under this
+ruling.
 
 Both cannons retain their catalog `range` unlock for players who did not receive them at placement.
 They therefore have two intentional, band-specific acquisition paths; every other range cannon
-remains mastery-earned, and the Nine-Pounder remains chest-only. A-032 owns the complete
-band-by-cannon policy audit and A-034 owns the placement/presentation change.
+remains mastery-earned, and the Nine-Pounder remains chest-only. **A-032** owns the complete
+band-by-cannon policy audit; **A-034** owns the placement/presentation change that surfaces those
+difficulties and weapons.

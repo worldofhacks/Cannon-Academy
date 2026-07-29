@@ -1,12 +1,13 @@
-# Raw downloads go here — nothing in this folder ships
+# Raw asset inputs — nothing here ships in the app bundle
 
-| Folder | Download from | Format to grab |
-|---|---|---|
-| `quaternius-pirate-kit/` | https://quaternius.com/packs/piratekit.html | **glTF / GLB** |
-| `kenney-pirate-kit/` | https://kenney.nl/assets/pirate-kit | **glTF / GLB** |
-| `kenney-pirate-pack-2d/` | https://kenney.nl/assets/pirate-pack | PNG (the parachute — no Blender needed) |
+| Folder | Planned upstream | Notes |
+| --- | --- | --- |
+| `quaternius-pirate-kit/` | https://quaternius.com/packs/piratekit.html | glTF/GLB inputs present in-tree; still an input directory |
+| `kenney-pirate-kit/` | https://kenney.nl/assets/pirate-kit | Reserved for the 3D kit |
+| `kenney-pirate-pack-2d/` | https://kenney.nl/assets/pirate-pack | Reserved for the 2D parachute pack |
 
-Unzip each pack directly into its folder. All three are CC0.
+Upstream pack pages describe their own licences (often CC0). That does **not** automatically
+licence every file under `assets/sprites/`, and this private repository has no owner-selected
+open-source licence documented here.
 
-These are inputs to `tools/studio.blend`, which renders them to `assets/sprites/` as WebP.
-See `../README.md` for the full asset list and output conventions.
+Rendered output belongs in `../sprites/`. See [`../README.md`](../README.md).
