@@ -1871,7 +1871,7 @@ Phase `tests`. Publish session API in COORDINATION.md after merge.
 **Adjudication:** `recentTemplateIds` = most-recent-first (T-007). Other ambiguities accepted as suite-pinned.
 Test-design review dispatched.
 
-### T-017 FROZEN () — ACCEPT_WITH_NITS
+### T-017 FROZEN (`34755b6a6e6d2c2e…`) — ACCEPT_WITH_NITS
 
-[T-017 test-design](5aa08818-6f0c-451a-82ca-4af9beaf2fe1): I-1 closed ( in AC-2).
-Phase → . Implementer dispatched.
+[T-017 test-design](5aa08818-6f0c-451a-82ca-4af9beaf2fe1): I-1 closed (`NEGATIVE_INFINITY` in AC-2).
+Phase → `implement`. Implementer dispatched.
