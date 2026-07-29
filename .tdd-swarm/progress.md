@@ -1381,6 +1381,26 @@ expected RED-state typecheck and unit failures.
 
 Count verified 19 → **21**, gate red on AC-20 and AC-21 only ([[L-026]]).
 
+## T-013 round 3 — accepted, pending re-review
+
+Narrow scope delivered as asked: one AC-3 reference-inequality test and three AC-16 aliasing
+tests covering `playerLoadout`, `rivalLoadout`, and `templatesBySkill` plus nested `Template[]`.
+Authored on Grok 4.5 fast after Opus hit the API limit. Re-verified by me:
+
+| Claim | Verified |
+| --- | --- |
+| Start hash `154ebee1…` → end `c5e80f2b…` | matches |
+| Diff vs merge base | suite + report only, **0 under `src/`** |
+| RED still 88: 3 `TS2307` / 51 `TS2322` / 34 `TS2578` | matches, 0 outside suite |
+| Baseline | `Tests 1229 passed` |
+| `spec-lint` | **PASS** — 16/16 AC, DoD-9 `SKIP` |
+| Prettier / ESLint / `no-todos` | 0 / 0 / PASS |
+| `types.ts` absent; scratchpad gone | yes |
+
+Liveness method held: aliasing and memoising impls passed the old suite and die on the new tests.
+Matrix 51/51 killed, 5/5 controls surviving including the three T-022 forward-compat ones.
+Implementer target remains **88 → 0**.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
