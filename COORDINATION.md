@@ -39,12 +39,60 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
 
 ## Current state at the time of writing
 
-- Engine: waves 1–4 merged on `swarm/engine-core`, **1,438 tests green**. Wave 5 in flight —
-  priority order from owner (2026-07-28): **T-014 → T-015 → T-016** (templates, ≥8/skill floor)
-  first, then **T-017** (range drill; publish session API here when it lands), **T-018**
-  (onboarding rival), **T-020** (duel reducer; publish state/event shape here — do **not** edit
-  `src/stores/duel.ts`), **T-034** last. Owner ruling **D-6** applied to **T-032** (starters-only placement). **T-029** remains owner-blocked.
-  Push `swarm/engine-core` after every ticket merge, not at wave end.
+- Engine: Wave 5 — **T-014…T-017 done** (templates + range drill; drill API published below).
+  Next: **T-018** (onboarding rival), **T-020** (duel reducer; publish state/event shape here — do
+  **not** edit `src/stores/duel.ts`), **T-034** last. Owner ruling **D-6** on **T-032**. **T-029**
+  remains owner-blocked. Push `swarm/engine-core` after every ticket merge.
 - App track (`app/shell`): owns presentation; currently uses a placeholder question service that
   must not ship — real templates from T-014…T-016 replace it.
 - iOS: Simulator + Expo web demo path; TestFlight gated on Apple Developer enrollment.
+
+## Published engine APIs (Track A → Track B)
+
+### T-017 — Gunnery-range drill (`@engine/drill`)
+
+Source: `src/engine/drill.ts` (merged on `swarm/engine-core`).
+
+```ts
+export interface DrillAnswer {
+  readonly templateId: string;
+  readonly choiceIndex: number | null; // null = timed out (counts as miss)
+  readonly correct: boolean;
+  readonly elapsedMs: number;
+}
+
+export interface DrillSession {
+  readonly skillId: SkillId;
+  readonly rng: Rng;
+  readonly length: number;
+  readonly answered: number;
+  readonly correct: number;
+  readonly recentTemplateIds: readonly string[]; // most-recent-first
+  readonly mastery: SkillMastery; // updated at full rate after each answer
+  readonly current: Question | null; // null once complete
+  readonly complete: boolean;
+  readonly log: readonly DrillAnswer[];
+  readonly templates: readonly Template[]; // retained for generate / restore
+}
+
+export function startDrill(input: {
+  readonly skillId: SkillId;
+  readonly templates: readonly Template[];
+  readonly mastery: SkillMastery;
+  readonly rng: Rng;
+  readonly length: number; // integer >= 1
+}): DrillSession;
+
+export function answerDrill(
+  session: DrillSession,
+  choiceIndex: number | null,
+  elapsedMs: number,
+): DrillSession;
+```
+
+Notes for Track B (`app/range.tsx`):
+
+- Mastery fills via `applyAnswer(..., 'range', ...)` at full rate; caller runs `resolveUnlocks`.
+- Timeout = `choiceIndex === null` (miss, not skip). No `Date` / `Math.random` in the engine.
+- Session is plain JSON (interrupt/restore safe). Post-complete `answerDrill` throws.
+- Inject a skill's template pool; do not edit `src/engine/**` from the app track.
