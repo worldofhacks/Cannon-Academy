@@ -240,3 +240,13 @@ export const MERCY_LOSS_STREAK_TRIGGER = 2;
 
 /** PLAN.md §Questions/opponents: "the next rival misfires twice". */
 export const MERCY_FORCED_MISFIRES = 2;
+
+// ============================================================================================
+// Loadout / tray
+// ============================================================================================
+
+/**
+ * PLAN.md §The armory — the duel tray shows a subset of owned cannons.
+ * Design / T-030 Context: tray capacity is 3 (gun deck board 4d; A-011).
+ */
+export const TRAY_CAPACITY = 3;
