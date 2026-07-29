@@ -20,6 +20,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import type { VictoryRewardProjection } from '../../services/victoryRewards';
 import { sprite } from '../../theme/sprites';
 import { color, radius, space, type } from '../../theme/tokens';
 
@@ -167,7 +168,7 @@ interface VictoryProps {
   readonly right: number;
   readonly asked: number;
   readonly perfects: number;
-  readonly coins: number;
+  readonly rewards: VictoryRewardProjection;
   readonly chestOpen: boolean;
   readonly onOpenChest: () => void;
   readonly onLeave: () => void;
@@ -177,7 +178,7 @@ export function VictoryPanel({
   right,
   asked,
   perfects,
-  coins,
+  rewards,
   chestOpen,
   onOpenChest,
   onLeave,
@@ -199,16 +200,22 @@ export function VictoryPanel({
       <Pressable onPress={onOpenChest} disabled={chestOpen} style={s.chestBox}>
         {chestOpen ? (
           <View style={s.chestReveal}>
-            <View style={s.rewardCard}>
-              <View style={s.rewardIcon}>
-                <Image source={sprite.cannonMobile} style={{ width: 40, height: 40 }} resizeMode="contain" />
+            {rewards.cannons.map((cannon) => (
+              <View key={cannon.id} style={s.rewardCard}>
+                <View style={s.rewardIcon}>
+                  <Image
+                    source={sprite.cannonMobile}
+                    style={{ width: 40, height: 40 }}
+                    resizeMode="contain"
+                  />
+                </View>
+                <Text style={s.rewardName}>{cannon.displayName}</Text>
+                <Text style={s.rewardTag}>NEW CANNON</Text>
               </View>
-              <Text style={s.rewardName}>Chain Shot</Text>
-              <Text style={s.rewardTag}>NEW CANNON</Text>
-            </View>
+            ))}
             <View style={s.coinRow}>
               <View style={s.coin} />
-              <Text style={s.coinCount}>+{coins}</Text>
+              <Text style={s.coinCount}>+{rewards.coins}</Text>
             </View>
           </View>
         ) : (
