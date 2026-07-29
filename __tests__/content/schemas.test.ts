@@ -7,7 +7,14 @@
  * reason per test.
  *
  * Traceability: every test cites `spec(T-003:AC-n)` in its name.
+ *
+ * T-034 appends the param-key identifier-grammar narrowing below (same file per
+ * `test_scopes`). Do not weaken the frozen T-003 / T-026 cases above the T-034 divider.
  */
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -40,6 +47,7 @@ import type {
   Template,
   Temperament,
 } from '@content/schemas';
+import { evaluateNumber } from '@engine/questions/expr';
 
 /** Compile-time exact-type equality (invariant in both directions, unlike `extends`). */
 type Exact<A, B> = (<T>() => T extends A ? 1 : 2) extends <T>() => T extends B ? 1 : 2 ? true : false;
@@ -918,5 +926,243 @@ describe('unknown keys inside the unlock union', () => {
     );
 
     expect(result.success).toBe(false);
+  });
+});
+
+// =============================================================================================
+// T-034 — narrow template param keys to T-002's IDENT grammar
+// =============================================================================================
+//
+// Locked decision: keys must match IDENT := [A-Za-z_][A-Za-z0-9_]* (T-002). Today's
+// `z.record(paramRangeSchema)` accepts any string — these cases stay RED until schemas.ts
+// narrows the key side. AC-4 measures agreement against the live evaluator so a schema-only
+// regex cannot drift from the grammar that consumes the keys.
+
+const HERE = dirname(fileURLToPath(import.meta.url));
+const REPO_ROOT = join(HERE, '../..');
+const SCHEMAS_SRC_PATH = join(REPO_ROOT, 'src/content/schemas.ts');
+const EXPR_SRC_PATH = join(REPO_ROOT, 'src/engine/questions/expr.ts');
+const TEMPLATES_DIR = join(REPO_ROOT, 'src/content/templates');
+const OWN_SOURCE = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+const TICKET_SOURCE = readFileSync(join(REPO_ROOT, 'tickets/T-034.md'), 'utf8');
+
+/** Keys spanning the full IDENT grammar (same shape as T-007 AC-19's fixture). */
+const LEGAL_PARAM_KEYS = ['_x', 'Total', 'a1', 'A_1b2', 'z_', 'a', 'n'] as const;
+
+/**
+ * Reject set enumerated by T-034 AC-2 — not sampled. Each is authorable today under
+ * `z.record` and unusable as an expression identifier.
+ */
+const ILLEGAL_PARAM_KEYS = ['a-b', '2x', '', 'a b', 'a.b'] as const;
+
+/**
+ * Shared drift corpus for AC-4: legal + illegal + a few near-misses so neither side can
+ * quietly widen or narrow without the other noticing.
+ */
+const IDENT_DRIFT_CORPUS: readonly string[] = [
+  ...LEGAL_PARAM_KEYS,
+  ...ILLEGAL_PARAM_KEYS,
+  'x-y',
+  '1a',
+  'a/b',
+  'a+b',
+  'foo.bar',
+  'a\tb',
+  '__proto__',
+  'constructor',
+  'abs',
+  '_',
+  'Z',
+  'camelCase',
+  'snake_case_1',
+];
+
+function templateWithParamKey(key: string): unknown {
+  return withOverrides(MINIMAL_TEMPLATE, {
+    id: `param-key-${key === '' ? 'empty' : key}`,
+    params: { [key]: [1, 5] },
+    answerExpr: key === '' || !/^[A-Za-z_][A-Za-z0-9_]*$/.test(key) ? '1' : key,
+  });
+}
+
+/**
+ * True when a Zod failure names `key` — either as a path segment (preferred) or inside the
+ * issue message. Empty-string keys can only be named via the path.
+ */
+function issuesNameKey(
+  issues: readonly { readonly path: readonly (string | number)[]; readonly message: string }[],
+  key: string,
+): boolean {
+  return issues.some((issue) => {
+    if (issue.path.some((segment) => segment === key)) return true;
+    return key.length > 0 && issue.message.includes(key);
+  });
+}
+
+/**
+ * T-002 IDENT membership measured through the evaluator: a string is an identifier iff it
+ * tokenises as a single IDENT and resolves from the environment. Uses a null-prototype env so
+ * `__proto__` / `constructor` probe the grammar, not Object.prototype.
+ */
+function isT002Ident(key: string): boolean {
+  const env = Object.create(null) as Record<string, number>;
+  env[key] = 7;
+  try {
+    return evaluateNumber(key, env) === 7;
+  } catch {
+    return false;
+  }
+}
+
+function loadShippedTemplates(): Template[] {
+  const files = readdirSync(TEMPLATES_DIR)
+    .filter((name) => name.endsWith('.json'))
+    .sort();
+  expect(files.length, 'shipped template catalog must not be empty').toBeGreaterThan(0);
+
+  const loaded: Template[] = [];
+  for (const file of files) {
+    const raw: unknown = JSON.parse(readFileSync(join(TEMPLATES_DIR, file), 'utf8'));
+    expect(Array.isArray(raw), `${file} must be a JSON array`).toBe(true);
+    for (const entry of raw as unknown[]) {
+      const parsed = templateSchema.safeParse(entry);
+      expect(
+        parsed.success,
+        parsed.success
+          ? undefined
+          : `${file}: ${JSON.stringify(parsed.error.issues)}`,
+      ).toBe(true);
+      if (parsed.success) loaded.push(parsed.data);
+    }
+  }
+  return loaded;
+}
+
+describe('T-034 — template param keys match the expression-identifier grammar', () => {
+  it('spec(T-034:AC-1) accepts identifier-shaped param keys and preserves them unchanged', () => {
+    const params = Object.fromEntries(LEGAL_PARAM_KEYS.map((key, index) => [key, [index, index + 1]]));
+    const result = templateSchema.safeParse(
+      withOverrides(MINIMAL_TEMPLATE, {
+        id: 'legal-param-keys',
+        text: LEGAL_PARAM_KEYS.map((key) => `{${key}}`).join(' '),
+        params,
+        answerExpr: LEGAL_PARAM_KEYS.join(' + '),
+      }),
+    );
+
+    expect(result.success).toBe(true);
+    if (!result.success) return;
+    expect(Object.keys(result.data.params)).toEqual([...LEGAL_PARAM_KEYS]);
+    expect(result.data.params).toEqual(params);
+  });
+
+  it.each([...ILLEGAL_PARAM_KEYS])(
+    'spec(T-034:AC-2) rejects param key %j and names it in the error',
+    (key) => {
+      const result = templateSchema.safeParse(templateWithParamKey(key));
+
+      expect(result.success, `key ${JSON.stringify(key)} must fail under the narrowed schema`).toBe(
+        false,
+      );
+      if (result.success) return;
+      expect(
+        issuesNameKey(result.error.issues, key),
+        `Zod issues must name the offending key ${JSON.stringify(key)}: ${JSON.stringify(result.error.issues)}`,
+      ).toBe(true);
+    },
+  );
+
+  it('spec(T-034:AC-3) every shipped template still parses under the narrowed schema', () => {
+    const templates = loadShippedTemplates();
+    expect(templates.length).toBeGreaterThan(0);
+
+    const offenders: string[] = [];
+    for (const template of templates) {
+      for (const key of Object.keys(template.params)) {
+        if (!isT002Ident(key)) {
+          offenders.push(`${template.id}: ${JSON.stringify(key)}`);
+        }
+      }
+    }
+    expect(offenders, 'shipped catalogs must already satisfy IDENT — content bug if not').toEqual([]);
+  });
+
+  it('spec(T-034:AC-4) schema key acceptance matches T-002 IDENT over a shared corpus', () => {
+    const drift: string[] = [];
+    for (const key of IDENT_DRIFT_CORPUS) {
+      const schemaAccepts = templateSchema.safeParse(templateWithParamKey(key)).success;
+      const exprAccepts = isT002Ident(key);
+      if (schemaAccepts !== exprAccepts) {
+        drift.push(
+          `${JSON.stringify(key)}: schema=${String(schemaAccepts)} exprIdent=${String(exprAccepts)}`,
+        );
+      }
+    }
+    expect(drift).toEqual([]);
+  });
+});
+
+describe('T-034 Definition of Done', () => {
+  it('dod(T-034:1) tags a test against every acceptance criterion the ticket declares', () => {
+    const declared = [...TICKET_SOURCE.matchAll(/\*\*(AC-\d+)\*\*/g)].map((match) => match[1]);
+    const unique = [...new Set(declared)];
+    const untagged = unique.filter((ac) => !OWN_SOURCE.includes(`spec(T-034:${ac})`));
+
+    expect(unique.length).toBe(4);
+    expect(untagged).toEqual([]);
+  });
+
+  it('dod(T-034:2) keeps local gates wired and this suite free of skip/only markers', () => {
+    const gates = readFileSync(join(REPO_ROOT, '.tdd-swarm/run-local-gates.sh'), 'utf8');
+    for (const command of ['prettier --check', 'eslint . --max-warnings 0', 'tsc --noEmit', 'vitest run']) {
+      expect(gates, `run-local-gates.sh must still run: ${command}`).toContain(command);
+    }
+    expect(/\b(it|test|describe)\.(skip|only)\b|\bx(it|describe)\b/.test(OWN_SOURCE)).toBe(false);
+  });
+
+  it('dod(T-034:3) numbers every dod tag so spec-lint covers all six DoD items', () => {
+    const dodCount = (TICKET_SOURCE.match(/^- \[[ x]\] /gm) ?? []).length;
+    // Only count concrete numeric tags in `it('dod(T-034:N) …')` titles — not prose mentions.
+    const tagged = [...OWN_SOURCE.matchAll(/\bit\('dod\(T-034:(\d+)\)/g)].map((match) => Number(match[1]));
+    const covered = new Set(tagged);
+    const missing = Array.from({ length: dodCount }, (_, i) => i + 1).filter((n) => !covered.has(n));
+
+    expect(dodCount).toBe(6);
+    expect(missing).toEqual([]);
+    expect(OWN_SOURCE).toContain('spec(T-034:AC-');
+  });
+
+  it('dod(T-034:4) every DoD checkbox has a corresponding numbered dod tag in this suite', () => {
+    expect(OWN_SOURCE).toContain("it('dod(T-034:1)");
+    expect(OWN_SOURCE).toContain("it('dod(T-034:2)");
+    expect(OWN_SOURCE).toContain("it('dod(T-034:3)");
+    expect(OWN_SOURCE).toContain("it('dod(T-034:4)");
+    expect(OWN_SOURCE).toContain("it('dod(T-034:5)");
+    expect(OWN_SOURCE).toContain("it('dod(T-034:6)");
+  });
+
+  it('dod(T-034:5) the IDENT pattern is imported from T-002, not re-stated as a literal in schemas.ts', () => {
+    expect(existsSync(SCHEMAS_SRC_PATH)).toBe(true);
+    expect(existsSync(EXPR_SRC_PATH)).toBe(true);
+    const schemasSrc = readFileSync(SCHEMAS_SRC_PATH, 'utf8');
+    const exprSrc = readFileSync(EXPR_SRC_PATH, 'utf8');
+
+    // Locked decision: schemas consumes the grammar; it does not re-derive the character class.
+    expect(schemasSrc).toMatch(/from\s+['"]@engine\/questions\/expr['"]/);
+    expect(schemasSrc).not.toMatch(/\[A-Za-z_\]\[A-Za-z0-9_\]\*/);
+
+    // Expr must export a reusable identifier predicate/pattern for the schema to import.
+    // (file_scopes lists only schemas.ts — see report ambiguity if this export is disputed.)
+    expect(exprSrc).toMatch(/export\s+(?:const|function)\s+\w*(?:Ident|IDENT|Identifier)\w*/);
+  });
+
+  it('dod(T-034:6) production scope for the narrowing is src/content/schemas.ts', () => {
+    expect(existsSync(SCHEMAS_SRC_PATH)).toBe(true);
+    const schemasSrc = readFileSync(SCHEMAS_SRC_PATH, 'utf8');
+    expect(schemasSrc).toContain('export const templateSchema');
+
+    // Do not split the key grammar into a sibling content module — file_scopes is schemas.ts.
+    const contentTs = readdirSync(join(REPO_ROOT, 'src/content')).filter((name) => name.endsWith('.ts'));
+    expect(contentTs.filter((name) => /param|ident/i.test(name))).toEqual([]);
   });
 });
