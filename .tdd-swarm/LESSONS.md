@@ -798,3 +798,46 @@ A has not moved, which is precisely what stops being true during a wave with a l
 verification of a territory claim is worthless if its baseline drifted mid-run, and the failure mode
 is the expensive direction — it accuses a clean agent, and doing that once teaches you to discount
 the check.
+
+---
+
+## L-034 — A mutation matrix scores the mutants you thought of (Wave 4, test-design review)
+
+**Pattern:** Both Wave 4 Test Agents did the mutation work properly and reported perfect scores —
+T-007 **38 of 38** killed, T-013 **29 of 29** — and both went further than asked: each proved its
+harness live before trusting a verdict, and each caught a _coincidental_ survivor in its own fixtures
+(a hull literal that matched `PLAYER_HULL`, a palindromic boolean sequence, an already-sorted pool).
+By every internal measure the suites had teeth.
+
+An independent reviewer on a **different model family** then found **five live mutants between them**,
+each passing the entire frozen suite:
+
+- T-007: an implementation throwing `RangeError` instead of `QuestionGenerationError` for every
+  input but the one directly-tested seed (AC-7), the same trick for `INVALID_QUESTION` (AC-11), and
+  rejecting schema-legal `params: {}`.
+- T-013: a **mutable** `DuelCore.seed`, and an extra optional payload field on one `DuelEvent`
+  variant — both contrary to the ticket's own text, both green at 100/100.
+
+**Why:** an author's mutant set is drawn from the same reading of the spec that produced its tests,
+so a blind spot is shared between the test and the mutant designed to probe it. A perfect score
+measures the intersection of what the author tested and what the author thought to attack — it
+cannot measure what never occurred to them. This is [[L-001]] in its sharpest form: the suite is
+worth what it has been observed rejecting, and a self-designed matrix observes only the author's
+imagination.
+
+**What to do instead:**
+
+- **Cross-model test-design review is a required gate, not polish.** It is the only step in this
+  process that has ever found a hole an author's own matrix missed, and it has now done so on every
+  ticket where it ran. Budget it, and give the reviewer a different family from the author.
+- **Two concrete shapes to check by hand every time, because both recurred here:**
+  - A sweep asserting "throws for **every** seed" with a bare `catch {}` proves only that something
+    threw. Both T-007 survivors live in exactly that gap: the error _type and code_ were checked at a
+    single direct fixture while the broad sweep accepted any throw. Assert the type and code **inside
+    the sweep**.
+  - An indexed access such as `Exact<DuelState['seed'], number>` **discards property modifiers**, so
+    it cannot see `readonly` ([[L-012]]). Assert `Exact<Readonly<T>, T>` over the whole interface, and
+    `Exact<Extract<Union, {type: T}>, {...}>` per variant, or "readonly throughout" is untested.
+- **Reviewers also correct the author's arithmetic.** The T-013 report's "30 `@ts-expect-error`
+  directives" was 25 active ones plus five in prose, and its "exactly 8 edit sites" for a new phase
+  and event was too low. Counts in a report are claims; treat them as such.

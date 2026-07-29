@@ -1168,3 +1168,101 @@ perfectly. PLAN.md's onboarding sloop that "politely sinks in three volleys" is 
 `ONBOARDING_ENEMY_HULL` is dead code, unless `DuelConfig` carries an `enemyMaxHull` override. The
 agent escalated rather than inventing the override, and deliberately avoided `keyof DuelConfig`
 exactness so that adding one lands additively with no test change. Affects T-018 and T-020.
+
+---
+
+# HANDOFF — paused 2026-07-28, mid Wave 4 (tests phase)
+
+**Both Wave 4 suites are written, verified, and REJECTED by independent review. Neither is frozen.
+No implementation has begun. Nothing is half-written; every branch is committed and every gate on
+the integration branch is green.**
+
+## Where the work stands
+
+| unit               | branch                            | state                                        |
+| ------------------ | --------------------------------- | -------------------------------------------- |
+| integration        | `swarm/engine-core`               | all local gates PASS, clean tree             |
+| T-007 question gen | `ticket/T-007-question-generator` | tests written, review **REJECT**, not frozen |
+| T-013 duel types   | `ticket/T-013-duel-types`         | tests written, review **REJECT**, not frozen |
+
+Worktrees are at `.worktrees/wt-T-007` and `.worktrees/wt-T-013`, both with `phase=tests` and
+`active-ticket` set. Frozen-file hashes, for a tamper check on resume:
+
+- T-007 `__tests__/engine/questions/generator.test.ts` → `12e82f4ddfc45b872ce0f57f100035852ba2a9786083037a7ec9b6d42b2cd1bf`
+- T-013 `__tests__/engine/duel/types.test.ts` → `89dcd0f967db0e9fdc487927fd5e593353e151e313987bcc3563076d7dd9d030`
+
+Evidence is committed, not left untracked (L-030): four reports under `.tdd-swarm/reports/` —
+`T-007-tests.md`, `T-007-test-design-review.md`, `T-013-tests.md`, `T-013-test-design-review.md`.
+
+## Why both were rejected
+
+Cross-model review earned its cost — see **L-034**. Both authors reported perfect self-scored
+mutation matrices (38/38 and 29/29) and both were still leaving demonstrably wrong implementations
+green. Five live mutants, each verified by the reviewer against its own scratch reference:
+
+**T-007** — the two error sweeps use a bare `catch {}` (verified by the orchestrator at
+`generator.test.ts:1130` and `:1445`), so they prove _something_ throws, not _what_:
+
+1. Throw `RangeError` instead of `QuestionGenerationError`/`CONSTRAINTS_UNSATISFIED` for every input
+   except the one directly-tested seed → 57/57 green (AC-7).
+2. The same trick for `INVALID_QUESTION` → 57/57 green (AC-11).
+3. Reject schema-legal `params: {}` → 57/57 green. No fixture reaches the zero-parameter branch.
+
+Plus a **frozen-in misreading**: the oracle's `renderText` only matches identifier-shaped `{name}`
+(`:178`) while `templateSchema` permits arbitrary string keys (`src/content/schemas.ts:78`). Freezing
+this narrows the schema by accident.
+
+**T-013** — two contract holes, each contradicting the ticket's own DoD while 100/100 pass:
+
+4. **Mutable `DuelCore.seed`.** `Exact<DuelState['seed'], number>` cannot see `readonly` — indexed
+   access discards modifiers (L-012). "Readonly throughout" is untested outside two arrays.
+5. **An extra optional payload field** (`debug?: string`) on the `CANNON_SELECTED` variant. Only
+   `DuelEvent['type']` and the keys of hand-written fixtures are checked, never the variants.
+
+## Rulings already made — apply these, do not re-litigate
+
+1. **Pre-shuffle choice order is `[answer, ...distractors]`** (answer first), matching the algorithm's
+   step order. Verified as pinned by T-007's oracle; no contradiction elsewhere in the suite.
+2. **Onboarding hull: add an optional `enemyMaxHull` override to `DuelConfig`.** The onboarding duel
+   passes 28 explicitly. `ONBOARDING_ENEMY_HULL` stops being dead code, and T-013's tests absorb this
+   with no change because they deliberately avoid `keyof DuelConfig` exactness. Affects T-018, T-020.
+3. **AC-4: reword to "distinct modulo 2³²"** rather than restricting the seed domain. This describes
+   what the frozen `createRng` actually does and leaves shipped T-001 code and its tests untouched.
+4. **Sequencing: review first, amend once.** Both reviews are now in, so the amendment round can
+   proceed with full information.
+
+## Resume here — the next actions, in order
+
+1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
+   draw, measured twice independently); add an AC pinning lexicographic parameter order and the
+   answer-first pre-shuffle order; extend AC-12 to cover `skill`, `templateId` and `label`; carve
+   `NO_TEMPLATE` out of the DoD's "must name the template id"; and **decide the token-name domain** —
+   either narrow the schema to `[A-Za-z_][A-Za-z0-9_]*` or widen the oracle, plus an AC for
+   `params: {}`.
+2. **Amend `tickets/T-013.md`:** reword AC-4; add seed validation to AC-5; add the `enemyMaxHull`
+   override to AC-2; and add numbered ACs for the `DuelEvent` union so its 13 currently `dod(...)`-
+   tagged tests become enforceable. **Note:** the reviewer found the drafted AC-15 unusable as written
+   — `RivalVolley` has no `actions` field to be "ordered". Fix that wording before adopting it.
+3. **Re-dispatch both Test Agents** (resume them; they hold the context) to fix the five survivors and
+   re-tag against the amended ACs. Every amendment adding an AC requires a citing test or spec-lint
+   fails — that is the gate working, not an obstacle.
+4. **Re-review, then freeze.** Same different-family policy.
+5. **Only then dispatch implementation.** Give the implementers the two RED-state facts the authors
+   surfaced: T-013's `tsc` must go **75 → 0**, not merely lose its `TS2307`s, and T-007's suite is one
+   failing _file_, not one failing assertion.
+
+## Open decision, deferred deliberately
+
+**L-032:** `spec-lint` harvests only numbered `**AC-n**`, so DoD checkboxes and prose requirements are
+invisible to the coverage gate. The systemic fix — number every DoD item, or teach the gate to harvest
+`dod(...)` — was **not** applied under two running agents. Decide it before Wave 5.
+
+## Process repairs landed this session
+
+The guard was rebuilt and is now proven in **37 directions**. Newly closed: the integration tree is
+off limits to everyone while a wave is in flight (L-031), after a Test Agent's shell tool silently
+ignored its `working_directory` and ran in the repo root — where the guard was inert by design. Also
+fixed: the root lint gate was linting `.worktrees/*/` (L-029's blast radius), and `.gitignore` never
+matched the worktrees' `node_modules` **symlink**. Lessons added this session: **L-031, L-032, L-033,
+L-034**, plus a note that the `SWARM_ORCHESTRATOR=1` bypass is anchored to the first token, so a
+misplaced one is indistinguishable from a real policy hit.
