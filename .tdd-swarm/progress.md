@@ -1463,6 +1463,13 @@ not a reject.
   its nested `distractors` / `params` / `constraints`.
 - **AC-3** — independent state graphs, not just top-level reference inequality.
 
+## T-007 round 4 — accepted, pending re-review
+
+Cause-identity tightenings landed. Re-verified: hash `1a586570…`, merge-base diff = suite +
+report only, sole `TS2307`, baseline 1229, `spec-lint` 21/21 with DoD-7 SKIP. Suite now asserts
+`cause === undefined` on every AC-11 seed and matches frozen-evaluator `code`/`message` on AC-20/21.
+Agent reported m3 81/81 → 4 fails (AC-11 ×3 + AC-21 ×1); assertion shapes confirm that kill path.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
