@@ -43,8 +43,13 @@ export function Splash() {
     );
   }, [bob]);
 
+  // Hoisted OUT of the worklet on purpose. `useAnimatedStyle` runs on the UI runtime, which
+  // cannot synchronously call a JS closure — and `px` is one. Calling it inside crashed the app
+  // on its very first frame with "[Worklets] Tried to synchronously call a Remote Function".
+  // react-native-web does not enforce worklet boundaries, so this was invisible until a device.
+  const bobRise = px(5);
   const bobStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -px(5) * bob.value }, { rotate: `${-1.2 + 2.4 * bob.value}deg` }],
+    transform: [{ translateY: -bobRise * bob.value }, { rotate: `${-1.2 + 2.4 * bob.value}deg` }],
   }));
 
   return (
