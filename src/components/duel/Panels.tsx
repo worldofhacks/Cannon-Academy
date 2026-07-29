@@ -20,9 +20,14 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import type { ChestReceipt } from '../../contracts/rewards';
 import type { VictoryRewardProjection } from '../../services/victoryRewards';
+import { chestRarityLook, projectChestCeremony } from '../../theme/chestRarity';
 import { sprite } from '../../theme/sprites';
 import { color, radius, space, type } from '../../theme/tokens';
+
+export { projectChestCeremony } from '../../theme/chestRarity';
+export type { ChestCeremonyProjection } from '../../theme/chestRarity';
 
 // ── Waiting beats ────────────────────────────────────────────────────────────────────────────
 
@@ -169,6 +174,7 @@ interface VictoryProps {
   readonly asked: number;
   readonly perfects: number;
   readonly rewards: VictoryRewardProjection;
+  readonly chestReceipt?: ChestReceipt | null;
   readonly chestOpen: boolean;
   readonly onOpenChest: () => void;
   readonly onLeave: () => void;
@@ -179,10 +185,15 @@ export function VictoryPanel({
   asked,
   perfects,
   rewards,
+  chestReceipt = null,
   chestOpen,
   onOpenChest,
   onLeave,
 }: VictoryProps) {
+  const receipt = chestReceipt;
+  const ceremony =
+    chestOpen && receipt !== null ? projectChestCeremony(receipt, rewards) : null;
+
   return (
     <View style={s.wrap}>
       <View style={s.endHead}>
@@ -198,10 +209,28 @@ export function VictoryPanel({
       </View>
 
       <Pressable onPress={onOpenChest} disabled={chestOpen} style={s.chestBox}>
-        {chestOpen ? (
+        {ceremony !== null && receipt !== null ? (
           <View style={s.chestReveal}>
-            {rewards.cannons.map((cannon) => (
-              <View key={cannon.id} style={s.rewardCard}>
+            <View
+              style={[
+                s.rarityBadge,
+                {
+                  backgroundColor: chestRarityLook[receipt.rarity].fill,
+                  borderColor: chestRarityLook[receipt.rarity].border,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  s.rarityLabel,
+                  { color: chestRarityLook[receipt.rarity].label },
+                ]}
+              >
+                {ceremony.label}
+              </Text>
+            </View>
+            {ceremony.grant.kind === 'cannon' ? (
+              <View style={s.rewardCard}>
                 <View style={s.rewardIcon}>
                   <Image
                     source={sprite.cannonMobile}
@@ -209,14 +238,22 @@ export function VictoryPanel({
                     resizeMode="contain"
                   />
                 </View>
-                <Text style={s.rewardName}>{cannon.displayName}</Text>
+                <Text style={s.rewardName}>{ceremony.grant.displayName}</Text>
                 <Text style={s.rewardTag}>NEW CANNON</Text>
               </View>
-            ))}
-            <View style={s.coinRow}>
-              <View style={s.coin} />
-              <Text style={s.coinCount}>+{rewards.coins}</Text>
-            </View>
+            ) : null}
+            {ceremony.grant.kind === 'coins' ? (
+              <View style={s.coinRow}>
+                <View style={s.coin} />
+                <Text style={s.coinCount}>+{ceremony.grant.amount}</Text>
+              </View>
+            ) : null}
+            {ceremony.purseCoins > 0 ? (
+              <View style={s.coinRow}>
+                <View style={s.coin} />
+                <Text style={s.purseCoinCount}>+{ceremony.purseCoins} from the duel</Text>
+              </View>
+            ) : null}
           </View>
         ) : (
           <>
@@ -513,6 +550,14 @@ const s = StyleSheet.create({
   },
   chestPrompt: { ...type.title, color: color.inkDark },
   chestReveal: { alignItems: 'center', gap: space[2] },
+  rarityBadge: {
+    paddingVertical: 6,
+    paddingHorizontal: space[3],
+    borderRadius: radius.pill,
+    borderWidth: 2,
+  },
+  rarityLabel: { ...type.chip, fontSize: 11, letterSpacing: 1 },
+  purseCoinCount: { ...type.body, color: color.inkDarkMuted },
   rewardCard: {
     width: 150,
     padding: space[3],
