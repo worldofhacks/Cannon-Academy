@@ -2385,17 +2385,18 @@ describe('T-013 Definition of Done', () => {
   });
 
   /**
-   * The file-scope rule, narrowed to the part a test can actually observe: T-013 declares exactly
-   * one production file, and `damage.ts` is T-008's frozen module. A third file appearing in this
-   * directory means the implementer spread the ticket across a scope it was not granted, which no
-   * other assertion in this suite would notice.
+   * The file-scope rule, narrowed to the part a test can actually observe: T-013 declares
+   * `types.ts`; `damage.ts` is T-008's frozen module; `reducer.ts` is T-020's. Sibling tickets
+   * share this directory — the check is an allowlist, not exclusive ownership (same pattern as
+   * content templates DoD after T-014/T-015/T-016).
    */
-  it('dod(T-013:9) keeps src/engine/duel to this ticket file scope plus the frozen T-008 module', () => {
-    const permitted = ['damage.ts', 'types.ts'];
+  it('dod(T-013:9) keeps src/engine/duel to known ticket modules (T-008/T-013/T-020)', () => {
+    const permitted = ['damage.ts', 'reducer.ts', 'types.ts'];
     const present = readdirSync(`${REPO_ROOT}src/engine/duel`).filter((name) => name.endsWith('.ts'));
     const unexpected = present.filter((name) => !permitted.includes(name));
 
-    expect(unexpected, 'T-013 declares only src/engine/duel/types.ts in its file_scopes').toEqual([]);
+    expect(unexpected, 'only T-008/T-013/T-020 duel modules belong here').toEqual([]);
     expect(present, 'the frozen T-008 module must still be there').toContain('damage.ts');
+    expect(present, 'T-013 types module must still be there').toContain('types.ts');
   });
 });
