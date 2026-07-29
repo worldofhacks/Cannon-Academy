@@ -12,7 +12,7 @@
  * the screen. That keeps a duel replayable from `{seed, action log}` and keeps this file testable
  * without a clock.
  */
-import type { Cannon } from '@content/schemas';
+import type { Cannon, SkillId } from '@content/schemas';
 import { resolveShot, type ShotOutcome } from '@engine/duel/damage';
 import { computeCoinPayout } from '@engine/economy';
 import { createRng, nextInt, type Rng } from '@engine/rng';
@@ -41,8 +41,27 @@ export type DuelPhase =
   | 'victory'
   | 'defeat';
 
+/**
+ * How many questions each skill was asked in this duel, and how many landed.
+ *
+ * The aggregate `asked`/`right` counters cannot say WHICH meter to fill: a duel can fire two
+ * cannons on two different skills, and the only thing left to guess from is the last gun held.
+ */
+export type DuelSkillTally = Readonly<
+  Partial<Record<SkillId, { readonly correct: number; readonly asked: number }>>
+>;
+
 export interface DuelState {
   readonly phase: DuelPhase;
+  /**
+   * This duel's identity — the key the reward ledger settles against (A-008 AC-6).
+   *
+   * Not the state object: `OPEN_CHEST` makes a new object for the same duel, so anything keyed on
+   * identity pays twice. Not `{seed, turn}` either: a re-mount rebuilds the same seed, so the
+   * second duel would be silently swallowed. Minted once here, preserved by every transition, and
+   * freshly minted by `RESET`.
+   */
+  readonly duelId: string;
   readonly rng: Rng;
   readonly cannon: Cannon | null;
   readonly question: DuelQuestion | null;
@@ -59,6 +78,8 @@ export interface DuelState {
   readonly asked: number;
   readonly right: number;
   readonly perfects: number;
+  /** Per-skill breakdown of `asked`/`right` — the reward layer's map of which meter to fill. */
+  readonly skillTally: DuelSkillTally;
   readonly coins: number;
   readonly chestOpen: boolean;
 }
@@ -80,9 +101,25 @@ export type DuelAction =
 const RIVAL_DAMAGE_MIN = 7;
 const RIVAL_DAMAGE_MAX = 12;
 
+/** The widest seed `createRng` accepts, so a redrawn duel seed can span the whole stream. */
+const MAX_SEED = 0xffffffff;
+
+/**
+ * A duel's id, derived from its seed and nothing else.
+ *
+ * The reducer is pure — no clock, no uuid — so the id can only come from what it was handed. That
+ * makes supplying a FRESH SEED PER DUEL the screen's job: a hardcoded seed replays one duel id,
+ * and a reward ledger that has already settled that id pays nothing for every duel after the
+ * first. `app/duel.tsx` mints the seed with the same clock it already uses for `elapsedMs`.
+ */
+function duelIdForSeed(seed: number): string {
+  return `duel-${(seed >>> 0).toString(36)}`;
+}
+
 export function initialDuelState(seed: number): DuelState {
   return {
     phase: 'select',
+    duelId: duelIdForSeed(seed),
     rng: createRng(seed),
     cannon: null,
     question: null,
@@ -97,8 +134,18 @@ export function initialDuelState(seed: number): DuelState {
     asked: 0,
     right: 0,
     perfects: 0,
+    skillTally: {},
     coins: 0,
     chestOpen: false,
+  };
+}
+
+/** Folds one asked question into the fired skill's entry. Never mutates the tally it is given. */
+function tallyAnswer(tally: DuelSkillTally, skill: SkillId, correct: boolean): DuelSkillTally {
+  const entry = tally[skill] ?? { correct: 0, asked: 0 };
+  return {
+    ...tally,
+    [skill]: { correct: entry.correct + (correct ? 1 : 0), asked: entry.asked + 1 },
   };
 }
 
@@ -164,6 +211,7 @@ export function duelReducer(s: DuelState, action: DuelAction): DuelState {
         asked: s.asked + 1,
         right: s.right + (correct ? 1 : 0),
         perfects: s.perfects + (outcome.perfectShot ? 1 : 0),
+        skillTally: tallyAnswer(s.skillTally, s.cannon.skill, correct),
         // Recoil is the engine's, not the screen's: a volatile gun bites its own deck on a wrong
         // answer and `damageToSelf` is where that lives.
         playerHull: Math.max(0, s.playerHull - outcome.damageToSelf),
@@ -174,10 +222,18 @@ export function duelReducer(s: DuelState, action: DuelAction): DuelState {
     }
 
     case 'TIMEOUT': {
-      if (s.phase !== 'question') return s;
+      if (s.phase !== 'question' || s.cannon === null) return s;
       // A burned fuse costs nothing but the turn. It counts as asked so accuracy stays honest,
-      // and it is not a wrong answer, so no recoil — the gun never fired.
-      return { ...s, phase: 'timeout', picked: null, asked: s.asked + 1 };
+      // and it is not a wrong answer, so no recoil — the gun never fired. It counts as asked in
+      // the per-skill tally for the same reason: the two must always sum to the same total, or
+      // the mastery meter and the scoreboard tell a child two different stories.
+      return {
+        ...s,
+        phase: 'timeout',
+        picked: null,
+        asked: s.asked + 1,
+        skillTally: tallyAnswer(s.skillTally, s.cannon.skill, false),
+      };
     }
 
     case 'ADVANCE': {
@@ -209,10 +265,15 @@ export function duelReducer(s: DuelState, action: DuelAction): DuelState {
     case 'OPEN_CHEST':
       return { ...s, chestOpen: true };
 
-    case 'RESET':
-      // A fresh duel, but NOT a fresh seed — the rng carries forward, so replaying the session
-      // from its seed replays every duel in it, not just the first.
-      return { ...initialDuelState(0), rng: s.rng };
+    case 'RESET': {
+      // A fresh duel, but NOT a fresh stream — the rng carries forward, so replaying the session
+      // from its seed replays every duel in it, not just the first. The next duel's seed is DRAWN
+      // from that same stream rather than fixed: "Fight again" is a new duel and must be paid for
+      // on its own, so it needs an id the reward ledger has not already settled — and drawing it
+      // is how the reducer gets one without reaching for a clock.
+      const [seed, rng] = nextInt(s.rng, 0, MAX_SEED);
+      return { ...initialDuelState(seed), rng };
+    }
   }
 }
 

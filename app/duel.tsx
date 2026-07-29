@@ -20,6 +20,8 @@ import {
 } from '../src/components/duel/Panels';
 import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
+import { applyDuelOutcome } from '../src/services/duelRewards';
+import { captainStore } from '../src/stores/useCaptain';
 import { cannonLook } from '../src/theme/cannonPresentation';
 import { seaStageHeight } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
@@ -42,7 +44,7 @@ import { duelReducer, initialDuelState, PHASE_DURATION_MS, type DuelPhase } from
 export default function DuelScreen() {
   const insets = useSafeAreaInsets();
   const L = useLayout();
-  const [state, dispatch] = useReducer(duelReducer, 0, () => initialDuelState(2026));
+  const [state, dispatch] = useReducer(duelReducer, 0, () => initialDuelState(freshSeed()));
   const askedAt = useRef(0);
 
   // The tray is the player's actual arsenal, not a hardcoded three — but in CATALOG order, not
@@ -78,6 +80,15 @@ export default function DuelScreen() {
     const id = setTimeout(() => dispatch({ type: 'TIMEOUT' }), state.cannon.timerMs);
     return () => clearTimeout(id);
   }, [state.phase, state.cannon, state.question]);
+
+  // Where the loop closes: a finished duel is worth coins, mastery and a win, and none of it
+  // existed until it was applied here. Firing this from an effect means it can fire twice — a
+  // re-render, StrictMode's double-invoke, or simply observing `victory` again after the chest
+  // opens — so `applyDuelOutcome` is idempotent per `duelId` and the second call is a no-op.
+  useEffect(() => {
+    if (state.phase !== 'victory' && state.phase !== 'defeat') return;
+    applyDuelOutcome(captainStore, state);
+  }, [state.phase, state.duelId]);
 
   const onAnswer = useCallback((value: number) => {
     dispatch({ type: 'ANSWER', value, elapsedMs: Date.now() - askedAt.current });
@@ -176,6 +187,20 @@ export default function DuelScreen() {
   function pickCannon(picked: (typeof tray)[number]) {
     dispatch({ type: 'PICK_CANNON', cannon: picked });
   }
+}
+
+/**
+ * A fresh seed for each duel this screen starts — and therefore a fresh `duelId`.
+ *
+ * The reducer is pure, so a duel's identity is a function of its seed. This file used to hardcode
+ * `initialDuelState(2026)`, which was harmless while the payout was thrown away and is not now:
+ * leaving and re-entering the screen would replay one duel id, the reward ledger would see a duel
+ * it had already settled, and every duel after the first would pay nothing. Minting the seed is
+ * the screen's job because the screen is already the impure edge — the same clock measures
+ * `elapsedMs` two functions up.
+ */
+function freshSeed(): number {
+  return Date.now() >>> 0;
 }
 
 // ── Copy ─────────────────────────────────────────────────────────────────────────────────────
