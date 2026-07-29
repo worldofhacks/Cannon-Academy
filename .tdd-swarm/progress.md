@@ -1709,7 +1709,6 @@ waves; neither blocks the merge.
 
 **Status: Wave 4 COMPLETE — integration PASS.** Next: Wave 5 dispatch (T-014…T-020).
 
-
 ## Wave 5 — dispatched 2026-07-28 (owner priority)
 
 Baseline: `swarm/engine-core` @ `6acaa39`, **1438/1438**, all local gates PASS.
@@ -1723,17 +1722,25 @@ Push policy: merge each ticket into `swarm/engine-core` and **push immediately**
 do not batch 14 invisible commits).
 
 Worktrees (phase=`tests`):
-| Ticket | Worktree | Branch |
-| --- | --- | --- |
-| T-014 | `.worktrees/wt-T-014` | `ticket/T-014-templates-k2-addsub` |
-| T-015 | `.worktrees/wt-T-015` | `ticket/T-015-templates-g23` |
-| T-016 | `.worktrees/wt-T-016` | `ticket/T-016-templates-g35` |
+
+| Ticket | Worktree              | Branch                             |
+| ------ | --------------------- | ---------------------------------- |
+| T-014  | `.worktrees/wt-T-014` | `ticket/T-014-templates-k2-addsub` |
+| T-015  | `.worktrees/wt-T-015` | `ticket/T-015-templates-g23`       |
+| T-016  | `.worktrees/wt-T-016` | `ticket/T-016-templates-g35`       |
 
 Test Agents dispatched in parallel for the three template tickets.
-
 
 ### T-016 tests-written (commit `953bc7d`)
 
 [T-016 Test Agent](d05384d3-5e8d-42e1-8f93-f00010357c9d): suite `__tests__/content/templates/g35.test.ts`
 (sha `d478d382…`). Orchestrator verified: spec-lint PASS; 23 failed / 3 passed (missing JSON —
 clean RED); baseline 1438 green. Test-design review dispatched (Composer).
+
+## Owner ruling D-6 + gate fix — 2026-07-28
+
+- **D-6:** Placement grants islands (band-scoped) + **starter cannons only**. Range/chest earned
+  via declared unlocks. T-011 AC-2/4/5 + Rules amended; T-032 rewritten with composition ACs and
+  dispatched. Rationale: `tickets/app/OWNER-RULINGS.md` on `app/shell`.
+- **frozen-tests-unmodified:** allow `test|style|spec|freeze`; on `swarm/engine-core` compare
+  `main..HEAD` with `--no-merges` (was vacuously green via empty `swarm/engine-core..HEAD`).

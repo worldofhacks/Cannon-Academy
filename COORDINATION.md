@@ -43,7 +43,7 @@ Neither track pushes to `main` — main moves only by owner-approved PR.
   priority order from owner (2026-07-28): **T-014 → T-015 → T-016** (templates, ≥8/skill floor)
   first, then **T-017** (range drill; publish session API here when it lands), **T-018**
   (onboarding rival), **T-020** (duel reducer; publish state/event shape here — do **not** edit
-  `src/stores/duel.ts`), **T-034** last. Do not touch owner-blocked **T-029** / **T-032**.
+  `src/stores/duel.ts`), **T-034** last. Owner ruling **D-6** applied to **T-032** (starters-only placement). **T-029** remains owner-blocked.
   Push `swarm/engine-core` after every ticket merge, not at wave end.
 - App track (`app/shell`): owns presentation; currently uses a placeholder question service that
   must not ship — real templates from T-014…T-016 replace it.

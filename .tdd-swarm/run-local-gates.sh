@@ -53,24 +53,35 @@ fi
 # Frozen tests unmodified. The PreToolUse hook blocks Write/Edit under __tests__/,
 # but cannot see a shell write (cp, cat >, sed -i). This catches the OUTCOME regardless
 # of mechanism: any committed change under __tests__/ must come from a test(...),
-# style(...), or spec(...) commit. `spec(` is accepted because Test Agents in this swarm
-# have used it as a synonym for `test(` when amending suites against review findings;
-# the gate's job is to block *implement* commits that touch tests, not to police the
-# exact synonym a Test Agent picked. See LESSONS.md L-023. Runs in every phase -- an
-# earlier revision gated on .tdd-swarm/phase, which is untracked and absent in the main
-# repo, and that was one of three reasons it silently never executed at all (L-001, L-007).
-if git rev-parse --verify --quiet swarm/engine-core >/dev/null 2>&1; then
-  BAD=$(git log --format='%H %s' swarm/engine-core..HEAD -- '__tests__' 2>/dev/null \
-        | grep -vE '^[0-9a-f]+ (test|style|spec)\(' || true)
+# style(...), spec(...), or freeze(...) commit. `spec(` / `freeze(` are accepted because
+# Test Agents and freeze ledgers in this swarm use those subjects; the gate's job is to
+# block *implement* commits that touch tests, not to police the exact synonym. See
+# LESSONS.md L-023. Same class as L-033: never compare a tip to itself.
+#
+# Range selection:
+#   - On a ticket branch (HEAD != swarm/engine-core): swarm/engine-core..HEAD
+#   - On the integration branch itself: main..HEAD (swarm/engine-core..HEAD is empty there
+#     and the gate used to pass vacuously — 2026-07-28 owner fix)
+# Merge commits are excluded (--no-merges); they only transport already-reviewed test commits.
+RANGE_BASE=""
+if git rev-parse --verify --quiet swarm/engine-core >/dev/null 2>&1 \
+   && [ "$(git rev-parse HEAD)" != "$(git rev-parse swarm/engine-core)" ]; then
+  RANGE_BASE=swarm/engine-core
+elif git rev-parse --verify --quiet main >/dev/null 2>&1; then
+  RANGE_BASE=main
+fi
+if [ -n "$RANGE_BASE" ]; then
+  BAD=$(git log --no-merges --format='%H %s' "${RANGE_BASE}..HEAD" -- '__tests__' 2>/dev/null \
+        | grep -vE '^[0-9a-f]+ (test|style|spec|freeze)\(' || true)
   if [ -n "$BAD" ]; then
-    echo "  FAIL  frozen-tests-unmodified"
+    echo "  FAIL  frozen-tests-unmodified (vs ${RANGE_BASE})"
     printf '%s\n' "$BAD" | sed 's/^/        /'
     FAIL=1
   else
-    echo "  PASS  frozen-tests-unmodified"
+    echo "  PASS  frozen-tests-unmodified (vs ${RANGE_BASE})"
   fi
 else
-  echo "  PASS  frozen-tests-unmodified (no integration branch to compare against)"
+  echo "  PASS  frozen-tests-unmodified (no base branch to compare against)"
 fi
 
 [ "$FAIL" -eq 0 ] && echo "== ALL LOCAL GATES PASS ==" || echo "== LOCAL GATES RED =="
