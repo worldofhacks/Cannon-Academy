@@ -3,8 +3,6 @@ import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router } from 'expo-router';
 
-import { cannons as catalog, getCannon } from '@content/index';
-
 import { captainStore, useCaptain } from '../src/stores/useCaptain';
 import { captainPoseForPhase } from '../src/components/duel/Captain';
 import { CannonTray } from '../src/components/duel/CannonTray';
@@ -21,6 +19,7 @@ import {
 import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
 import { applyDuelOutcome } from '../src/services/duelRewards';
+import { trayCannons } from '../src/services/loadout';
 import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
 import { seaStageHeight } from '../src/theme/responsive';
@@ -50,21 +49,15 @@ export default function DuelScreen() {
   const [state, dispatch] = useReducer(duelReducer, 0, () => initialDuelState(freshSeed()));
   const askedAt = useRef(0);
 
-  // The captain's OWN loadout, in catalog order. This read `resolvePlacement('k_1')` — a
-  // hardcoded band that handed a grade 4-5 player K-1 cannons, defeating placement, defeating
-  // ruling D-6, and making "two starter cannons that are a real choice" false for two of the
-  // three bands. Found by the adversarial plan review; it had shipped.
-  const equipped = useCaptain((s) => s.captain.equippedCannons);
-  const tray = useMemo(() => {
-    const owned = new Set(equipped);
-    return catalog.filter((c) => owned.has(c.id)).map((c) => getCannon(c.id));
-  }, [equipped]);
+  // The captain's OWN loadout, in catalog order — via trayCannons (A-011), never a grade-band lookup.
+  const captain = useCaptain((s) => s.captain);
+  const tray = useMemo(() => [...trayCannons(captain)], [captain]);
 
   // `tray[0]` is a total lookup, not an optimistic one: placement always grants at least one
   // cannon, and if that ever stops being true the duel is unplayable and should say so loudly
   // rather than render a screen with no gun on it.
   const fallback = tray[0];
-  if (fallback === undefined) throw new Error('duel: placement granted no cannons');
+  if (fallback === undefined) throw new Error('duel: captain has no equipped cannons');
   const cannon = state.cannon ?? fallback;
   const look = cannonLook[cannon.id];
 

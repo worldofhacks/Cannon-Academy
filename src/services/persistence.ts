@@ -59,6 +59,7 @@ function isCaptain(value: unknown): value is Captain {
     c.mastery !== null &&
     Array.isArray(c.ownedCannons) &&
     Array.isArray(c.equippedCannons) &&
+    (c.seenCannons === undefined || Array.isArray(c.seenCannons)) &&
     Array.isArray(c.unlockedIslands) &&
     typeof c.rankTier === 'number' &&
     typeof c.wins === 'number' &&
@@ -104,7 +105,12 @@ export async function hydrate(storage: KeyValueStore): Promise<HydrateResult> {
     return { captain: emptyCaptain(), recovered: true, migrated: false };
   }
 
-  return { captain: envelope.captain, recovered: false, migrated: false };
+  // Older saves predate A-011's seenCannons field — default rather than discard the captain.
+  const captain: Captain = {
+    ...envelope.captain,
+    seenCannons: Array.isArray(envelope.captain.seenCannons) ? envelope.captain.seenCannons : [],
+  };
+  return { captain, recovered: false, migrated: false };
 }
 
 /**

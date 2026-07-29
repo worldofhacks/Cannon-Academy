@@ -19,7 +19,7 @@ import { color } from './tokens';
 export type Projectile = 'iron' | 'chain' | 'wobble' | 'fire' | 'bolt' | 'tentacle';
 
 /**
- * Arc height. Three shapes cover all ten cannons — the boards' single best-value decision, because
+ * Arc height. Three shapes cover every catalog cannon — the boards' single best-value decision, because
  * it costs one keyframe and makes ten guns feel like ten weapons without touching a damage number.
  * Volatile guns get `high`: long hang-time reads as "anything could happen", which is exactly what
  * their damage band already says.
@@ -43,6 +43,8 @@ export interface CannonLook {
 export const cannonLook: Record<CannonId, CannonLook> = {
   swivel_gun: { glyph: '+', range: 'to 10', projectile: 'iron', arc: 'standard', spectacle: null },
   culverin: { glyph: '+', range: 'to 10', projectile: 'wobble', arc: 'high', spectacle: null },
+  // T-029 / D-7 — invented range payoff for add_within_10; presentation only.
+  saker: { glyph: '+', range: 'to 10', projectile: 'iron', arc: 'standard', spectacle: null },
   six_pounder: { glyph: '+', range: 'to 20', projectile: 'iron', arc: 'standard', spectacle: null },
   chain_shot: { glyph: '−', range: 'to 20', projectile: 'chain', arc: 'standard', spectacle: null },
   nine_pounder: { glyph: '×', range: 'times', projectile: 'iron', arc: 'standard', spectacle: null },
