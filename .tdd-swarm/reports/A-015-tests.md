@@ -5,7 +5,7 @@ Status: RED_READY
 ## Frozen test
 
 - `__tests__/app/guided-duel.test.ts`
-- 9 declared tests (11 executions through two `it.each` tables)
+- 8 declared test cases (10 executions through two `it.each` tables)
 
 ## Criterion mapping
 
