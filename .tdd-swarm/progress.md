@@ -1993,3 +1993,8 @@ Test-design review dispatched.
 
 [T-034 test-design](151af5b2-d671-4e90-9132-f60cc6332d95): I-1 AC-4 numeric-oracle; I-2/I-3 DoD-5 comments.
 Test Agent amending suite.
+
+### T-034 FROZEN (`66bfa2cb93fc93fb…`) — Important nits closed
+
+[T-034 Test Agent](a9cbdabc-389e-4c96-8270-6414a4d3aae1) `2240821`: AC-4 oracle + digit corpus; DoD-5 comments.
+Phase → implement. Implementer dispatched.
