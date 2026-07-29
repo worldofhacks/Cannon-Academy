@@ -55,7 +55,7 @@ README, HANDOFF, or STATE — those documents link here.
 | A-038 | app | Demo navigation — every built screen is reachable from the chart | backlog | G5 | A-010, A-012, A-015, A-028, A-031, A-033, A-034 | ticket/a-038-demo-navigation | [A-038](app/A-038.md) |
 | A-039 | app | Canonical duel core — one rules machine with a presentation adapter | backlog | G1 | A-016, T-020, T-021, T-036 | ticket/a-039-canonical-duel-core | [A-039](app/A-039.md) |
 | A-040 | app | Cloud-safe profile sync — one local-first dispatcher and owner-only schema | backlog | D4 | A-026, A-030, A-032, A-041 | ticket/a-040-profile-sync | [A-040](app/A-040.md) |
-| A-041 | app | Durable captain contract — mercy and reward receipts survive relaunch | backlog | G2 | A-027 | ticket/a-041-durable-captain | [A-041](app/A-041.md) |
+| A-041 | app | Durable captain contract — mercy and reward receipts survive relaunch | review-passed | G2 | A-027 | ticket/a-041-durable-captain | [A-041](app/A-041.md) |
 | A-042 | app | Demo launch gate and unclipped ship picker | review-passed | RELEASE-HOTFIX | A-005, A-025 | ticket/a-042-launch-picker | [A-042](app/A-042.md) |
 | A-043 | app | Responsive tablet and desktop surfaces | review-passed | RELEASE-RESPONSIVE | A-042 | ticket/a-043-responsive-surfaces | [A-043](app/A-043.md) |
 | A-044 | app | Reviewer-ready repository baseline — current landing docs without erasing history | review-passed | DOC-BASELINE | A-035 | ticket/a-044-reviewer-ready-docs | [A-044](app/A-044.md) |
