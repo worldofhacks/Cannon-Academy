@@ -20,6 +20,11 @@ victoryRewards(outcome: DuelRewardOutcome): {
   readonly coins: number;
   readonly cannons: readonly Cannon[];
 };
+
+retainFirstApplied(
+  current: DuelRewardOutcome | null,
+  observed: DuelRewardOutcome,
+): DuelRewardOutcome | null;
 ```
 
 The cannon objects must be catalog entries resolved from the exact ordered
@@ -32,10 +37,10 @@ the projected cannon collection.
 
 | Criterion | Frozen evidence |
 |---|---|
-| AC-1 | Empty-unlock projection preserves actual coins and returns no cannons; panel source maps claims from projected cannons. |
-| AC-2 | Multiple ids resolve through the real catalog in exact outcome order; AST inspection finds authored catalog display names in the actual `VictoryPanel` function body, excluding comments. |
-| AC-3 | Real `applyDuelOutcome` crosses the subtraction mastery threshold, then the same projected cannon is owned and appears `isNew` in existing `deckSlots`; screen AST wires retained state through `victoryRewards` to the `rewards` panel prop. |
-| AC-4 | Screen AST requires the `applyDuelOutcome` result to be bound, guarded by `applied`, and installed with a functional nullish-coalescing state update that preserves the first value. |
+| AC-1 | Empty-unlock projection preserves actual coins and returns no cannons; the actual returned `VictoryPanel` JSX must place both `cannon.displayName` and the sole `NEW CANNON` badge inside its live `rewards.cannons.map` callback. Dead maps and unconditional badges fail. |
+| AC-2 | One deliberately reversed outcome contains every id in the real cannon catalog and must return each exact catalog object in that order; AST inspection rejects authored catalog display names in returned `VictoryPanel` JSX. |
+| AC-3 | Real `applyDuelOutcome` crosses the subtraction mastery threshold, then the same projected cannon is owned and appears `isNew` in existing `deckSlots`; one scoped AST/dataflow check follows the exact settlement binding through its matching state setter and `retainFirstApplied` into the rendered `VictoryPanel` prop. |
+| AC-4 | Pure sequential behavior retains the first applied object by identity after a no-payment observation and retains `null` when no applied outcome has occurred. The scoped wiring check requires the screen to use that helper on the exact settlement result. |
 
 ## Baseline and RED evidence
 
@@ -57,11 +62,11 @@ Tests       7 failed (7)
 
 All seven failures are missing-feature assertions, not collection/import/setup errors:
 
-- `src/services/victoryRewards.ts` is absent.
-- `VictoryPanel` does not map projected cannons.
+- `src/services/victoryRewards.ts` and its projection/retention helpers are absent.
+- `VictoryPanel` does not render its real reward rows from `rewards.cannons`.
 - `VictoryPanel` authors `Chain Shot`.
-- `app/duel.tsx` does not wire a retained projection into the panel.
-- `app/duel.tsx` discards `applyDuelOutcome` instead of retaining the first applied result.
+- `app/duel.tsx` does not bind the exact `applyDuelOutcome` result through one retained state
+  identity into the live panel.
 
 ## Gates
 
