@@ -1401,6 +1401,27 @@ Liveness method held: aliasing and memoising impls passed the old suite and die 
 Matrix 51/51 killed, 5/5 controls surviving including the three T-022 forward-compat ones.
 Implementer target remains **88 → 0**.
 
+## T-007 round 3 — accepted, pending re-review
+
+Round-3 suite closes the re-review rejection: AC-20 (ExprError wrap at all three sites with
+`cause`), AC-21 (failure precedence), AC-5 negative half. Authored on Grok 4.5 fast. Re-verified:
+
+| Claim | Verified |
+| --- | --- |
+| Start `09b3da13…` → end `f7c62e4d…` | matches |
+| Diff vs merge base | suite + report only, **0 under `src/`** |
+| RED | sole `TS2307`; baseline `Tests 1229 passed` |
+| `spec-lint` | **PASS** — 21/21 AC, DoD-7 `SKIP` |
+| Prettier / ESLint / `no-todos` | 0 / 0 / PASS |
+| Tags | AC-20 ×5, AC-21 ×3, AC-5 ×3; 81 tests |
+| `generator.ts` absent | yes |
+
+Cause assertions are real (`toBeInstanceOf(ExprError)`), and AC-20 includes a premise that the three
+fixtures are schema-valid and throw `ExprError` directly — so the translation is testable.
+
+T-013's GPT Terra re-review died on API limit before starting; both re-reviews re-dispatched on
+Claude Sonnet (still cross-family vs Grok authoring).
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
