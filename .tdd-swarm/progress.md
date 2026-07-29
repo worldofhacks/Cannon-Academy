@@ -1542,6 +1542,15 @@ Implementer DONE (`a358270`). Re-verified: frozen suite still `1a586570…`; com
 `generator.ts` + implementation report; prettier/eslint/tsc 0; **1310/1310**; spec-lint PASS;
 `run-local-gates` ALL PASS including `frozen-tests-unmodified`.
 
+## T-013 implementation — verified green, pending code review
+
+Implementer DONE_WITH_CONCERNS (`f4adb7b`). Re-verified: frozen suite still `767fc8da…`;
+commit touches only `types.ts` + report; **tsc 88→0**; **1357/1357**; prettier/eslint/spec-lint
+PASS. The sole concern was real: two Test Agent commits used `spec(T-013):` subjects, which
+`frozen-tests-unmodified` rejected. Gate now also accepts `spec(` — its job is blocking
+implement commits that touch tests, not policing Test Agent synonyms. Local gates ALL PASS
+after that fix.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
