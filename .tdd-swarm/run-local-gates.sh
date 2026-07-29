@@ -24,8 +24,13 @@ run "lint"      npx eslint . --max-warnings 0
 run "typecheck" npx tsc --noEmit
 run "unit"      npx vitest run
 
-# No new TODO/FIXME/HACK in tracked source.
-if grep -rnE '(TODO|FIXME|HACK)' src __tests__ 2>/dev/null | grep -v '^\s*$' > /tmp/_todos; then
+# No new TODO/FIXME/HACK in tracked source. The marker must look like a marker: the bare word
+# matched prose about markers, so a test asserting the suite carries "no-TODO markers" failed this
+# gate on its own description. That is the false positive L-002 warns about — a gate red for a
+# reason nobody believes is a gate everyone learns to skip, and this one was red in a worktree while
+# green at the root, where the file mentioning it did not yet exist. Requiring the canonical `:` or
+# `(owner)` form costs the un-punctuated `// TODO fix this`, which is the cheaper miss.
+if grep -rnE '(^|[^A-Za-z0-9_-])(TODO|FIXME|HACK)(\(|:)' src __tests__ 2>/dev/null | grep -v '^\s*$' > /tmp/_todos; then
   echo "  FAIL  no-todos"; sed 's/^/        /' /tmp/_todos; FAIL=1
 else
   echo "  PASS  no-todos"
@@ -43,6 +48,40 @@ if grep -rnE "from '(react|react-native|expo|firebase|@firebase)" src/engine 2>/
   echo "  FAIL  engine-purity"; sed 's/^/        /' /tmp/_purity; FAIL=1
 else
   echo "  PASS  engine-purity"
+fi
+
+# Frozen tests unmodified. The PreToolUse hook blocks Write/Edit under __tests__/,
+# but cannot see a shell write (cp, cat >, sed -i). This catches the OUTCOME regardless
+# of mechanism: any committed change under __tests__/ must come from a test(...),
+# style(...), spec(...), or freeze(...) commit. `spec(` / `freeze(` are accepted because
+# Test Agents and freeze ledgers in this swarm use those subjects; the gate's job is to
+# block *implement* commits that touch tests, not to police the exact synonym. See
+# LESSONS.md L-023. Same class as L-033: never compare a tip to itself.
+#
+# Range selection:
+#   - On a ticket branch (HEAD != swarm/engine-core): swarm/engine-core..HEAD
+#   - On the integration branch itself: main..HEAD (swarm/engine-core..HEAD is empty there
+#     and the gate used to pass vacuously — 2026-07-28 owner fix)
+# Merge commits are excluded (--no-merges); they only transport already-reviewed test commits.
+RANGE_BASE=""
+if git rev-parse --verify --quiet swarm/engine-core >/dev/null 2>&1 \
+   && [ "$(git rev-parse HEAD)" != "$(git rev-parse swarm/engine-core)" ]; then
+  RANGE_BASE=swarm/engine-core
+elif git rev-parse --verify --quiet main >/dev/null 2>&1; then
+  RANGE_BASE=main
+fi
+if [ -n "$RANGE_BASE" ]; then
+  BAD=$(git log --no-merges --format='%H %s' "${RANGE_BASE}..HEAD" -- '__tests__' 2>/dev/null \
+        | grep -vE '^[0-9a-f]+ (test|style|spec|freeze)\(' || true)
+  if [ -n "$BAD" ]; then
+    echo "  FAIL  frozen-tests-unmodified (vs ${RANGE_BASE})"
+    printf '%s\n' "$BAD" | sed 's/^/        /'
+    FAIL=1
+  else
+    echo "  PASS  frozen-tests-unmodified (vs ${RANGE_BASE})"
+  fi
+else
+  echo "  PASS  frozen-tests-unmodified (no base branch to compare against)"
 fi
 
 [ "$FAIL" -eq 0 ] && echo "== ALL LOCAL GATES PASS ==" || echo "== LOCAL GATES RED =="

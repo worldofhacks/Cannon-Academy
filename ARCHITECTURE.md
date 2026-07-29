@@ -1,16 +1,16 @@
 # Cannon Academy — Architecture
 
-*K-5 math duels on the high seas. Turn-based naval combat where correct answers fire cannons and answer speed aims the shot.*
+_K-5 math duels on the high seas. Turn-based naval combat where correct answers fire cannons and answer speed aims the shot._
 
 This document records, for each layer of the stack and each core game system: the options considered, the decision, why, and what would make us revisit it. Constraints that shaped every call: **one developer, 5 days, MVP at day 2**, target audience K-5 (ages 5–11), must demo well on a phone, and the architecture should leave a clean path to real multiplayer without building any of it now.
 
 Baseline versions at time of writing (July 2026): Expo SDK 57 / React Native 0.86 / Reanimated 4.5 / Gesture Handler 2.32. New Architecture (Fabric) is the default and we do nothing to opt out.
 
-* * *
+---
 
 ## 0. Priorities
 
-**The product is a fun, functional game — and the first milestone is a functional MVP at the end of day 2.** Every architecture decision below is subordinate to two questions: does it make the duel feel better, and does it keep the build shippable? Explicitly *not* priorities for this build: hardened security, analytics, CI, and scalability — each gets the minimum viable treatment and a one-line future note, no more.
+**The product is a fun, functional game — and the first milestone is a functional MVP at the end of day 2.** Every architecture decision below is subordinate to two questions: does it make the duel feel better, and does it keep the build shippable? Explicitly _not_ priorities for this build: hardened security, analytics, CI, and scalability — each gets the minimum viable treatment and a one-line future note, no more.
 
 **Sequencing rule: function first, juice after.** Days 1–2 ship the MVP checklist (playable loop, persistence, placeholder art, basic cannonball arc \+ hull bars, zero sound). The juice checklist below is the **day-3+ budget** — timeboxed to roughly half a day, applied in priority order, with overflow landing in day 5's polish block. Two architectural prerequisites make that deferral safe, and both are day-1 work: feedback hooks live in the duel reducer's events, so bolting juice on later touches components and never game logic; and the art pipeline (§7) is incremental by construction, so real sprites replace grey boxes one file at a time, any hour of any day.
 
@@ -18,10 +18,10 @@ The corollary is that **layout is not juice**. Where things sit, how big they ar
 
 The juice checklist (day 3+, in order):
 
-- **Answer → impact latency near zero**: the volley fires the frame after a correct answer; all feedback on the UI thread. *(Free — it's just not blocking the answer path — and applies from day 1.)*
+- **Answer → impact latency near zero**: the volley fires the frame after a correct answer; all feedback on the UI thread. _(Free — it's just not blocking the answer path — and applies from day 1.)_
 - **Feedback layering**: cannon boom \+ splash/hit SFX, screen shake on big hits, haptics (expo-haptics), Perfect Shot chime.
 - **The chest moment**: anticipation pause → shake → burst — the reward beat gets the largest single animation allocation.
-- **Never a dead end**: wrong answers keep the duel moving; a slow kid still lands volleys; losing still pays a little. *(Design rule, not animation — applies from day 1.)*
+- **Never a dead end**: wrong answers keep the duel moving; a slow kid still lands volleys; losing still pays a little. _(Design rule, not animation — applies from day 1.)_
 - **Tuning without rebuilds**: every feel constant in `tuning.ts` behind the dev slider screen.
 
 Functional \= crash-free duels and never teaching wrong math — which is why the engine tests (§9) stay even in a fun-first build.
@@ -30,12 +30,12 @@ Functional \= crash-free duels and never teaching wrong math — which is why th
 
 **Options considered**
 
-| Option | Verdict |
-| --- | --- |
-| **Expo (managed) \+ TypeScript** | ✅ Chosen |
-| Bare React Native | More native control we don't need; loses EAS velocity |
-| Flutter | Strong engine, but team experience is React; ecosystem parity for our needs; no reuse of RN web export |
-| Native (Swift/Kotlin) | Two codebases in 5 days; disqualified |
+| Option                               | Verdict                                                                                                        |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------- |
+| **Expo (managed) \+ TypeScript**     | ✅ Chosen                                                                                                      |
+| Bare React Native                    | More native control we don't need; loses EAS velocity                                                          |
+| Flutter                              | Strong engine, but team experience is React; ecosystem parity for our needs; no reuse of RN web export         |
+| Native (Swift/Kotlin)                | Two codebases in 5 days; disqualified                                                                          |
 | Web-first (Phaser/PixiJS \+ wrapper) | Real game engine, but WebView perf on Android is 5–10× worse, and bridging auth/UI between runtimes burns days |
 
 **Decision: Expo SDK 57, TypeScript strict mode, managed workflow, iterated through a development build (§6).**
@@ -56,19 +56,19 @@ Revisit if: we ever need \>100 animated entities on screen simultaneously (we wo
 ### 3.1 Navigation
 
 **Options:** expo-router (file-based, typed routes) vs bare react-navigation.
-**Decision: expo-router.** It *is* react-navigation underneath, adds typed links and web URL support for free (our web demo build gets shareable routes), and file-based layout matches a 6-screen app: `map`, `duel`, `range` (practice), `harbor` (garage/shop), `ranks` (ladder/leaderboard), `onboarding`.
+**Decision: expo-router.** It _is_ react-navigation underneath, adds typed links and web URL support for free (our web demo build gets shareable routes), and file-based layout matches a 6-screen app: `map`, `duel`, `range` (practice), `harbor` (garage/shop), `ranks` (ladder/leaderboard), `onboarding`.
 
 ### 3.2 State management
 
 **Options considered**
 
-| Option | Verdict |
-| --- | --- |
-| **Zustand \+ pure reducer modules** | ✅ Chosen |
-| Redux Toolkit | Same architecture, more ceremony; nothing RTK gives us that we need (no complex middleware, no devtools requirement) |
-| Jotai/Recoil | Atom model fits derived-data UIs, fights an explicit state-machine design |
-| React Context only | Re-render blast radius during animation-heavy duels |
-| XState | The *right* formalism for our duel machine, but its learning/integration tax in 5 days outweighs the benefit over a hand-rolled discriminated-union reducer |
+| Option                              | Verdict                                                                                                                                                     |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Zustand \+ pure reducer modules** | ✅ Chosen                                                                                                                                                   |
+| Redux Toolkit                       | Same architecture, more ceremony; nothing RTK gives us that we need (no complex middleware, no devtools requirement)                                        |
+| Jotai/Recoil                        | Atom model fits derived-data UIs, fights an explicit state-machine design                                                                                   |
+| React Context only                  | Re-render blast radius during animation-heavy duels                                                                                                         |
+| XState                              | The _right_ formalism for our duel machine, but its learning/integration tax in 5 days outweighs the benefit over a hand-rolled discriminated-union reducer |
 
 **Decision: two Zustand stores, with all game logic outside React.**
 
@@ -81,17 +81,17 @@ The rule that matters more than the library: **`src/engine/**` contains zero Rea
 
 **Options considered**
 
-| Option | Verdict |
-| --- | --- |
-| **RN Views \+ Reanimated 4 \+ pre-rendered sprites \+ Lottie** | ✅ Chosen |
-| Real-time 3D (expo-gl \+ three.js \+ react-three-fiber) | Rejected — see below |
-| react-native-skia canvas | GPU batching we don't need at our entity count; hand-rolled loop/camera/input \= days |
-| react-native-game-engine | Dormant since 2020; View-per-entity, no GPU batching |
-| Phaser 4 in WebView | Separate runtime sandbox; Android WebView 5–10× slower; postMessage bridge for auth/state |
+| Option                                                         | Verdict                                                                                   |
+| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| **RN Views \+ Reanimated 4 \+ pre-rendered sprites \+ Lottie** | ✅ Chosen                                                                                 |
+| Real-time 3D (expo-gl \+ three.js \+ react-three-fiber)        | Rejected — see below                                                                      |
+| react-native-skia canvas                                       | GPU batching we don't need at our entity count; hand-rolled loop/camera/input \= days     |
+| react-native-game-engine                                       | Dormant since 2020; View-per-entity, no GPU batching                                      |
+| Phaser 4 in WebView                                            | Separate runtime sandbox; Android WebView 5–10× slower; postMessage bridge for auth/state |
 
 **Decision: ordinary RN Views animated with Reanimated worklets. All game art is pre-rendered 2D sprites (§7). Lottie for particle-ish FX; one parallax pair of sea/sky layers.**
 
-**Why not real-time 3D, stated plainly, because voxel/3D art was seriously considered:** our camera never moves. Portrait, fixed side view, two ships facing each other, turn-based. Under a fixed camera, real-time 3D produces the *same silhouettes* as pre-rendered 3D while trading Blender's offline path-traced lighting for whatever a mid-range Android manages at 60fps. It is strictly worse output for materially more cost: \~2.3 MB of added JS (three \+ drei), an `expo-gl` dependency whose own maintainers have flagged it as a maintenance burden they're migrating off (`pmndrs/native` carries a "DO NOT USE YET" banner and has been stalled since Jan 2026), an unresolved iOS Simulator GL crash open since 2024, and 12–25 hours of first-timer setup against a 5-day box. The 3D work still happens — it happens *offline*, in Blender, where it's cheap (§7).
+**Why not real-time 3D, stated plainly, because voxel/3D art was seriously considered:** our camera never moves. Portrait, fixed side view, two ships facing each other, turn-based. Under a fixed camera, real-time 3D produces the _same silhouettes_ as pre-rendered 3D while trading Blender's offline path-traced lighting for whatever a mid-range Android manages at 60fps. It is strictly worse output for materially more cost: \~2.3 MB of added JS (three \+ drei), an `expo-gl` dependency whose own maintainers have flagged it as a maintenance burden they're migrating off (`pmndrs/native` carries a "DO NOT USE YET" banner and has been stalled since Jan 2026), an unresolved iOS Simulator GL crash open since 2024, and 12–25 hours of first-timer setup against a 5-day box. The 3D work still happens — it happens _offline_, in Blender, where it's cheap (§7).
 
 Peak simultaneous animated elements in a volley is roughly a dozen cannonballs (parabolic arcs \= one `withTiming` on x plus a derived parabola on y), two ship sprites, hull bars, and a Lottie or two — comfortably inside plain-RN territory on mid-range Android under the New Architecture.
 
@@ -134,25 +134,25 @@ The engine is a set of pure TypeScript modules. This section is the real archite
 
 **Options for question sourcing**
 
-| Option | Verdict |
-| --- | --- |
-| **Parameterized golden templates** | ✅ Chosen |
-| Static question bank | Finite, repeats, heavy authoring |
-| LLM generation at runtime | Latency in the hot path \+ nonzero wrong-answer rate \= disqualified for K-5 math |
-| Adaptive engine (IRT-style) | Out of scope; "player chooses difficulty" replaces it with agency |
+| Option                             | Verdict                                                                           |
+| ---------------------------------- | --------------------------------------------------------------------------------- |
+| **Parameterized golden templates** | ✅ Chosen                                                                         |
+| Static question bank               | Finite, repeats, heavy authoring                                                  |
+| LLM generation at runtime          | Latency in the hot path \+ nonzero wrong-answer rate \= disqualified for K-5 math |
+| Adaptive engine (IRT-style)        | Out of scope; "player chooses difficulty" replaces it with agency                 |
 
 **Answers are four-choice taps, universally.** Every question renders one correct answer plus three engineered distractors — a decision driven by mobile smoothness (no keypad for small hands), K-friendliness (no digit reversal, no free-entry anxiety), and uniformity (addition and fractions share one input, so no skill needs a bespoke keypad). A template therefore carries a distractor strategy, not just an answer:
 
 ```ts
 type Template = {
   id: string;
-  skill: SkillId;                 // e.g. "add_within_20"
-  text: string;                   // "{a} + {b} = ?"  (symbolic only for K-1)
-  params: Record<string, [number, number]>;   // inclusive ranges
-  constraints?: string[];         // ["a + b <= 20"] — tiny safe evaluator over params
-  answerExpr: string;             // "a + b"
-  distractors: string[];          // exprs, e.g. ["a + b + 1", "a + b - 1", "a * b"] — plausible, never equal to answer or each other
-  readAloud?: boolean;            // grade 2+ word problems flagged for TTS
+  skill: SkillId; // e.g. "add_within_20"
+  text: string; // "{a} + {b} = ?"  (symbolic only for K-1)
+  params: Record<string, [number, number]>; // inclusive ranges
+  constraints?: string[]; // ["a + b <= 20"] — tiny safe evaluator over params
+  answerExpr: string; // "a + b"
+  distractors: string[]; // exprs, e.g. ["a + b + 1", "a + b - 1", "a * b"] — plausible, never equal to answer or each other
+  readAloud?: boolean; // grade 2+ word problems flagged for TTS
 };
 ```
 
@@ -177,7 +177,7 @@ countdown → playerChoose → reload(question) → resolvePlayer
 ```ts
 interface Opponent {
   chooseAction(view: RivalView): Promise<RivalAction>;
-  produceAnswer(q: Question): Promise<{correct: boolean; elapsedMs: number}>;
+  produceAnswer(q: Question): Promise<{ correct: boolean; elapsedMs: number }>;
 }
 ```
 
@@ -199,32 +199,32 @@ All tuning constants live in one file, `engine/tuning.ts`, exposed on the hidden
 ```
 roll = uniform(cannon.min, cannon.max) biased by answerQuality
 answerQuality ∈ [0,1] from elapsedMs vs the cannon's timer (floored at 0.35 for any correct answer)
-perfectShot (elapsed < 40% of timer) → +1 bonus ball
+perfectShot (elapsed < 40% of timer) → +1 damage, celebrated with an extra cannonball arc (presentation only)
 volatile guns: wrong answer → recoil damage to self
 ```
 
-**Enemy hull is per-island, in `tuning.ts` from day 1** (starter sloops 40–50 vs the player's 100), so the day-1 "a duel you can win" resolves in 4–6 player volleys rather than the 10+ a flat 100-hull enemy would force. Player hull is session-only and resets each duel. The floor is a pedagogical guarantee: a slow-but-correct K kid always lands ≥ a respectable mid-range volley. Damage renders as N cannonball arcs with per-ball hit/splash, so the roll reads as shot spread.
+**Enemy hull is per-island, in `tuning.ts` from day 1** (starter sloops 40–50 vs the player's 100), so the day-1 "a duel you can win" resolves in 4–6 player volleys rather than the 10+ a flat 100-hull enemy would force. Player hull is session-only and resets each duel. The floor is a pedagogical guarantee: a slow-but-correct K kid always lands ≥ a respectable mid-range volley. Damage is a scalar total; the duel view may render it as N cannonball arcs (from `BASE_BALLS_PER_VOLLEY`, plus one extra arc on a Perfect Shot) so the roll reads as shot spread — arc count is presentation and does not subdivide damage.
 
 `perfectShot` and volatile recoil are **engine behavior from day 1** (cheap, and §8 tests them); their **VFX/UI surface lands day 3**. Writing that split down here prevents a mid-build scope debate.
 
 ### 4.4 Content catalogs
 
-`src/content/` holds `cannons.json`, `islands.json`, `crew.json`, `ranks.json`, `templates/<skill>.json` — all typed, all zod-validated in a test that also golden-tests every template (1,000 samples per template: constraints hold, answer expression evaluates, params in range). Content ships in the bundle; **no network call in the play path, ever**. The whole game must be playable in airplane mode except the leaderboard.
+`src/content/` holds `skills.json`, `cannons.json`, `islands.json`, `crew.json`, `ranks.json`, `templates/<skill>.json` — all typed, all zod-validated in a test that also golden-tests every template (1,000 samples per template: constraints hold, answer expression evaluates, params in range). Content ships in the bundle; **no network call in the play path, ever**. The whole game must be playable in airplane mode except the leaderboard.
 
 ## 5. Backend
 
 **Options considered**
 
-| Option | Verdict |
-| --- | --- |
-| **Firebase JS SDK (Auth \+ Firestore)** | ✅ Chosen |
-| react-native-firebase (native) | Needed only for Analytics/Crashlytics; costs Expo Go \+ config plugins; skipped |
-| Supabase | Fine alternative; Firebase chosen for Expo-docs blessing, anonymous-auth ergonomics, familiarity |
-| Local-only | Loses accounts/leaderboard, and the brief includes account creation \+ onboarding |
+| Option                                  | Verdict                                                                                          |
+| --------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| **Firebase JS SDK (Auth \+ Firestore)** | ✅ Chosen                                                                                        |
+| react-native-firebase (native)          | Needed only for Analytics/Crashlytics; costs Expo Go \+ config plugins; skipped                  |
+| Supabase                                | Fine alternative; Firebase chosen for Expo-docs blessing, anonymous-auth ergonomics, familiarity |
+| Local-only                              | Loses accounts/leaderboard, and the brief includes account creation \+ onboarding                |
 
 **Pin `firebase@^12`.** Expo SDK 57 only supports firebase 12.0.0+ (earlier versions hit ES-module resolution errors with Metro's package exports). Do **not** add the widely-Googled `unstable_enablePackageExports=false` / `.cjs` Metro workaround — it's obsolete and can itself break an SDK 57 project.
 
-**Auth: Firebase anonymous auth — and it must be initialized for persistence.** The JS SDK defaults to *in-memory* auth on React Native, which mints a brand-new anonymous UID on every cold start (orphaned progress, duplicate leaderboard rows) — a silent, latent bug the day-2 checklist would otherwise miss because Zustand is local. Initialize explicitly on day 1:
+**Auth: Firebase anonymous auth — and it must be initialized for persistence.** The JS SDK defaults to _in-memory_ auth on React Native, which mints a brand-new anonymous UID on every cold start (orphaned progress, duplicate leaderboard rows) — a silent, latent bug the day-2 checklist would otherwise miss because Zustand is local. Initialize explicitly on day 1:
 
 ```ts
 const auth = initializeAuth(app, { persistence: getReactNativePersistence(AsyncStorage) });
@@ -264,7 +264,7 @@ duels/{id}:   { uid, rivalId, result, seed, actions[], endedAt }   // seed + per
 
 **What this buys beyond unblocking:** the scariest infrastructure step of the week — first EAS build, credentials, `app.json` identifiers, config — moves from day 2 to day 1, when there is slack to absorb it. It also permanently deletes the entire class of "is this in Expo Go?" questions.
 
-**The old no-native-modules invariant softens from constraint to discipline.** With a dev client we *could* adopt MMKV, Skia, or react-native-filament. We still don't: every native dependency is build time, upgrade risk, and debugging surface we can't afford this week. The rule is now "justify each native addition against the days it costs," not "never." Current native surface, all first-party or long-stable: Reanimated, Gesture Handler, expo-audio, expo-image, expo-haptics, AsyncStorage, safe-area-context. Firebase stays the pure-JS SDK.
+**The old no-native-modules invariant softens from constraint to discipline.** With a dev client we _could_ adopt MMKV, Skia, or react-native-filament. We still don't: every native dependency is build time, upgrade risk, and debugging surface we can't afford this week. The rule is now "justify each native addition against the days it costs," not "never." Current native surface, all first-party or long-stable: Reanimated, Gesture Handler, expo-audio, expo-image, expo-haptics, AsyncStorage, safe-area-context. Firebase stays the pure-JS SDK.
 
 **Fallback:** if the dev build fights us for more than \~90 minutes on day 1, fall back to the iOS Simulator plus an Android emulator (neither needs a dev client for JS-only iteration) and retry the build in the evening. This never blocks engine or UI work, which is all JS.
 
@@ -274,17 +274,17 @@ The visual style is **bright, chunky, flat-shaded low-poly**, delivered as pre-r
 
 ### 7.1 Sources — all CC0, $0
 
-| Pack | Contents | License |
-| --- | --- | --- |
+| Pack                                                                 | Contents                                                                                                                                          | License |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- | ------- |
 | [Quaternius Pirate Kit](https://quaternius.com/packs/piratekit.html) | 71 models — ships, dock, cannon, chests, coins, gems, barrels, palms, rocks, houses, shark, **tentacle**, 5 animated pirate characters, skeletons | **CC0** |
-| [Kenney Pirate Kit](https://kenney.nl/assets/pirate-kit) | 70+ naval assets, modular ship parts, treasure, terrain | **CC0** |
-| [Kenney Pirate Pack (2D)](https://kenney.nl/assets/pirate-pack) | 190 finished 2D sprites — **the parachute** if the Blender step ever stalls | **CC0** |
+| [Kenney Pirate Kit](https://kenney.nl/assets/pirate-kit)             | 70+ naval assets, modular ship parts, treasure, terrain                                                                                           | **CC0** |
+| [Kenney Pirate Pack (2D)](https://kenney.nl/assets/pirate-pack)      | 190 finished 2D sprites — **the parachute** if the Blender step ever stalls                                                                       | **CC0** |
 
 CC0 means no attribution obligation, no license text to comply with, and no redistribution question about pre-rendering to sprites. Both 3D packs ship glTF/GLB natively. Quaternius is the base style; Kenney fills gaps — the two mix well (both flat-shaded, saturated, comparable poly budgets). **Do not mix in a third house style** (Synty in particular reads weathered and adult next to these, and its prop inventory is wall-to-wall cutlasses and blunderbusses — wrong register for K-5).
 
-**The two gaps, solved without shopping:** the *ghost ship* is a standard hull with a translucent cyan-white emissive material, rendered as a separate sprite. The *kraken* is Quaternius' tentacle duplicated and rotated into a cluster around a ship — which reads better at K-5 than a full monster and stays perfectly in style. No pack at any price ships a matching sea monster, so this is the answer rather than a compromise.
+**The two gaps, solved without shopping:** the _ghost ship_ is a standard hull with a translucent cyan-white emissive material, rendered as a separate sprite. The _kraken_ is Quaternius' tentacle duplicated and rotated into a cluster around a ship — which reads better at K-5 than a full monster and stays perfectly in style. No pack at any price ships a matching sea monster, so this is the answer rather than a compromise.
 
-**Rejected, with reasons worth remembering:** true voxel is a genuine market gap — the one good voxel pirate pack (monogon, €12.95) is **CC BY-ND**, and NoDerivatives forbids pre-rendering it to sprites at all. MagicaVoxel is abandoned on macOS (0.99.6.2, 2020, Intel-only — unusable on Apple Silicon). AI 3D generation (TRELLIS.2, Hunyuan3D) works per-asset but has a *consistency* problem across a set that costs roughly the half-day the packs hand over free — kept in reserve as a day-3 gap-filler only, never as the day-1 pipeline.
+**Rejected, with reasons worth remembering:** true voxel is a genuine market gap — the one good voxel pirate pack (monogon, €12.95) is **CC BY-ND**, and NoDerivatives forbids pre-rendering it to sprites at all. MagicaVoxel is abandoned on macOS (0.99.6.2, 2020, Intel-only — unusable on Apple Silicon). AI 3D generation (TRELLIS.2, Hunyuan3D) works per-asset but has a _consistency_ problem across a set that costs roughly the half-day the packs hand over free — kept in reserve as a day-3 gap-filler only, never as the day-1 pipeline.
 
 ### 7.2 The render pipeline
 
@@ -366,19 +366,19 @@ The safe-by-construction posture falls out of the design rather than requiring w
 
 ## 12. Risks & mitigations (architecture-level)
 
-| Risk | Mitigation |
-| --- | --- |
-| Duel feel needs endless tuning | All constants in `tuning.ts` \+ hidden dev slider screen (`dev.tsx`, day 1); feel work never requires a rebuild |
-| Dev build fights us on day 1 | 90-minute timebox, then fall back to Simulator/emulator (JS-only iteration is unaffected) and retry in the evening |
-| Blender defeats a first-timer | Fallback is Kenney's 190-sprite 2D Pirate Pack — ship on free 2D art, lose only the low-poly look. Route's fallback costs nothing; real-time 3D's fallback would have cost two days |
-| Anonymous UID rotates on cold start | `initializeAuth` \+ `getReactNativePersistence(AsyncStorage)` day 1; day-2 checklist asserts same-UID-after-relaunch |
-| AsyncStorage hydration race on launch | Root layout gates on `hasHydrated`; splash held until rehydrated |
-| Async Opponent ↔ sync reducer races | Turn-token discard \+ out-of-phase no-op events \+ teardown cancellation (§4.2) |
-| Firestore transport hangs on RN | Auto-detect long-polling on; every write fire-and-forget with catch |
-| Offline writes lost (memory-only cache) | Idempotent full-profile `setDoc` from local state on every boundary \+ foreground; profile self-heals |
-| A template generates a wrong answer / bad distractor | Golden tests make it a commit-time failure, not a runtime one |
-| Reinstall/device-switch orphans cloud progress | Accepted for showcase; never demo from a reinstalled device with an account you care about |
-| Art/juice creep eats content days | The §0 checklist is the finite juice budget; sprite work is incremental and interruptible by construction |
+| Risk                                                 | Mitigation                                                                                                                                                                          |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Duel feel needs endless tuning                       | All constants in `tuning.ts` \+ hidden dev slider screen (`dev.tsx`, day 1); feel work never requires a rebuild                                                                     |
+| Dev build fights us on day 1                         | 90-minute timebox, then fall back to Simulator/emulator (JS-only iteration is unaffected) and retry in the evening                                                                  |
+| Blender defeats a first-timer                        | Fallback is Kenney's 190-sprite 2D Pirate Pack — ship on free 2D art, lose only the low-poly look. Route's fallback costs nothing; real-time 3D's fallback would have cost two days |
+| Anonymous UID rotates on cold start                  | `initializeAuth` \+ `getReactNativePersistence(AsyncStorage)` day 1; day-2 checklist asserts same-UID-after-relaunch                                                                |
+| AsyncStorage hydration race on launch                | Root layout gates on `hasHydrated`; splash held until rehydrated                                                                                                                    |
+| Async Opponent ↔ sync reducer races                  | Turn-token discard \+ out-of-phase no-op events \+ teardown cancellation (§4.2)                                                                                                     |
+| Firestore transport hangs on RN                      | Auto-detect long-polling on; every write fire-and-forget with catch                                                                                                                 |
+| Offline writes lost (memory-only cache)              | Idempotent full-profile `setDoc` from local state on every boundary \+ foreground; profile self-heals                                                                               |
+| A template generates a wrong answer / bad distractor | Golden tests make it a commit-time failure, not a runtime one                                                                                                                       |
+| Reinstall/device-switch orphans cloud progress       | Accepted for showcase; never demo from a reinstalled device with an account you care about                                                                                          |
+| Art/juice creep eats content days                    | The §0 checklist is the finite juice budget; sprite work is incremental and interruptible by construction                                                                           |
 
 ## 13. Future architecture (documented, not built)
 
