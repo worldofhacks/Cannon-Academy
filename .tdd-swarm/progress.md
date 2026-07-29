@@ -1730,3 +1730,10 @@ Worktrees (phase=`tests`):
 | T-016 | `.worktrees/wt-T-016` | `ticket/T-016-templates-g35` |
 
 Test Agents dispatched in parallel for the three template tickets.
+
+
+### T-016 tests-written (commit `953bc7d`)
+
+[T-016 Test Agent](d05384d3-5e8d-42e1-8f93-f00010357c9d): suite `__tests__/content/templates/g35.test.ts`
+(sha `d478d382…`). Orchestrator verified: spec-lint PASS; 23 failed / 3 passed (missing JSON —
+clean RED); baseline 1438 green. Test-design review dispatched (Composer).
