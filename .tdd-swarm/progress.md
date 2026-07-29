@@ -1769,3 +1769,11 @@ Implementer copied `REQUIRED_TEMPLATES` faithfully (`31cb5ba`) then hit AC-7:
 `add_within_{10,20}_near_doubles` use distractors `a + a` and `a + b - 1` under constraint
 `b == a + 1` → algebraic identity → 1000/1000 ladder. Deep-equals AC-1 forbids content fix.
 Phase reopened to `tests`; Test Agent fixing contract + adding AC-7 preflight (review I-3).
+
+
+### Pulse — T-015 REJECT / T-016 fixed / T-032 RED / T-014 dispute in flight
+
+- **T-015:** [review](f74531b4-806b-4e0c-b3e3-37d2ff32b51b) **REJECT** (AC-11 parallel evaluator, dead-param). Fix dispatched.
+- **T-016:** fix commit `2929435` verified (SPOT_CHECKS, `\b` params, structural div constraints); re-review dispatched.
+- **T-032:** RED suite `fe76dd2` verified (29 fail — range still pre-granted); test-design review dispatched.
+- **T-014:** implementer BLOCKED confirmed; Test Agent amending near_doubles + AC-7 preflight (uncommitted).
