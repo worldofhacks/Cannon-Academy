@@ -11,19 +11,19 @@
     "esModuleInterop": true,
     "forceConsistentCasingInFileNames": true,
     "types": ["node"],
-
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "noImplicitOverride": true,
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "exactOptionalPropertyTypes": true,
-
     "baseUrl": ".",
     "paths": {
       "@engine/*": ["src/engine/*"],
       "@content/*": ["src/content/*"]
-    }
+    },
+    "jsx": "react-jsx",
+    "skipLibCheck": true
   },
-  "include": ["src/**/*", "__tests__/**/*", "*.config.ts"]
+  "include": ["*.config.ts", ".expo/types/**/*", "__tests__/**/*", "app/**/*", "expo-env.d.ts", "src/**/*"]
 }

@@ -11,7 +11,11 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --check .",
-    "format:write": "prettier --write ."
+    "format:write": "prettier --write .",
+    "start": "expo start --dev-client",
+    "ios": "expo run:ios",
+    "android": "expo run:android",
+    "web": "expo start --web"
   },
   "devDependencies": {
     "@eslint/js": "^9.18.0",
@@ -24,9 +28,25 @@
     "vitest": "^3.0.0"
   },
   "dependencies": {
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "expo": "~57.0.0",
+    "expo-constants": "~57.0.7",
+    "expo-image": "~57.0.1",
+    "expo-linking": "~57.0.4",
+    "expo-router": "~57.0.8",
+    "expo-status-bar": "~57.0.1",
+    "firebase": "^12.16.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.0",
+    "react-native-gesture-handler": "~2.32.0",
+    "react-native-reanimated": "4.5.0",
+    "react-native-safe-area-context": "~5.7.0",
+    "react-native-screens": "~4.26.0",
     "zod": "^3.24.1"
   },
   "overrides": {
     "brace-expansion": "^5.0.8"
-  }
+  },
+  "main": "expo-router/entry"
 }

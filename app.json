@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Cannon Academy",
+    "slug": "cannon-academy",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "cannonacademy",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.worldofhacks.cannonacademy"
+    },
+    "android": {
+      "package": "com.worldofhacks.cannonacademy",
+      "edgeToEdgeEnabled": true
+    },
+    "web": {
+      "bundler": "metro",
+      "output": "static"
+    },
+    "plugins": ["expo-router", "expo-status-bar", "expo-image"],
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
