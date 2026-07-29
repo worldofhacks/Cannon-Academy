@@ -10,17 +10,21 @@ Solo build, 5-day timebox. **Day 1 is Tuesday July 28, 2026. Submission is Satur
 
 ## Status
 
-Planning is complete and adversarially reviewed. Nothing is open; the next action is code.
+Planning is complete and adversarially reviewed. Two design decisions are open and owner-blocked —
+**T-029** (does a K-1 captain get a third starter cannon) and **T-032** (placement pre-grants the
+cannons mastery is meant to award). Neither blocks code; both change content.
 
-| Artifact                                           | State                                                                               |
-| -------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Concept, name, differentiation                     | Locked (`PLAN.md`)                                                                  |
-| Game design + 5-day schedule                       | Locked (`PLAN.md`)                                                                  |
-| Technical architecture                             | Locked (`ARCHITECTURE.md`)                                                          |
-| UI approach + art pipeline                         | Locked (`ARCHITECTURE.md` §3.6, §7)                                                 |
-| Adversarial review (schedule / technical / design) | Complete — findings folded in                                                       |
-| Repo scaffold                                      | Complete (Vitest + TS strict + lint gates)                                          |
-| Engine core (`src/engine/`, `src/content/`)        | **Waves 1–3 merged — 1,229 tests. Wave 4 paused at the freeze gate ← you are here** |
+| Artifact                                            | State                                                                            |
+| --------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Concept, name, differentiation                      | Locked (`PLAN.md`)                                                               |
+| Game design + 5-day schedule                        | Locked (`PLAN.md`)                                                               |
+| Technical architecture                              | Locked (`ARCHITECTURE.md`)                                                       |
+| UI approach + art pipeline                          | Locked (`ARCHITECTURE.md` §3.6, §7)                                              |
+| Adversarial review (schedule / technical / design)  | Complete — findings folded in                                                    |
+| Repo scaffold                                       | Complete (Vitest + TS strict + lint gates)                                       |
+| Engine core (`src/engine/`, `src/content/`)         | Waves 1–3 merged — 1,229 tests. Wave 4 at the freeze gate (engine track)         |
+| App shell (`app/`, `src/components/`, `src/theme/`) | Duel screen playable end to end against the real engine (app track, `app/shell`) |
+| Design system                                       | Tokens, type scale and sprites transcribed from the Claude Design boards         |
 
 ## Documents
 

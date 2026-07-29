@@ -41,6 +41,28 @@ export default tseslint.config(
     },
   },
 
+  // Build config at the repo root. `package.json` is `"type": "module"`, so `module.exports` is
+  // only legal in a file the `.cjs` extension marks as CommonJS — the extension IS the module
+  // system, which is the same trap that made the frozen-test guard fail open (LESSONS.md L-007).
+  // Lint has to be told the same thing, or it reports the correct file as broken.
+  {
+    files: ['*.cjs'],
+    languageOptions: {
+      sourceType: 'commonjs',
+      globals: { require: 'readonly', module: 'writable', process: 'readonly', __dirname: 'readonly' },
+    },
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+
+  // The sprite manifest. `require()` is React Native's documented form for a static asset — the
+  // bundler resolves the literal path at build time and rewrites it to an asset reference. This
+  // exemption is scoped to the single file precisely so the manifest stays the only place any
+  // component needs it.
+  {
+    files: ['src/theme/sprites.ts'],
+    rules: { '@typescript-eslint/no-require-imports': 'off' },
+  },
+
   // ARCHITECTURE.md §4.1 / §8: src/engine/ is PURE TypeScript.
   // No React imports, no Math.random() — every draw goes through the seeded PRNG.
   {

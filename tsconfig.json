@@ -25,5 +25,14 @@
     "jsx": "react-jsx",
     "skipLibCheck": true
   },
-  "include": ["*.config.ts", ".expo/types/**/*", "__tests__/**/*", "app/**/*", "expo-env.d.ts", "src/**/*"]
+  "include": [
+    "*.config.ts",
+    ".expo/types/**/*",
+    "__tests__/**/*",
+    "app/**/*",
+    "expo-env.d.ts",
+    "src/**/*",
+    ".expo/types/**/*.ts"
+  ],
+  "extends": "expo/tsconfig.base"
 }
