@@ -100,7 +100,17 @@ export default function DuelScreen() {
         damageToPlayer={state.phase === 'rivalImpact' ? state.rivalDamage : null}
       />
 
-      <View style={[s.sheet, { paddingBottom: insets.bottom }]}>
+      {/* The sheet carries the phase's own colour, not just parchment. The rival's turn tints the
+          whole sheet lavender, and with a fixed parchment sheet the home-indicator inset showed as
+          a cream strip under it — the panel stopped short of the bottom of the screen. */}
+      <View
+        style={[
+          s.sheet,
+          { paddingBottom: insets.bottom },
+          isRivalTurn(state.phase) ? { backgroundColor: '#EFE6F7' } : null,
+          state.phase === 'perfect' ? { backgroundColor: color.gold } : null,
+        ]}
+      >
         {state.phase === 'select' ? <CannonTray cannons={tray} onPick={pickCannon} /> : null}
 
         {state.phase === 'question' && state.question !== null ? (

@@ -55,7 +55,12 @@ export function HullCard({ name, flag, hp, max }: HullCardProps) {
   const tone = { ok: '#1E7F41', warn: color.goldDeep, low: '#B02418', sunk: '#B02418' }[level];
   const fill = { ok: color.success, warn: '#F0A315', low: '#D93A2E', sunk: '#D93A2E' }[level];
   const word = { ok: 'SOUND', warn: 'HIT', low: 'LOW', sunk: 'SUNK' }[level];
-  const icon = { ok: '❤', warn: '◐', low: '⚠', sunk: '✕' }[level];
+  // U+FE0E is the text-presentation selector, and it is load-bearing. Bare ❤ (U+2764) and ⚠
+  // (U+26A0) default to EMOJI presentation on iOS: the system paints its own red glyph and
+  // ignores `color` entirely. Every hull state then shows the same red heart, which silently
+  // deletes the colour channel that distinguishes SOUND from LOW. Web renders them as text and
+  // never showed this.
+  const icon = { ok: '❤︎', warn: '◐', low: '⚠︎', sunk: '✕' }[level];
 
   return (
     <View style={s.hullCard}>
