@@ -44,7 +44,7 @@ files.
    same tally**, so it must be ruled once or the two lanes drift.
 2. **Fidelity vs checklist ordering** — the plan review recommends demoting A-013 (sprites) last.
    The owner asked for pixel fidelity explicitly, so this is theirs.
-   *(D-7 fog was decided on the engine ticket — early Isla Products accepted.)*
+   _(D-7 fog was decided on the engine ticket — early Isla Products accepted.)_
 
 ## The thing most likely to be repeated if forgotten
 
