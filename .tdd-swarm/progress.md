@@ -1885,3 +1885,8 @@ Suite fix `6007ef6` re-frozen `7db026f67f89e6dc…`. Phase → implement; implem
 
 [T-017 Implementer](1b4a4546-66b3-4300-8290-8d3895f1a617): 1652/1652; drill 32/32; gates PASS.
 Code + security review dispatched.
+
+### T-017 security PASS_WITH_NOTES
+
+[T-017 Security Review](36aa48d2-6c7d-453e-80f9-11f79d5b8a1f): offline orchestrator clean; minor contract-immutability notes.
+Awaiting code review before merge.
