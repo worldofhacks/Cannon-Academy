@@ -1967,3 +1967,8 @@ Implementer resumed for full gates.
 
 [T-020 Implementer](8ce1a513-93c0-4562-9c8f-e6b596693975): 1707/1707; reducer 33/33; gates PASS.
 Code + security review dispatched.
+
+### T-020 security PASS_WITH_NOTES
+
+[T-020 Security Review](703a3952-83b2-477a-a831-561d5b827672): clean reducer; minor elapsedMs notes.
+Awaiting code review before merge.
