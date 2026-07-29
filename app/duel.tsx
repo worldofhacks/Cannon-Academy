@@ -80,10 +80,7 @@ function DuelBody() {
   const [state, dispatch] = useReducer(duelReducer, duelContext, (ctx) =>
     ctx.ok ? initialDuelStateWithContext(ctx, freshSeed(), captain) : initialDuelState(0),
   );
-  const rival = useMemo(
-    () => enemyPresentationFor(getEnemyForIsland(state.islandId)),
-    [state.islandId],
-  );
+  const rival = useMemo(() => enemyPresentationFor(getEnemyForIsland(state.islandId)), [state.islandId]);
   const [appliedReward, setAppliedReward] = useState<DuelRewardOutcome | null>(null);
   const askedAt = useRef(0);
   const rivalCancel = useRef<(() => void) | null>(null);
@@ -103,17 +100,13 @@ function DuelBody() {
   // The captain's OWN loadout, in catalog order — via trayCannons (A-011), never a grade-band lookup.
   const tray = useMemo(() => [...trayCannons(captain)], [captain]);
 
-  if (!duelContext.ok) return <Redirect href="/chart" />;
-
-  // An empty tray is unplayable, but it is NOT unrecoverable, so it must not throw. Placement
-  // always equips at least one cannon, so the only way here is a legacy or corrupted save
-  // hydrating with cannons owned but none equipped — and `resolveDestination` returns exactly
-  // `gun-deck` for that state (flow.ts step 4). Throwing red-screened a child on a condition the
-  // flow resolver already knows how to fix; this hands them the screen that fixes it.
-  const fallback = tray[0];
-  if (fallback === undefined) return <Redirect href={`/${resolveDestination(captain)}`} />;
-  const cannon = state.cannon ?? fallback;
-  const look = cannonLook[cannon.id];
+  // NOTHING may return before this point. Both redirects below used to sit HERE, above the eight
+  // hooks that follow, and that is a rules-of-hooks violation with a real trigger: the moment
+  // `captain` changes such that a redirect condition flips — which the victory effect does, by
+  // writing to `captainStore` — React re-renders this component with eight fewer hooks and throws
+  // "Rendered fewer hooks than expected". It cost a live duel. The redirects now sit below every
+  // hook, where a conditional return is legal, and `cannon`/`look` go with them because they are
+  // derived from `fallback` and read only by JSX (A-047).
 
   // Every non-interactive phase advances on its own timer. One effect, so there is exactly one
   // place a beat can be left hanging.
@@ -211,6 +204,20 @@ function DuelBody() {
   const pickCannon = useCallback((picked: (typeof tray)[number]) => {
     dispatch({ type: 'PICK_CANNON', cannon: picked });
   }, []);
+
+  // ── Every hook has now run. Conditional returns are legal from here down. ──
+
+  if (!duelContext.ok) return <Redirect href="/chart" />;
+
+  // An empty tray is unplayable, but it is NOT unrecoverable, so it must not throw. Placement
+  // always equips at least one cannon, so the only way here is a legacy or corrupted save
+  // hydrating with cannons owned but none equipped — and `resolveDestination` returns exactly
+  // `gun-deck` for that state (flow.ts step 4). Throwing red-screened a child on a condition the
+  // flow resolver already knows how to fix; this hands them the screen that fixes it.
+  const fallback = tray[0];
+  if (fallback === undefined) return <Redirect href={`/${resolveDestination(captain)}`} />;
+  const cannon = state.cannon ?? fallback;
+  const look = cannonLook[cannon.id];
 
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>

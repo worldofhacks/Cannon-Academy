@@ -75,7 +75,27 @@ function GuidedDuelBody() {
   const viewRef = useRef(view);
   viewRef.current = view;
 
-  const tray = useMemo(() => [...trayCannons(captain)], [captain]);
+  /**
+   * The guided tray is the SESSION's loadout, not the captain's equipped set.
+   *
+   * Board "Guided first duel" draws exactly one cannon — "Tap the green cannon", with everything
+   * else dimmed to 35% — and the engine agrees: `guidedConfig` sets `playerLoadout: ['swivel_gun']`,
+   * and `selectCannon` returns the SAME STATE, silently, for any id outside that list.
+   *
+   * So rendering `trayCannons(captain)` here painted the captain's second starter as a live tile
+   * that could never fire. No error, no feedback, nothing — a dead button in the one duel whose
+   * entire job is teaching a five-year-old that tapping a cannon does something (A-047).
+   *
+   * The fallback is deliberate: if a future config and the catalog ever disagree, show the captain's
+   * tray rather than an empty sheet, because an empty tray trips the `/gun-deck` redirect below and
+   * would bounce a child out of onboarding.
+   */
+  const permitted = useMemo(() => new Set(session.getState().core.playerLoadout), [session]);
+  const tray = useMemo(() => {
+    const equipped = trayCannons(captain);
+    const gated = equipped.filter((c) => permitted.has(c.id));
+    return gated.length > 0 ? [...gated] : [...equipped];
+  }, [captain, permitted]);
 
   useEffect(() => {
     mounted.current = true;
@@ -136,12 +156,11 @@ function GuidedDuelBody() {
     router.replace('/chart');
   }, [view.phase, appliedReward]);
 
-  if (captain.hasFoughtGuidedDuel) return <Redirect href="/chart" />;
-
-  const fallback = tray[0];
-  if (fallback === undefined) return <Redirect href="/gun-deck" />;
-  const cannon = view.cannon ?? fallback;
-  const look = cannonLook[cannon.id];
+  // NOTHING may return before this point — see the block below. This is the exact bug that ended a
+  // live guided duel: the two redirects used to sit HERE, above the three hooks that follow, and
+  // `settleGuidedDuel` sets `hasFoughtGuidedDuel = true` on victory. The store subscription then
+  // re-rendered this component, the first redirect fired, three hooks disappeared, and React threw
+  // "Rendered fewer hooks than expected" on the winning turn (A-047).
 
   const onAnswer = useCallback(
     (value: number) => {
@@ -171,6 +190,15 @@ function GuidedDuelBody() {
     }
   }, [view.phase, view.cannon, view.question]);
 
+  // ── Every hook has now run. Conditional returns are legal from here down. ──
+
+  if (captain.hasFoughtGuidedDuel) return <Redirect href="/chart" />;
+
+  const fallback = tray[0];
+  if (fallback === undefined) return <Redirect href="/gun-deck" />;
+  const cannon = view.cannon ?? fallback;
+  const look = cannonLook[cannon.id];
+
   return (
     <View style={[s.screen, { paddingTop: insets.top }]}>
       <View style={[s.hud, { paddingHorizontal: L.gutter }]}>
@@ -182,7 +210,12 @@ function GuidedDuelBody() {
         />
         <View style={s.hullRow}>
           <HullCard name="You" flag={color.amber} hp={view.playerHull} max={view.playerMax} />
-          <HullCard name={GUIDED_RIVAL.displayName} flag={GUIDED_RIVAL.accent} hp={view.rivalHull} max={view.rivalMax} />
+          <HullCard
+            name={GUIDED_RIVAL.displayName}
+            flag={GUIDED_RIVAL.accent}
+            hp={view.rivalHull}
+            max={view.rivalMax}
+          />
         </View>
       </View>
 
@@ -213,11 +246,7 @@ function GuidedDuelBody() {
         ]}
       >
         {view.phase === 'select' ? (
-          <CannonTray
-            cannons={tray}
-            gradeBand={captain.gradeBand ?? 'k_1'}
-            onPick={pickCannon}
-          />
+          <CannonTray cannons={tray} gradeBand={captain.gradeBand ?? 'k_1'} onPick={pickCannon} />
         ) : null}
 
         {view.phase === 'question' && view.question !== null ? (
