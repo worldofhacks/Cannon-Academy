@@ -1,0 +1,96 @@
+[
+  {
+    "id": "mult_facts_basic",
+    "skill": "mult_facts",
+    "text": "{a} × {b} = ?",
+    "params": {
+      "a": [2, 10],
+      "b": [2, 10]
+    },
+    "constraints": ["a * b <= 100"],
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"]
+  },
+  {
+    "id": "mult_facts_missing_factor",
+    "skill": "mult_facts",
+    "text": "{a} × ? = {c}",
+    "params": {
+      "a": [2, 10],
+      "c": [4, 100]
+    },
+    "constraints": ["c % a == 0", "c / a >= 2", "c / a <= 10"],
+    "answerExpr": "c / a",
+    "distractors": ["(c / a) + 1", "(c / a) - 1", "(c / a) + 2"]
+  },
+  {
+    "id": "mult_facts_missing_first",
+    "skill": "mult_facts",
+    "text": "? × {b} = {c}",
+    "params": {
+      "b": [2, 10],
+      "c": [4, 100]
+    },
+    "constraints": ["c % b == 0", "c / b >= 2", "c / b <= 10"],
+    "answerExpr": "c / b",
+    "distractors": ["(c / b) + 1", "(c / b) - 1", "(c / b) + 2"]
+  },
+  {
+    "id": "mult_facts_doubling",
+    "skill": "mult_facts",
+    "text": "{a} × 2 = ?",
+    "params": {
+      "a": [2, 10]
+    },
+    "answerExpr": "a * 2",
+    "distractors": ["(a * 2) + 1", "(a * 2) - 1", "(a * 2) + 2"]
+  },
+  {
+    "id": "mult_facts_times_ten",
+    "skill": "mult_facts",
+    "text": "{a} × 10 = ?",
+    "params": {
+      "a": [1, 10]
+    },
+    "answerExpr": "a * 10",
+    "distractors": ["(a * 10) + 1", "(a * 10) - 1", "(a * 10) + 2"]
+  },
+  {
+    "id": "mult_facts_array_word",
+    "skill": "mult_facts",
+    "text": "{a} crates × {b} balls each. How many balls?",
+    "params": {
+      "a": [2, 10],
+      "b": [2, 10]
+    },
+    "constraints": ["a * b <= 100"],
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "mult_facts_groups_word",
+    "skill": "mult_facts",
+    "text": "{a} rows × {b} guns. How many guns on deck?",
+    "params": {
+      "a": [2, 10],
+      "b": [2, 10]
+    },
+    "constraints": ["a * b <= 100"],
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "mult_facts_commute",
+    "skill": "mult_facts",
+    "text": "{b} × {a} = ?",
+    "params": {
+      "a": [2, 10],
+      "b": [2, 10]
+    },
+    "constraints": ["a * b <= 100"],
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"]
+  }
+]
