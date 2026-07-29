@@ -1853,3 +1853,10 @@ reviews dispatched.
 
 Orchestrator: gates ALL PASS; g23 53/53; frozen hash `f941a204…` unchanged. Code + security
 reviews dispatched.
+
+
+### T-016 — done (merged)
+
+Code APPROVE_WITH_NITS ([T-016 Code Review](05b12eee-bf5c-47ae-a6ab-5c7c05d8c618));
+security PASS ([T-016 Security Review](b3e18507-96fc-456c-8579-bcd3bf4c883a)).
+Merged into `swarm/engine-core` and pushed.
