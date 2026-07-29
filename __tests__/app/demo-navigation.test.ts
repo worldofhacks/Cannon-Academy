@@ -224,12 +224,145 @@ function callExpressions(parsed: ts.SourceFile, localName: string): readonly ts.
   return calls;
 }
 
+function resolvedInitializer(parsed: ts.SourceFile, expression: ts.Expression): ts.Node {
+  if (!ts.isIdentifier(expression)) return expression;
+  let initializer: ts.Expression | undefined;
+  const visit = (node: ts.Node) => {
+    if (
+      initializer === undefined &&
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === expression.text
+    ) {
+      initializer = node.initializer;
+      return;
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parsed);
+  return initializer ?? expression;
+}
+
+function rootIdentifier(expression: ts.Expression): string | null {
+  if (ts.isIdentifier(expression)) return expression.text;
+  if (ts.isPropertyAccessExpression(expression)) return rootIdentifier(expression.expression);
+  return null;
+}
+
+function propLocalName(parsed: ts.SourceFile, component: string, prop: string): string | null {
+  let local: string | null = null;
+  const inspectParameters = (parameters: readonly ts.ParameterDeclaration[]) => {
+    const parameter = parameters[0];
+    if (parameter === undefined || !ts.isObjectBindingPattern(parameter.name)) return;
+    const binding = parameter.name.elements.find(
+      (element) => (element.propertyName ?? element.name).getText(parsed) === prop,
+    );
+    if (binding !== undefined && ts.isIdentifier(binding.name)) local = binding.name.text;
+  };
+  const visit = (node: ts.Node) => {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === component) inspectParameters(node.parameters);
+    if (
+      ts.isVariableDeclaration(node) &&
+      ts.isIdentifier(node.name) &&
+      node.name.text === component &&
+      node.initializer !== undefined &&
+      (ts.isArrowFunction(node.initializer) || ts.isFunctionExpression(node.initializer))
+    ) {
+      inspectParameters(node.initializer.parameters);
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(parsed);
+  return local;
+}
+
+function propertyOf(node: ts.Node, object: string, property: string): boolean {
+  return (
+    ts.isPropertyAccessExpression(node) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === object &&
+    node.name.text === property
+  );
+}
+
+function containsProperty(node: ts.Node, object: string, property: string): boolean {
+  let found = false;
+  const visit = (child: ts.Node) => {
+    if (propertyOf(child, object, property)) {
+      found = true;
+      return;
+    }
+    ts.forEachChild(child, visit);
+  };
+  visit(node);
+  return found;
+}
+
+function pressDispatchesEdge(
+  callback: ts.ArrowFunction | ts.FunctionExpression,
+  parsed: ts.SourceFile,
+  control: string,
+  dispatch: string,
+): boolean {
+  let pressable = false;
+  let accessible = false;
+  let visibleLabel = false;
+  let onPressDispatch = false;
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(parsed) === 'Text') {
+      if (containsProperty(node, control, 'label')) visibleLabel = true;
+    }
+    if (
+      (ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&
+      node.tagName.getText(parsed) === 'Pressable'
+    ) {
+      pressable = true;
+      const accessibility = node.attributes.properties.find(
+        (attribute): attribute is ts.JsxAttribute =>
+          ts.isJsxAttribute(attribute) && attribute.name.getText(parsed) === 'accessibilityLabel',
+      );
+      if (
+        accessibility?.initializer !== undefined &&
+        containsProperty(accessibility.initializer, control, 'accessibilityLabel')
+      ) {
+        accessible = true;
+      }
+      const onPress = node.attributes.properties.find(
+        (attribute): attribute is ts.JsxAttribute =>
+          ts.isJsxAttribute(attribute) && attribute.name.getText(parsed) === 'onPress',
+      );
+      if (onPress?.initializer !== undefined) {
+        const inspectCall = (child: ts.Node) => {
+          if (
+            ts.isCallExpression(child) &&
+            ts.isIdentifier(child.expression) &&
+            child.expression.text === dispatch &&
+            child.arguments.length === 1 &&
+            propertyOf(child.arguments[0] as ts.Node, control, 'edgeId')
+          ) {
+            onPressDispatch = true;
+          }
+          ts.forEachChild(child, inspectCall);
+        };
+        inspectCall(onPress.initializer);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(callback.body);
+  return pressable && accessible && visibleLabel && onPressDispatch;
+}
+
 /**
- * Proves the layout helper's return value crosses the React boundary into a rendered chart child.
- * This is intentionally narrower than claiming native hit-testing: the screenshot/device gate owns
- * composition, while this guard prevents an unused helper or a comment from turning the unit green.
+ * Binds the whole chain rather than checking its pieces independently:
+ *
+ * layout helper -> chart prop -> unfiltered `.map` -> rendered Pressable ->
+ * accessibility label + visible label + that iteration's edgeId -> chart executor callback.
+ *
+ * The AST contains no comments, and the pure model is known above to contain exactly five unique
+ * controls. Therefore one unfiltered map renders five presses and each dispatches its own id.
  */
-function chartConsumesLayoutModel(): boolean {
+function chartRendersAndBindsEveryControl(): boolean {
   const parsed = ts.createSourceFile(
     'chart.tsx',
     source('app/chart.tsx'),
@@ -239,6 +372,8 @@ function chartConsumesLayoutModel(): boolean {
   );
   const localName = importedLocalName(parsed, 'chartHubControlLayout');
   if (localName === null) return false;
+  const executeName = importedLocalName(parsed, 'executeDemoRouteEdge');
+  if (executeName === null) return false;
   const calls = callExpressions(parsed, localName);
   if (calls.length === 0) return false;
 
@@ -247,14 +382,9 @@ function chartConsumesLayoutModel(): boolean {
     if (ts.isVariableDeclaration(call.parent) && ts.isIdentifier(call.parent.name)) {
       boundNames.add(call.parent.name.text);
     }
-    let cursor: ts.Node | undefined = call.parent;
-    while (cursor !== undefined) {
-      if (ts.isJsxExpression(cursor)) return true;
-      cursor = cursor.parent;
-    }
   }
 
-  let consumed = false;
+  let proven = false;
   const visit = (node: ts.Node) => {
     const initializer = ts.isJsxAttribute(node) ? node.initializer : undefined;
     if (
@@ -262,33 +392,82 @@ function chartConsumesLayoutModel(): boolean {
       initializer !== undefined &&
       ts.isJsxExpression(initializer) &&
       initializer.expression !== undefined &&
-      ts.isIdentifier(initializer.expression) &&
-      boundNames.has(initializer.expression.text)
+      rootIdentifier(initializer.expression) !== null &&
+      boundNames.has(rootIdentifier(initializer.expression) ?? '')
     ) {
       const opening = node.parent.parent;
       const tag =
         ts.isJsxOpeningElement(opening) || ts.isJsxSelfClosingElement(opening)
           ? opening.tagName.getText(parsed)
           : '';
-      if (tag === 'ChartDock' || tag === 'HeaderPill') consumed = true;
+      if (tag !== 'ChartDock' && tag !== 'HeaderPill') {
+        ts.forEachChild(node, visit);
+        return;
+      }
+
+      const controlsProp = node.name.getText(parsed);
+      const dispatchAttribute =
+        ts.isJsxOpeningElement(opening) || ts.isJsxSelfClosingElement(opening)
+          ? opening.attributes.properties.find((attribute) => {
+              if (!ts.isJsxAttribute(attribute) || attribute.initializer === undefined) return false;
+              if (
+                !ts.isJsxExpression(attribute.initializer) ||
+                attribute.initializer.expression === undefined
+              ) {
+                return false;
+              }
+              const resolved = resolvedInitializer(parsed, attribute.initializer.expression);
+              return containsCall(resolved, executeName);
+            })
+          : undefined;
+      if (!dispatchAttribute || !ts.isJsxAttribute(dispatchAttribute)) {
+        ts.forEachChild(node, visit);
+        return;
+      }
+      const dispatchProp = dispatchAttribute.name.getText(parsed);
+      const componentFile =
+        tag === 'ChartDock' ? 'src/components/chart/Dock.tsx' : 'src/components/chart/HeaderPill.tsx';
+      const component = ts.createSourceFile(
+        componentFile,
+        source(componentFile),
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TSX,
+      );
+      const controlsLocal = propLocalName(component, tag, controlsProp);
+      const dispatchLocal = propLocalName(component, tag, dispatchProp);
+      if (controlsLocal === null || dispatchLocal === null) {
+        ts.forEachChild(node, visit);
+        return;
+      }
+
+      const inspectMap = (candidate: ts.Node) => {
+        if (
+          ts.isCallExpression(candidate) &&
+          ts.isPropertyAccessExpression(candidate.expression) &&
+          candidate.expression.name.text === 'map' &&
+          rootIdentifier(candidate.expression.expression) === controlsLocal
+        ) {
+          const callback = candidate.arguments[0];
+          if (
+            callback !== undefined &&
+            (ts.isArrowFunction(callback) || ts.isFunctionExpression(callback)) &&
+            callback.parameters.length === 1 &&
+            callback.parameters[0] !== undefined &&
+            ts.isIdentifier(callback.parameters[0].name) &&
+            pressDispatchesEdge(callback, component, callback.parameters[0].name.text, dispatchLocal)
+          ) {
+            proven = true;
+          }
+        }
+        ts.forEachChild(candidate, inspectMap);
+      };
+      inspectMap(component);
     }
     ts.forEachChild(node, visit);
   };
   visit(parsed);
-  return consumed;
-}
-
-function chartCallsEdgeExecutor(): boolean {
-  for (const file of [
-    'app/chart.tsx',
-    'src/components/chart/Dock.tsx',
-    'src/components/chart/HeaderPill.tsx',
-  ]) {
-    const parsed = ts.createSourceFile(file, source(file), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
-    const localName = importedLocalName(parsed, 'executeDemoRouteEdge');
-    if (localName !== null && callExpressions(parsed, localName).length > 0) return true;
-  }
-  return false;
+  return proven;
 }
 
 describe('A-038 demo navigation', () => {
@@ -456,8 +635,8 @@ describe('A-038 demo navigation', () => {
 
     // This does not claim to prove visual clipping: native screenshots do that. TypeScript AST
     // checks ignore comments and require the actual helper result to cross into a rendered chart
-    // child, plus an executable call of the edge dispatcher somewhere in the hub owners.
-    expect(chartConsumesLayoutModel()).toBe(true);
-    expect(chartCallsEdgeExecutor()).toBe(true);
+    // child. That child must map the complete model to Pressables and bind each iteration's own
+    // edge id to the executor callback; one unrelated executor call cannot satisfy this chain.
+    expect(chartRendersAndBindsEveryControl()).toBe(true);
   });
 });
