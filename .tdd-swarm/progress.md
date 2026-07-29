@@ -1955,5 +1955,5 @@ Phase → implement. Implementer dispatched.
 
 ### T-020 TEST_DISPUTE closed — AC-24 self-poison + tsc choices type
 
-[T-020 Implementer](8ce1a513-93c0-4562-9c8f-e6b596693975): 32/33; feat intact.
-Suite fix re-frozen . Implementer resumed.
+[T-020 Implementer](8ce1a513-93c0-4562-9c8f-e6b596693975): 32/33; feat `6ef7aaf` intact.
+Suite fix `bd8bc4d` re-frozen `80c4cdb1367a3915…` (33/33 with reducer). Implementer resumed.
