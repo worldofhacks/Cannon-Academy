@@ -46,7 +46,7 @@ README, HANDOFF, or STATE — those documents link here.
 | A-029 | app | Island-aware duel context — five levels no longer fight like Port Sumwich | review-passed | G2 | A-016, A-039 | ticket/a-029-duel-context | [A-029](app/A-029.md) |
 | A-030 | app | Real rival bridge — use the seeded bot and mercy system already built | backlog | G3 | A-027, A-029, A-039, A-041 | ticket/a-030-opponent-bridge | [A-030](app/A-030.md) |
 | A-031 | app | Enemy encounters — pirate, skeleton, ghost, shark, and kraken | backlog | G4 | A-030 | ticket/a-031-enemy-variety | [A-031](app/A-031.md) |
-| A-032 | app | Real chest settlement — every catalog cannon has an attainable path | backlog | G3 | A-008, A-039, A-041 | ticket/a-032-chest-acquisition | [A-032](app/A-032.md) |
+| A-032 | app | Real chest settlement — every catalog cannon has an attainable path | review-passed | G3 | A-008, A-039, A-041 | ticket/a-032-chest-acquisition | [A-032](app/A-032.md) |
 | A-033 | app | Harbor store — spend coins without buying past learning | backlog | G4 | A-032 | ticket/a-033-harbor-store | [A-033](app/A-033.md) |
 | A-034 | app | Cannon identity — visible difficulty, distinct weapons, and grade-aware starting play | backlog | G4 | A-027, A-032, A-041 | ticket/a-034-cannon-identity | [A-034](app/A-034.md) |
 | A-035 | app | Canonical ticket index — one generated source of delivery truth | review-passed | D1 | none | ticket/a-035-canonical-ticket-index | [A-035](app/A-035.md) |
