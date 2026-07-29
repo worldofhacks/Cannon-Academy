@@ -366,10 +366,8 @@ function assertScreenOwnsController(source: string): void {
     ts.ScriptKind.TSX,
   );
   let importedLocal: string | null = null;
-  const controllerVariables = new Set<string>();
-  const disposedVariables = new Set<string>();
 
-  function visit(node: ts.Node): void {
+  for (const node of file.statements) {
     if (
       ts.isImportDeclaration(node) &&
       ts.isStringLiteral(node.moduleSpecifier) &&
@@ -383,33 +381,98 @@ function assertScreenOwnsController(source: string): void {
         }
       }
     }
-    if (
-      importedLocal !== null &&
-      ts.isVariableDeclaration(node) &&
-      ts.isIdentifier(node.name) &&
-      node.initializer !== undefined &&
-      ts.isCallExpression(node.initializer) &&
-      ts.isIdentifier(node.initializer.expression) &&
-      node.initializer.expression.text === importedLocal &&
-      node.initializer.arguments.some((argument) => /\bsession\b/.test(argument.getText(file)))
-    ) {
-      controllerVariables.add(node.name.text);
-    }
-    if (
+  }
+
+  expect(importedLocal).not.toBeNull();
+
+  function isDisposeCall(node: ts.Node, variable: string): boolean {
+    return (
       ts.isCallExpression(node) &&
       ts.isPropertyAccessExpression(node.expression) &&
       ts.isIdentifier(node.expression.expression) &&
-      node.expression.name.text === 'dispose'
+      node.expression.expression.text === variable &&
+      node.expression.name.text === 'dispose' &&
+      node.arguments.length === 0
+    );
+  }
+
+  function cleanupDirectlyDisposes(
+    cleanup: ts.ArrowFunction | ts.FunctionExpression,
+    variable: string,
+  ): boolean {
+    if (!ts.isBlock(cleanup.body)) return isDisposeCall(cleanup.body, variable);
+    return cleanup.body.statements.some(
+      (statement) => ts.isExpressionStatement(statement) && isDisposeCall(statement.expression, variable),
+    );
+  }
+
+  function effectOwnsController(node: ts.Node): boolean {
+    if (
+      !ts.isCallExpression(node) ||
+      !ts.isIdentifier(node.expression) ||
+      node.expression.text !== 'useEffect'
     ) {
-      disposedVariables.add(node.expression.expression.text);
+      return false;
     }
+    const effect = node.arguments[0];
+    if (
+      effect === undefined ||
+      (!ts.isArrowFunction(effect) && !ts.isFunctionExpression(effect)) ||
+      !ts.isBlock(effect.body)
+    ) {
+      return false;
+    }
+
+    for (const statement of effect.body.statements) {
+      if (!ts.isVariableStatement(statement)) continue;
+      for (const declaration of statement.declarationList.declarations) {
+        if (
+          !ts.isIdentifier(declaration.name) ||
+          declaration.initializer === undefined ||
+          !ts.isCallExpression(declaration.initializer) ||
+          !ts.isIdentifier(declaration.initializer.expression) ||
+          declaration.initializer.expression.text !== importedLocal ||
+          !declaration.initializer.arguments.some((argument) => /\bsession\b/.test(argument.getText(file)))
+        ) {
+          continue;
+        }
+        const controller = declaration.name.text;
+        const cleanupReturns = effect.body.statements.filter(ts.isReturnStatement);
+        const ownsCleanup = cleanupReturns.some((returned) => {
+          const cleanup = returned.expression;
+          return (
+            cleanup !== undefined &&
+            (ts.isArrowFunction(cleanup) || ts.isFunctionExpression(cleanup)) &&
+            cleanupDirectlyDisposes(cleanup, controller)
+          );
+        });
+        if (!ownsCleanup) continue;
+
+        // A same-named dispose elsewhere in the effect cannot masquerade as lifecycle cleanup.
+        const hasImmediateDispose = effect.body.statements.some(
+          (candidate) =>
+            candidate !== statement &&
+            !ts.isReturnStatement(candidate) &&
+            ts.isExpressionStatement(candidate) &&
+            isDisposeCall(candidate.expression, controller),
+        );
+        if (!hasImmediateDispose) return true;
+      }
+    }
+    return false;
+  }
+
+  let lifecycleBound = false;
+  let manualAdvanceLiteral = false;
+  function visit(node: ts.Node): void {
+    if (effectOwnsController(node)) lifecycleBound = true;
+    if (ts.isStringLiteralLike(node) && node.text === 'ADVANCE') manualAdvanceLiteral = true;
     ts.forEachChild(node, visit);
   }
   visit(file);
 
-  expect(importedLocal).not.toBeNull();
-  expect(controllerVariables.size).toBeGreaterThan(0);
-  expect([...controllerVariables].some((name) => disposedVariables.has(name))).toBe(true);
+  expect(lifecycleBound).toBe(true);
+  expect(manualAdvanceLiteral).toBe(false);
   expect(source).not.toMatch(/\bsetTimeout\s*\(/);
   expect(source).not.toMatch(/from\s+['"]\.\.\/src\/stores\/duel['"]/);
 }
