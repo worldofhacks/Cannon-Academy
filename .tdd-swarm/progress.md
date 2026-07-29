@@ -1443,6 +1443,26 @@ Partial-wrap / no-cause / answer-before-constraints mutants all die — round 3 
 
 Count stays 21; gate still green on tags. Suite assertions themselves are what must change.
 
+## T-013 round-3 re-review — REJECTED (Composer 2.5)
+
+Two live mutants, both re-measured at **126/126**:
+
+1. **Shallow `Template[]`** — `[...templates]` sharing `Template` object refs. Suite only mutated
+   containers (`pop` / reassignment), never `template.text`. Direct probe: caller overwrites text →
+   state sees `"HACKED BY CALLER"`.
+2. **Shared-core wrapper** — `WeakMap` caches core; each call returns `{ ...cached, phase }`.
+   Top-level `not.toBe` is green; `first.playerLoadout.push` rewrites `second`. Control that
+   returns the same top-level ref still dies on AC-3 — so the reference clause partially bites.
+
+`startsWith` terminal predicate remains equivalent over the closed eight-phase domain — residual,
+not a reject.
+
+### Rulings (count stays 16)
+
+- **AC-16** — deep-copy: new containers **and** new element objects, including each `Template` and
+  its nested `distractors` / `params` / `constraints`.
+- **AC-3** — independent state graphs, not just top-level reference inequality.
+
 ## Resume here — the next actions, in order
 
 1. **Amend `tickets/T-007.md`:** rewrite AC-14 (its literal claim is false — 63 of 500 seeds repeat a
