@@ -39,7 +39,7 @@
 | id    | title                                                         | status        | deps         | model    |
 | ----- | ------------------------------------------------------------- | ------------- | ------------ | -------- |
 | A-008 | The duel earns something — coins, mastery and wins persist    | review-passed | A-001, A-007 | standard |
-| A-009 | Gunnery range — the drill that makes mastery real             | backlog       | A-001, A-007 | standard |
+| A-009 | Gunnery range — the drill that makes mastery real             | review-passed | A-001, A-007 | standard |
 | A-010 | Chest ceremony — the real rarity roll, not a hardcoded reward | backlog       | A-008        | cheap    |
 
 ## Wave A5
