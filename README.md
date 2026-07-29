@@ -125,13 +125,13 @@ Development builds are required (App Store Expo Go is an older SDK).
 
 ## Repository mirrors (inspected 2026-07-29)
 
-| Remote          | URL                                                           | `app/shell`              | `swarm/engine-core` | `main`    |
-| --------------- | ------------------------------------------------------------- | ------------------------ | ------------------- | --------- |
-| GitHub `origin` | <https://github.com/worldofhacks/Cannon-Academy>              | `4740d3d` at probe time* | `91c013c`           | `aea6fe2` |
-| GitLab `gitlab` | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy> | `4740d3d` at probe time* | `91c013c`           | `b498a96` |
+| Remote          | URL                                                           | `app/shell`            | `swarm/engine-core` | `main`    |
+| --------------- | ------------------------------------------------------------- | ---------------------- | ------------------- | --------- |
+| GitHub `origin` | <https://github.com/worldofhacks/Cannon-Academy>              | `d53cf00` (A-044 push) | `91c013c`           | `aea6fe2` |
+| GitLab `gitlab` | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy> | `d53cf00` (A-044 push) | `91c013c`           | `b498a96` |
 
-\*Push `app/shell` after this documentation commit before treating the tip as mirrored. The
-deployed web bundle remains `28f4ccc` until a new EAS promote.
+The deployed web bundle remains `28f4ccc` until a new EAS promote. Re-run `git ls-remote` after
+later pushes.
 
 ---
 

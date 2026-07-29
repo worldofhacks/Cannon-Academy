@@ -31,8 +31,8 @@ git ls-remote origin refs/heads/app/shell refs/heads/swarm/engine-core refs/head
 git ls-remote gitlab refs/heads/app/shell refs/heads/swarm/engine-core refs/heads/main
 ```
 
-On 2026-07-29 pre-doc-push, both remotes had `app/shell` at `4740d3d`, `swarm/engine-core` at
-`91c013c`, GitHub `main` at `aea6fe2`, GitLab `main` at `b498a96`. Re-inspect after every push.
+After the A-044 push (2026-07-29), both remotes had `app/shell` at `d53cf00`, `swarm/engine-core`
+at `91c013c`, GitHub `main` at `aea6fe2`, GitLab `main` at `b498a96`. Re-inspect after every push.
 
 iOS space-free worktree: `/Users/quietguy/Documents/Dev/Gauntlet/cannon-academy-ios` — see
 [`RELEASE.md`](../../RELEASE.md).
