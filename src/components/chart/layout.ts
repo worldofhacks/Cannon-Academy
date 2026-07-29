@@ -44,8 +44,14 @@ export function art(f: MapFrame, designPx: number): number {
   return designPx * f.art;
 }
 
-/** The board's caption: "four node states in one glance". */
-export type StationState = 'cleared' | 'live' | 'locked' | 'silhouette';
+/** The five progress states a child can encounter on the chart. */
+export type StationState = 'current' | 'available' | 'cleared' | 'locked-near' | 'far-silhouette';
+
+export interface StationPresentation {
+  readonly accessibilityLabel: string;
+  readonly markerHead: 'live' | 'available' | 'cleared' | 'locked' | 'silhouette';
+  readonly tappable: boolean;
+}
 
 /**
  * Where the ship parks, and which node gets the ring and the `SAIL HERE` chip.
@@ -63,8 +69,54 @@ export function focusIndex(nodes: readonly ChartNode[]): number {
 }
 
 export function stationState(node: ChartNode, station: Station, isFocus: boolean): StationState {
-  if (!node.fogged) return isFocus ? 'live' : 'cleared';
-  return station.silhouette ? 'silhouette' : 'locked';
+  if (node.fogged) return station.silhouette ? 'far-silhouette' : 'locked-near';
+  if (node.isCurrent || isFocus) return 'current';
+  return node.cleared ? 'cleared' : 'available';
+}
+
+/**
+ * The renderer and accessibility tree consume the same state description, so a visual tick can
+ * never drift away from what VoiceOver announces or which markers accept a press.
+ */
+export function stationPresentation(
+  node: ChartNode,
+  state: StationState,
+  requirement: string | null,
+): StationPresentation {
+  const label = node.island.displayName;
+
+  switch (state) {
+    case 'current':
+      return {
+        accessibilityLabel: `${label}, current island. Sail here`,
+        markerHead: 'live',
+        tappable: !node.fogged,
+      };
+    case 'available':
+      return {
+        accessibilityLabel: `${label}, available. Sail here`,
+        markerHead: 'available',
+        tappable: !node.fogged,
+      };
+    case 'cleared':
+      return {
+        accessibilityLabel: `${label}, cleared. Sail here again`,
+        markerHead: 'cleared',
+        tappable: !node.fogged,
+      };
+    case 'locked-near':
+      return {
+        accessibilityLabel: `${label}, locked in the fog. ${requirement ?? ''}`.trim(),
+        markerHead: 'locked',
+        tappable: !node.fogged,
+      };
+    case 'far-silhouette':
+      return {
+        accessibilityLabel: `${label}, far beyond the fog. ${requirement ?? ''}`.trim(),
+        markerHead: 'silhouette',
+        tappable: !node.fogged,
+      };
+  }
 }
 
 /**
