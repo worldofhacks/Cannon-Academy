@@ -1988,3 +1988,8 @@ Worktree `.worktrees/wt-T-034` from post-T-020 tip. Phase `tests`. T-029 still b
 [T-034 Test Agent](a9cbdabc-389e-4c96-8270-6414a4d3aae1): 7 fail / 102 pass in schemas suite; baseline 1612.
 **Adjudication:** file_scopes += `expr.ts` for pure IDENT export only; schemas must import it.
 Test-design review dispatched.
+
+### T-034 ACCEPT_WITH_NITS — closing Important before freeze
+
+[T-034 test-design](151af5b2-d671-4e90-9132-f60cc6332d95): I-1 AC-4 numeric-oracle; I-2/I-3 DoD-5 comments.
+Test Agent amending suite.
