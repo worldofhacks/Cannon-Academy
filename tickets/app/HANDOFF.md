@@ -203,12 +203,15 @@ problem at 11:55, not shipping a slightly older bundle.
 
 | #   | item                                                 | est | notes                                             |
 | --- | ---------------------------------------------------- | --- | ------------------------------------------------- |
-| 1   | **Device verification** of chart / glyphs / D-8      | 30m | see §5 — do this first                            |
-| 2   | **A-015** guided duel                                | 45m | fresh Test Agent then implementer; fallback in §4 |
-| 3   | Confirm engine agent landed **D-8's drill half**     | 5m  | `src/engine/drill.ts`                             |
-| 4   | README + known limitations                           | 20m | delegated to engine agent — verify                |
-| 5   | PR `app/shell` → `main`                              | 10m | **owner merges, never the swarm**                 |
-| 6   | Delete engine stray `.tdd-swarm/t025-stack-smoke.ts` | 1m  | untracked in `wt-app`, not ours                   |
+| 1   | **Verify the chart renders**, web + device           | 15m | §5, §5A — newest, least-observed screen           |
+| 2   | **First deploy — get a live URL existing**           | 10m | §5A — do this EARLY, redeploy later               |
+| 3   | **Device verification** of glyphs / D-8 / full loop  | 25m | §5 — the worklet review is the point              |
+| 4   | **A-015** guided duel                                | 45m | fresh Test Agent then implementer; fallback in §4 |
+| 5   | **Final deploy + live smoke test**                   | 15m | §5A                                               |
+| 6   | Confirm engine agent landed **D-8's drill half**     | 5m  | `src/engine/drill.ts`                             |
+| 7   | README + known limitations (incl. the live URL)      | 20m | delegated to engine agent — verify                |
+| 8   | PR `app/shell` → `main`                              | 10m | **owner merges, never the swarm**                 |
+| 9   | Delete engine stray `.tdd-swarm/t025-stack-smoke.ts` | 1m  | untracked in `wt-app`, not ours                   |
 
 **Minor, deferred deliberately:** cold start does a redundant double redirect (root layout
 `replace` + index route `Redirect`); both consult the same resolver post-hydration and always agree.
