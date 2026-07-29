@@ -76,6 +76,16 @@ export interface CaptainState {
 export type CaptainStore = StoreApi<CaptainState>;
 
 /**
+ * The name a captain sails under when they skip the name screen.
+ *
+ * Applied at COMMIT, never in `emptyCaptain()`. `flow.ts` reads an empty name as "not yet asked"
+ * and routes to the name screen — so defaulting at construction would make that screen permanently
+ * unreachable, and leaving the bare `.trim()` would make "skip" produce `''`, which routes straight
+ * back to the same screen. Commit-time substitution is the only placement that satisfies both.
+ */
+export const DEFAULT_CAPTAIN_NAME = 'Captain';
+
+/**
  * A fresh captain. A FUNCTION, not a frozen constant: a shared nested object would leak one
  * captain's mastery into the next fresh install, and that is invisible until someone reinstalls.
  */
@@ -152,7 +162,10 @@ export function createCaptainStore(initial?: Captain): CaptainStore {
         };
       }),
 
-    setNameAndFlag: (name, flag) => set((s) => ({ captain: { ...s.captain, name: name.trim(), flag } })),
+    setNameAndFlag: (name, flag) =>
+      set((s) => ({
+        captain: { ...s.captain, name: name.trim() || DEFAULT_CAPTAIN_NAME, flag },
+      })),
 
     completeOnboarding: () => set((s) => ({ captain: { ...s.captain, hasCompletedOnboarding: true } })),
 
