@@ -248,24 +248,7 @@ function NameFlagBody() {
               </Text>
             </View>
 
-            <View style={{ flex: 1 }} />
-
-            <Pressable
-              onPress={() => setPanel('flag')}
-              accessibilityRole="button"
-              accessibilityLabel="Next, pick your flag"
-              style={({ pressed }) => [
-                s.primary,
-                {
-                  height: px(MIN_TAP_TARGET),
-                  borderRadius: px(radius.card),
-                  borderBottomWidth: px(4),
-                },
-                pressed && { transform: [{ translateY: px(3) }], borderBottomWidth: px(1) },
-              ]}
-            >
-              <Text style={[s.primaryText, { fontSize: tx(20), lineHeight: tx(24) }]}>Next</Text>
-            </Pressable>
+            <View style={{ flex: 1, minHeight: px(8) }} />
           </>
         ) : (
           <>
@@ -332,7 +315,7 @@ function NameFlagBody() {
       </View>
 
       {/*
-        The flag panel's commit controls are PINNED here, outside the scrolling body, and that
+        BOTH panels's commit controls are PINNED here, outside the scrolling body, and that
         placement is load-bearing rather than stylistic.
 
         Six flag cards wrap to three rows and size themselves from their content, so on a tall phone
@@ -345,6 +328,27 @@ function NameFlagBody() {
         the bottom of the screen with the coach bar, and the grid takes whatever is left.
       */}
       <View style={{ paddingBottom: insets.bottom }}>
+        {panel === 'name' ? (
+          <View style={{ paddingHorizontal: L.gutter, paddingBottom: px(8) }}>
+            <Pressable
+              onPress={() => setPanel('flag')}
+              accessibilityRole="button"
+              accessibilityLabel="Next, pick your flag"
+              style={({ pressed }) => [
+                s.primary,
+                {
+                  height: px(MIN_TAP_TARGET),
+                  borderRadius: px(radius.card),
+                  borderBottomWidth: px(4),
+                },
+                pressed && { transform: [{ translateY: px(3) }], borderBottomWidth: px(1) },
+              ]}
+            >
+              <Text style={[s.primaryText, { fontSize: tx(20), lineHeight: tx(24) }]}>Next</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {panel === 'flag' ? (
           <View style={{ paddingHorizontal: L.gutter, paddingBottom: px(8), gap: px(4) }}>
             <Pressable
