@@ -74,13 +74,24 @@ export function shipCosmeticsForCaptain(captain: Captain): ShipCosmetics {
 }
 
 /**
- * A skin rendered as a ship, for the Harbor shelf.
+ * A skin rendered as a ship, for every preview: shelf card, confirm modal, reveal card.
  *
- * This one DOES fly the skin's own pennant: there is no captain on a shop shelf, so there is no flag
- * to respect, and a preview showing the buyer's current pennant on every card would make four skins
- * look more alike than they are.
+ * It flies the CAPTAIN'S flag, not the skin's own pennant — the designer's ruling, and a better
+ * argument than the one it replaced:
+ *
+ * > "The version where only the shelf preview flies the skin's pennant makes the picture a promise
+ * > the purchase then breaks — and for a non-reader the picture is the contract."
+ *
+ * My first pass flew `skin.pennant` here, reasoning that four cards would otherwise look alike. That
+ * was wrong on the thing that matters: a five-year-old cannot read the name on the card, so the
+ * picture IS the offer, and an offer that changes on delivery is a broken promise. The cards still
+ * differ on hull, sheer stripe, deck and sails — four channels — and the pennant was never carrying
+ * that load.
+ *
+ * `skin.pennant` is deliberately kept on the record even though nothing renders it: it is exactly
+ * what a flag shelf would sell if flags ever become their own cheap tier (A-053).
  */
-export function shipCosmeticsForSkin(skin: ShipSkin): ShipCosmetics {
+export function shipCosmeticsForSkin(skin: ShipSkin, captain: Captain): ShipCosmetics {
   return {
     ...RIGGING,
     hull: skin.hull,
@@ -88,6 +99,6 @@ export function shipCosmeticsForSkin(skin: ShipSkin): ShipCosmetics {
     sail: skin.sail,
     trim: skin.trim,
     deck: skin.deck,
-    pennant: skin.pennant,
+    pennant: flagById(captain.flag)?.color ?? DEFAULT_PENNANT,
   };
 }

@@ -147,8 +147,14 @@ describe('A-052 the equipped skin reaches the ship', () => {
     expect(cosmetics.pennant).toBe(flagById('flag-3')?.color);
     expect(cosmetics.pennant).not.toBe(deepInk.pennant);
 
-    // …but the shelf preview, which has no captain, DOES fly the skin's own pennant.
-    expect(shipCosmeticsForSkin(deepInk).pennant).toBe(deepInk.pennant);
+    // …and so does every PREVIEW. The designer overturned my first ruling here, correctly: for a
+    // non-reader the picture is the contract, so a card that flies a pennant the purchase then
+    // changes is a broken promise. The cards differ on hull, stripe, deck and sails instead.
+    expect(shipCosmeticsForSkin(deepInk, captain).pennant).toBe(flagById('flag-3')?.color);
+    expect(shipCosmeticsForSkin(deepInk, captain).pennant).not.toBe(deepInk.pennant);
+
+    // The skin's own pennant hex stays on the record — it is what a flag shelf would sell later.
+    expect(deepInk.pennant).toBeTruthy();
   });
 
   it('spec(A-052:AC-3) an equipped skin the captain does not own still renders something', () => {
