@@ -19,6 +19,7 @@
 import type { ShipCosmetics } from '../components/duel/Ship';
 import type { Captain } from '../stores/player';
 import { flagById } from './flags';
+import { skinOrDefault, type ShipSkin } from './shipSkins';
 import { color } from './tokens';
 
 /**
@@ -31,31 +32,62 @@ import { color } from './tokens';
 const DEFAULT_PENNANT: string = color.amber;
 
 /**
- * The six layers a flag never touches. Kept here rather than spread from `PLAYER_SHIP` so that
- * this module stays free of a runtime import of `Ship.tsx` (and therefore of `react-native`).
+ * The mast, which no skin and no flag repaints.
+ *
+ * Every other hull layer now comes from the equipped skin. The mast does not, because none of the
+ * four board palettes names one — they specify hull, hullDeep, trim, deck, sail and pennant, and a
+ * mast invented per skin would be a colour with no provenance.
  */
-const HULL_AND_RIGGING = {
-  hull: color.woodLight,
-  hullDeep: color.woodDeep,
-  sail: color.parchment,
-  trim: color.amber,
+const RIGGING = {
   mast: color.wood,
-  deck: color.deck,
-  /** Board 7a's red vertical stripe. The player is the only ship that flies it. */
+  /** Board 7a's red vertical stripe. The player is the only ship that flies it, on any skin. */
   sailStripe: color.sailStripe,
 } as const;
 
 /**
  * A complete, renderable cosmetics set for any captain — including one who has not chosen yet.
  *
- * Resolved from the stored id on every read rather than from a stored colour: that is what lets the
+ * Resolved from stored IDs on every read rather than from stored colours: that is what lets the
  * palette be retuned without rewriting every persisted captain. Storage is untrusted input (see
- * `persistence.ts`), so an id from a build that renamed the flags resolves to the default rather
- * than to a broken screen.
+ * `persistence.ts`), so an id from a build that renamed a flag or a skin resolves to the default
+ * rather than to a broken screen.
+ *
+ * ## The flag beats the skin, on purpose
+ *
+ * Every skin carries its own `pennant`, and it is deliberately NOT used here. Board 5b makes the
+ * onboarding flag the ship's pennant — it is the mark a child recognises as *theirs* on a moving
+ * ship — and a cosmetic purchase must not overwrite the one thing they chose about themselves. The
+ * skin's pennant exists for the Harbor shelf preview, where there is no captain and therefore no
+ * flag to fly (A-052).
  */
 export function shipCosmeticsForCaptain(captain: Captain): ShipCosmetics {
+  const skin = skinOrDefault(captain.equippedSkin);
   return {
-    ...HULL_AND_RIGGING,
+    ...RIGGING,
+    hull: skin.hull,
+    hullDeep: skin.hullDeep,
+    sail: skin.sail,
+    trim: skin.trim,
+    deck: skin.deck,
     pennant: flagById(captain.flag)?.color ?? DEFAULT_PENNANT,
+  };
+}
+
+/**
+ * A skin rendered as a ship, for the Harbor shelf.
+ *
+ * This one DOES fly the skin's own pennant: there is no captain on a shop shelf, so there is no flag
+ * to respect, and a preview showing the buyer's current pennant on every card would make four skins
+ * look more alike than they are.
+ */
+export function shipCosmeticsForSkin(skin: ShipSkin): ShipCosmetics {
+  return {
+    ...RIGGING,
+    hull: skin.hull,
+    hullDeep: skin.hullDeep,
+    sail: skin.sail,
+    trim: skin.trim,
+    deck: skin.deck,
+    pennant: skin.pennant,
   };
 }

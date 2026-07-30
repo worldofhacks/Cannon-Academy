@@ -15,6 +15,7 @@
  * worse outcome than a child who lost their coins.
  */
 import { normalizeRewardReceipts } from '../contracts/rewards';
+import { DEFAULT_SKIN_ID } from '../theme/shipSkins';
 import { emptyCaptain, type Captain } from '../stores/player';
 import type { MercyState } from '@engine/opponents/mercy';
 
@@ -82,7 +83,9 @@ function normalizeNextPurchaseSequence(raw: unknown): number {
  * screen, as `NaN`. Checking the shape here is what makes AC-3 hold for well-formed-but-wrong data
  * as well as for truncated data.
  */
-function isBaseCaptain(value: unknown): value is Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'> {
+function isBaseCaptain(
+  value: unknown,
+): value is Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'> {
   if (typeof value !== 'object' || value === null) return false;
   const c = value as Record<string, unknown>;
   return (
@@ -96,6 +99,11 @@ function isBaseCaptain(value: unknown): value is Omit<Captain, 'mercyState' | 'r
     Array.isArray(c.ownedCannons) &&
     Array.isArray(c.equippedCannons) &&
     (c.seenCannons === undefined || Array.isArray(c.seenCannons)) &&
+    // Skins arrived after v2 shipped. Tolerated as absent rather than required, exactly like
+    // `seenCannons` — requiring them would reject every save written before the Harbor existed
+    // and silently reset real captains to zero (A-052).
+    (c.ownedSkins === undefined || Array.isArray(c.ownedSkins)) &&
+    (c.equippedSkin === undefined || c.equippedSkin === null || typeof c.equippedSkin === 'string') &&
     Array.isArray(c.unlockedIslands) &&
     typeof c.rankTier === 'number' &&
     typeof c.wins === 'number' &&
@@ -105,11 +113,30 @@ function isBaseCaptain(value: unknown): value is Omit<Captain, 'mercyState' | 'r
   );
 }
 
+/**
+ * Skins, defaulted for any save written before they existed.
+ *
+ * The starter is ALWAYS present, even if a stored list omits it: it is the fallback
+ * `skinOrDefault` resolves to, so a captain who somehow owned nothing would sail a ship whose
+ * palette came from a skin they do not own. `equippedSkin` stays `null` for the starter rather than
+ * being written out, which keeps an untouched save byte-identical after a round trip.
+ */
+function normalizeSkins(raw: Record<string, unknown>): Pick<Captain, 'ownedSkins' | 'equippedSkin'> {
+  const stored = Array.isArray(raw.ownedSkins)
+    ? raw.ownedSkins.filter((s): s is string => typeof s === 'string')
+    : [];
+  const owned = stored.includes(DEFAULT_SKIN_ID) ? stored : [DEFAULT_SKIN_ID, ...stored];
+  const equipped =
+    typeof raw.equippedSkin === 'string' && owned.includes(raw.equippedSkin) ? raw.equippedSkin : null;
+  return { ownedSkins: owned, equippedSkin: equipped };
+}
+
 function normalizeCaptain(raw: Record<string, unknown>): Captain {
   const base = raw as Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'>;
   return {
     ...base,
     seenCannons: Array.isArray(base.seenCannons) ? base.seenCannons : [],
+    ...normalizeSkins(raw),
     mercyState: normalizeMercyState(raw.mercyState),
     rewardReceipts: normalizeRewardReceipts(raw.rewardReceipts),
     nextPurchaseSequence: normalizeNextPurchaseSequence(raw.nextPurchaseSequence),
@@ -120,6 +147,7 @@ function migrateLegacyCaptain(raw: Record<string, unknown>): Captain {
   return {
     ...(raw as Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'>),
     seenCannons: Array.isArray(raw.seenCannons) ? (raw.seenCannons as Captain['seenCannons']) : [],
+    ...normalizeSkins(raw),
     mercyState: freshMercyState(),
     rewardReceipts: {},
     nextPurchaseSequence: 0,

@@ -30,6 +30,7 @@ import { resolvePlacement } from '@engine/placement';
 import { rankTierForWins } from '@engine/ranks';
 
 import type { RewardReceipts } from '../contracts/rewards';
+import { DEFAULT_SKIN_ID } from '../theme/shipSkins';
 
 /** Fresh mercy container — never alias `emptyMercyState` (shared nested array). */
 function freshMercyState(): MercyState {
@@ -54,6 +55,13 @@ export interface Captain {
   /** Owned cannons the captain has inspected on the gun deck — drives the "new" badge (A-011). */
   seenCannons: CannonId[];
   unlockedIslands: IslandId[];
+  /**
+   * Ship skins the captain owns. Paint only — a skin can never reach damage, mastery or unlocks
+   * (`theme/shipSkins.ts`). Always contains the starter, so this is never empty on a live captain.
+   */
+  ownedSkins: string[];
+  /** The skin currently sailing. `null` means the starter, so an untouched save needs no migration. */
+  equippedSkin: string | null;
   rankTier: number;
   wins: number;
   currentIsland: IslandId | null;
@@ -122,6 +130,8 @@ export function emptyCaptain(): Captain {
     equippedCannons: [],
     seenCannons: [],
     unlockedIslands: [],
+    ownedSkins: [DEFAULT_SKIN_ID],
+    equippedSkin: null,
     rankTier: 0,
     wins: 0,
     currentIsland: null,
