@@ -494,8 +494,8 @@ function SailChip({ typeScale }: { typeScale: number }) {
 function RequirementChip({ frame, typeScale, text }: { frame: MapFrame; typeScale: number; text: string }) {
   return (
     <View
-      pointerEvents="none"
       style={{
+        pointerEvents: 'none',
         position: 'absolute',
         left: 0,
         right: 0,

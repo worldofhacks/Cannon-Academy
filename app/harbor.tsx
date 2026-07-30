@@ -87,8 +87,14 @@ function HarborBody() {
   }, [confirming]);
 
   return (
-    <View style={[s.screen, { paddingTop: insets.top }]}>
-      <View style={[s.header, { paddingHorizontal: L.gutter }]}>
+    <View style={s.screen}>
+      {/*
+        The safe area belongs to the HEADER, not the page. `StatusBar` is `style="light"` app-wide
+        (`app/_layout.tsx`), so a parchment strip behind the clock renders white-on-cream and the
+        time disappears. Painting the inset with the header's own sea-deep keeps the status bar on
+        the ground it was styled for.
+      */}
+      <View style={[s.header, { paddingHorizontal: L.gutter, paddingTop: insets.top + 8 }]}>
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Back to the sea chart"

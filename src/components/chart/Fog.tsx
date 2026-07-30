@@ -45,7 +45,7 @@ export function Fog({ frame }: { frame: MapFrame }) {
   const driftStyle = useAnimatedStyle(() => ({ transform: [{ translateX: driftX * drift.value }] }));
 
   return (
-    <Animated.View style={FILL} pointerEvents="none">
+    <Animated.View style={[FILL, { pointerEvents: 'none' }]}>
       <Animated.View style={[FILL, driftStyle]}>
         {FOG.banks.map((bank) => (
           <Blob

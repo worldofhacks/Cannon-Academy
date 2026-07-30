@@ -77,8 +77,8 @@ export function ChartShip({
   return (
     <>
       <View
-        pointerEvents="none"
         style={{
+          pointerEvents: 'none',
           position: 'absolute',
           left: mapX(frame, station.ship.cx) - width / 2,
           top: mapY(frame, station.ship.cy) - height / 2,
@@ -106,8 +106,8 @@ export function ChartShip({
 
       {!showHere ? null : (
         <View
-          pointerEvents="none"
           style={{
+            pointerEvents: 'none',
             position: 'absolute',
             left: mapX(frame, station.hereChip.x),
             top: mapY(frame, station.hereChip.y),

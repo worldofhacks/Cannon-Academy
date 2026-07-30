@@ -57,8 +57,8 @@ export function Route({ frame }: { frame: MapFrame }) {
 
   return (
     <View
-      pointerEvents="none"
       style={{
+        pointerEvents: 'none',
         position: 'absolute',
         left: mapX(frame, ROUTE.x) + half * (Math.cos(theta) - 1),
         top: mapY(frame, ROUTE.y) + half * Math.sin(theta),

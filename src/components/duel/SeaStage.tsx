@@ -125,9 +125,7 @@ export function SeaStage({
           {...(rivalPresentation.ghostOpacity !== undefined
             ? { ghostOpacity: rivalPresentation.ghostOpacity }
             : {})}
-          {...(rivalPresentation.ghostGlow !== undefined
-            ? { ghostGlow: rivalPresentation.ghostGlow }
-            : {})}
+          {...(rivalPresentation.ghostGlow !== undefined ? { ghostGlow: rivalPresentation.ghostGlow } : {})}
           facing="left"
           width={126 * art}
           burning={rivalHullPct > 0 && rivalHullPct <= 0.3}
@@ -157,10 +155,14 @@ export function SeaStage({
         <>
           {/* A wash, not a curtain. The child must still see their own ship taking the hit. */}
           <View
-            style={[s.rivalWash, { backgroundColor: `${rivalPresentation.accent}29` }]}
-            pointerEvents="none"
+            style={[s.rivalWash, { backgroundColor: `${rivalPresentation.accent}29`, pointerEvents: 'none' }]}
           />
-          <View style={[s.rivalArrow, { right: x(BOARD.rivalArrowRight), backgroundColor: rivalPresentation.accent }]}>
+          <View
+            style={[
+              s.rivalArrow,
+              { right: x(BOARD.rivalArrowRight), backgroundColor: rivalPresentation.accent },
+            ]}
+          >
             <Text style={s.rivalArrowText}>▼</Text>
           </View>
         </>
