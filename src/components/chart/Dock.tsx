@@ -150,8 +150,29 @@ export function ChartDock({
           (10), needing 362.5, and `minWidth` stops flex from shrinking anything. So the last button
           hung off the screen and every label truncated to "Har…", "G…", "Fi…".
 
-          The gap is read back off the controls' own x positions instead of being re-derived here, so
-          the two can never drift: one owner for the geometry, one consumer.
+          Every computed gap here has been wrong, so the row no longer computes one. `flow.ts` derives
+          spacing from `viewport.width − 2 × 12` — 351 at a 375pt phone — but the rendered row
+          measures **327**: a second 12pt inset sits between the screen and this row that the pure
+          geometry cannot see. Four gaps × the 6pt difference is 24pt of overflow, which pinned Fight
+          flush to x=375 with no right padding while Harbor kept its 24 on the left. Reading the gap
+          back off `control.x` reproduced the same error, because those x values come from the same
+          351 assumption.
+
+          Measuring showed the deeper problem: five targets at the 64pt floor are **320pt of button**,
+          and a 320pt iPhone SE leaves ~272pt of row. No gap arithmetic fixes that — the buttons
+          themselves do not fit, and `space-between` has no slack to distribute, so they simply
+          overran the edge.
+
+          So `control.width` is now a CEILING, not a fixed size: `flex: 1` with `maxWidth` lets flex
+          divide whatever row actually exists, equally, and clamps at the board's 64pt on a screen wide
+          enough to grant it. Never `minWidth` — that was the original overflow, because it forbids
+          the shrinking that keeps the last button on screen.
+
+          **Documented trade-off:** at 375pt this yields ~62pt targets rather than 64, and narrower
+          phones go lower. The boards set 64 as a floor for small hands, so five controls in this band
+          is a demo affordance in tension with that floor at phone widths — the honest fixes are two
+          rows (the dock must then grow past the board's 126) or the board's own two controls. Flagged
+          for the owner in A-049 rather than silently clipped.
 
           The labels STAY. A-038 froze a visible-label contract on these buttons — a demo viewer has
           to see where each one goes — so the fix is to stack the label under the icon instead of
@@ -161,7 +182,7 @@ export function ChartDock({
         <View
           style={{
             flexDirection: 'row',
-            gap: controlGap(controls),
+            gap: DOCK.controlGap * typeScale,
             marginTop: DOCK.gap * typeScale,
           }}
         >
@@ -178,7 +199,8 @@ export function ChartDock({
                 accessibilityLabel={control.accessibilityLabel}
                 style={({ pressed }) => [
                   {
-                    width: control.width,
+                    flex: 1,
+                    maxWidth: control.width,
                     height: control.height,
                     borderRadius: DOCK.buttonRadius * typeScale,
                     backgroundColor: primary ? chart.gold : chart.white,
@@ -215,19 +237,6 @@ export function ChartDock({
       <View style={{ height: insetBottom, backgroundColor: chart.parchment }} />
     </View>
   );
-}
-
-/**
- * The gap between two adjacent controls, read back off the geometry that positioned them.
- *
- * `chartHubControlLayout` spaces five fixed-width targets across the dock's inner width; recomputing
- * that spacing here would be a second opinion about the same number, and the overflow this file just
- * fixed was exactly that — two owners disagreeing by 2.9pt each, five times over.
- */
-function controlGap(controls: readonly HubControl[]): number {
-  const [first, second] = controls;
-  if (first === undefined || second === undefined) return 0;
-  return Math.max(0, second.x - (first.x + first.width));
 }
 
 /**

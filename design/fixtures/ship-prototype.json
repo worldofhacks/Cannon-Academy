@@ -76,7 +76,12 @@
       "fill": "#C9813C",
       "points": "0,0 100,0 90,100 9,100",
       "trim": { "inset": 5, "top": 5, "height": 7, "fill": "#F5A623" },
-      "waterline": { "height": 12, "fill": "#A0631F" },
+      "waterline": {
+        "height": 12,
+        "fill": "#A0631F",
+        "points": "6.231,0 93.077,0 90,100 9,100",
+        "_note": "The board nests this INSIDE the hull div, so the hull's clip-path trims it and the board can reuse the hull polygon verbatim. React Native has no clip-path and an SVG sibling clips nothing, so the band must carry the hull's taper at its own top edge or it juts out past the planking. Derived, not measured: at (39-12)/39 = 0.6923 of the hull's height the edges have travelled 9*0.6923 = 6.231 and 10*0.6923 = 6.923. A-049."
+      },
       "gunports": {
         "x": [28, 64, 100],
         "top": 17,

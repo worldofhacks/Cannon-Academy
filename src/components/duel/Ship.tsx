@@ -101,6 +101,27 @@ const SAIL = {
 
 const JIB_POINTS = '100,0 100,100 0,100';
 const HULL_POINTS = '0,0 100,0 90,100 9,100';
+
+/**
+ * The waterline band, tapered to sit INSIDE the hull rather than across it.
+ *
+ * The board nests the waterline as a child of the hull div, so the hull's own `clip-path` clips it —
+ * the band's full-width top edge is simply cut off where the hull has already narrowed. React Native
+ * has no `clip-path` and an SVG sibling clips nothing, so drawing `HULL_POINTS` again at 12pt tall
+ * put a full-width top edge 27pt up a hull that is 6pt narrower on each side by then: the band stuck
+ * out past the planking, which is exactly the "bottom trapezoid extends past the ship" report.
+ *
+ * So the top edge is moved to where the hull actually is at that height. The hull is 39 tall and
+ * tapers from 0→9 (stern) and 100→90 (bow) over its full height, so at the waterline's top —
+ * `(39 − 12) / 39 = 0.6923` of the way down — the edges have travelled `9 × 0.6923 = 6.231` and
+ * `10 × 0.6923 = 6.923`:
+ *
+ *     stern  0 + 6.231  = 6.231        bow  100 − 6.923 = 93.077
+ *
+ * Both bottom corners stay on the hull's own bottom edge, so the band is now a strict subset of the
+ * hull outline at every height (A-049).
+ */
+const WATERLINE_POINTS = '6.231,0 93.077,0 90,100 9,100';
 const PENNANT_CLEAN = '0,0 100,0 68,50 100,100 0,100';
 const PENNANT_TATTERED = '0,0 100,0 66,32 100,64 56,100 0,100';
 const BOWSPRIT_POINTS = '0,100 0,0 100,100';
@@ -370,9 +391,10 @@ export function Ship({
           }}
         />
         {/* The waterline band follows the same taper — a straight bar across a tapered hull reads
-            as a stripe painted on, not as the hull's own shadowed lower strake. */}
+            as a stripe painted on, not as the hull's own shadowed lower strake. Its own outline is
+            inset at the top to match where the hull already is; see WATERLINE_POINTS. */}
         <Poly
-          points={HULL_POINTS}
+          points={WATERLINE_POINTS}
           width={width}
           height={12 * s}
           fill={c.hullDeep}
@@ -496,17 +518,40 @@ function Sail({
   );
 }
 
+/**
+ * The pirate's crossbones, sized to the pennant it is painted on.
+ *
+ * It used to be an 18×18 cross at `bottom: 112` on a flag that spans `110 → 122`, so eight of its
+ * eighteen points hung above the cloth — two-thirds of the flag's own height, floating in the sky.
+ *
+ * The flag is 12 tall and 26 wide, and the tattered outline (`0,0 100,0 66,32 100,64 56,100 0,100`)
+ * bites its right edge in, leaving the left ~56% solid. So the mark is 8pt in an 8pt box at
+ * `left: 73, bottom: 112` — x 73→81 inside the solid 70→84.6, y 112→120 inside 110→122, with 2pt of
+ * cloth showing on every side (A-049).
+ */
+const CROSSBONES = { size: 8, bar: 2.2, left: 73, bottom: 112 } as const;
+
 function CrossbonesFlag({ scale: s }: { scale: number }) {
+  const { size, bar } = CROSSBONES;
+  const centre = (size - bar) / 2;
   return (
-    <View style={{ position: 'absolute', left: 74 * s, bottom: 112 * s, width: 18 * s, height: 18 * s }}>
+    <View
+      style={{
+        position: 'absolute',
+        left: CROSSBONES.left * s,
+        bottom: CROSSBONES.bottom * s,
+        width: size * s,
+        height: size * s,
+      }}
+    >
       <View
         style={{
           position: 'absolute',
-          left: 7 * s,
+          left: centre * s,
           top: 0,
-          width: 4 * s,
-          height: 18 * s,
-          borderRadius: 2,
+          width: bar * s,
+          height: size * s,
+          borderRadius: 1,
           backgroundColor: color.parchment,
         }}
       />
@@ -514,10 +559,10 @@ function CrossbonesFlag({ scale: s }: { scale: number }) {
         style={{
           position: 'absolute',
           left: 0,
-          top: 7 * s,
-          width: 18 * s,
-          height: 4 * s,
-          borderRadius: 2,
+          top: centre * s,
+          width: size * s,
+          height: bar * s,
+          borderRadius: 1,
           backgroundColor: color.parchment,
         }}
       />
@@ -525,13 +570,22 @@ function CrossbonesFlag({ scale: s }: { scale: number }) {
   );
 }
 
+/**
+ * The skeleton's skull, on the mainsail.
+ *
+ * Same class of overflow as the crossbones, smaller in degree: a 16pt skull at `bottom: 72` reached
+ * 88 on a mainsail that ends at `52 + 34 = 86`, so its crown sat 2pt above the canvas. 14pt at
+ * `bottom: 68` keeps it 68→82, inside the sail with margin (A-049).
+ */
 function SkullSails({ scale: s }: { scale: number }) {
   return (
-    <View style={{ position: 'absolute', left: 48 * s, bottom: 72 * s, width: 16 * s, height: 16 * s }}>
+    <View style={{ position: 'absolute', left: 48 * s, bottom: 68 * s, width: 14 * s, height: 14 * s }}>
+      {/* The cranium was 16 wide inside a box that is now 14 — every part below is the original
+          geometry at 14/16, so the skull shrank without changing shape. */}
       <View
         style={{
-          width: 16 * s,
-          height: 14 * s,
+          width: 14 * s,
+          height: 12 * s,
           borderRadius: 999,
           backgroundColor: color.parchment,
         }}
@@ -539,10 +593,10 @@ function SkullSails({ scale: s }: { scale: number }) {
       <View
         style={{
           position: 'absolute',
-          left: 4 * s,
-          top: 5 * s,
-          width: 3 * s,
-          height: 3 * s,
+          left: 3.5 * s,
+          top: 4.4 * s,
+          width: 2.6 * s,
+          height: 2.6 * s,
           borderRadius: 999,
           backgroundColor: color.inkDark,
         }}
@@ -550,10 +604,10 @@ function SkullSails({ scale: s }: { scale: number }) {
       <View
         style={{
           position: 'absolute',
-          right: 4 * s,
-          top: 5 * s,
-          width: 3 * s,
-          height: 3 * s,
+          right: 3.5 * s,
+          top: 4.4 * s,
+          width: 2.6 * s,
+          height: 2.6 * s,
           borderRadius: 999,
           backgroundColor: color.inkDark,
         }}
@@ -561,10 +615,10 @@ function SkullSails({ scale: s }: { scale: number }) {
       <View
         style={{
           position: 'absolute',
-          left: 6 * s,
+          left: 5.25 * s,
           bottom: 2 * s,
-          width: 4 * s,
-          height: 2 * s,
+          width: 3.5 * s,
+          height: 1.75 * s,
           borderRadius: 2,
           backgroundColor: color.inkDark,
         }}

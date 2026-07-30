@@ -168,6 +168,18 @@ describe('A-045 ship composition — the duel ships are built, not blitted', () 
     expectOutline(ship, hull.points, 'hull');
     expect(ship).toMatch(/color\.gunport/);
 
+    // The waterline must NOT reuse the hull polygon. The board can, because it nests the band inside
+    // the hull and the hull's clip-path trims it; RN has no clip-path, so an untapered top edge juts
+    // out past the planking. It carries the hull's taper at its own top edge instead (A-049).
+    expectOutline(ship, hull.waterline.points, 'waterline');
+    expect(hull.waterline.points).not.toBe(hull.points);
+
+    // …and it is a strict subset of the hull at both of its own edges.
+    const topLeft = Number(hull.waterline.points.split(' ')[0]?.split(',')[0]);
+    const bottomLeft = Number(hull.points.split(' ')[3]?.split(',')[0]);
+    expect(topLeft).toBeGreaterThan(0);
+    expect(topLeft).toBeLessThan(bottomLeft);
+
     for (const x of hull.gunports.x) {
       expect(ship, `gunport at x=${x} is missing`).toMatch(new RegExp(`\\b${x}\\b`));
     }

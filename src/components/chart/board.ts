@@ -286,6 +286,12 @@ export const DOCK = {
    * controls, delete this and use `primaryTextSize`/`secondaryTextSize` again (A-048).
    */
   controlLabelSize: 10.5,
+  /**
+   * Gap between hub controls. Small on purpose: with five controls the row's whole slack budget is
+   * `rowWidth − 5 × 64`, which is ~7pt at a 375pt phone and NEGATIVE below ~350. Every point spent
+   * here is taken off a tap target, so this is the least the row can look like a row (A-049).
+   */
+  controlGap: 4,
 } as const;
 
 /**
