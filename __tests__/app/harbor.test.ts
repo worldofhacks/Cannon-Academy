@@ -1,291 +1,205 @@
 /**
- * A-033 — Harbor store: spend coins on a game chest without buying past learning.
+ * A-055 — the Harbor sells paint. **This file supersedes A-033's suite.**
  *
- * The store delegates settlement to A-032's `settleStoreChest`; this suite owns catalog,
- * affordability, idempotent purchase handling, and the child-facing copy contracts.
+ * ## Why a frozen suite was replaced rather than amended
+ *
+ * A-033 froze fourteen tests around one repeatable game chest. An owner ruling on 2026-07-29 removed
+ * the chest from the shelf, and that ruling postdates the tests — the same adjudication the project
+ * made for D-8: an owner decision that comes after a test supersedes it. Amending them one at a time
+ * was not possible, because the product they describe no longer exists; `harborCatalog` and
+ * `buyHarborChest` are gone, not changed.
+ *
+ * The ruling was not arbitrary. The shipped screen contradicted itself: it sold a chest that
+ * `chestSettlement` can fill with a **cannon**, under copy reading *"Earn cannons by learning — not
+ * by buying them."* Coins bought capability, which the Harbor board forbids outright:
+ *
+ * > "Never put a cannon, a timer bonus, or a hull upgrade on this shelf. The moment coins buy power,
+ * > cut the screen."
+ *
+ * **What A-033 protected and is still protected here:** no real-money language, a 64pt purchase
+ * target, no cannon on the shelf, purchases idempotent under repeated taps, and the balance being
+ * the captain's coins and nothing else. Those assertions live on below against the new product.
+ *
+ * **What is deliberately not carried over:** anything describing a chest, a rarity roll or a purchase
+ * receipt. Chests are a victory reward now and are tested where they are settled.
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { describe, expect, it } from 'vitest';
 
-import { describe, expect, it, vi, afterEach } from 'vitest';
+import { COINS_WIN_BASE } from '@engine/tuning';
 
-import { cannons } from '@content/index';
-import { purchaseReceiptKey } from '../../src/contracts/rewards';
-import { CHEST_COIN_RANGE_BY_RARITY, HARBOR_CHEST_PRICE } from '@engine/tuning';
-
-import { deckSlots } from '../../src/services/loadout';
-import { hydrate, persist, type KeyValueStore } from '../../src/services/persistence';
-import { settleStoreChest } from '../../src/services/rewardSettlement';
+import { buySkin, duelsToAfford, equipSkin, harborCoinBalance, harborShelf } from '../../src/services/harbor';
 import { createCaptainStore, emptyCaptain, type Captain } from '../../src/stores/player';
+import {
+  harborBalanceLabel,
+  harborShortfallMessage,
+  HARBOR_PURCHASE_TARGET,
+} from '../../src/theme/harborPresentation';
+import { DEFAULT_SKIN_ID, SHIP_SKINS, skinById } from '../../src/theme/shipSkins';
 
-const REPO_ROOT = join(import.meta.dirname, '../..');
-
-async function loadHarborModule(): Promise<typeof import('../../src/services/harbor')> {
-  let loaded: unknown;
-  try {
-    loaded = await import('../../src/services/harbor');
-  } catch {
-    loaded = undefined;
-  }
-  expect(loaded, 'A-033 is RED: src/services/harbor.ts must export the harbor store API').toBeDefined();
-  return loaded as typeof import('../../src/services/harbor');
+function captainWith(over: Partial<Captain> = {}): Captain {
+  return { ...emptyCaptain(), ...over };
 }
 
-async function readSource(relative: string): Promise<string> {
-  return readFileSync(join(REPO_ROOT, relative), 'utf8');
+function storeWith(over: Partial<Captain> = {}) {
+  return createCaptainStore(captainWith(over));
 }
 
-function fakeStorage(): KeyValueStore {
-  const data = new Map<string, string>();
-  return {
-    getItem: async (k) => data.get(k) ?? null,
-    setItem: async (k, v) => void data.set(k, v),
-  };
-}
-
-const captain = (over: Partial<Captain> = {}): Captain => ({ ...emptyCaptain(), ...over });
-
-describe('A-033 harbor store', () => {
-  afterEach(() => {
-    vi.restoreAllMocks();
+describe('A-055 the shelf', () => {
+  it('spec(A-055:AC-1) sells every skin with a price, and never the starter', () => {
+    const shelf = harborShelf(captainWith());
+    expect(shelf.map((i) => i.skin.id)).toEqual(['seaglass', 'sunset', 'deepink']);
+    expect(shelf.every((i) => i.skin.price > 0)).toBe(true);
+    expect(shelf.some((i) => i.skin.id === DEFAULT_SKIN_ID)).toBe(false);
   });
 
-  // ── AC-1 — catalog prices are named tuning values; coins are the only currency ───────────────
-
-  it('spec(A-033:AC-1) lists every product with a positive price from engine tuning', async () => {
-    const { harborCatalog } = await loadHarborModule();
-    const products = harborCatalog();
-
-    expect(products.length).toBeGreaterThan(0);
-    for (const product of products) {
-      expect(Number.isInteger(product.price), `${product.id} price must be an integer`).toBe(true);
-      expect(product.price, `${product.id} price must be positive`).toBeGreaterThan(0);
-      expect(product.price).toBe(HARBOR_CHEST_PRICE);
-    }
-  });
-
-  it('spec(A-033:AC-1) exposes the captain coin balance as the only spendable currency', async () => {
-    const { harborCoinBalance } = await loadHarborModule();
-    expect(harborCoinBalance(captain({ coins: 37 }))).toBe(37);
-    expect(harborCoinBalance(captain({ coins: 0 }))).toBe(0);
-  });
-
-  it('spec(A-033:AC-1) the demo inventory is exactly one repeatable game chest', async () => {
-    const { harborCatalog } = await loadHarborModule();
-    expect(harborCatalog()).toEqual([
-      expect.objectContaining({ id: 'game_chest', kind: 'chest', price: HARBOR_CHEST_PRICE }),
-    ]);
-  });
-
-  // ── AC-2 — sufficient coins debit once and settle through A-032 ─────────────────────────────
-
-  it('spec(A-033:AC-2) buying debits once and passes sequence plus HARBOR_CHEST_PRICE to settleStoreChest', async () => {
-    const { buyHarborChest } = await loadHarborModule();
-    const store = createCaptainStore(captain({ coins: 100 }));
-    const sequence = store.getState().captain.nextPurchaseSequence;
-
-    const result = buyHarborChest(store);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.applied).toBe(true);
-    expect(result.receipt).toBeDefined();
-    expect(result.receipt?.source).toBe('purchase');
-    expect(result.receipt?.key).toBe(purchaseReceiptKey(sequence));
-    expect(store.getState().captain.coins).toBeLessThan(100);
-    expect(store.getState().captain.nextPurchaseSequence).toBe(sequence + 1);
-    expect(store.getState().captain.rewardReceipts[purchaseReceiptKey(sequence)]).toEqual(
-      result.receipt,
-    );
-  });
-
-  it('spec(A-033:AC-2) a successful purchase returns the persisted receipt from settlement', async () => {
-    const { buyHarborChest } = await loadHarborModule();
-    const store = createCaptainStore(captain({ coins: 80 }));
-    const result = buyHarborChest(store);
-
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    const key = purchaseReceiptKey(store.getState().captain.nextPurchaseSequence - 1);
-    expect(store.getState().captain.rewardReceipts[key]).toEqual(result.receipt);
-  });
-
-  // ── AC-3 — failures and replays leave state untouched and return actionable messages ───────
-
-  it('spec(A-033:AC-3) insufficient coins refuse without changing balance or inventory', async () => {
-    const { buyHarborChest } = await loadHarborModule();
-    const store = createCaptainStore(captain({ coins: HARBOR_CHEST_PRICE - 1, ownedCannons: ['swivel_gun'] }));
-    const before = structuredClone(store.getState().captain);
-
-    const result = buyHarborChest(store);
-
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.reason).toBe('insufficient-coins');
-    expect(result.message.length).toBeGreaterThan(0);
-    expect(store.getState().captain).toEqual(before);
-  });
-
-  it('spec(A-033:AC-3) repeated taps reuse the committed sequence without another debit', async () => {
-    const { buyHarborChest } = await loadHarborModule();
-    const store = createCaptainStore(captain({ coins: 120 }));
-    const first = buyHarborChest(store);
-    expect(first.ok).toBe(true);
-    const afterFirst = structuredClone(store.getState().captain);
-
-    const second = buyHarborChest(store);
-    expect(second.ok).toBe(true);
-    if (!second.ok || !first.ok) return;
-    expect(second.applied).toBe(false);
-    expect(second.receipt).toEqual(first.receipt);
-    expect(store.getState().captain).toEqual(afterFirst);
-  });
-
-  it('spec(A-033:AC-3) remount reads the retained receipt without settling again', async () => {
-    const { buyHarborChest, harborLastReceipt } = await loadHarborModule();
-    const store = createCaptainStore(captain({ coins: 90 }));
-    const bought = buyHarborChest(store);
-    expect(bought.ok).toBe(true);
-
-    const io = fakeStorage();
-    await persist(io, store.getState().captain);
-    const reloaded = await hydrate(io);
-    const remounted = createCaptainStore(reloaded.captain);
-
-    const receipt = harborLastReceipt(remounted.getState().captain);
-    expect(receipt).toEqual(bought.ok ? bought.receipt : null);
-
-    const replaceSpy = vi.spyOn(remounted.getState(), 'replaceCaptain');
-    const replay = buyHarborChest(remounted);
-    expect(replay.ok).toBe(true);
-    if (!replay.ok) return;
-    expect(replay.applied).toBe(false);
-    expect(replay.receipt).toEqual(receipt);
-    expect(replaceSpy).not.toHaveBeenCalled();
-  });
-
-  it('spec(A-033:AC-3) injected settlement failure leaves Captain unchanged and returns a message', async () => {
-    vi.resetModules();
-    const settlement = await import('../../src/services/rewardSettlement');
-    vi.spyOn(settlement, 'settleStoreChest').mockReturnValue({
-      applied: false,
-      receipt: null,
-      coinsSpent: 0,
-      coinsGranted: 0,
-      unlockedCannons: [],
-    });
-    const { buyHarborChest } = await import('../../src/services/harbor');
-    const store = createCaptainStore(captain({ coins: 100 }));
-    const before = structuredClone(store.getState().captain);
-
-    const result = buyHarborChest(store);
-    expect(result.ok).toBe(false);
-    if (result.ok) return;
-    expect(result.message.length).toBeGreaterThan(0);
-    expect(store.getState().captain).toEqual(before);
-    vi.resetModules();
-  });
-
-  // ── AC-4 — mastery cannons are not directly purchasable ─────────────────────────────────────
-
-  it('spec(A-033:AC-4) no mastery-earned cannon is listed as a direct product', async () => {
-    const { harborCatalog } = await loadHarborModule();
-    const masteryIds = new Set(cannons.filter((c) => c.unlock.kind === 'range').map((c) => c.id));
-    const products = harborCatalog();
-
-    for (const product of products) {
-      expect(product.kind).toBe('chest');
-      expect(masteryIds.has(product.id as never)).toBe(false);
-    }
-    expect(products.every((p) => p.kind === 'chest')).toBe(true);
-  });
-
-  // ── AC-5 — purchases persist and new cannons badge on the gun deck ─────────────────────────
-
-  it('spec(A-033:AC-5) spent coins and acquired cannons survive relaunch', async () => {
-    const store = createCaptainStore(captain({ coins: 100, ownedCannons: ['swivel_gun', 'culverin'] }));
-    const beforeCoins = store.getState().captain.coins;
-    const outcome = settleStoreChest(store, {
-      sequence: store.getState().captain.nextPurchaseSequence,
-      price: HARBOR_CHEST_PRICE,
-    });
-    expect(outcome.applied).toBe(true);
-
-    const io = fakeStorage();
-    await persist(io, store.getState().captain);
-    const reloaded = await hydrate(io);
-
-    expect(reloaded.captain.coins).toBeLessThan(beforeCoins);
-    expect(reloaded.captain.rewardReceipts).toEqual(store.getState().captain.rewardReceipts);
-    if (outcome.unlockedCannons.length > 0) {
-      for (const id of outcome.unlockedCannons) {
-        expect(reloaded.captain.ownedCannons).toContain(id);
+  it('spec(A-055:AC-1) nothing on the shelf can buy power', () => {
+    // The board's hard rule, asserted as a property of the goods rather than as a promise in copy.
+    // `hull` is allowed because on a skin it is a COLOUR — so it is checked for type, not absence.
+    const forbidden = ['cannonId', 'damage', 'timerMs', 'unlock', 'skill', 'minGrade'];
+    for (const item of harborShelf(captainWith())) {
+      const record = item.skin as unknown as Record<string, unknown>;
+      expect(typeof record.hull).toBe('string');
+      for (const key of forbidden) {
+        expect(record[key], `a shelf item exposes ${key}`).toBeUndefined();
       }
     }
   });
 
-  it('spec(A-033:AC-5) a chest-acquired cannon is marked new on the gun deck until seen', async () => {
-    const { buyHarborChest } = await loadHarborModule();
-    const store = createCaptainStore(
-      captain({ coins: 200, ownedCannons: ['swivel_gun', 'culverin'], seenCannons: ['swivel_gun', 'culverin'] }),
-    );
-    const result = buyHarborChest(store);
-    expect(result.ok).toBe(true);
+  it('spec(A-055:AC-2) affordability, shortfall and the duel estimate agree', () => {
+    const shelf = harborShelf(captainWith({ coins: 100 }));
+    const seaglass = shelf.find((i) => i.skin.id === 'seaglass')!; // 60
+    const deepink = shelf.find((i) => i.skin.id === 'deepink')!; // 260
 
-    const unlocked = store.getState().captain.ownedCannons.filter(
-      (id) => !['swivel_gun', 'culverin'].includes(id),
-    );
-    if (unlocked.length === 0) return;
+    expect(seaglass.affordable).toBe(true);
+    expect(seaglass.shortfall).toBe(0);
+    expect(seaglass.duelsAway).toBe(0);
 
-    const fresh = unlocked[0]!;
-    const slots = deckSlots(store.getState().captain);
-    expect(slots.find((s) => s.cannon.id === fresh)?.isNew).toBe(true);
+    expect(deepink.affordable).toBe(false);
+    expect(deepink.shortfall).toBe(160);
+    expect(deepink.duelsAway).toBe(Math.ceil(160 / COINS_WIN_BASE));
   });
 
-  // ── AC-6 — child-facing copy and tap target ─────────────────────────────────────────────────
+  it('spec(A-055:AC-2) the duel estimate uses the payout FLOOR, so it errs toward arriving early', () => {
+    // The designer: "compute it from the floor of the payout range, never the average, so the child
+    // always arrives sooner than promised." An average would promise fewer duels than the worst case
+    // delivers, which is the direction that disappoints.
+    expect(duelsToAfford(COINS_WIN_BASE)).toBe(1);
+    expect(duelsToAfford(COINS_WIN_BASE + 1)).toBe(2);
+    expect(duelsToAfford(0)).toBe(0);
+    expect(duelsToAfford(-5)).toBe(0);
 
-  it('spec(A-033:AC-6) purchase copy says coins and game chest with no real-money language', async () => {
-    const presentation = await import('../../src/theme/harborPresentation');
-    expect(presentation.harborPurchaseLabel.toLowerCase()).toContain('coins');
-    expect(presentation.harborProductTitle.toLowerCase()).toContain('game chest');
-
-    const src = await readSource('app/harbor.tsx');
-    const forbidden = /\b(purchase|buy now|\$|USD|IAP|in-app|checkout|credit card|real money)\b/i;
-    expect(src).not.toMatch(forbidden);
-    expect(src.toLowerCase()).toContain('coins');
-    expect(src.toLowerCase()).toContain('game chest');
+    // A generous payout of 40 would say 4 duels for 160; the floor says 8. The floor must win.
+    expect(duelsToAfford(160)).toBeGreaterThan(Math.ceil(160 / 40));
   });
 
-  it('spec(A-033:AC-6) the purchase control exposes a 64pt tap target', async () => {
-    const presentation = await import('../../src/theme/harborPresentation');
-    expect(presentation.HARBOR_PURCHASE_TARGET).toBe(64);
+  it('spec(A-055:AC-2) an owned skin is never shown as unaffordable', () => {
+    const shelf = harborShelf(captainWith({ coins: 0, ownedSkins: [DEFAULT_SKIN_ID, 'deepink'] }));
+    const deepink = shelf.find((i) => i.skin.id === 'deepink')!;
+    expect(deepink.owned).toBe(true);
+    expect(deepink.affordable).toBe(true);
+    expect(deepink.shortfall).toBe(0);
+  });
+});
 
-    const src = await readSource('app/harbor.tsx');
-    expect(src).toMatch(/HARBOR_PURCHASE_TARGET|MIN_TAP_TARGET/);
+describe('A-055 buying', () => {
+  it('spec(A-055:AC-3) a purchase debits once, grants the skin, and wears it', () => {
+    const store = storeWith({ coins: 100 });
+    const result = buySkin(store, 'seaglass');
+
+    expect(result).toMatchObject({ ok: true, applied: true });
+    const after = store.getState().captain;
+    expect(after.coins).toBe(40);
+    expect(after.ownedSkins).toContain('seaglass');
+    expect(after.equippedSkin).toBe('seaglass');
   });
 
-  // ── Definition of Done ──────────────────────────────────────────────────────────────────────
+  it('spec(A-055:AC-3) a second tap does not debit again — ownership is the receipt', () => {
+    // A-033 needed a receipt ledger because a chest outcome was random. A skin is deterministic, so
+    // owning it IS proof the purchase happened, and a repeat tap cannot double-charge.
+    const store = storeWith({ coins: 100 });
+    buySkin(store, 'seaglass');
+    const afterFirst = store.getState().captain.coins;
 
-  it('dod(A-033:1) HARBOR_CHEST_PRICE is frozen at 50 before implementation', () => {
-    expect(HARBOR_CHEST_PRICE).toBe(50);
-    expect(HARBOR_CHEST_PRICE).toBeGreaterThan(CHEST_COIN_RANGE_BY_RARITY.common.max);
+    const second = buySkin(store, 'seaglass');
+    expect(second).toMatchObject({ ok: true, applied: false });
+    expect(store.getState().captain.coins).toBe(afterFirst);
+    expect(store.getState().captain.ownedSkins.filter((s) => s === 'seaglass')).toHaveLength(1);
   });
 
-  it('dod(A-033:2) harbor screen delegates settlement — it does not roll or grant rewards', async () => {
-    const src = await readSource('app/harbor.tsx');
-    expect(src).toMatch(/from '\.\.\/src\/services\/harbor'/);
-    expect(src).not.toMatch(/\brollChest\b/);
-    expect(src).not.toMatch(/settleStoreChest/);
+  it('spec(A-055:AC-4) insufficient coins refuses without changing anything, and says how far', () => {
+    const store = storeWith({ coins: 10 });
+    const before = store.getState().captain;
+
+    const result = buySkin(store, 'deepink'); // 260
+    expect(result.ok).toBe(false);
+    if (!result.ok && result.reason === 'insufficient-coins') {
+      expect(result.shortfall).toBe(250);
+      expect(result.duelsAway).toBe(duelsToAfford(250));
+    } else {
+      throw new Error('expected an insufficient-coins refusal');
+    }
+
+    expect(store.getState().captain).toEqual(before);
   });
 
-  it('dod(A-033:3) every acceptance criterion in the ticket is cited by a test in this file', async () => {
-    const ticket = await readSource('tickets/app/A-033.md');
-    const suite = await readSource('__tests__/app/harbor.test.ts');
-    const acs = new Set([...ticket.matchAll(/\*\*(AC-\d+)\*\*/g)].map((m) => m[1]!));
+  it('spec(A-055:AC-4) an unknown skin id refuses rather than throwing', () => {
+    const store = storeWith({ coins: 9999 });
+    const before = store.getState().captain;
+    expect(buySkin(store, 'not-a-skin')).toEqual({ ok: false, reason: 'unknown-skin' });
+    expect(store.getState().captain).toEqual(before);
+  });
 
-    expect(acs.size).toBeGreaterThan(0);
-    for (const ac of acs) {
-      expect(suite, `${ac} has no test in harbor.test.ts`).toContain(`spec(A-033:${ac})`);
+  it('spec(A-055:AC-5) equipping is limited to skins actually owned', () => {
+    const store = storeWith({ coins: 0, ownedSkins: [DEFAULT_SKIN_ID] });
+    expect(equipSkin(store, 'deepink')).toBe(false);
+    expect(store.getState().captain.equippedSkin).toBeNull();
+
+    expect(equipSkin(store, DEFAULT_SKIN_ID)).toBe(true);
+    expect(store.getState().captain.equippedSkin).toBe(DEFAULT_SKIN_ID);
+  });
+
+  it('spec(A-055:AC-5) buying one skin never removes another', () => {
+    const store = storeWith({ coins: 500, ownedSkins: [DEFAULT_SKIN_ID, 'seaglass'] });
+    buySkin(store, 'sunset');
+    const owned = store.getState().captain.ownedSkins;
+    expect(owned).toContain(DEFAULT_SKIN_ID);
+    expect(owned).toContain('seaglass');
+    expect(owned).toContain('sunset');
+  });
+});
+
+describe('A-055 copy — carried over from A-033', () => {
+  it('spec(A-055:AC-6) no real-money language anywhere in the harbor copy', () => {
+    const strings = [
+      harborBalanceLabel(120),
+      harborShortfallMessage(1),
+      harborShortfallMessage(4),
+      ...SHIP_SKINS.map((s) => s.name),
+    ].join(' ');
+
+    for (const banned of ['$', '£', '€', 'buy coins', 'real money', 'usd']) {
+      expect(strings.toLowerCase()).not.toContain(banned.toLowerCase());
+    }
+    expect(strings).toContain('coins');
+  });
+
+  it('spec(A-055:AC-6) the shortfall line counts duels, not coins the child must subtract', () => {
+    expect(harborShortfallMessage(1)).toBe('About one more duel.');
+    expect(harborShortfallMessage(4)).toBe('About 4 more duels.');
+    expect(harborShortfallMessage(0)).toBe('');
+  });
+
+  it('spec(A-055:AC-6) the purchase control keeps the 64pt child tap floor', () => {
+    expect(HARBOR_PURCHASE_TARGET).toBeGreaterThanOrEqual(64);
+  });
+
+  it('spec(A-055:AC-6) the balance is the captain coin count and nothing else', () => {
+    expect(harborCoinBalance(captainWith({ coins: 77 }))).toBe(77);
+  });
+
+  it('spec(A-055:AC-1) every shelf price is a real catalog price', () => {
+    for (const item of harborShelf(captainWith())) {
+      expect(skinById(item.skin.id)?.price).toBe(item.skin.price);
     }
   });
 });

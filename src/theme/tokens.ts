@@ -77,6 +77,12 @@ export const color = {
 
   // ── Semantic state. ────────────────────────────────────────────────────────
   success: '#2FB65E',
+  /**
+   * The artifact's `success-deep`. Certified both ways: white ON it is 5.04, and it AS text is 5.04
+   * on white and 4.69 on parchment — so it is the green that may carry a word, where `success`
+   * itself may not (white on it is 2.63, a board-banned pair). See A-054.
+   */
+  successDeep: '#1E7F41',
   /** Chip background for a cost/penalty. Paired with `dangerInk`. */
   dangerBg: '#4A1F1A',
   dangerInk: '#F09A92',
