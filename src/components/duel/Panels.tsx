@@ -191,8 +191,7 @@ export function VictoryPanel({
   onLeave,
 }: VictoryProps) {
   const receipt = chestReceipt;
-  const ceremony =
-    chestOpen && receipt !== null ? projectChestCeremony(receipt, rewards) : null;
+  const ceremony = chestOpen && receipt !== null ? projectChestCeremony(receipt, rewards) : null;
 
   return (
     <View style={s.wrap}>
@@ -220,12 +219,7 @@ export function VictoryPanel({
                 },
               ]}
             >
-              <Text
-                style={[
-                  s.rarityLabel,
-                  { color: chestRarityLook[receipt.rarity].label },
-                ]}
-              >
+              <Text style={[s.rarityLabel, { color: chestRarityLook[receipt.rarity].label }]}>
                 {ceremony.label}
               </Text>
             </View>
@@ -577,7 +571,7 @@ const s = StyleSheet.create({
     justifyContent: 'center',
   },
   rewardName: { ...type.subtitle, color: color.inkDark },
-  rewardTag: { ...type.chip, color: color.goldDeep },
+  rewardTag: { ...type.chip, color: color.goldDeepest },
   coinRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   coin: { width: 22, height: 22, borderRadius: 999, backgroundColor: color.amber },
   coinCount: { ...type.display, fontSize: 20, lineHeight: 24, color: color.inkDark },

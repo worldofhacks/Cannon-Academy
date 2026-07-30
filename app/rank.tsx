@@ -32,8 +32,18 @@ function RankBody() {
   const progress = skillProgress(captain);
 
   return (
-    <View style={[styles.root, { paddingTop: insets.top + tx(space[4]), paddingBottom: insets.bottom + tx(space[4]) }]}>
-      <View style={[styles.header, { paddingHorizontal: tx(space[5]), gap: tx(space[3]), marginBottom: tx(space[4]) }]}>
+    <View
+      style={[
+        styles.root,
+        { paddingTop: insets.top + tx(space[4]), paddingBottom: insets.bottom + tx(space[4]) },
+      ]}
+    >
+      <View
+        style={[
+          styles.header,
+          { paddingHorizontal: tx(space[5]), gap: tx(space[3]), marginBottom: tx(space[4]) },
+        ]}
+      >
         <Pressable
           onPress={() => router.back()}
           accessibilityRole="button"
@@ -51,10 +61,7 @@ function RankBody() {
           <Text style={[styles.backLabel, { fontSize: tx(18) }]}>←</Text>
         </Pressable>
         <View style={{ flex: 1, minWidth: 0 }}>
-          <Text
-            numberOfLines={1}
-            style={[styles.title, { fontSize: tx(19), lineHeight: tx(24) }]}
-          >
+          <Text numberOfLines={1} style={[styles.title, { fontSize: tx(19), lineHeight: tx(24) }]}>
             {captain.name === '' ? 'Captain' : captain.name}
           </Text>
           <Text style={[styles.subtitle, { fontSize: tx(10), letterSpacing: 0.8 }]}>RANK LADDER</Text>
@@ -75,11 +82,15 @@ function RankBody() {
         {ladder.nextRequirement !== null ? (
           <View style={[styles.card, { borderRadius: tx(radius.card), padding: tx(space[4]) }]}>
             <Text style={[styles.eyebrow, { fontSize: tx(10), marginBottom: tx(space[2]) }]}>NEXT RANK</Text>
-            <Text style={[styles.nextText, { fontSize: tx(16), lineHeight: tx(21) }]}>{ladder.nextRequirement}</Text>
+            <Text style={[styles.nextText, { fontSize: tx(16), lineHeight: tx(21) }]}>
+              {ladder.nextRequirement}
+            </Text>
           </View>
         ) : null}
 
-        <View style={[styles.card, { borderRadius: tx(radius.card), padding: tx(space[4]), gap: tx(space[3]) }]}>
+        <View
+          style={[styles.card, { borderRadius: tx(radius.card), padding: tx(space[4]), gap: tx(space[3]) }]}
+        >
           <Text style={[styles.eyebrow, { fontSize: tx(10) }]}>SEA CHART RANKS</Text>
           {ladder.rungs.map((rung) => (
             <View
@@ -90,7 +101,11 @@ function RankBody() {
                   borderRadius: tx(radius.cardInner),
                   paddingVertical: tx(space[3]),
                   paddingHorizontal: tx(space[4]),
-                  backgroundColor: rung.isCurrent ? color.gold : rung.isAchieved ? color.parchment : color.surfaceRaised,
+                  backgroundColor: rung.isCurrent
+                    ? color.gold
+                    : rung.isAchieved
+                      ? color.parchment
+                      : color.surfaceRaised,
                   borderBottomWidth: tx(rung.isCurrent ? 4 : 2),
                   borderBottomColor: rung.isCurrent ? color.goldDeep : color.border,
                 },
@@ -124,11 +139,20 @@ function RankBody() {
         </View>
 
         {progress.length > 0 ? (
-          <View style={[styles.card, { borderRadius: tx(radius.card), padding: tx(space[4]), gap: tx(space[4]) }]}>
+          <View
+            style={[styles.card, { borderRadius: tx(radius.card), padding: tx(space[4]), gap: tx(space[4]) }]}
+          >
             <Text style={[styles.eyebrow, { fontSize: tx(10) }]}>SKILL MASTERY</Text>
             {progress.map((row) => (
               <View key={row.skillId} style={{ gap: tx(space[2]) }}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: tx(space[3]) }}>
+                <View
+                  style={{
+                    flexDirection: 'row',
+                    justifyContent: 'space-between',
+                    alignItems: 'center',
+                    gap: tx(space[3]),
+                  }}
+                >
                   <Text
                     numberOfLines={2}
                     style={[styles.skillName, { flex: 1, fontSize: tx(13), lineHeight: tx(21) }]}
@@ -184,7 +208,7 @@ const styles = StyleSheet.create({
     fontFamily: font.displayBold,
   },
   subtitle: {
-    color: color.inkFaint,
+    color: color.inkSoft,
     fontFamily: font.bodyBold,
     textTransform: 'uppercase',
   },
@@ -198,7 +222,7 @@ const styles = StyleSheet.create({
     borderColor: color.border,
   },
   eyebrow: {
-    color: color.inkFaint,
+    color: color.inkSoft,
     fontFamily: font.bodyBold,
     letterSpacing: 0.8,
     textTransform: 'uppercase',

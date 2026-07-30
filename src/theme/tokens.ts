@@ -88,7 +88,22 @@ export const color = {
   chipInk: '#BFD8E8',
 
   // ── Sea and sky. ───────────────────────────────────────────────────────────
+  /**
+   * The artifact's `sea` token.
+   *
+   * **Never put text on this.** White on it measures 4.18 and ink on it 3.59 — both below AA, and
+   * the app's chip text is 10–11px, so "large only" does not rescue either. Use it as water and as
+   * secondary chrome; when something on it has to be read, use `seaDeep` (A-054).
+   */
   sea: '#1584B8',
+  /**
+   * The artifact's `sea-deep` — the status bar and HUD backdrop, and the readable blue.
+   *
+   * White on it is 7.09, certified in the board's own contrast table. This was inlined as `#0C5E86`
+   * in five places before it had a name, which is how the temperament badge ended up using the
+   * lighter `sea` behind a white glyph at 4.18.
+   */
+  seaDeep: '#0C5E86',
   seaFoam: '#43B4E0',
   foam: '#D6F0FB',
   skyTop: '#A9E6FF',

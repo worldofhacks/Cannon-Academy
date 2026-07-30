@@ -111,6 +111,15 @@ export const temperLook: Record<
   Temperament,
   {
     readonly color: string;
+    /**
+     * The glyph colour ON this badge, certified against its own fill.
+     *
+     * Not a constant: white on the green `reliable` badge measures 2.63 — one of the board's two
+     * explicitly BANNED pairs — while white on the red and the deep blue are 4.57 and 7.09. A single
+     * shared glyph colour cannot be right for three different grounds, and the badge a beginner sees
+     * most was the one failing (A-054).
+     */
+    readonly ink: string;
     readonly glyph: string;
     readonly word: string;
     /**
@@ -126,13 +135,18 @@ export const temperLook: Record<
 > = {
   reliable: {
     color: color.success,
+    // ink on hull-remaining — 5.70 AA. White here is 2.63 and banned by the board.
+    ink: color.inkDark,
     glyph: '=',
     word: 'steady',
     points: '50,0 100,25 100,75 50,100 0,75 0,25',
   },
-  standard: { color: color.sea, glyph: '~', word: 'normal', points: null },
+  // white on sea-deep — 7.09 AA, certified in the board's own table.
+  standard: { color: color.seaDeep, ink: color.white, glyph: '~', word: 'normal', points: null },
   volatile: {
     color: '#D93A2E',
+    // white on hull-critical — 4.57 AA.
+    ink: color.white,
     glyph: '!',
     word: 'risky',
     points: '50,0 62,30 93,22 80,50 98,74 66,74 50,100 34,74 2,74 20,50 7,22 38,30',

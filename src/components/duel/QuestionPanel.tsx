@@ -242,7 +242,7 @@ const s = StyleSheet.create({
   },
   fuseLabels: { flexDirection: 'row', justifyContent: 'space-between', paddingTop: 4, paddingHorizontal: 2 },
   takeYourTime: { ...type.chip, color: color.inkDarkMuted },
-  fastIsPerfect: { ...type.chip, color: color.goldDeep },
+  fastIsPerfect: { ...type.chip, color: color.goldDeepest },
 
   grid: { flex: 1, marginTop: space[2], gap: 10 },
   gridRow: { flex: 1, flexDirection: 'row', gap: 10 },

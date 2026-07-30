@@ -12,7 +12,7 @@ import Svg, { Circle, Polygon } from 'react-native-svg';
 import type { Temperament } from '@content/schemas';
 
 import { temperLook } from '../../theme/cannonPresentation';
-import { color, type } from '../../theme/tokens';
+import { type } from '../../theme/tokens';
 
 export function TemperBadge({ temper, size = 40 }: { temper: Temperament; size?: number }) {
   const look = temperLook[temper];
@@ -26,11 +26,11 @@ export function TemperBadge({ temper, size = 40 }: { temper: Temperament; size?:
           <Polygon points={look.points} fill={look.color} />
         )}
       </Svg>
-      <Text style={[t.glyph, { fontSize: size * 0.475 }]}>{look.glyph}</Text>
+      <Text style={[t.glyph, { fontSize: size * 0.475, color: look.ink }]}>{look.glyph}</Text>
     </View>
   );
 }
 
 const t = StyleSheet.create({
-  glyph: { ...type.title, color: color.white, includeFontPadding: false },
+  glyph: { ...type.title, includeFontPadding: false },
 });
