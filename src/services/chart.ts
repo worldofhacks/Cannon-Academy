@@ -11,9 +11,10 @@
  * The chart shows every island always — fogged, not absent. A five-island map that renders as one
  * node tells a child the game is one island long. The fog IS the promise that there is more.
  */
-import { islands, getIsland } from '@content/index';
+import { islands, getIsland, getSkill } from '@content/index';
 import type { Island } from '@content/schemas';
 import { emptyMastery, isMastered } from '@engine/mastery';
+import { maxGradeForBand } from '@engine/placement';
 
 import type { Captain } from '../stores/player';
 
@@ -36,15 +37,33 @@ export interface ChartNode {
  */
 export function chartNodes(captain: Captain): readonly ChartNode[] {
   const unlocked = new Set(captain.unlockedIslands);
+  /**
+   * The curriculum ceiling. `cleared` is measured against the skills this captain will actually be
+   * ASKED, not against every skill the island teaches at every age.
+   *
+   * Without this, the green tick was unreachable for the youngest band and the bug was invisible in
+   * any test that did not pick a band: Port Sumwich teaches four skills, and one of them —
+   * `two_step_add_sub` — is `minGrade: 2`. A K-1 captain is never served it (`range.ts` refuses a
+   * drill above the band), so `every` could never be satisfied, so their first island never earned
+   * its check no matter how completely they finished it.
+   *
+   * This is the same filter `resolveUnlocks` already applies when deciding whether an island is even
+   * eligible at a band, so the two now agree about what "done with this island" means (A-051).
+   */
+  const maxGrade = captain.gradeBand === null ? Number.POSITIVE_INFINITY : maxGradeForBand(captain.gradeBand);
   return [...islands]
     .sort((a, b) => a.order - b.order)
     .map((island) => {
       const fogged = !unlocked.has(island.id);
+      const inBand = island.rangeSkills.filter((skill) => getSkill(skill).minGrade <= maxGrade);
       return {
         island,
         fogged,
         isCurrent: captain.currentIsland === island.id,
-        cleared: island.rangeSkills.every((skill) => isMastered(captain.mastery[skill] ?? emptyMastery)),
+        // An island with nothing age-appropriate to teach is not "cleared" by vacuous truth —
+        // `every` on an empty list is `true`, which would tick every island above the band.
+        cleared:
+          inBand.length > 0 && inBand.every((skill) => isMastered(captain.mastery[skill] ?? emptyMastery)),
       };
     });
 }

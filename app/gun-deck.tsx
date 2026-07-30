@@ -5,6 +5,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { CannonId, GradeBand } from '@content/schemas';
 import { TRAY_CAPACITY } from '@engine/tuning';
+import { maxGradeForBand } from '@engine/placement';
 
 import { TemperBadge } from '../src/components/duel/TemperBadge';
 import { ResponsiveFrame, useResponsiveSurface } from '../src/components/ResponsiveFrame';
@@ -67,10 +68,25 @@ const board = {
 /**
  * The operator chips in the title bar. The board draws three, lit for the operations the captain
  * owns a gun for and dulled for the rest; the catalog has more glyphs than the board's fixture, so
- * the row is the four arithmetic operations rather than every glyph in the catalog — seven 22pt
- * chips do not fit beside the title at the 360pt floor.
+ * the row is the arithmetic operations rather than every glyph in the catalog — seven 22pt chips do
+ * not fit beside the title at the 360pt floor.
+ *
+ * **Gated by grade band (A-051).** This used to be a flat `['+', '−', '×', '÷']`, so a
+ * kindergartner who picked K–1 saw `×` and `÷` sitting dulled on their own gun deck — two
+ * operations they will not meet for three years, displayed as things they have not earned yet. The
+ * band already gates everything else that could surface them: `range.ts` refuses a drill above the
+ * band, `rankView` filters its skill rows, and `resolveUnlocks` will not open an island whose range
+ * teaches nothing age-appropriate. This row was the one place the ceiling leaked.
+ *
+ * Each operation is mapped to the lowest `minGrade` among the catalog skills that use it, so the
+ * chip appears exactly when the curriculum does.
  */
-const OPERATIONS: readonly string[] = ['+', '−', '×', '÷'];
+const OPERATION_MIN_GRADE: readonly { readonly glyph: string; readonly minGrade: number }[] = [
+  { glyph: '+', minGrade: 0 },
+  { glyph: '−', minGrade: 1 },
+  { glyph: '×', minGrade: 3 },
+  { glyph: '÷', minGrade: 3 },
+];
 
 /**
  * `←` and `↑` carry emoji presentation on iOS and would ignore the `color` prop, rendering as blue
@@ -143,6 +159,15 @@ function GunDeckBody() {
 
   const emptySlots = Math.max(0, TRAY_CAPACITY - onDeck.length);
   const newCount = inHold.filter((s) => s.isNew).length;
+
+  /**
+   * Only the operations this band will ever be asked. A K-1 deck shows `+` and `−`; multiplication
+   * and division appear at grade 3, which is where the catalog puts them (A-051).
+   */
+  const operations = useMemo(() => {
+    const maxGrade = maxGradeForBand(gradeBand);
+    return OPERATION_MIN_GRADE.filter((op) => op.minGrade <= maxGrade).map((op) => op.glyph);
+  }, [gradeBand]);
 
   const ownedGlyphs = useMemo(
     () => new Set(captain.ownedCannons.map((id) => cannonLook[id].glyph)),
@@ -239,7 +264,7 @@ function GunDeckBody() {
           </Text>
 
           <View style={[s.opRow, { gap: ax(3) }]}>
-            {OPERATIONS.map((glyph) => {
+            {operations.map((glyph) => {
               const owned = ownedGlyphs.has(glyph);
               return (
                 <View
