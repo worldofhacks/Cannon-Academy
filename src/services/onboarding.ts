@@ -23,7 +23,7 @@
  */
 import type { GradeBand } from '@content/schemas';
 
-import type { CaptainStore } from '../stores/player';
+import { emptyCaptain, type Captain, type CaptainStore } from '../stores/player';
 
 import { resolveDestination, type Destination } from './flow';
 
@@ -35,5 +35,97 @@ import { resolveDestination, type Destination } from './flow';
  */
 export function commitGradeBand(store: CaptainStore, band: GradeBand): Destination {
   store.getState().setGradeBand(band);
+  return resolveDestination(store.getState().captain);
+}
+
+// ── The grown-up's skip ───────────────────────────────────────────────────────────────────────
+
+/**
+ * "We have played this before" — the tour skipped, the setup untouched.
+ *
+ * Three properties, and each is a way to hurt a real captain if it is missed:
+ *
+ *  1. **It skips the TOUR, never the SETUP.** It writes the two tour latches and nothing else, then
+ *     asks the resolver where the captain now belongs. A skip that tried to jump the band, the name
+ *     or the flag would not even work: `resolveDestination` refuses a captain without them and
+ *     would hand back the very screen the skip was pressed on, forever.
+ *  2. **It returns the destination rather than navigating**, exactly like `commitGradeBand` — so
+ *     the flow resolver stays the single place that decides, and the screen navigates to what it is
+ *     handed. On the grade picker with no band chosen that answer is `onboarding`: the resolver
+ *     declining to let a skip outrun the setup, which is the behaviour rather than a failure of it.
+ *  3. **It is monotonic.** `skipTour` assigns both latches `true`; nothing here can write either
+ *     one `false`.
+ *
+ * The cost it does not hide: a captain who skips the guided duel never fights it, so the tutorial's
+ * coins and its chest are never banked. Settling a duel that was not played would be worse — it
+ * would fabricate a reward — so the skip forfeits it, and the copy is pitched at the grown-up who
+ * is making that trade knowingly.
+ */
+export function commitTourSkip(store: CaptainStore): Destination {
+  store.getState().skipTour();
+  return resolveDestination(store.getState().captain);
+}
+
+/**
+ * Whether the chart walkthrough is on screen for this captain.
+ *
+ * A pure predicate rather than an expression inside the overlay, because it is the one line that
+ * decides whether beats 17–20 can ever be seen again — and a component's internals cannot be
+ * frozen-tested under this runner (RN's entry point is Flow-typed; node cannot parse it).
+ *
+ * The `||` is the whole of decision 1. Gating on `!hasCompletedOnboarding` alone is what made the
+ * chart tour unreachable after the first run: the flag is set once and never cleared, so the Rank
+ * screen's "Watch the tour again" could only ever replay the duel half.
+ */
+export function chartTourShowing(
+  captain: Pick<Captain, 'hasCompletedOnboarding' | 'replayingTour'>,
+): boolean {
+  return !captain.hasCompletedOnboarding || captain.replayingTour;
+}
+
+// ── Start over ────────────────────────────────────────────────────────────────────────────────
+
+/**
+ * The copy for the "start over" sheet, held here rather than in a screen for one reason: it has to
+ * stay in step with what the reset actually clears, and a test can only check that if both are
+ * reachable from node. `spec(A-005:AC-3)` reads the two together.
+ *
+ * Tone is the Harbor's "Not yet, Captain" sheet — warm, plain, never blaming, and never an error.
+ * It states the loss in the child's own nouns (coins, ships, islands, skills) because those are the
+ * things on the screen the grown-up is standing in front of.
+ */
+export const START_OVER = {
+  /** The Rank row. Quiet, and worded as a thing you do, not a setting you toggle. */
+  rowTitle: 'Start over',
+  rowDetail: 'Clear this captain and begin again.',
+  rowAccessibilityLabel: 'Start over, clear this captain and begin again',
+  /** The sheet. A question, asked once, with the answer that keeps everything as the easy one. */
+  sheetTitle: 'Start over, Captain?',
+  sheetBody:
+    'This clears everything this captain has — their coins, their ships, the islands they opened and the skills they filled — and begins again at the very first screen.',
+  sheetNote: 'For grown-ups. There is no way to undo it.',
+  keepLabel: 'No, keep my captain',
+  confirmLabel: 'Yes, clear and start over',
+} as const;
+
+/**
+ * Clears the captain and reports where a brand-new one belongs.
+ *
+ * **Nothing is preserved.** The whole point is a state indistinguishable from a first install — the
+ * demo path this closes was "delete the app's Documents directory from a terminal", and a reset
+ * that quietly kept a field would leave the next launch subtly unlike the thing being demoed. So it
+ * is `emptyCaptain()` exactly: no band, no name, no flag, no coins, no mastery, no skins, no
+ * receipts, and both tour latches back at their fresh-install `false`.
+ *
+ * That is the ONE place either latch is written `false`, and it is not a regression of the
+ * monotonicity rule — it is the construction of a different captain. The rule protects a captain's
+ * progress from being re-gated behind them; here there is deliberately no progress left to protect.
+ *
+ * It goes through `replaceCaptain`, which means the root layout's store subscription persists it
+ * like any other change. A reset that only cleared memory would come back on the next launch, and a
+ * demo that unfixes itself is worse than no reset at all.
+ */
+export function commitStartOver(store: CaptainStore): Destination {
+  store.getState().replaceCaptain(emptyCaptain());
   return resolveDestination(store.getState().captain);
 }

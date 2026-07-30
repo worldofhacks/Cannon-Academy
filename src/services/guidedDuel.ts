@@ -9,7 +9,7 @@ import type { Cannon, IslandId } from '@content/schemas';
 import type { DuelConfig, DuelState } from '@engine/duel/types';
 import { createScriptedOpponent, type ScriptedStep } from '@engine/opponents/scripted';
 import type { Opponent } from '@engine/opponents/types';
-import { ONBOARDING_ENEMY_HULL } from '@engine/tuning';
+import { ONBOARDING_ENEMY_HULL, PLAYER_HULL } from '@engine/tuning';
 
 import { createDuelAdapter, type AdapterController, type PresentationBeat } from './duelAdapter';
 import type { DuelRewardOutcome } from './duelRewards';
@@ -133,7 +133,24 @@ export function projectGuidedView(adapter: ReturnType<AdapterController['getStat
     question: projectQuestion(core),
     playerHull: core.playerHull,
     rivalHull: projectRivalHull(core, adapter.phase, outcome),
-    playerMax: core.enemyMaxHull,
+    /*
+     * The PLAYER's hull, not the enemy's.
+     *
+     * This read `core.enemyMaxHull` and printed "100 / 28" on the HUD of the first duel a child
+     * ever plays — the one screen a parent watches from over their shoulder. The knock-ons were
+     * worse than the number: `HullCard` renders `hp / max` verbatim and derives its ten pips and
+     * its hull word from the ratio, so a 3.57 ratio clamped all ten pips full and pinned the word
+     * to SOUND for the entire tutorial, and `SeaStage` was handed the same 3.57 for the ship's own
+     * damage state. The child could not be shown the one thing the beat teaches — that hits take
+     * blocks off a hull.
+     *
+     * `PLAYER_HULL` is the right constant because `guidedConfig` above overrides the ENEMY's hull
+     * and the player's FLOOR, and never the player's hull — so the engine starts this duel at its
+     * own default, exactly like an ordinary one. The ordinary duel arrives at the same number by
+     * remembering the first frame's `playerHull` (`stores/duel.ts`); this projection is stateless,
+     * so it names the constant instead, and `spec(A-015:AC-5)` pins the two together.
+     */
+    playerMax: PLAYER_HULL,
     rivalMax: core.enemyMaxHull,
     outcome,
     rivalDamage: core.phase === 'resolveRival' ? core.damageToPlayer : 0,

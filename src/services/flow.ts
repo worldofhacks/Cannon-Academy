@@ -53,6 +53,17 @@ export type DemoRouteEdge = Readonly<{
 
 export type HubRoute = 'harbor' | 'rank' | 'range' | 'gun-deck' | 'duel';
 
+/**
+ * Which band of the chart a control is drawn in (A-057).
+ *
+ * The designer's rule, and the reason this axis exists at all: **"the dock is for doing, the header
+ * is for having."** Practice/Guns/Fight are verbs and stay in the dock; rank and coins are nouns —
+ * things you *have* — and move up to the header pill. That also dissolves A-048/A-049's whole
+ * five-controls-don't-fit problem: three buttons across 351pt is comfortable where five was
+ * negative-slack.
+ */
+export type HubSurface = 'dock' | 'header';
+
 export type HubControlBounds = Readonly<{
   x: number;
   y: number;
@@ -67,6 +78,7 @@ export type HubControl = HubControlBounds &
     route: `/${HubRoute}`;
     label: string;
     accessibilityLabel: string;
+    surface: HubSurface;
   }>;
 
 export type ChartHubLayout = Readonly<{
@@ -121,6 +133,10 @@ export const DEMO_ROUTE_EDGES: readonly DemoRouteEdge[] = [
   edge('duel-gun-deck-redirect', 'duel', 'gun-deck', 0, redirect('gun-deck')),
   edge('duel-chart-back', 'duel', 'chart', 1, backToChart()),
   edge('harbor-chart-back', 'harbor', 'chart', 1, backToChart()),
+  // The empty purse is a place to visit, not an error (Harbor board 8c) — so it offers the two ways
+  // to fill it rather than a dead end. "Go and earn" on the not-yet sheet lands on the same edge.
+  edge('harbor-duel', 'harbor', 'duel', 1, push('duel')),
+  edge('harbor-range', 'harbor', 'range', 1, push('range')),
   edge('rank-chart-back', 'rank', 'chart', 1, backToChart()),
   edge('range-chart-back', 'range', 'chart', 1, backToChart()),
   edge('chart-harbor', 'chart', 'harbor', 1, push('harbor')),
@@ -130,16 +146,39 @@ export const DEMO_ROUTE_EDGES: readonly DemoRouteEdge[] = [
   edge('chart-duel', 'chart', 'duel', 1, push('duel')),
 ];
 
-const HUB_CONTROL_DEFS: readonly Readonly<{ id: HubRoute; label: string; accessibilityLabel: string }>[] =
-  [
-    { id: 'harbor', label: 'Harbor', accessibilityLabel: 'Harbor store' },
-    { id: 'rank', label: 'Rank', accessibilityLabel: 'Rank ladder' },
-    { id: 'range', label: 'Practice', accessibilityLabel: 'Training range' },
-    { id: 'gun-deck', label: 'Guns', accessibilityLabel: 'Gun deck' },
-    { id: 'duel', label: 'Fight', accessibilityLabel: 'Fight duel' },
-  ];
+/**
+ * The five hub controls, split across the two surfaces (A-057).
+ *
+ * Dock order is the board's own: Practice, Guns, Fight. `weight` is the board's flex ratio — Fight
+ * is `1.2` because it is the primary verb and the board gives it the amber fill and the extra width.
+ * Header controls have no weight; they are laid out as "the rest of the row" plus a fixed purse.
+ */
+const HUB_CONTROL_DEFS: readonly Readonly<{
+  id: HubRoute;
+  label: string;
+  accessibilityLabel: string;
+  surface: HubSurface;
+  weight: number;
+}>[] = [
+  { id: 'range', label: 'Practice', accessibilityLabel: 'Training range', surface: 'dock', weight: 1 },
+  { id: 'gun-deck', label: 'Guns', accessibilityLabel: 'Gun deck', surface: 'dock', weight: 1 },
+  { id: 'duel', label: 'Fight', accessibilityLabel: 'Fight duel', surface: 'dock', weight: 1.2 },
+  { id: 'rank', label: 'Rank', accessibilityLabel: 'Your log and rank', surface: 'header', weight: 0 },
+  { id: 'harbor', label: 'Harbor', accessibilityLabel: 'Harbor store', surface: 'header', weight: 0 },
+];
 
 const MIN_HUB_TARGET = 64;
+
+/**
+ * The purse's width at the reference frame, summed from the board's own pieces:
+ * `padding 8 + coin 22 + gap 8 + count ~36 + gap 8 + chevron 18 + padding 8`.
+ *
+ * It lives here rather than in `board.ts` because it is a *layout* input to the pure hub model, and
+ * the model has to be computable without importing a component. The count is sized for four digits,
+ * which is more coins than the economy can currently produce — a purse that reflows as the balance
+ * crosses 1000 would shift the rank pill beside it.
+ */
+const HEADER_PURSE_WIDTH = 108;
 
 export function resolveDestination(captain: Captain): Destination {
   // 1. No band means we do not know what maths to show. Nothing else can proceed.
@@ -186,16 +225,39 @@ export function executeDemoRouteEdge(edgeId: string, navigator: NavigationPort):
 
 /**
  * Pure geometry for the five chart-hub controls at a phone viewport. Positions sit in header and
- * dock chrome — never over the island map — and honour the 64pt target floor from the boards.
+ * dock chrome — never over an island station — and honour the 64pt target floor from the boards.
+ *
+ * ## Why the header band is measured by its HIT box, not its ink
+ *
+ * The board draws the rank pill 52pt tall and the purse 40pt, and says so deliberately: the purse
+ * *"has to read as tappable without growing tall enough to break the chart header"*, so the visual
+ * box stays small and **the touch target is padded to 64×64 invisibly**. That split is the whole
+ * reason both fit up there.
+ *
+ * The pure model has to describe the target, because the target is what a child's thumb hits and
+ * what `MIN_HUB_TARGET` is about. So `headerBand` below is `max(ink, 64)`, and the map starts
+ * beneath *that* — not beneath the 52pt ink. Without this the arithmetic is genuinely impossible:
+ * at 360pt the header ink runs y 5.8→55.7 while the map would start at 63.4, leaving 57.6pt of
+ * clearance for a control that must be 64. Six points short, and no amount of nudging fixes it.
+ *
+ * ## `mapBounds` is the station-safe region, not the painted sea
+ *
+ * On the rebuilt close chart the sea is full-bleed and the header pill floats over it at `z-index:3`,
+ * so "the map" as *pixels* starts under the status bar. `mapBounds` is not that. It is the region
+ * where an island station may be placed — which is what the no-overlap rule has always actually
+ * been protecting. A control that sits on open water above the first island covers nothing a child
+ * needs to tap; a control over a station covers the game. The board agrees by construction: its
+ * northernmost station sits at frame y 206, far below this boundary.
  */
 export function chartHubControlLayout(viewport: Readonly<{ width: number; height: number }>): ChartHubLayout {
   const layout = computeLayout(viewport.width, viewport.height);
   const type = layout.type;
+  const inset = HEADER.inset * type;
 
   const statusSpacer = (HEADER.top - FRAME.statusBar) * type;
-  const headerHeight = HEADER.height * type;
+  const headerBand = Math.max(HEADER.height * type, MIN_HUB_TARGET);
   const mapMargin = (MAP.top - HEADER.top - HEADER.height) * type;
-  const mapTop = statusSpacer + headerHeight + mapMargin;
+  const mapTop = statusSpacer + headerBand + mapMargin;
   const dockHeight = DOCK.height * type;
   const mapHeight = Math.max(0, viewport.height - mapTop - dockHeight);
 
@@ -206,22 +268,51 @@ export function chartHubControlLayout(viewport: Readonly<{ width: number; height
     height: mapHeight,
   };
 
+  // ── Header band: the rank pill takes the slack, the purse is fixed. ────────────────────────────
+  const headerGap = HEADER.gap * type;
+  const purseWidth = Math.max(MIN_HUB_TARGET, HEADER_PURSE_WIDTH * type);
+  const rankWidth = Math.max(MIN_HUB_TARGET, viewport.width - inset * 2 - headerGap - purseWidth);
+  const headerBounds: Record<string, HubControlBounds> = {
+    rank: { x: inset, y: statusSpacer, width: rankWidth, height: headerBand },
+    harbor: {
+      x: Math.max(inset + rankWidth + headerGap, viewport.width - inset - purseWidth),
+      y: statusSpacer,
+      width: purseWidth,
+      height: headerBand,
+    },
+  };
+
+  // ── Dock band: three weighted buttons, the board's 16pt gap. ───────────────────────────────────
+  const dockDefs = HUB_CONTROL_DEFS.filter((def) => def.surface === 'dock');
   const dockBandTop = mapTop + mapHeight;
-  const inset = HEADER.inset * type;
-  const target = Math.max(MIN_HUB_TARGET, DOCK.buttonHeight * type);
+  const dockGap = DOCK.controlGap * type;
   const innerWidth = viewport.width - inset * 2;
-  const gap =
-    HUB_CONTROL_DEFS.length > 1
-      ? Math.max(0, (innerWidth - HUB_CONTROL_DEFS.length * target) / (HUB_CONTROL_DEFS.length - 1))
-      : 0;
-  const rowStartX = inset;
+  const weightTotal = dockDefs.reduce((sum, def) => sum + def.weight, 0);
+  const spendable = Math.max(0, innerWidth - dockGap * Math.max(0, dockDefs.length - 1));
+  // The button row is whatever the dock has left once its own header row and padding are taken.
+  // Clamped to the tap floor so a short dock shrinks the map rather than the target.
+  const rowHeight = Math.max(
+    MIN_HUB_TARGET,
+    (DOCK.height - DOCK.padding * 2 - DOCK.headerHeight - DOCK.gap) * type,
+  );
   const rowY = dockBandTop + DOCK.padding * type + DOCK.headerHeight * type + DOCK.gap * type;
 
-  const controls: HubControl[] = HUB_CONTROL_DEFS.map((def, index) => {
+  let cursorX = inset;
+  const dockBounds = new Map<string, HubControlBounds>();
+  for (const def of dockDefs) {
+    const width = Math.max(MIN_HUB_TARGET, weightTotal > 0 ? (spendable * def.weight) / weightTotal : 0);
+    dockBounds.set(def.id, { x: cursorX, y: rowY, width, height: rowHeight });
+    cursorX += width + dockGap;
+  }
+
+  const controls: HubControl[] = HUB_CONTROL_DEFS.map((def) => {
     const routeEdge = DEMO_ROUTE_EDGES.find(
       (candidate) => candidate.from === 'chart' && candidate.to === def.id,
     );
     if (routeEdge === undefined) throw new Error(`flow: chart hub missing edge for ${def.id}`);
+
+    const bounds = def.surface === 'dock' ? dockBounds.get(def.id) : headerBounds[def.id];
+    if (bounds === undefined) throw new Error(`flow: chart hub missing bounds for ${def.id}`);
 
     return {
       id: def.id,
@@ -229,10 +320,8 @@ export function chartHubControlLayout(viewport: Readonly<{ width: number; height
       route: `/${def.id}`,
       label: def.label,
       accessibilityLabel: def.accessibilityLabel,
-      x: rowStartX + index * (target + gap),
-      y: rowY,
-      width: target,
-      height: target,
+      surface: def.surface,
+      ...bounds,
     };
   });
 

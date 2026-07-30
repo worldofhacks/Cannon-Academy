@@ -327,3 +327,78 @@ describe('A-041 durable captain persistence', () => {
     expect(result.captain.nextPurchaseSequence).toBe(5);
   });
 });
+
+/**
+ * A-002 — the walkthrough resume index, added the only safe way.
+ *
+ * Onboarding board rule RESUME: *"Children are interrupted constantly. The beat index persists, so
+ * a closed app reopens on the same beat."* That needs a new `Captain` field, and a new field is the
+ * single most dangerous kind of change this file can carry — because `hydrate` answers a captain
+ * that fails `isBaseCaptain` with `emptyCaptain()`. Require the field structurally, or bump
+ * `SCHEMA_VERSION` for it, and every save written before today is discarded: band, name, flag,
+ * coins, mastery, rank. To a child that is the game deleting them.
+ *
+ * So it follows the `seenCannons` / `ownedSkins` precedent exactly — defaulted on read, absent from
+ * the structural check, no version bump — and these tests are what stop that being undone later by
+ * someone tidying up.
+ */
+describe('A-002 onboarding beat is tolerated as absent', () => {
+  it('spec(A-002:AC-3) a save written before the field existed still hydrates with its progress intact', async () => {
+    const io = fakeStorage();
+    const legacy = preTicketCaptain({ coins: 137, wins: 9 });
+    delete legacy.onboardingBeat;
+    io.data.set(STORAGE_KEY, JSON.stringify({ version: SCHEMA_VERSION, captain: legacy }));
+
+    const result = await hydrate(io.store);
+
+    // The whole point: NOT recovered, NOT migrated, and the captain is the stored one.
+    expect(result.recovered, 'a missing onboardingBeat discarded a real captain').toBe(false);
+    expect(result.migrated).toBe(false);
+    expect(result.captain.coins).toBe(137);
+    expect(result.captain.wins).toBe(9);
+    expect(result.captain.name).toBe('Ada');
+    expect(result.captain.onboardingBeat).toBe(0);
+  });
+
+  it('spec(A-002:AC-3) the field did not cost a schema bump', () => {
+    // A bump would reject every v2 payload on the next branch of `hydrate` — the same data loss by
+    // a different door, and one that no amount of tolerant normalising can undo.
+    expect(SCHEMA_VERSION).toBe(2);
+  });
+
+  it('spec(A-002:AC-3) a stored beat round-trips, and a corrupt one resolves to something playable', async () => {
+    const io = fakeStorage();
+    const store = createCaptainStore();
+    store.getState().setGradeBand('k_1');
+    store.getState().setNameAndFlag('Ada', 'flag-3');
+    store.getState().setOnboardingBeat(2);
+
+    await persist(io.store, store.getState().captain);
+    expect((await hydrate(io.store)).captain.onboardingBeat).toBe(2);
+
+    // Storage is untrusted input. Each of these used to be a way to resume into a walkthrough state
+    // that does not exist, leaving a captain behind an invisible overlay with no beat to render.
+    for (const bad of ['nine', -4, 2.7, null, undefined, Number.NaN]) {
+      const corrupt = fakeStorage();
+      corrupt.data.set(
+        STORAGE_KEY,
+        JSON.stringify({ version: SCHEMA_VERSION, captain: preTicketCaptain({ onboardingBeat: bad }) }),
+      );
+      const read = await hydrate(corrupt.store);
+      expect(read.recovered, `onboardingBeat ${String(bad)} discarded the captain`).toBe(false);
+      expect(Number.isInteger(read.captain.onboardingBeat)).toBe(true);
+      expect(read.captain.onboardingBeat).toBeGreaterThanOrEqual(0);
+    }
+  });
+
+  it('spec(A-002:AC-4) a v1 save migrates forward with the field defaulted rather than dropped', async () => {
+    const io = fakeStorage();
+    io.data.set(STORAGE_KEY, JSON.stringify({ version: 1, captain: preTicketCaptain() }));
+
+    const result = await hydrate(io.store);
+    expect(result.migrated).toBe(true);
+    expect(result.recovered).toBe(false);
+    expect(result.captain.onboardingBeat).toBe(0);
+    expect(result.captain.coins).toBe(42);
+  });
+});

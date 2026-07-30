@@ -1,16 +1,23 @@
 /**
- * A station — one island's place on the chart, in whichever of the four states it is in.
+ * A station — one island's place on the chart, in whichever of the five states it is in.
  *
  * The state is not decided here. `services/chart.ts` decides fog and order and has frozen tests;
  * `layout.ts` pairs its answer with the board's own per-position drawing. This file is the
  * renderer, and the only judgement it makes is which measured numbers to reach for.
  *
- * The requirement sentence is likewise printed as `requirementText()` returns it. It deliberately
- * names the PLACE ("Train at Port Sumwich to lift the fog.") rather than a skill id, and a test
- * asserts no snake_case ever reaches a child — so it is rendered, never rephrased.
+ * One marker serves both screens. The compositions differ (owner ruling 3) but a NODE is the same
+ * object in both — a head, a name chip, sometimes a small chip under it — so the sizes arrive as a
+ * `MarkerLook` from `board.ts` rather than being branched on a screen name.
+ *
+ * The requirement sentence is printed as `requirementText()` returns it. It deliberately names the
+ * PLACE ("Train at Isla Products to lift the fog.") rather than a skill id, and a test asserts no
+ * snake_case ever reaches a child — so it is rendered, never rephrased. The board's own chip reads
+ * `MASTER ÷ TO LIFT THE FOG`, which is mock copy of the same class as its `VOYAGER` subtitle: it
+ * names the operator hidden BY the fog rather than the island that lifts it, which is the one thing
+ * a child cannot act on.
  */
 import { useEffect, type ReactNode } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Pressable, Text, View, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -21,169 +28,136 @@ import Animated, {
 
 import type { IslandId } from '@content/schemas';
 
-import { Blob } from './Blob';
-import { NODE, STATIONS, islandGlyph, type Station as BoardStation } from './board';
-import { art, mapX, mapY, stationPresentation, type MapFrame, type StationState } from './layout';
+import { RING, islandGlyph } from './board';
+import { stationPresentation, targetSlop, type StationState } from './layout';
 import { chart } from './palette';
 import type { ChartNode } from '../../services/chart';
-import { font, MIN_TAP_TARGET } from '../../theme/tokens';
-
-/**
- * The board does not record a shadow offset for the sand, only its colour. 4pt is the offset every
- * hard shadow on this screen that IS recorded uses — the cleared node, the live node, the dock —
- * so the islands cast the same one rather than a second, invented depth.
- */
-const SAND_SHADOW_DY = 4;
-
-/**
- * How wide a marker's label column is allowed to be, in design points.
- *
- * A node is anchored by its horizontal CENTRE, and React Native centres a child on a box rather
- * than on a point — so the column is a fixed width the chips centre inside. 160 is the widest that
- * still keeps the outermost node (cx 283.6) clear of the screen edge at the 360pt floor.
- */
-const LABEL_COLUMN = 160;
+import { font } from '../../theme/tokens';
 
 /**
  * U+FE0E, the text-presentation selector.
  *
- * `▸` and `✓` are emoji-capable. Left bare, iOS may draw them as colour emoji, which ignores the
- * `color` prop entirely — a white tick turns green-and-white on a green disc and disappears.
+ * `✓` is emoji-capable. Left bare, iOS may draw it as a colour emoji, which ignores the `color`
+ * prop entirely — a dark tick turns green-and-white on a green disc and disappears.
  */
 const TEXT_PRESENTATION = '\uFE0E';
 
-const RING_FROM = NODE.live.ringFrom;
-const RING_SPAN = NODE.live.ringTo - NODE.live.ringFrom;
+const RING_SPAN = RING.to - RING.from;
 
-/** The sand, its foliage and — at Port Sumwich only — its hut. Drawn under the fog and the nodes. */
-export function IslandLand({ station, frame }: { station: BoardStation; frame: MapFrame }) {
-  const land = station.land;
-  if (land === undefined) return null;
-
-  const width = art(frame, land.w);
-  const height = art(frame, land.h);
-  const hut = land.hut;
-
-  return (
-    <Blob
-      radii={land.radii}
-      width={width}
-      height={height}
-      fill={chart.sand}
-      shadow={{ color: chart.sandShadow, dy: art(frame, SAND_SHADOW_DY) }}
-      style={{
-        position: 'absolute',
-        left: mapX(frame, land.cx) - width / 2,
-        top: mapY(frame, land.cy) - height / 2,
-      }}
-    >
-      <Blob
-        radii={land.foliage.radii}
-        width={art(frame, land.foliage.w)}
-        height={art(frame, land.foliage.h)}
-        fill={chart.foliage}
-        style={{
-          position: 'absolute',
-          left: art(frame, land.foliage.dx),
-          top: art(frame, land.foliage.dy),
-        }}
-      />
-      {hut === undefined ? null : (
-        <View
-          style={{
-            position: 'absolute',
-            right: art(frame, hut.right),
-            top: art(frame, hut.dy),
-            width: art(frame, hut.w),
-            height: art(frame, hut.h),
-            borderRadius: art(frame, hut.radius),
-            backgroundColor: chart.hut,
-          }}
-        />
-      )}
-    </Blob>
-  );
+/** Every measured size a node needs, so one marker can draw both screens' geometry. */
+export interface MarkerLook {
+  readonly live: {
+    readonly ring: number;
+    readonly disc: number;
+    readonly discInset: number;
+    readonly shadowDy: number;
+    readonly glyphSize: number;
+  };
+  readonly cleared: { readonly size: number; readonly shadowDy: number; readonly tickSize: number };
+  readonly locked: { readonly size: number; readonly shadowDy: number; readonly glyphSize: number };
+  readonly gap: number;
+  readonly chip: {
+    readonly padX: number;
+    readonly padY: number;
+    readonly size: number;
+    readonly shadowDy: number;
+  };
+  readonly liveChipSize: number;
+  readonly sub: {
+    readonly padX: number;
+    readonly padY: number;
+    readonly size: number;
+    readonly tracking: number;
+  };
+  readonly requirement?: {
+    readonly padX: number;
+    readonly padY: number;
+    readonly size: number;
+    readonly tracking: number;
+  };
+  /** Board 9b's transparent target around the drawn disc. */
+  readonly hit: number;
 }
 
 interface MarkerProps {
-  readonly index: number;
   readonly node: ChartNode;
   readonly state: StationState;
-  readonly frame: MapFrame;
+  /** Absolute placement, computed by the screen that owns the coordinate space. */
+  readonly position: ViewStyle;
+  readonly look: MarkerLook;
   /** Type scale. Chips hug text, so they follow type rather than art (`theme/responsive.ts`). */
   readonly typeScale: number;
+  /** The board prints one under two of its five islands. */
+  readonly sub: string | null;
+  /** Printed under the name chip when the board's fog group is drawing this node. */
   readonly requirement: string | null;
   readonly onSail: (id: IslandId) => void;
 }
 
-export function StationMarker({ index, node, state, frame, typeScale, requirement, onSail }: MarkerProps) {
-  const station = STATIONS[index];
-  if (station === undefined) return null;
-
-  const label = node.island.displayName;
+export function StationMarker({
+  node,
+  state,
+  position,
+  look,
+  typeScale,
+  sub,
+  requirement,
+  onSail,
+}: MarkerProps) {
   const presentation = stationPresentation(node, state, requirement);
-  const column = LABEL_COLUMN * typeScale;
-  const gap = index === 0 ? NODE.chipGap : NODE.chipGapTight;
+  const label = node.island.displayName;
+  const glyph = islandGlyph[node.island.id];
 
   const head =
-    presentation.markerHead === 'silhouette' ? (
-      <SilhouetteHead size={art(frame, station.lockedSize)} label={label} typeScale={typeScale} />
-    ) : presentation.markerHead === 'locked' ? (
-      <LockedHead size={art(frame, station.lockedSize)} frame={frame} />
+    presentation.markerHead === 'cleared' ? (
+      <ClearedHead look={look} typeScale={typeScale} />
     ) : presentation.markerHead === 'live' ? (
-      <LiveHead frame={frame} glyph={islandGlyph[node.island.id]} typeScale={typeScale} />
-    ) : presentation.markerHead === 'cleared' ? (
-      <ClearedHead frame={frame} typeScale={typeScale} />
+      <LiveHead look={look} glyph={glyph} typeScale={typeScale} />
+    ) : presentation.markerHead === 'available' ? (
+      <AvailableHead look={look} glyph={glyph} typeScale={typeScale} />
     ) : (
-      <AvailableHead frame={frame} glyph={islandGlyph[node.island.id]} typeScale={typeScale} />
+      <LockedHead look={look} glyph={glyph} typeScale={typeScale} />
     );
 
+  const live = presentation.markerHead === 'live';
+  const locked = presentation.markerHead === 'locked' || presentation.markerHead === 'silhouette';
   const body = (
-    <View style={{ alignItems: 'center' }}>
+    <>
       {head}
-      {presentation.markerHead === 'silhouette' ? null : (
-        <View style={{ marginTop: gap * typeScale, alignItems: 'center' }}>
-          <NameChip label={label} locked={presentation.markerHead === 'locked'} typeScale={typeScale} />
-          {state === 'current' ? <SailChip typeScale={typeScale} /> : null}
-        </View>
+      <NameChip label={label} live={live} locked={locked} look={look} typeScale={typeScale} />
+      {sub === null ? null : <SubChip text={sub} look={look} typeScale={typeScale} />}
+      {requirement === null || look.requirement === undefined ? null : (
+        <RequirementChip text={requirement} look={look} typeScale={typeScale} />
       )}
-    </View>
+    </>
   );
 
-  const left = mapX(frame, station.node.cx) - column / 2;
-  const top = mapY(frame, station.node.top);
-  const box = { position: 'absolute', left, top, width: column, alignItems: 'center' } as const;
+  const box: ViewStyle = { position: 'absolute', alignItems: 'center', gap: look.gap, ...position };
 
   if (!presentation.tappable) {
     // A fogged node is not tappable — it is a plain View, not a disabled Pressable, so there is no
     // control here to press at all. It still SPEAKS: the requirement is what a screen reader reads
     // out, which is why it is `accessible` rather than hidden.
     return (
-      <>
-        <View
-          accessible
-          accessibilityRole="text"
-          accessibilityLabel={presentation.accessibilityLabel}
-          style={box}
-        >
-          {body}
-        </View>
-        {requirement === null ? null : (
-          <RequirementChip frame={frame} typeScale={typeScale} text={requirement} />
-        )}
-      </>
+      <View
+        accessible
+        accessibilityRole="text"
+        accessibilityLabel={presentation.accessibilityLabel}
+        style={box}
+      >
+        {body}
+      </View>
     );
   }
 
-  const disc = art(frame, state === 'current' ? NODE.live.size : NODE.cleared.size);
-  const slop = Math.max(0, (MIN_TAP_TARGET - disc) / 2);
+  const drawn = live ? look.live.ring : look.cleared.size;
 
   return (
     <Pressable
       onPress={() => onSail(node.island.id)}
       accessibilityRole="button"
       accessibilityLabel={presentation.accessibilityLabel}
-      hitSlop={{ top: slop, bottom: slop, left: 0, right: 0 }}
+      hitSlop={targetSlop(drawn, drawn, look.hit)}
       style={({ pressed }) => [box, pressed ? { transform: [{ translateY: 2 }] } : null]}
     >
       {body}
@@ -191,164 +165,132 @@ export function StationMarker({ index, node, state, frame, typeScale, requiremen
   );
 }
 
-/** Available: open and tappable, but deliberately has no success-green tick. */
-function AvailableHead({ frame, glyph, typeScale }: { frame: MapFrame; glyph: string; typeScale: number }) {
-  const size = art(frame, NODE.cleared.size);
-  return (
-    <Disc size={size} fill={chart.live} shadow={chart.liveShadow} dy={art(frame, NODE.live.shadowDy)}>
-      <Text
-        style={{
-          fontFamily: font.displayBold,
-          fontSize: NODE.live.glyphSize * typeScale,
-          lineHeight: NODE.live.glyphSize * typeScale * 1.15,
-          color: chart.ink,
-        }}
-      >
-        {glyph}
-      </Text>
-    </Disc>
-  );
-}
-
-/** Cleared: the board's 52pt disc, its 4pt hard shadow and the 5pt spread ring around both. */
-function ClearedHead({ frame, typeScale }: { frame: MapFrame; typeScale: number }) {
-  const size = art(frame, NODE.cleared.size);
-  const spread = art(frame, NODE.cleared.ringSpread);
-
-  return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <View
-        style={{
-          position: 'absolute',
-          left: -spread,
-          top: -spread,
-          width: size + spread * 2,
-          height: size + spread * 2,
-          borderRadius: 999,
-          backgroundColor: chart.clearedRing,
-        }}
-      />
-      <Disc
-        size={size}
-        fill={chart.cleared}
-        shadow={chart.clearedShadow}
-        dy={art(frame, NODE.cleared.shadowDy)}
-      >
-        <Text
-          style={{
-            fontFamily: font.displayBold,
-            fontSize: NODE.cleared.tickSize * typeScale,
-            lineHeight: NODE.cleared.tickSize * typeScale * 1.15,
-            color: chart.white,
-          }}
-        >
-          {`✓${TEXT_PRESENTATION}`}
-        </Text>
-      </Disc>
-    </View>
-  );
-}
-
-/** The live target: a 54pt disc inside a 60pt ring that pulses `.8 → 1.9` every 1.6s. */
-function LiveHead({ frame, glyph, typeScale }: { frame: MapFrame; glyph: string; typeScale: number }) {
-  const size = art(frame, NODE.live.size);
-  const ring = art(frame, NODE.live.ring);
+/**
+ * The live target: the board's only animation with a beat.
+ *
+ * `sc-ring` runs `scale(.82) opacity(.9) → scale(1.5) opacity(0)` over 1.8s. The element is
+ * authored at `opacity:.5` and never renders at it, because the keyframe animates opacity too —
+ * see `board.ts`, trap 2. Board 9d: *"A child's eye lands on the gold ring because it is the only
+ * thing keeping time."*
+ */
+function LiveHead({ look, glyph, typeScale }: { look: MarkerLook; glyph: string; typeScale: number }) {
   const pulse = useSharedValue(0);
 
   useEffect(() => {
     pulse.value = withRepeat(
-      withTiming(1, { duration: NODE.live.ringMs, easing: Easing.out(Easing.quad) }),
+      withTiming(1, { duration: RING.ms, easing: Easing.out(Easing.quad) }),
       -1,
       false,
     );
   }, [pulse]);
 
-  // `RING_FROM`/`RING_SPAN` are module constants captured by value. Nothing in this body calls a
+  // `RING.from`/`RING_SPAN` are module constants captured by value. Nothing in this body calls a
   // JS closure — a `useAnimatedStyle` runs on the UI runtime and cannot, and the crash would only
   // ever show up on a device.
+  const from = RING.from;
+  const opacityFrom = RING.opacityFrom;
   const ringStyle = useAnimatedStyle(() => ({
-    opacity: 1 - pulse.value,
-    transform: [{ scale: RING_FROM + RING_SPAN * pulse.value }],
+    opacity: opacityFrom * (1 - pulse.value),
+    transform: [{ scale: from + RING_SPAN * pulse.value }],
   }));
 
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+    <View style={{ width: look.live.ring, height: look.live.ring }}>
       <Animated.View
         style={[
           {
             position: 'absolute',
-            left: (size - ring) / 2,
-            top: (size - ring) / 2,
-            width: ring,
-            height: ring,
+            left: 0,
+            top: 0,
+            width: look.live.ring,
+            height: look.live.ring,
             borderRadius: 999,
-            backgroundColor: chart.liveRing,
+            backgroundColor: chart.live,
           },
           ringStyle,
         ]}
       />
-      <Disc size={size} fill={chart.live} shadow={chart.liveShadow} dy={art(frame, NODE.live.shadowDy)}>
-        <Text
-          style={{
-            fontFamily: font.displayBold,
-            fontSize: NODE.live.glyphSize * typeScale,
-            lineHeight: NODE.live.glyphSize * typeScale * 1.15,
-            color: chart.ink,
-          }}
-        >
-          {glyph}
-        </Text>
+      <Disc
+        size={look.live.disc}
+        left={look.live.discInset}
+        top={look.live.discInset}
+        fill={chart.live}
+        shadow={chart.liveShadow}
+        dy={look.live.shadowDy}
+      >
+        <Glyph text={glyph} size={look.live.glyphSize * typeScale} display />
       </Disc>
     </View>
   );
 }
 
-/** Locked but near: a flat disc with a padlock. No shadow — the board draws it flat under the fog. */
-function LockedHead({ size, frame }: { size: number; frame: MapFrame }) {
+/** Cleared: a green disc, a tick, and the board's plank shadow — it is solid ground now. */
+function ClearedHead({ look, typeScale }: { look: MarkerLook; typeScale: number }) {
   return (
-    <Disc size={size} fill={chart.lockedNode} shadow={chart.lockedNode} dy={0}>
-      <Padlock size={art(frame, NODE.locked.lockSize)} ink={chart.frame} />
+    <Disc
+      size={look.cleared.size}
+      fill={chart.cleared}
+      shadow={chart.clearedShadow}
+      dy={look.cleared.shadowDy}
+    >
+      {/*
+        `#14283C` on `#2FB65E`, which is the board's own pairing and measures 5.54. White on the
+        same green is 2.63 and is one of the four project-banned pairs (A-054) — it was shipping
+        here, invisible to `text-contrast.test.ts` because that file certifies PAIRS rather than
+        call sites, so the ban itself never looked at this tick.
+      */}
+      <Glyph text={`✓${TEXT_PRESENTATION}`} size={look.cleared.tickSize * typeScale} />
     </Disc>
   );
 }
 
-/** The far end of the map: a 30pt disc, a small label 2pt under it, the whole group at .75. */
-function SilhouetteHead({ size, label, typeScale }: { size: number; label: string; typeScale: number }) {
+/** Available: open and tappable, but deliberately has no success-green tick. */
+function AvailableHead({ look, glyph, typeScale }: { look: MarkerLook; glyph: string; typeScale: number }) {
   return (
-    <View style={{ alignItems: 'center', opacity: NODE.silhouette.opacity }}>
-      <View style={{ width: size, height: size, borderRadius: 999, backgroundColor: chart.lockedNode }} />
-      <Text
-        numberOfLines={1}
-        style={{
-          marginTop: NODE.silhouette.gap * typeScale,
-          fontFamily: font.bodyBold,
-          fontSize: NODE.silhouette.labelSize * typeScale,
-          lineHeight: NODE.silhouette.labelSize * typeScale * 1.3,
-          color: chart.silhouetteLabel,
-        }}
-      >
-        {label}
-      </Text>
-    </View>
+    <Disc size={look.cleared.size} fill={chart.live} shadow={chart.liveShadow} dy={look.cleared.shadowDy}>
+      <Glyph text={glyph} size={look.locked.glyphSize * typeScale} display />
+    </Disc>
+  );
+}
+
+/**
+ * Locked — near or far, drawn the same.
+ *
+ * Board 9a: *"Everything unearned is under fog, but nothing is invisible: a silhouette, a name and
+ * a skill glyph survive the fog on every locked node, because anticipation is the whole point of a
+ * map."* So there is no padlock any more and no shrunken far-end variant; the two locked states
+ * differ in what a screen reader says, not in what is drawn.
+ */
+function LockedHead({ look, glyph, typeScale }: { look: MarkerLook; glyph: string; typeScale: number }) {
+  return (
+    <Disc size={look.locked.size} fill={chart.locked} shadow={chart.lockedShadow} dy={look.locked.shadowDy}>
+      <Glyph text={glyph} size={look.locked.glyphSize * typeScale} display />
+    </Disc>
   );
 }
 
 /** A disc with the board's hard offset shadow — the same circle again, `dy` points lower. */
 function Disc({
   size,
+  left,
+  top,
   fill,
   shadow,
   dy,
   children,
 }: {
   size: number;
+  left?: number;
+  top?: number;
   fill: string;
   shadow: string;
   dy: number;
   children: ReactNode;
 }) {
+  const placed = left === undefined ? undefined : ({ position: 'absolute', left, top } as const);
+
   return (
-    <View style={{ width: size, height: size }}>
+    <View style={[{ width: size, height: size }, placed]}>
       {dy <= 0 ? null : (
         <View
           style={{
@@ -377,45 +319,45 @@ function Disc({
   );
 }
 
-/** A padlock, drawn rather than typed: `🔒` is a colour emoji on iOS and ignores `color`. */
-function Padlock({ size, ink }: { size: number; ink: string }) {
+function Glyph({ text, size, display }: { text: string; size: number; display?: boolean }) {
   return (
-    <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'flex-end' }}>
-      <View
-        style={{
-          position: 'absolute',
-          top: size * 0.06,
-          width: size * 0.52,
-          height: size * 0.52,
-          borderWidth: Math.max(1.5, size * 0.11),
-          borderBottomWidth: 0,
-          borderColor: ink,
-          borderTopLeftRadius: 999,
-          borderTopRightRadius: 999,
-        }}
-      />
-      <View
-        style={{
-          width: size * 0.78,
-          height: size * 0.5,
-          borderRadius: size * 0.14,
-          backgroundColor: ink,
-          marginBottom: size * 0.1,
-        }}
-      />
-    </View>
+    <Text
+      style={{
+        fontFamily: display === true ? font.displayBold : font.bodyBold,
+        fontSize: size,
+        lineHeight: size * 1.15,
+        color: chart.ink,
+      }}
+    >
+      {text}
+    </Text>
   );
 }
 
-function NameChip({ label, locked, typeScale }: { label: string; locked: boolean; typeScale: number }) {
+function NameChip({
+  label,
+  live,
+  locked,
+  look,
+  typeScale,
+}: {
+  label: string;
+  live: boolean;
+  locked: boolean;
+  look: MarkerLook;
+  typeScale: number;
+}) {
+  const size = (live ? look.liveChipSize : look.chip.size) * typeScale;
+  const dark = live || locked;
+
   return (
     <View
       style={{
-        paddingHorizontal: (locked ? NODE.locked.chipPadX : NODE.chip.padX) * typeScale,
-        paddingVertical: (locked ? NODE.locked.chipPadY : NODE.chip.padY) * typeScale,
+        paddingHorizontal: look.chip.padX * typeScale,
+        paddingVertical: look.chip.padY * typeScale,
         borderRadius: 999,
-        backgroundColor: locked ? chart.lockedChip : chart.parchment,
-        borderBottomWidth: locked ? 0 : NODE.chip.shadowDy * typeScale,
+        backgroundColor: live ? chart.darkChip : locked ? chart.lockedChip : chart.parchment,
+        borderBottomWidth: dark ? 0 : look.chip.shadowDy * typeScale,
         borderBottomColor: chart.parchmentShadow,
       }}
     >
@@ -423,9 +365,9 @@ function NameChip({ label, locked, typeScale }: { label: string; locked: boolean
         numberOfLines={1}
         style={{
           fontFamily: font.displayBold,
-          fontSize: (locked ? NODE.locked.chipSize : NODE.chip.size) * typeScale,
-          lineHeight: (locked ? NODE.locked.chipSize : NODE.chip.size) * typeScale * 1.3,
-          color: locked ? chart.parchment : chart.ink,
+          fontSize: size,
+          lineHeight: size * 1.3,
+          color: dark ? chart.parchment : chart.ink,
         }}
       >
         {label}
@@ -434,95 +376,62 @@ function NameChip({ label, locked, typeScale }: { label: string; locked: boolean
   );
 }
 
-/** `SAIL HERE ▸` — board 4f rises it in over 240ms on cold entry, "the same rise as everything else". */
-function SailChip({ typeScale }: { typeScale: number }) {
-  const rise = useSharedValue(0);
+/** `YOU ARE HERE` and `THE LAST SEA` — the board's two gold sub-chips. */
+function SubChip({ text, look, typeScale }: { text: string; look: MarkerLook; typeScale: number }) {
+  const size = look.sub.size * typeScale;
 
-  useEffect(() => {
-    rise.value = withTiming(1, { duration: NODE.sailRiseMs, easing: Easing.out(Easing.quad) });
-  }, [rise]);
-
-  // Hoisted out of the worklet: the body below may not call a JS closure.
-  const travel = NODE.sailRisePx * typeScale;
-  const riseStyle = useAnimatedStyle(() => ({
-    opacity: rise.value,
-    transform: [{ translateY: travel * (1 - rise.value) }],
-  }));
-
-  return (
-    <Animated.View
-      style={[
-        {
-          marginTop: NODE.chipGapTight * typeScale,
-          paddingHorizontal: NODE.sailChip.padX * typeScale,
-          paddingVertical: NODE.sailChip.padY * typeScale,
-          borderRadius: 999,
-          backgroundColor: chart.gold,
-        },
-        riseStyle,
-      ]}
-    >
-      <Text
-        style={{
-          fontFamily: font.bodyBold,
-          fontSize: NODE.sailChip.size * typeScale,
-          lineHeight: NODE.sailChip.size * typeScale * 1.3,
-          letterSpacing: NODE.sailChip.size * NODE.sailChip.tracking * typeScale,
-          color: chart.ink,
-        }}
-      >
-        {`SAIL HERE ▸${TEXT_PRESENTATION}`}
-      </Text>
-    </Animated.View>
-  );
-}
-
-/**
- * Why the nearest closed island is closed, in the words `requirementText()` chose.
- *
- * The board pins this at a fixed MAP y (393) rather than hanging it off a node, and that 393 is
- * not arbitrary: station 2's marker ends at 364, its name chip runs 368→389, and 4pt of
- * `chipGapTight` below that is 393. So the constant IS "just under the first locked node" for the
- * captain the board draws.
- *
- * It is still rendered at the recorded y, centred on the map, rather than re-derived per node.
- * 187.5 — the cx the board's own chip hangs under — is the map's exact centre, so this reproduces
- * the board at the board's own state; and it is the only placement that keeps a 38-character
- * sentence on one line and on screen when the nearest closed island is the one at cx 283.6, which
- * is what an early captain actually sees.
- */
-function RequirementChip({ frame, typeScale, text }: { frame: MapFrame; typeScale: number; text: string }) {
   return (
     <View
       style={{
-        pointerEvents: 'none',
-        position: 'absolute',
-        left: 0,
-        right: 0,
-        top: mapY(frame, NODE.requirementChip.top),
-        alignItems: 'center',
+        paddingHorizontal: look.sub.padX * typeScale,
+        paddingVertical: look.sub.padY * typeScale,
+        borderRadius: 999,
+        backgroundColor: chart.gold,
       }}
     >
-      <View
+      <Text
+        numberOfLines={1}
         style={{
-          paddingHorizontal: NODE.requirementChip.padX * typeScale,
-          paddingVertical: NODE.requirementChip.padY * typeScale,
-          borderRadius: 999,
-          backgroundColor: chart.requirementChip,
+          fontFamily: font.bodyBold,
+          fontSize: size,
+          lineHeight: size * 1.3,
+          letterSpacing: size * look.sub.tracking,
+          color: chart.ink,
         }}
       >
-        <Text
-          style={{
-            fontFamily: font.bodyBold,
-            fontSize: NODE.requirementChip.size * typeScale,
-            lineHeight: NODE.requirementChip.size * typeScale * 1.35,
-            letterSpacing: NODE.requirementChip.size * NODE.requirementChip.tracking * typeScale,
-            color: chart.requirementInk,
-          }}
-        >
-          {text}
-        </Text>
-      </View>
+        {text}
+      </Text>
+    </View>
+  );
+}
+
+/** Why the fogged island is closed, in the words `requirementText()` chose. */
+function RequirementChip({ text, look, typeScale }: { text: string; look: MarkerLook; typeScale: number }) {
+  const spec = look.requirement;
+  if (spec === undefined) return null;
+  const size = spec.size * typeScale;
+
+  return (
+    <View
+      style={{
+        paddingHorizontal: spec.padX * typeScale,
+        paddingVertical: spec.padY * typeScale,
+        borderRadius: 999,
+        backgroundColor: chart.parchment,
+      }}
+    >
+      <Text
+        numberOfLines={1}
+        style={{
+          fontFamily: font.bodyBold,
+          fontSize: size,
+          lineHeight: size * 1.3,
+          letterSpacing: size * spec.tracking,
+          color: chart.requirementInk,
+        }}
+      >
+        {text}
+      </Text>
     </View>
   );
 }

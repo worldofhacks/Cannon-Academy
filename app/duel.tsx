@@ -28,7 +28,7 @@ import { duelReceiptKey } from '../src/contracts/rewards';
 import { applyDuelOutcome, type DuelRewardOutcome } from '../src/services/duelRewards';
 import { resolveDuelContext } from '../src/services/duelContext';
 import { resolveDestination } from '../src/services/flow';
-import { trayCannons } from '../src/services/loadout';
+import { asksInBand, trayCannons } from '../src/services/loadout';
 import { retainFirstApplied, victoryRewards } from '../src/services/victoryRewards';
 import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
@@ -98,7 +98,16 @@ function DuelBody() {
   }, []);
 
   // The captain's OWN loadout, in catalog order — via trayCannons (A-011), never a grade-band lookup.
-  const tray = useMemo(() => [...trayCannons(captain)], [captain]);
+  //
+  // Then the curriculum ceiling, which is NOT a lookup either: it removes, it never substitutes
+  // (A-058). It has to be applied here as well as in `legacyConfig`, and with the same rule, because
+  // the two must agree — `selectCannon` returns the SAME STATE for a cannon outside `playerLoadout`,
+  // so a tile the ceiling dropped from the duel but not from the tray is a button that does nothing,
+  // in the phase that has no other way out (the A-047 failure, one screen over).
+  const tray = useMemo(
+    () => trayCannons(captain).filter((c) => asksInBand(c, captain.gradeBand)),
+    [captain],
+  );
 
   // NOTHING may return before this point. Both redirects below used to sit HERE, above the eight
   // hooks that follow, and that is a rules-of-hooks violation with a real trigger: the moment

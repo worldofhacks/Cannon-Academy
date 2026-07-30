@@ -6,6 +6,7 @@
  */
 import { getCannon, cannons, getIsland, islands } from '@content/index';
 import type { Cannon, GradeBand, IslandId, SkillId } from '@content/schemas';
+import { GRADE_BANDS } from '@content/schemas';
 import { drawNextDuelSeed, duelReducer as coreDuelReducer } from '@engine/duel/reducer';
 import {
   createDuelState,
@@ -22,6 +23,7 @@ import {
   type AdapterState,
 } from '../services/duelAdapter';
 import type { ValidDuelContext } from '../services/duelContext';
+import { inBandLoadout } from '../services/loadout';
 import { deriveRivalLoadout } from '../services/rivalLoadout';
 import { planRivalVolleySync } from '../services/rivalDriver';
 import { TEMPLATE_POOLS } from '../services/templatePools';
@@ -146,20 +148,26 @@ export const PHASE_DURATION_MS: Partial<Record<DuelPhase, number>> = {
   rivalImpact: 1400,
 };
 
-function defaultBandForIsland(islandId: IslandId): GradeBand {
-  const island = getIsland(islandId);
-  const needed = cannons
-    .filter((cannon) => island.rangeSkills.includes(cannon.skill))
-    .reduce((max, cannon) => Math.max(max, cannon.minGrade), 0);
-  if (needed >= 4) return 'g4_5';
-  if (needed >= 2) return 'g2_3';
-  return 'k_1';
-}
+/** The widest band the catalog declares — read from `GRADE_BANDS`, never written down again. */
+const TOP_GRADE_BAND: GradeBand = GRADE_BANDS[GRADE_BANDS.length - 1] ?? 'g4_5';
 
+/**
+ * The omniscient fallback captain: every cannon, every island, no real placement behind it.
+ *
+ * Its band is the TOP band rather than one derived from the island, and that is load-bearing now
+ * that `legacyConfig` applies the ceiling (A-058). This captain equips the whole catalog, so the top
+ * band is the only band consistent with the guns it is holding — deriving a narrower one from the
+ * island produced a captain whose declared band contradicted its own loadout, which is exactly the
+ * contradiction the ceiling exists to resolve, and the ceiling would have resolved it by silently
+ * deleting six cannons from a fixture whose whole purpose is to hold all eleven.
+ *
+ * It reaches no child. `app/duel.tsx` builds its state from this only on the `!duelContext.ok`
+ * branch, and that branch renders `<Redirect href="/chart" />` instead of the duel.
+ */
 function defaultLegacyCaptain(islandId: IslandId = 'port_sumwich'): Captain {
   return {
     ...emptyCaptain(),
-    gradeBand: defaultBandForIsland(islandId),
+    gradeBand: TOP_GRADE_BAND,
     equippedCannons: cannons.map((cannon) => cannon.id),
     ownedCannons: cannons.map((cannon) => cannon.id),
     unlockedIslands: islands.map((island) => island.id),
@@ -168,11 +176,29 @@ function defaultLegacyCaptain(islandId: IslandId = 'port_sumwich'): Captain {
   };
 }
 
+/**
+ * The one place a duel's questions are chosen, and therefore the one place the band ceiling has to
+ * hold (A-058).
+ *
+ * `playerLoadout` is what the engine will accept a `CANNON_SELECTED` for, and the question it draws
+ * is the picked cannon's own skill — so filtering here is filtering the questions themselves.
+ * `app/duel.tsx` applies the same rule to the tray it renders, or the screen would offer a tile the
+ * engine silently refuses.
+ *
+ * `templatesBySkill` is handed over WHOLE and unfiltered, on purpose. `templatePools.ts` warns that
+ * file order is part of the replay contract because the generator indexes into the array it is
+ * given; subsetting a skill's pool would change which question a seed produces. Dropping whole
+ * CANNONS changes which pool is indexed, never the indexing, so an in-band gun at a given seed draws
+ * the same question it always did.
+ */
 function legacyConfig(seed: number, islandId: IslandId, captain: Captain): DuelConfig {
+  const band = captain.gradeBand;
+  const equipped = inBandLoadout(captain.equippedCannons, band);
+  // An empty equipped set is a legacy or half-written save, not a choice. It falls back to the
+  // catalog — through the same ceiling, because the untethered version of this line handed a
+  // kindergartner every gun in the game including multiplication and division.
   const playerLoadout =
-    captain.equippedCannons.length > 0
-      ? [...captain.equippedCannons]
-      : cannons.map((cannon) => cannon.id);
+    equipped.length > 0 ? [...equipped] : inBandLoadout(cannons.map((cannon) => cannon.id), band);
 
   return {
     seed,

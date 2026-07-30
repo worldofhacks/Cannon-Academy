@@ -695,3 +695,270 @@ describe('A-015 guided first duel', () => {
     });
   });
 });
+
+/**
+ * A-015 — replaying the walkthrough must not pay for it twice.
+ *
+ * The Rank screen's "Captain's papers" pushes `/guided-duel?replay=1`, so a captain can walk the
+ * tutorial as often as they like. Three things make that safe, and each one is a way to damage a
+ * real save if it is missed:
+ *
+ *   1. settlement is skipped entirely — see the property below for why idempotence does not cover
+ *      it, which is the non-obvious half;
+ *   2. `hasFoughtGuidedDuel` is never written `false`, because clearing the latch re-gates the
+ *      captain into the tutorial on the next cold start (`resolveDestination` step 3);
+ *   3. the victory sheet has its own branch, because skipping settlement leaves `appliedReward`
+ *      null and the ordinary panel is gated on it.
+ *
+ * The screen half is asserted through TypeScript's AST rather than by rendering, for the reason
+ * stated at the top of this file. Comments are absent from the AST, so no claim below can be met
+ * by a sentence promising it.
+ */
+function guidedScreenAst(source: string): ts.SourceFile {
+  return ts.createSourceFile('guided-duel.tsx', source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
+}
+
+/** Every `useEffect` whose body contains a call to `name`, with that body's statements. */
+function effectsCalling(file: ts.SourceFile, name: string): readonly ts.Statement[][] {
+  const bodies: ts.Statement[][] = [];
+  const visit = (node: ts.Node): void => {
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === 'useEffect'
+    ) {
+      const effect = node.arguments[0];
+      if (
+        effect !== undefined &&
+        (ts.isArrowFunction(effect) || ts.isFunctionExpression(effect)) &&
+        ts.isBlock(effect.body)
+      ) {
+        const statements = [...effect.body.statements];
+        const callsIt = statements.some((statement) => {
+          let hit = false;
+          const look = (child: ts.Node): void => {
+            if (ts.isCallExpression(child) && child.expression.getText(file).includes(name)) hit = true;
+            ts.forEachChild(child, look);
+          };
+          look(statement);
+          return hit;
+        });
+        if (callsIt) bodies.push(statements);
+      }
+    }
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return bodies;
+}
+
+function countCalls(file: ts.SourceFile, name: string): number {
+  let total = 0;
+  const visit = (node: ts.Node): void => {
+    if (ts.isCallExpression(node) && node.expression.getText(file) === name) total += 1;
+    ts.forEachChild(node, visit);
+  };
+  visit(file);
+  return total;
+}
+
+describe('A-015 guided duel replay', () => {
+  it('spec(A-015:AC-5) a fresh mount mints a NEW duel id, so receipts cannot make a replay free', async () => {
+    // This is the property the whole guard exists for, and it is the counter-intuitive one:
+    // `spec(A-015:AC-5)` above proves that settling the SAME duel twice is a durable no-op, which
+    // makes it tempting to assume a replay is harmless. It is not. `openGuidedDuel(freshSeed())`
+    // produces a different `duelId` on every mount, so the A-032 receipt has nothing to match and
+    // settlement applies in full — coins, mastery and the rank tally, once per replay, forever.
+    const { api } = await loadWithHarness({ realSettlement: true });
+    const store = readyStore();
+
+    const first = api.openGuidedDuel(15_701);
+    await finish(first);
+    const firstOutcome = api.settleGuidedDuel(store, first.session);
+    expect(firstOutcome.applied).toBe(true);
+    const afterFirst = store.getState().captain.coins;
+    expect(afterFirst).toBeGreaterThan(0);
+
+    const second = api.openGuidedDuel(15_702);
+    await finish(second);
+    const secondOutcome = api.settleGuidedDuel(store, second.session);
+
+    // If this ever goes red because the second settlement stopped applying, the screen guard below
+    // may be redundant — but delete the guard only after re-reading `canonicalDuelSeed`, never
+    // because this test changed shape.
+    expect(secondOutcome.applied).toBe(true);
+    expect(store.getState().captain.coins).toBeGreaterThan(afterFirst);
+  });
+
+  it('spec(A-015:AC-5) the screen skips settlement on replay, in the effect, before the call', async () => {
+    const source = await readFile(new URL('../../app/guided-duel.tsx', import.meta.url), 'utf8');
+    const file = guidedScreenAst(source);
+
+    expect(countCalls(file, 'settleGuidedDuel'), 'settlement must have exactly one call site').toBe(1);
+
+    const bodies = effectsCalling(file, 'settleGuidedDuel');
+    expect(bodies, 'settlement is not owned by a useEffect').toHaveLength(1);
+    const statements = bodies[0] ?? [];
+
+    const settlementIndex = statements.findIndex((statement) =>
+      statement.getText(file).includes('settleGuidedDuel'),
+    );
+    const guardIndex = statements.findIndex(
+      (statement) =>
+        ts.isIfStatement(statement) &&
+        /\breplay\b/.test(statement.expression.getText(file)) &&
+        statement.thenStatement.getText(file).includes('return'),
+    );
+
+    expect(guardIndex, 'no `if (replay) return` guard in the settlement effect').toBeGreaterThanOrEqual(0);
+    expect(
+      guardIndex,
+      'the replay guard sits AFTER the settlement call, which pays out before it bails',
+    ).toBeLessThan(settlementIndex);
+  });
+
+  it('spec(A-015:AC-5) the screen never clears the latch and never latches it itself', async () => {
+    const source = await readFile(new URL('../../app/guided-duel.tsx', import.meta.url), 'utf8');
+
+    // `markGuidedDuelFought` belongs to `settleGuidedDuel` alone. A screen that called it directly
+    // would latch a replay, which is harmless — and would also latch a duel that was never settled,
+    // which strands the captain's first-run rewards.
+    expect(source, 'the screen calls markGuidedDuelFought itself').not.toMatch(/markGuidedDuelFought/);
+
+    // Clearing the latch to "let them replay" is the tempting fix and the destructive one: on the
+    // next cold start `resolveDestination` sends the captain back into the tutorial instead of the
+    // chart, and `demo-navigation.test.ts` AC-3 freezes that behaviour.
+    expect(source, 'the screen writes hasFoughtGuidedDuel = false').not.toMatch(
+      /hasFoughtGuidedDuel\s*[:=]\s*false/,
+    );
+  });
+
+  it('spec(A-015:AC-5) replay gets past the latch redirect and gets its own ending', async () => {
+    const source = await readFile(new URL('../../app/guided-duel.tsx', import.meta.url), 'utf8');
+    const file = guidedScreenAst(source);
+
+    // The `/chart` redirect turns away any captain who has already fought. Without a replay branch
+    // the Rank screen's "walk me through it again" is a button that bounces straight back.
+    const redirectGuard = source.match(/if\s*\(([^)]*)\)\s*return\s*<Redirect href="\/chart"/);
+    expect(redirectGuard?.[1], 'the /chart redirect is not mode-aware').toMatch(/\breplay\b/);
+
+    // Skipping settlement leaves `appliedReward` null forever, and the ordinary victory panel is
+    // gated on it — so without this branch a replay ends on a blank parchment sheet.
+    expect(source, 'no replay-specific victory branch').toMatch(
+      /view\.phase === 'victory' && replay/,
+    );
+    expect(countCalls(file, 'router.back'), 'replay does not return where it came from').toBeGreaterThan(
+      0,
+    );
+  });
+});
+
+/**
+ * A-015 — the HUD shows the child their own hull.
+ *
+ * `projectGuidedView` fed `core.enemyMaxHull` into BOTH hull cards, so the first duel a child ever
+ * plays printed "100 / 28" over their own ship. The number was the smallest part of it: `HullCard`
+ * derives its ten pips and its hull word from `hp / max`, so a ratio of 3.57 clamped every pip full
+ * and pinned the word to SOUND for the whole tutorial, and `SeaStage` was handed the same 3.57 for
+ * the ship's damage state. The one thing beat 12 exists to teach — that a hit takes blocks off a
+ * hull — could not be seen happening.
+ *
+ * Asserted against the ENGINE's own starting hull rather than against the literal 100, so the day
+ * `PLAYER_HULL` moves this follows it instead of freezing a number the duel no longer uses.
+ */
+describe('A-015 the guided duel’s hull readout', () => {
+  it('spec(A-015:AC-5) the player’s max is the player’s own starting hull, never the rival’s', async () => {
+    type HudView = {
+      readonly playerHull: number;
+      readonly playerMax: number;
+      readonly rivalMax: number;
+    };
+    const { api } = await loadWithHarness();
+    const project = (api as unknown as {
+      readonly projectGuidedView: (state: SessionState) => HudView;
+    }).projectGuidedView;
+    expect(project, 'guidedDuel must export projectGuidedView').toBeTypeOf('function');
+
+    const opened = api.openGuidedDuel(15_801);
+    const start = opened.session.getState();
+    const first = project(start);
+
+    // The engine's own number, and the projection's, have to be the same number.
+    expect(first.playerMax).toBe(start.core.playerHull);
+    expect(first.playerMax).toBe(PLAYER_HULL);
+    expect(first.rivalMax).toBe(ONBOARDING_ENEMY_HULL);
+    expect(
+      first.playerMax,
+      'the player card is reading the enemy’s hull — this is the "100 / 28" defect',
+    ).not.toBe(first.rivalMax);
+
+    // The ratio every derived thing hangs off: pips, hull word, and the ship's damage state. Over
+    // 1 it clamps, and a clamped bar cannot show a child that anything happened.
+    expect(first.playerHull / first.playerMax).toBe(1);
+
+    // And it has to MOVE. `ALWAYS_HITS` is the default opponent, so one wrong answer costs hull.
+    await runTurn(opened, 'wrong');
+    const hit = project(opened.session.getState());
+    expect(hit.playerHull, 'the rival never landed one, so this proves nothing').toBeLessThan(
+      PLAYER_HULL,
+    );
+    expect(hit.playerMax).toBe(PLAYER_HULL);
+    expect(hit.playerHull / hit.playerMax).toBeLessThan(1);
+  });
+});
+
+/**
+ * A-015 — the replay's hand-off into the chart tour.
+ *
+ * The Rank row says "watch the tour again", and the tour is twenty beats: the duel is beats 5–16
+ * and the chart walkthrough is 17–20. A replay that ended on this screen ended on the half the row
+ * does not name — and the other half was unreachable by construction, because `ChartWalkthrough`
+ * rendered `null` the moment `hasCompletedOnboarding` latched.
+ *
+ * Two properties, and the second is the one that keeps a captain safe:
+ *
+ *   1. the send-off arms the chart half and goes there, rather than dropping the captain back;
+ *   2. it is armed ONLY there — so a captain who abandons the duel halfway has armed nothing, and
+ *      there is no state for them to be stuck inside.
+ */
+describe('A-015 replay continues into the chart tour', () => {
+  it('spec(A-015:AC-5) the replay send-off arms the chart tour and lands on the chart', async () => {
+    const source = await readFile(new URL('../../app/guided-duel.tsx', import.meta.url), 'utf8');
+
+    const handOff = source.match(/const continueTour = \(\) => \{([\s\S]*?)\n {2}\};/);
+    expect(handOff?.[1], 'no replay hand-off').toBeDefined();
+    expect(handOff?.[1], 'the hand-off does not arm the chart tour').toMatch(/beginTourReplay\(\)/);
+    expect(handOff?.[1], 'the hand-off does not go to the chart').toMatch(
+      /router\.replace\('\/chart'\)/,
+    );
+    // The replay ending is wired to it, rather than to the abandon path.
+    expect(source).toMatch(/<ReplayVictoryPanel[\s\S]{0,120}onContinue=\{continueTour\}/);
+  });
+
+  it('spec(A-015:AC-5) an abandoned replay arms nothing — the flag is set at the send-off alone', async () => {
+    const source = await readFile(new URL('../../app/guided-duel.tsx', import.meta.url), 'utf8');
+    const file = guidedScreenAst(source);
+
+    expect(countCalls(file, 'captainStore.getState().beginTourReplay')).toBe(1);
+
+    // `leave` is every other way off this screen — the turn bar, the defeat panel. If it armed the
+    // tour, a captain who walked away mid-duel would meet the chart walkthrough on their next visit
+    // to the chart with no idea why.
+    const leave = source.match(/const leave = \(\) => \{([\s\S]*?)\n {2}\};/);
+    expect(leave?.[1], 'no leave handler').toBeDefined();
+    expect(leave?.[1], 'the abandon path arms a replay').not.toMatch(/beginTourReplay/);
+  });
+
+  it('spec(A-015:AC-5) the grown-up skip goes through the resolver, never to a route of its own', async () => {
+    const source = await readFile(new URL('../../app/guided-duel.tsx', import.meta.url), 'utf8');
+
+    // Skipping writes `hasFoughtGuidedDuel`, but writes nothing about the band, the name or the
+    // flag — so where it lands has to be the resolver's answer. A hardcoded `/chart` would strand a
+    // captain who reached this screen without a name: `resolveDestination` would send them back to
+    // the name screen on the next launch, and the skip would look like it had done nothing.
+    expect(source).toMatch(/const skipTour = \(\) => router\.replace\(`\/\$\{commitTourSkip\(captainStore\)\}`\)/);
+    expect(source, 'the screen writes hasFoughtGuidedDuel = false').not.toMatch(
+      /hasFoughtGuidedDuel\s*[:=]\s*false/,
+    );
+  });
+});

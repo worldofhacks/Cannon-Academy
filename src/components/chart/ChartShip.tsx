@@ -1,17 +1,22 @@
 /**
- * The player's ship, parked at the live station.
+ * The player's ship — the position marker on both screens.
+ *
+ * One of only two rasters the board uses (`sprites/ship-01.png` and `cannon.png`); everything else
+ * on the chart is composed geometry. Board 9d: *"The only images on the screen are two of the nine
+ * PNGs already in the project."*
  *
  * `board.ts` records the trap this file would otherwise walk into: the board authors
- * `transform: rotate(38deg)` on the sprite and then animates `transform`, which in CSS REPLACES
- * it — so the ship the board actually renders sits at ±1.2°, not 38°. `SHIP.bob.rotateDeg` holds
- * the rendered value and that is what is used here. Transcribing the 38 would draw a ship the
- * design never shows.
+ * `transform: rotate(-24deg)` on the voyage sprite and `rotate(-18deg)` on the close one, then runs
+ * `sc-bob`, which animates `transform` — and in CSS an animated transform REPLACES the authored one
+ * for its whole run. So neither angle ever renders; both ships oscillate at ±2°, and that is what
+ * `SHIP.bob.rotateDeg` holds. The previous board set the identical trap at 38deg (A-045), which is
+ * how it is recognisable at all.
  *
  * The cast shadow sits OUTSIDE the animated view. A shadow that rises with the hull is not a
  * shadow; it is a second boat.
  */
 import { useEffect } from 'react';
-import { Image, Text, View } from 'react-native';
+import { Image, View } from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -21,36 +26,27 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { SHIP, type Station } from './board';
-import { art, mapX, mapY, type MapFrame } from './layout';
-import { chart } from './palette';
+import { SHIP } from './board';
+import { art, type MapFrame } from './layout';
 import { sprite } from '../../theme/sprites';
-import { font } from '../../theme/tokens';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
 
-/**
- * The board's own sprite, at the size the board draws it (66×113 natural, 42pt wide).
- * Referenced through the typed manifest so a missing file is a compile error.
- */
 const ROTATE = SHIP.bob.rotateDeg;
 
 export function ChartShip({
-  station,
   frame,
-  typeScale,
-  showHere,
+  left,
+  top,
+  width,
 }: {
-  station: Station;
   frame: MapFrame;
-  typeScale: number;
-  /**
-   * Whether the chip may say YOU ARE HERE. The ship is always drawn — a chart with no ship on it
-   * asks a child "where am I?" and answers nothing — but a captain the fog has not let ashore
-   * anywhere is not standing on an island, and the chip must not claim they are.
-   */
-  showHere: boolean;
+  /** Already resolved to pixels by the screen that owns the coordinate space. */
+  left: number;
+  top: number;
+  /** The board's own sprite width in design points — 38 on the voyage map, 46 on the close chart. */
+  width: number;
 }) {
   const bob = useSharedValue(0);
 
@@ -64,8 +60,8 @@ export function ChartShip({
     );
   }, [bob]);
 
-  const width = art(frame, SHIP.width);
-  const height = width * SHIP.aspect;
+  const w = art(frame, width);
+  const h = w * SHIP.aspect;
 
   // Hoisted out of the worklet. `art()` is a JS closure and a `useAnimatedStyle` body runs on the
   // UI runtime, where calling one crashes the first frame — invisibly to react-native-web.
@@ -75,61 +71,23 @@ export function ChartShip({
   }));
 
   return (
-    <>
+    <View pointerEvents="none" style={{ position: 'absolute', left, top, width: w, height: h }}>
+      {/* No blur in React Native, so the board's `drop-shadow(0 4px 5px …)` becomes the flat
+          ellipse the rest of this screen's shadows already are. */}
       <View
         style={{
-          pointerEvents: 'none',
           position: 'absolute',
-          left: mapX(frame, station.ship.cx) - width / 2,
-          top: mapY(frame, station.ship.cy) - height / 2,
-          width,
-          height,
+          alignSelf: 'center',
+          bottom: -art(frame, SHIP.shadow.dy),
+          width: w * 0.62,
+          height: art(frame, SHIP.shadow.radius),
+          borderRadius: 999,
+          backgroundColor: `rgba(20, 40, 60, ${SHIP.shadow.opacity})`,
         }}
-      >
-        {/* No blur in React Native, so the board's `0 4px 6px rgba(0,0,0,.25)` becomes the flat
-            ellipse the rest of this screen's shadows already are. */}
-        <View
-          style={{
-            position: 'absolute',
-            alignSelf: 'center',
-            bottom: -art(frame, SHIP.shadow.dy),
-            width: width * 0.62,
-            height: art(frame, SHIP.shadow.radius),
-            borderRadius: 999,
-            backgroundColor: `rgba(20, 40, 60, ${SHIP.shadow.opacity})`,
-          }}
-        />
-        <Animated.View style={[FILL, bobStyle]}>
-          <Image source={sprite.ship01} style={{ width, height }} resizeMode="contain" />
-        </Animated.View>
-      </View>
-
-      {!showHere ? null : (
-        <View
-          style={{
-            pointerEvents: 'none',
-            position: 'absolute',
-            left: mapX(frame, station.hereChip.x),
-            top: mapY(frame, station.hereChip.y),
-            paddingHorizontal: SHIP.hereChip.padX * typeScale,
-            paddingVertical: SHIP.hereChip.padY * typeScale,
-            borderRadius: 999,
-            backgroundColor: chart.parchment,
-          }}
-        >
-          <Text
-            style={{
-              fontFamily: font.bodyBold,
-              fontSize: SHIP.hereChip.size * typeScale,
-              lineHeight: SHIP.hereChip.size * typeScale * 1.3,
-              letterSpacing: SHIP.hereChip.size * SHIP.hereChip.tracking * typeScale,
-              color: chart.ink,
-            }}
-          >
-            YOU ARE HERE
-          </Text>
-        </View>
-      )}
-    </>
+      />
+      <Animated.View style={[FILL, bobStyle]}>
+        <Image source={sprite.ship01} style={{ width: w, height: h }} resizeMode="contain" />
+      </Animated.View>
+    </View>
   );
 }

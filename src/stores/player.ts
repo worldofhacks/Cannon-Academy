@@ -67,6 +67,45 @@ export interface Captain {
   currentIsland: IslandId | null;
   hasCompletedOnboarding: boolean;
   hasFoughtGuidedDuel: boolean;
+  /**
+   * Which beat of the chart walkthrough the captain is on (onboarding board rule RESUME).
+   *
+   * *"Children are interrupted constantly. The beat index persists, so a closed app reopens on the
+   * same beat with the same line spoken again — never at the start, and never skipped forward."*
+   *
+   * Only the chart beats (17–20) need this. Every earlier beat is already resumable because its
+   * position is a fact about the captain — no band means the picker, no name means the name screen,
+   * no latch means the guided duel — and `resolveDestination` reads all three. The chart
+   * walkthrough is the one stretch with nothing else to derive its position from.
+   *
+   * Tolerated as absent by `persistence.ts` and deliberately NOT part of `isBaseCaptain`; see the
+   * note there before adding it to the structural check.
+   */
+  onboardingBeat: number;
+  /**
+   * A tour replay is running — the Rank screen's "Watch the tour again", walked a second time.
+   *
+   * This exists because the two things that gate the tour on a first run are LATCHES, and latches
+   * are the one kind of state a replay must not touch. `hasCompletedOnboarding` and
+   * `hasFoughtGuidedDuel` are written `true` exactly once and never back to `false`: clearing
+   * either to "let them replay" re-gates a returning captain into the tutorial on the next cold
+   * start (`resolveDestination` step 3, frozen by `demo-navigation.test.ts` AC-3), which to a child
+   * is indistinguishable from the game deleting their progress.
+   *
+   * So the replay gets its own bit, and the chart walkthrough shows when
+   * `!hasCompletedOnboarding || replayingTour` — see `chartTourShowing`.
+   *
+   * **It is session state wearing a persisted field's clothes.** It is written into the save
+   * because the whole captain is, but `persistence.ts` reads it back as `false` on every launch,
+   * always. That is what clears an ABANDONED replay: a captain who force-quits halfway through one
+   * relaunches onto their chart, not into a tour they walked away from. A resume index is worth
+   * restoring (board rule RESUME); an unfinished second viewing of a tutorial the captain has
+   * already completed is not.
+   *
+   * Tolerated as absent by `persistence.ts` and deliberately NOT part of `isBaseCaptain`, exactly
+   * like `onboardingBeat` and `seenCannons`.
+   */
+  replayingTour: boolean;
   /** Durable rival-mercy ledger (A-041). Survives relaunch for A-030. */
   mercyState: MercyState;
   /** Committed reward receipts keyed by `duel:<id>` / `purchase:<seq>` (A-041). */
@@ -81,8 +120,25 @@ export interface CaptainState {
   /** Placement: pre-unlocks islands to band and STARTER cannons only (owner ruling D-6). */
   setGradeBand: (band: GradeBand) => void;
   setNameAndFlag: (name: string, flag: string) => void;
+  /** Ends the tour: latches completion and disarms any replay. Never writes a latch `false`. */
   completeOnboarding: () => void;
   markGuidedDuelFought: () => void;
+  /**
+   * Arms the chart half of a tour replay, from its first beat.
+   *
+   * Called at the replay duel's send-off, not when the Rank row is tapped — see the note on the
+   * action itself. Touches nothing but `replayingTour` and the beat index: a replay pays nothing
+   * and owes nothing (A-015).
+   */
+  beginTourReplay: () => void;
+  /**
+   * The grown-up's "we have played this before". Latches BOTH gates true and disarms any replay,
+   * which is the only shape a skip can take: `resolveDestination` reads `hasFoughtGuidedDuel`, so
+   * a skip that left it false would bounce the captain straight back into the guided duel.
+   */
+  skipTour: () => void;
+  /** Records the chart-walkthrough beat so a relaunch resumes on it (board rule RESUME). */
+  setOnboardingBeat: (beat: number) => void;
 
   addCoins: (amount: number) => void;
   /** Returns false and changes nothing when the captain cannot afford it. */
@@ -137,6 +193,8 @@ export function emptyCaptain(): Captain {
     currentIsland: null,
     hasCompletedOnboarding: false,
     hasFoughtGuidedDuel: false,
+    onboardingBeat: 0,
+    replayingTour: false,
     mercyState: freshMercyState(),
     rewardReceipts: {},
     nextPurchaseSequence: 0,
@@ -190,9 +248,14 @@ export function createCaptainStore(initial?: Captain): CaptainStore {
             // D-6: placement grants islands to band and starters only. Everything else is earned.
             ownedCannons: [...new Set([...s.captain.ownedCannons, ...placement.unlockedCannons])],
             unlockedIslands: [...new Set([...s.captain.unlockedIslands, ...placement.unlockedIslands])],
-            // Equip what they own. A-011 lets them change it; until then a captain is never
-            // stranded on a duel screen with no gun.
-            equippedCannons: [...placement.unlockedCannons],
+            // Equip what they own, CAPPED AT THE TRAY. A-011 lets them change it; until then a
+            // captain is never stranded on a duel screen with no gun.
+            //
+            // `equippedCannons`, not `unlockedCannons`: placement can grant more guns than the tray
+            // can carry (a `g4_5` captain gets four against a capacity of three, via
+            // `PLACEMENT_EXCEPTIONS`). Equipping all of them made the gun deck report "4 OF 3 SLOTS"
+            // and then refuse to Save a loadout the app had assigned itself.
+            equippedCannons: [...placement.equippedCannons],
             currentIsland: s.captain.currentIsland ?? placement.unlockedIslands[0] ?? null,
           },
         };
@@ -203,9 +266,56 @@ export function createCaptainStore(initial?: Captain): CaptainStore {
         captain: { ...s.captain, name: name.trim() || DEFAULT_CAPTAIN_NAME, flag },
       })),
 
-    completeOnboarding: () => set((s) => ({ captain: { ...s.captain, hasCompletedOnboarding: true } })),
+    // `Sail!`, and the end of a replay as well as of a first run. Setting the latch is idempotent
+    // on a captain who already had it; clearing `replayingTour` is what makes the sheet the end of
+    // the SECOND viewing too, rather than a tour that never switches itself off.
+    completeOnboarding: () =>
+      set((s) => ({
+        captain: { ...s.captain, hasCompletedOnboarding: true, replayingTour: false },
+      })),
 
     markGuidedDuelFought: () => set((s) => ({ captain: { ...s.captain, hasFoughtGuidedDuel: true } })),
+
+    /*
+     * Armed at the replay duel's send-off rather than when the Rank row is tapped, and that is the
+     * whole answer to "what clears an abandoned replay".
+     *
+     * A captain who opens the replay and leaves the duel halfway never armed anything, so there is
+     * nothing to clear — the flag only exists between the duel's ending and the chart tour's. From
+     * there the only two ways out both clear it: `Sail!` (completion) and the grown-up skip, which
+     * lands on the same send-off. Anything else is a force-quit, and `persistence.ts` reads the
+     * flag back as `false` on the next launch.
+     *
+     * The beat index goes back to the first chart beat because the walkthrough resumes from it
+     * (board rule RESUME) and a finished captain's index is parked on `done` — without this, a
+     * replay would open on the send-off it just came from.
+     */
+    beginTourReplay: () =>
+      set((s) => ({ captain: { ...s.captain, replayingTour: true, onboardingBeat: 0 } })),
+
+    // Monotonic by construction: both fields are assigned `true` and neither branch can produce
+    // `false`. A skip is "I have seen this", which is the same claim the first run makes when it
+    // finishes — so it makes the same two writes, and no others.
+    skipTour: () =>
+      set((s) => ({
+        captain: {
+          ...s.captain,
+          hasFoughtGuidedDuel: true,
+          hasCompletedOnboarding: true,
+          replayingTour: false,
+        },
+      })),
+
+    // Clamped and floored here rather than at the screen, for the same reason `addCoins` clamps:
+    // the store is the last place that can stop a bad index reaching a child's save. A negative or
+    // fractional beat would persist and resume into a walkthrough state that does not exist.
+    setOnboardingBeat: (beat) =>
+      set((s) => ({
+        captain: {
+          ...s.captain,
+          onboardingBeat: Number.isFinite(beat) ? Math.max(0, Math.floor(beat)) : 0,
+        },
+      })),
 
     // Clamped at zero rather than trusted: a negative payout is a bug somewhere upstream, and the
     // store is the last place that can stop it becoming a negative balance on a child's screen.

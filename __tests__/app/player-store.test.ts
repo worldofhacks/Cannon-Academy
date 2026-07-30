@@ -193,3 +193,52 @@ describe('A-001 captain store', () => {
     expect(c.nextPurchaseSequence).toBe(3);
   });
 });
+
+/**
+ * A-001 — the walkthrough resume index.
+ *
+ * The store clamps it for the same reason `addCoins` clamps: this is the last place that can stop a
+ * bad value reaching a child's save. A screen that computed a beat wrongly would otherwise persist
+ * it, and the captain would resume into a state the walkthrough has no beat for.
+ */
+describe('A-001 captain store — onboarding beat', () => {
+  it('spec(A-001:AC-1) a fresh captain starts on beat zero, and the field is never undefined', () => {
+    expect(emptyCaptain().onboardingBeat).toBe(0);
+    expect(store.getState().captain.onboardingBeat).toBe(0);
+  });
+
+  it('spec(A-001:AC-2) the beat advances and is readable back', () => {
+    store.getState().setOnboardingBeat(2);
+    expect(store.getState().captain.onboardingBeat).toBe(2);
+    store.getState().setOnboardingBeat(3);
+    expect(store.getState().captain.onboardingBeat).toBe(3);
+  });
+
+  it('spec(A-001:AC-2) a negative or fractional beat is floored rather than stored', () => {
+    for (const [given, expected] of [
+      [-1, 0],
+      [-99.5, 0],
+      [2.9, 2],
+      [Number.NaN, 0],
+      [Number.POSITIVE_INFINITY, 0],
+    ] as const) {
+      const fresh = createCaptainStore();
+      fresh.getState().setOnboardingBeat(given);
+      expect(fresh.getState().captain.onboardingBeat, `setOnboardingBeat(${given})`).toBe(expected);
+    }
+  });
+
+  it('spec(A-001:AC-2) advancing the beat touches nothing else on the captain', () => {
+    store.getState().setGradeBand('k_1');
+    store.getState().setNameAndFlag('Ada', 'flag-3');
+    const before = { ...store.getState().captain };
+
+    store.getState().setOnboardingBeat(1);
+    const after = store.getState().captain;
+
+    // A walkthrough index is bookkeeping. If it can move a coin or a latch it is not bookkeeping.
+    expect({ ...after, onboardingBeat: before.onboardingBeat }).toEqual(before);
+    expect(after.hasCompletedOnboarding).toBe(false);
+    expect(after.hasFoughtGuidedDuel).toBe(false);
+  });
+});

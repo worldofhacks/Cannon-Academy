@@ -1,25 +1,33 @@
 /**
- * A blob — the board's islands and fog banks, drawn as four elliptical corners.
+ * A blob — the board's islands, shallows and fog banks, drawn as four elliptical corners.
  *
- * The board's land is `border-radius: 52% 40% 58% 44%`. That is not a rounded rectangle: each
- * corner is a quarter ELLIPSE whose two radii are percentages of the box, so a 126×88 island
- * curves 65.5pt across its top-left and 45.8pt down it. React Native's `borderRadius` is absolute
+ * The board's land is `border-radius: 56% 44% 50% 50%`. That is not a rounded rectangle: each
+ * corner is a quarter ELLIPSE whose two radii are percentages of the box, so a 220×150 island
+ * curves 123pt across its top-left and 84pt down it. React Native's `borderRadius` is absolute
  * points with one radius per corner, so the nearest it can reach is a rounded rectangle — and a
  * rounded rectangle reads as a card, not as land. This is exactly the gap `Poly` was written for,
  * one shape family further on, and it is the difference between "an island" and "a tile".
  *
  * The path is authored in a 0–100 viewBox with `preserveAspectRatio="none"`, the same trick `Poly`
- * uses: the viewBox stretch is what turns "52% of the box" into "52% of the width across and 52%
- * of the height down", which is precisely CSS's rule for a percentage corner radius. One path
- * string therefore serves every size — the shape is scale-free, only the `<Svg>` box changes.
+ * uses: the viewBox stretch is what turns "56% of the box" into "56% of the width across and 56% of
+ * the height down", which is precisely CSS's rule for a percentage corner radius. One path string
+ * therefore serves every size — the shape is scale-free, only the `<Svg>` box changes.
  *
- * `shadow` draws that same path again underneath, offset straight down. The board's islands cast a
- * HARD shadow (`box-shadow: 0 4px 0 …`), never a blur; that flat offset is the whole idiom of this
- * art, and a blur would read as a different game.
+ * Two shadows, and they are different things:
+ *
+ *   `shadow`      the board's OUTER hard shadow (`box-shadow: 0 4px 0 …`) — the same path again,
+ *                 offset straight down. Never a blur; the flat offset is the whole idiom of this
+ *                 art, and a blur would read as a different game.
+ *   `innerShadow` the board's `box-shadow: inset 0 -8px 0 …`, which every island wears along its
+ *                 bottom edge and which is what makes sand read as a beach rather than a shape. An
+ *                 inset shadow offset UP by 8 leaves the bottom 8pt of the box uncovered, so it is
+ *                 drawn as the deep colour under a copy of the fill clipped to the silhouette and
+ *                 lifted by that much. Faking it with an outer shadow would grow the island by 8pt
+ *                 and change the outline, which is the one thing that must not move.
  */
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 import { View, type StyleProp, type ViewStyle } from 'react-native';
-import Svg, { Path } from 'react-native-svg';
+import Svg, { ClipPath, Defs, G, Path } from 'react-native-svg';
 
 import type { CornerPercents } from './board';
 
@@ -28,10 +36,8 @@ const VIEW_BOX = '0 0 100 100';
 
 /**
  * CSS shrinks EVERY radius by one common factor when the two on any one edge would overlap
- * (CSS Backgrounds §5.5). The board's own island is `52 40 58 44`, which sums to 102% along the
- * bottom edge — so the browser drew it at 0.98 of the stated radii. Skipping this step draws
- * corners the board does not have, and the error is worst on exactly the shapes that need to read
- * as organic.
+ * (CSS Backgrounds §5.5). Skipping this step draws corners the board does not have, and the error
+ * is worst on exactly the shapes that need to read as organic.
  */
 const edgeFactor = (p: number, q: number): number => (p + q <= 0 ? 1 : 100 / (p + q));
 
@@ -66,18 +72,37 @@ interface BlobProps {
   readonly width: number;
   readonly height: number;
   readonly fill: string;
-  /** The board's hard offset shadow — the same shape again, `dy` points lower. Never a blur. */
-  readonly shadow?: { readonly color: string; readonly dy: number };
+  /** The board's hard OUTER shadow — the same shape again, `dy` points lower. Never a blur. */
+  readonly shadow?: { readonly color: string; readonly dy: number } | undefined;
+  /** The board's `box-shadow: inset 0 -dy 0 color` — a band of `color` along the bottom inside. */
+  readonly innerShadow?: { readonly color: string; readonly dy: number } | undefined;
+  readonly opacity?: number | undefined;
   readonly style?: StyleProp<ViewStyle>;
-  /** Drawn ON the blob — foliage, a hut. Position them absolutely against the blob's own box. */
+  /** Drawn ON the blob — foliage, a hut, a palm. Position them against the blob's own box. */
   readonly children?: ReactNode;
 }
 
-export function Blob({ radii, width, height, fill, shadow, style, children }: BlobProps) {
+export function Blob({
+  radii,
+  width,
+  height,
+  fill,
+  shadow,
+  innerShadow,
+  opacity,
+  style,
+  children,
+}: BlobProps) {
+  // `useId` gives every blob on screen its own clip id. On web the SVG ids share one document, so
+  // two islands with the same corner set would otherwise clip through each other's definition.
+  const clipId = `blob-${useId().replace(/:/g, '')}`;
   const d = blobPath(radii);
+  // The inset shadow's offset, converted into the 0–100 viewBox. `preserveAspectRatio="none"`
+  // scales y by `height / 100`, so `-(dy / height) × 100` user units lands on exactly `-dy` pixels.
+  const lift = innerShadow === undefined || height <= 0 ? 0 : (innerShadow.dy / height) * 100;
 
   return (
-    <View style={[{ width, height }, style]}>
+    <View style={[{ width, height, opacity }, style]}>
       {shadow === undefined ? null : (
         <Svg
           width={width}
@@ -96,7 +121,21 @@ export function Blob({ radii, width, height, fill, shadow, style, children }: Bl
         preserveAspectRatio="none"
         style={{ position: 'absolute', left: 0, top: 0 }}
       >
-        <Path d={d} fill={fill} />
+        {innerShadow === undefined ? (
+          <Path d={d} fill={fill} />
+        ) : (
+          <>
+            <Defs>
+              <ClipPath id={clipId}>
+                <Path d={d} />
+              </ClipPath>
+            </Defs>
+            <Path d={d} fill={innerShadow.color} />
+            <G clipPath={`url(#${clipId})`}>
+              <Path d={d} fill={fill} transform={`translate(0 ${-lift})`} />
+            </G>
+          </>
+        )}
       </Svg>
       {children}
     </View>

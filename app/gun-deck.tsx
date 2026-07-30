@@ -13,6 +13,7 @@ import { cannonIdentityPresentation } from '../src/services/cannonDifficulty';
 import { resolveDestination } from '../src/services/flow';
 import {
   commitLoadout,
+  deckDraft,
   deckSlots,
   displaceCannon,
   selectCannon,
@@ -21,7 +22,14 @@ import {
   type SelectResult,
 } from '../src/services/loadout';
 import { captainStore, useCaptain } from '../src/stores/useCaptain';
-import { cannonLook, DAMAGE_BAND_SCALE, temperLook } from '../src/theme/cannonPresentation';
+import {
+  cannonLook,
+  cannonNotYetLabel,
+  CANNON_NOT_YET_CHIP,
+  CANNON_NOT_YET_MESSAGE,
+  DAMAGE_BAND_SCALE,
+  temperLook,
+} from '../src/theme/cannonPresentation';
 import { color, MIN_TAP_TARGET, radius, type } from '../src/theme/tokens';
 import { useLayout } from '../src/theme/useLayout';
 
@@ -41,6 +49,25 @@ import { useLayout } from '../src/theme/useLayout';
  * `TRAY_CAPACITY`. Nothing here re-decides either — a literal slot count on this screen is the bug
  * the ticket's DoD-3 exists to prevent, and a "helpfully" truncating tap is the bug AC-2 exists to
  * prevent.
+ *
+ * ## A third state: owned, and not yet
+ *
+ * A-058 put the curriculum ceiling on the duel and left one seam here. A K-1 captain can win the
+ * chest-only `nine_pounder` (skill `place_value_compare`, grade 2), own it, and slot it — the only
+ * gate `commitLoadout` applies is ownership — and the duel then refuses to arm it. The deck said
+ * "3 OF 3 SLOTS" while the tray showed two guns, and one of the child's three chosen guns did not
+ * exist in the fight.
+ *
+ * So the two zones become two-and-a-half: a gun that is owned but above the band is **shown**, in
+ * the hold, marked `NOT YET`, and is **not tappable and not countable**. Shown because the child
+ * earned it from a chest and this is the one screen where rewards live — the same call the sea
+ * chart makes for a fogged island and the Harbor makes for an unaffordable ship. Not countable
+ * because the slot count is a promise about the duel, and `deckDraft` applies the identical rule
+ * the duel does (`inBandLoadout`), so the count the deck reports is the count the duel will honour.
+ *
+ * Not tappable rather than tappable-and-refusing: `select` has no other exit, so a tile that eats a
+ * tap is the A-047 failure one screen over. The card carries its own answer instead, so there is
+ * nothing to discover by pressing it.
  */
 
 /**
@@ -127,18 +154,36 @@ function GunDeckBody() {
   const ax = L.a;
 
   const captain = useCaptain((s) => s.captain);
-  const gradeBand: GradeBand = captain.gradeBand ?? 'k_1';
 
   /**
-   * Filtered to what is actually owned, so the draft and the rendered deck cannot disagree: the
-   * deck is drawn from `deckSlots`, which only ever emits owned cannons, while `selectCannon`
-   * counts the draft. A save carrying a gun that was never earned would otherwise show two slots
-   * full and refuse the fourth tap as if three were. `commitLoadout` still refuses `not-owned` —
-   * that guarantee belongs to the service and stays there; this just keeps it unreachable here.
+   * The band used for LABELS only — difficulty wording and the operator row.
+   *
+   * `difficultyPresentation` needs a band to phrase "just right" against, and `null` is not one, so
+   * this coerces to the narrowest band rather than the widest: a bandless captain sees the fewest
+   * operators and the most conservative wording, never the most.
+   *
+   * The CEILING does not read this. It reads `captain.gradeBand` raw, through `deckDraft` and
+   * `slot.sails`, because it has to be byte-for-byte the rule the duel applies — and A-058's rule
+   * is that a missing band fails CLOSED. Coercing to `k_1` here would let the deck offer a
+   * bandless captain two guns the duel would then arm nothing with. See `gun-deck.test.ts`.
    */
-  const [draft, setDraft] = useState<readonly CannonId[]>(() =>
-    captain.equippedCannons.filter((id) => captain.ownedCannons.includes(id)),
-  );
+  const labelBand: GradeBand = captain.gradeBand ?? 'k_1';
+
+  /**
+   * Narrowed by `deckDraft` to what is owned AND can sail, so the draft and the rendered deck
+   * cannot disagree, and the deck's slot count cannot over-promise the duel's tray.
+   *
+   * The owned half: the deck is drawn from `deckSlots`, which only ever emits owned cannons, while
+   * `selectCannon` counts the draft. A save carrying a gun that was never earned would otherwise
+   * show two slots full and refuse the fourth tap as if three were. `commitLoadout` still refuses
+   * `not-owned` — that guarantee belongs to the service and stays there; this keeps it unreachable.
+   *
+   * The band half: a save can legitimately arrive carrying an over-grade chest gun, because that is
+   * exactly the state this screen used to be able to write. Dropping it from the DRAFT (never from
+   * the deck) means opening and leaving the gun deck heals such a save — the gun keeps its row and
+   * its ownership, and `equippedCannons` comes back agreeing with what the duel will arm.
+   */
+  const [draft, setDraft] = useState<readonly CannonId[]>(() => deckDraft(captain));
   const [pending, setPending] = useState<Extract<SelectResult, { kind: 'full' }> | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
 
@@ -165,9 +210,9 @@ function GunDeckBody() {
    * and division appear at grade 3, which is where the catalog puts them (A-051).
    */
   const operations = useMemo(() => {
-    const maxGrade = maxGradeForBand(gradeBand);
+    const maxGrade = maxGradeForBand(labelBand);
     return OPERATION_MIN_GRADE.filter((op) => op.minGrade <= maxGrade).map((op) => op.glyph);
-  }, [gradeBand]);
+  }, [labelBand]);
 
   const ownedGlyphs = useMemo(
     () => new Set(captain.ownedCannons.map((id) => cannonLook[id].glyph)),
@@ -176,6 +221,10 @@ function GunDeckBody() {
 
   /** Tapping a gun in the hold tries to put it on the deck. A full deck REFUSES and says so. */
   const tapHold = (id: CannonId) => {
+    // A not-yet gun renders as a plain card with no press handler, so this is belt and braces —
+    // but it is the draft's own invariant (never anything the duel would refuse) stated once, in
+    // the one function that can add to it, rather than resting on a JSX branch staying correct.
+    if (byId.get(id)?.sails === false) return;
     setRefusal(null);
     const result = selectCannon(draft, id);
     if (result.kind === 'full') {
@@ -383,7 +432,7 @@ function GunDeckBody() {
             <HoldCard
               key={slot.cannon.id}
               slot={slot}
-              gradeBand={gradeBand}
+              gradeBand={labelBand}
               isNew={slot.isNew}
               width={cardWidth}
               tx={tx}
@@ -411,36 +460,48 @@ interface HoldCardProps {
  * One gun in the hold. The band meter is the reason this is a card and not a list row: a fixed
  * 0–40 ruler lets a child compare two guns by where the bar sits rather than by reading two
  * numbers, which is the trade a volatile cannon is asking them to make.
+ *
+ * Two states, and `slot.sails` picks between them. A gun the band cannot fire yet keeps its glyph,
+ * its name and — most of all — its SKILL NAME, because what it teaches is the entire content of
+ * looking forward to it. What it loses is the stats row (damage and fuse are a trade you cannot
+ * make on a gun that cannot fire), its temperament colour, and its press handler.
+ *
+ * The two card grounds are `white` and the board's sunken parchment, and every text colour on this
+ * card clears AA on BOTH — `inkDark` measures 15.02 and 11.74, `inkDarkMuted` 6.23 and 4.87 — which
+ * is why the not-yet state needs no second set of text tokens (A-054's rule: certify the pair, not
+ * the colour).
  */
 function HoldCard({ slot, gradeBand, isNew, width, tx, ax, onPress }: HoldCardProps) {
-  const { cannon } = slot;
+  const { cannon, sails } = slot;
   const look = cannonLook[cannon.id];
   const temper = temperLook[cannon.temperament];
   const identity = cannonIdentityPresentation({ cannon, gradeBand });
   const left = (cannon.damageMin / DAMAGE_BAND_SCALE) * 100;
   const span = ((cannon.damageMax - cannon.damageMin) / DAMAGE_BAND_SCALE) * 100;
 
-  return (
-    <Pressable
-      onPress={onPress}
-      accessibilityRole="button"
-      accessibilityState={{ selected: false }}
-      accessibilityLabel={`${identity.accessibilityDescription}${isNew ? ', new' : ''}. Put on the deck`}
-      style={({ pressed }) => [
-        s.holdCard,
-        {
-          width,
-          height: tx(104),
-          borderRadius: tx(radius.card),
-          padding: tx(9),
-          gap: tx(5),
-          borderBottomColor: isNew ? color.success : color.parchmentEdge,
-        },
-        pressed && s.pressedDrop,
-      ]}
-    >
+  const frame = {
+    width,
+    height: tx(104),
+    borderRadius: tx(radius.card),
+    padding: tx(9),
+    gap: tx(5),
+    // A not-yet gun that just arrived from a chest is BOTH new and waiting; the badge stays,
+    // because "a thing arrived" is the true half a child most needs to see.
+    borderBottomColor: isNew ? color.success : color.parchmentEdge,
+  } as const;
+
+  const body = (
+    <>
       <View style={[s.holdHead, { gap: tx(7) }]}>
-        <View style={[s.holdTile, { width: ax(38), height: ax(38), borderRadius: ax(radius.tile) }]}>
+        <View
+          style={[
+            s.holdTile,
+            // The tile's own fill IS sunken parchment, so on a sunken card it would vanish; one
+            // step darker keeps the glyph sitting on something.
+            !sails && s.holdTileNotYet,
+            { width: ax(38), height: ax(38), borderRadius: ax(radius.tile) },
+          ]}
+        >
           <Text style={[s.holdTileGlyph, { fontSize: ax(21) }]}>{look.glyph}</Text>
         </View>
 
@@ -461,28 +522,79 @@ function HoldCard({ slot, gradeBand, isNew, width, tx, ax, onPress }: HoldCardPr
         <View
           style={[
             s.bandFill,
-            { left: `${left}%`, width: `${span}%`, borderRadius: ax(6), backgroundColor: temper.color },
+            {
+              left: `${left}%`,
+              width: `${span}%`,
+              borderRadius: ax(6),
+              // Drained of its temperament colour. The bar still shows the gun's reach — that is
+              // the anticipation — but the colour is a cue about firing, and this one cannot fire.
+              backgroundColor: sails ? temper.color : color.inkDarkMuted,
+            },
           ]}
         />
       </View>
 
-      <View style={[s.holdMeta, { gap: tx(5) }]}>
-        <Text style={[s.holdDifficulty, { fontSize: tx(9) }]}>{identity.difficultyLabel}</Text>
-        <Text style={[s.holdFuse, { fontSize: tx(9) }]}>{identity.fuseLabel}</Text>
-        <Text style={[s.holdDamage, { fontSize: tx(13) }]}>
-          {cannon.damageMin}–{cannon.damageMax}
-        </Text>
-        <Text style={[s.holdTemper, { fontSize: tx(10) }]}>{identity.temperamentWord}</Text>
-        {identity.weaponChipLabel !== null ? (
-          <Text style={[s.holdWeapon, { fontSize: tx(9) }]}>{identity.weaponChipLabel}</Text>
-        ) : null}
-      </View>
+      {sails ? (
+        <View style={[s.holdMeta, { gap: tx(5) }]}>
+          <Text style={[s.holdDifficulty, { fontSize: tx(9) }]}>{identity.difficultyLabel}</Text>
+          <Text style={[s.holdFuse, { fontSize: tx(9) }]}>{identity.fuseLabel}</Text>
+          <Text style={[s.holdDamage, { fontSize: tx(13) }]}>
+            {cannon.damageMin}–{cannon.damageMax}
+          </Text>
+          <Text style={[s.holdTemper, { fontSize: tx(10) }]}>{identity.temperamentWord}</Text>
+          {identity.weaponChipLabel !== null ? (
+            <Text style={[s.holdWeapon, { fontSize: tx(9) }]}>{identity.weaponChipLabel}</Text>
+          ) : null}
+        </View>
+      ) : (
+        <View style={[s.holdMeta, { gap: tx(4) }]}>
+          <View style={[s.notYetChip, { paddingVertical: tx(2), paddingHorizontal: tx(7) }]}>
+            <Text style={s.notYetChipText}>{CANNON_NOT_YET_CHIP}</Text>
+          </View>
+          {/* Its own line, always — the card is half a phone wide and this sentence is the point. */}
+          <Text
+            style={[s.notYetMessage, { fontSize: tx(10), lineHeight: tx(13) }]}
+            numberOfLines={2}
+          >
+            {CANNON_NOT_YET_MESSAGE}
+          </Text>
+        </View>
+      )}
 
       {isNew ? (
         <View style={[s.newChip, { paddingVertical: tx(3), paddingHorizontal: tx(9) }]}>
           <Text style={s.newChipText}>NEW</Text>
         </View>
       ) : null}
+    </>
+  );
+
+  // Not a disabled Pressable: a control that announces itself as a button and then does nothing is
+  // the A-047 dead tile, and `select` is a phase with no other exit. The card carries its own
+  // answer, so there is nothing a press could reveal.
+  if (!sails) {
+    return (
+      <View
+        accessible
+        accessibilityLabel={`${cannonNotYetLabel(cannon.displayName, identity.skillName)}${
+          isNew ? ' New.' : ''
+        }`}
+        style={[s.holdCard, s.holdCardNotYet, frame]}
+      >
+        {body}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      onPress={onPress}
+      accessibilityRole="button"
+      accessibilityState={{ selected: false }}
+      accessibilityLabel={`${identity.accessibilityDescription}${isNew ? ', new' : ''}. Put on the deck`}
+      style={({ pressed }) => [s.holdCard, frame, pressed && s.pressedDrop]}
+    >
+      {body}
     </Pressable>
   );
 }
@@ -557,12 +669,15 @@ const s = StyleSheet.create({
     backgroundColor: color.white,
     borderBottomWidth: 4,
   },
+  /** Owned, above the band. Sunken parchment is this screen's own word for "not live". */
+  holdCardNotYet: { backgroundColor: board.parchmentSunken },
   holdHead: { flexDirection: 'row', alignItems: 'center' },
   holdTile: {
     backgroundColor: board.parchmentSunken,
     alignItems: 'center',
     justifyContent: 'center',
   },
+  holdTileNotYet: { backgroundColor: board.bandTrack },
   holdTileGlyph: { ...type.display, color: color.inkDark, includeFontPadding: false },
   holdNameCol: { flex: 1, minWidth: 0 },
   holdName: { ...type.subtitle, color: color.inkDark },
@@ -578,6 +693,25 @@ const s = StyleSheet.create({
   holdDamage: { ...type.subtitle, color: color.inkDark },
   holdTemper: { ...type.chip, letterSpacing: 0, color: color.inkDarkMuted },
   holdWeapon: { ...type.chip, letterSpacing: 0, color: color.inkDarkMuted },
+
+  /**
+   * The NOT YET pill. `seaDeep` because white on it is 7.09 — the one blue `tokens.ts` certifies to
+   * carry a word, and already in `text-contrast.test.ts`'s certified list. Deliberately dark rather
+   * than another parchment tone: on a sunken parchment card a parchment chip is 1.24 against its
+   * own ground and would read as a smudge, and the state has to be visible at arm's length.
+   *
+   * It is never the amber or the success green — those are this app's "yes", and nothing about a
+   * gun that cannot fire is a yes.
+   */
+  notYetChip: {
+    borderRadius: radius.pill,
+    backgroundColor: color.seaDeep,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  notYetChipText: { ...type.chip, color: color.white },
+  /** Full width so it always takes its own line inside the wrapping meta row. */
+  notYetMessage: { ...type.chip, letterSpacing: 0, width: '100%', color: color.inkDark },
 
   // Sits proud of the card's top-right corner, exactly as drawn.
   newChip: {

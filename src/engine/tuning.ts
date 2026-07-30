@@ -63,6 +63,21 @@ export const ENEMY_HULL_BY_ISLAND: Readonly<Record<IslandId, number>> = deepFree
  */
 export const ONBOARDING_ENEMY_HULL = 28;
 
+/**
+ * The FEWEST questions one duel asks — ARCHITECTURE §4.3: *"a duel you can win resolves in 4–6
+ * player volleys"*, one question per volley.
+ *
+ * Not a new feel-number: the 4–6 window is already enforced against every entry of
+ * `ENEMY_HULL_BY_ISLAND` by `tuning.test.ts`'s "sinks too fast / drags" case, and this names its
+ * lower bound so presentation can quote it.
+ *
+ * It exists because `services/chart.ts` turns a mastery shortfall into a promise — *"two more
+ * duels"* — and a promise needs a conversion that errs the safe way. Using the FLOOR over-counts
+ * duels, so the island arrives sooner than the chart said. That is the discipline
+ * `harborShortfallMessage` already follows for coins, for the same reason.
+ */
+export const DUEL_VOLLEY_FLOOR = 4;
+
 // ============================================================================================
 // Damage
 // ============================================================================================
@@ -159,11 +174,46 @@ export const MASTERY_MIN_ACCURACY = 0.7;
 /** PLAN.md §Sea chart: "range drills fill a skill's meter at full rate". */
 export const MASTERY_RATE_RANGE = 1;
 
-/** PLAN.md §Sea chart: "correct answers in real duels fill the matching skill at half rate". */
-export const MASTERY_RATE_DUEL = 0.5;
+/**
+ * **OWNER CHANGE (2026-07-30): 0.5 → 1.** PLAN.md §Sea chart said "correct answers in real duels
+ * fill the matching skill at half rate", and that clause is now void.
+ *
+ * The owner won a duel and saw nothing change on the chart. At 0.5, with
+ * `MASTERY_THRESHOLD_CORRECT` at 10, opening the next island took ~20 correct duel answers and a
+ * green check took ~60 — so the mechanism worked and the pacing hid it. A duel answer is the same
+ * arithmetic as a drill answer, asked under more pressure; paying it half was a tax on the mode the
+ * game is named after.
+ *
+ * The half-rate clause existed to keep the range worth visiting. That job now belongs to the range's
+ * OWN economics (a drill serves ~10 questions back to back with no duel around them), not to a
+ * discount on the duel. `__tests__/engine/tuning.test.ts`'s "worth twice a duel answer" case is
+ * re-baselined against this, and its original intent is recorded there as void rather than nudged.
+ */
+export const MASTERY_RATE_DUEL = 1;
 
 /** ARCHITECTURE.md §5: Firestore field `mastery: {skillId: 0-100}`. */
 export const MASTERY_METER_MAX = 100;
+
+// ============================================================================================
+// Placement
+// ============================================================================================
+
+const PLACEMENT_ISLANDS_BY_BAND_RAW: Record<GradeBand, number> = {
+  // OWNER RULE (2026-07-30). Placement opens a PREFIX OF THE CHAIN, sized to the band — never
+  // "every island whose maths is age-appropriate", which is what `resolvePlacement` used to do and
+  // which handed a 4th-grader the whole game at onboarding (measured: k_1 → 1, g2_3 → 3, g4_5 → 5).
+  //
+  // The band governs question DIFFICULTY WITHIN an island. It does not govern how much of the map
+  // is free. Every band therefore leaves at least two islands to earn, which is what makes the fog
+  // a promise rather than decoration.
+  k_1: 1,
+  g2_3: 2,
+  g4_5: 3,
+};
+/** How many islands, in `requiresIsland` chain order, a band's placement opens. */
+export const PLACEMENT_ISLANDS_BY_BAND: Readonly<Record<GradeBand, number>> = deepFreeze(
+  PLACEMENT_ISLANDS_BY_BAND_RAW,
+);
 
 // ============================================================================================
 // Economy

@@ -252,18 +252,112 @@ export function Splash({
   return (
     <View style={s.screen}>
       {scenery}
-      <View style={[s.footer, { bottom: px(64) }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="SET SAIL"
-          onPress={onStart}
-          style={({ pressed }) => [s.start, { minHeight: Math.max(px(64), 64) }, pressed && s.startPressed]}
-        >
-          <Text style={[s.startLabel, { fontFamily: displayFace, fontSize: tx(18), lineHeight: tx(24) }]}>
-            {['SET', 'SAIL'].join(' ')}
-          </Text>
-        </Pressable>
+      <View style={[s.footer, { bottom: px(44) }]}>
+        {/*
+          Beat 1 of the onboarding board, and the board is explicit about what it is for: *"One
+          216×88 button with a pulsing ring. The whole first screen is a tap lesson disguised as a
+          title card."* Its reading audit is equally explicit that *"the word is decoration"* — a
+          waving ring, a crosshair and a quarter of the screen are what carry it.
+
+          Which is why the ring and the geometry are adopted and the board's "Start" is not. The
+          label stays SET SAIL: `launch-picker.test` `spec(A-042:AC-2)` binds the accessible name to
+          that exact string, and shipping a button whose visible word disagrees with what a screen
+          reader announces is an accessibility defect, not a copy change.
+        */}
+        <View style={{ width: px(216), height: px(88) }}>
+          <PulseRing width={px(216)} height={px(88)} radius={px(22)} />
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="SET SAIL"
+            onPress={onStart}
+            style={({ pressed }) => [
+              s.start,
+              {
+                width: px(216),
+                minHeight: Math.max(px(88), 64),
+                borderRadius: px(22),
+                borderBottomWidth: px(6),
+                gap: px(4),
+              },
+              pressed && s.startPressed,
+            ]}
+          >
+            <Crosshair size={px(34)} />
+            <Text style={[s.startLabel, { fontFamily: displayFace, fontSize: tx(22), lineHeight: tx(28) }]}>
+              {['SET', 'SAIL'].join(' ')}
+            </Text>
+          </Pressable>
+        </View>
       </View>
+    </View>
+  );
+}
+
+/**
+ * The board's `ob-ring`: a copy of the button that scales from 0.86 to 1.6 and fades out, on a
+ * 1.8s loop. It sits BEHIND the button and is `pointerEvents="none"`, so the one tap target on the
+ * screen stays one tap target — `spec(A-042:AC-2)` counts `Pressable`s and it must find exactly one.
+ */
+function PulseRing({ width, height, radius }: { width: number; height: number; radius: number }) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 1800, easing: Easing.out(Easing.quad) }), -1);
+  }, [t]);
+  const animated = useAnimatedStyle(() => ({
+    opacity: 0.45 * (1 - t.value),
+    transform: [{ scale: 0.86 + 0.74 * t.value }],
+  }));
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        { position: 'absolute', left: 0, top: 0, width, height, borderRadius: radius, backgroundColor: color.amber },
+        animated,
+      ]}
+    />
+  );
+}
+
+/**
+ * The board's target reticle — a ring, four ticks and a centre dot. It is the picture of "tap
+ * here", and it is the half of this button a pre-reader can actually use.
+ */
+function Crosshair({ size }: { size: number }) {
+  const u = size / 34;
+  const tick = {
+    position: 'absolute' as const,
+    borderRadius: 2 * u,
+    backgroundColor: color.inkDark,
+  };
+  return (
+    <View style={{ width: size, height: size }}>
+      <View
+        style={{
+          position: 'absolute',
+          left: 0,
+          top: 0,
+          width: size,
+          height: size,
+          borderRadius: 999,
+          borderWidth: 5 * u,
+          borderColor: color.inkDark,
+        }}
+      />
+      <View style={[tick, { left: 15 * u, top: -3 * u, width: 4 * u, height: 9 * u }]} />
+      <View style={[tick, { left: 15 * u, top: 28 * u, width: 4 * u, height: 9 * u }]} />
+      <View style={[tick, { left: -3 * u, top: 15 * u, width: 9 * u, height: 4 * u }]} />
+      <View style={[tick, { left: 28 * u, top: 15 * u, width: 9 * u, height: 4 * u }]} />
+      <View
+        style={{
+          position: 'absolute',
+          left: 12 * u,
+          top: 12 * u,
+          width: 10 * u,
+          height: 10 * u,
+          borderRadius: 999,
+          backgroundColor: color.inkDark,
+        }}
+      />
     </View>
   );
 }
@@ -310,16 +404,14 @@ const s = StyleSheet.create({
   wordmark: { color: color.parchment, textAlign: 'center' },
   footer: { position: 'absolute', left: 0, right: 0, alignItems: 'center' },
   hoisting: { color: color.chipInk, textAlign: 'center' },
+  /** Board: 216×88, radius 22, `0 6px 0 #B87309`. The bottom edge IS the affordance. */
   start: {
-    minWidth: 160,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 28,
-    borderRadius: 32,
+    paddingHorizontal: 16,
     backgroundColor: color.amber,
-    borderBottomWidth: 4,
-    borderBottomColor: color.woodDeep,
+    borderBottomColor: color.goldDeep,
   },
-  startPressed: { transform: [{ translateY: 3 }], borderBottomWidth: 1 },
+  startPressed: { transform: [{ translateY: 4 }], borderBottomWidth: 2 },
   startLabel: { color: color.inkDark },
 });

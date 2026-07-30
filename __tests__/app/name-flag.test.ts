@@ -36,6 +36,7 @@
  * in particular it keeps the AC-3 store tests failing on the *real* reason (`setNameAndFlag`
  * trims a blank name to `''`) rather than on a missing file.
  */
+import tsModule from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { resolveDestination } from '../../src/services/flow';
@@ -555,3 +556,126 @@ describe('A-006 name and flag — AC-4, the six flags are told apart by hue', ()
     expect(new Set(flags.map((f) => f.label)).size).toBe(flags.length);
   });
 });
+
+/**
+ * A-006 — the rename sheet, reached forever after from the Rank screen's "Captain's papers".
+ *
+ * `/name-flag?mode=edit` is the SAME route as the first run, deliberately: `flow.test.ts` AC-2 pins
+ * `resolveDestination` to the single string `'name-flag'`, and a second route file would break
+ * `demo-navigation.test.ts` AC-1's exact ten-file inventory. What differs is three behaviours, and
+ * the first of them is a live data-loss bug if it is missed.
+ *
+ * These are source assertions for the same reason every other screen assertion in this file is:
+ * `app/name-flag.tsx` reaches `react-native`, whose Flow-typed entry point the node runner cannot
+ * parse. TypeScript's TSX parser binds each claim to a real syntax node rather than to prose — the
+ * AST carries no comments, so nothing here can be satisfied by a sentence saying it was done.
+ */
+describe('A-006 name and flag — the rename sheet does not blank the captain', () => {
+  const parse = (source: string) =>
+    tsFor(source);
+
+  it('spec(A-006:AC-3) the fields are seeded FROM the captain, never from empty', async () => {
+    const source = (await readScreenSource()) as string;
+    expect(source).not.toBeNull();
+    const initializers = useStateInitializers(parse(source));
+
+    // The bug, stated as the thing that must not be in the file. A sheet that opens on `''` renames
+    // a captain called "Wren" to "Captain" the moment a grown-up opens it and saves without typing,
+    // because `setNameAndFlag` substitutes the default for a blank name. Same shape for the flag:
+    // opening on the first flag silently reflags a captain flying `flag-4`.
+    expect(
+      initializers.some((text) => /^(''|""|``)$/.test(text.trim())),
+      'name-flag seeds a field from the empty string; in edit mode that is a silent rename',
+    ).toBe(false);
+
+    expect(
+      initializers.some((text) => /captain\s*\.\s*name/.test(text)),
+      'the name field is not seeded from captain.name',
+    ).toBe(true);
+    expect(
+      initializers.some((text) => /captain\s*\.\s*flag/.test(text)),
+      'the flag field is not seeded from captain.flag',
+    ).toBe(true);
+  });
+
+  it('spec(A-006:AC-3) an untouched edit-mode save is a no-op, not a rename', () => {
+    // What the seeded screen actually does when a grown-up opens the sheet and saves at once.
+    const store = createCaptainStore();
+    store.getState().setGradeBand('k_1');
+    store.getState().setNameAndFlag('Wren', 'flag-4');
+    const before = store.getState().captain;
+
+    const seededName = before.name;
+    const seededFlag = before.flag ?? 'flag-1';
+    store.getState().setNameAndFlag(seededName, seededFlag);
+
+    expect(store.getState().captain.name).toBe('Wren');
+    expect(store.getState().captain.flag).toBe('flag-4');
+    expect(store.getState().captain).toEqual(before);
+  });
+
+  it('spec(A-006:AC-3) the commit still goes through setNameAndFlag, so an empty name is unwritable', async () => {
+    const source = (await readScreenSource()) as string;
+    // Assigning `captain.name` directly would bypass A-001's `name.trim() || DEFAULT_CAPTAIN_NAME`
+    // and make an empty name structurally possible — which routes the captain back to this screen
+    // forever, because `flow.ts` reads a blank name as "not yet asked".
+    expect(source, 'the screen writes captain.name directly instead of through the store').not.toMatch(
+      /captain\s*\.\s*name\s*=[^=]/,
+    );
+
+    const store = createCaptainStore();
+    store.getState().setGradeBand('k_1');
+    store.getState().setNameAndFlag('Wren', 'flag-4');
+    // Even a caretaker who clears the field cannot land the captain on an unroutable name.
+    store.getState().setNameAndFlag('   ', 'flag-4');
+    expect(store.getState().captain.name.trim()).not.toBe('');
+    expect(resolveDestination(store.getState().captain)).not.toBe('name-flag');
+  });
+
+  it('spec(A-006:AC-3) edit mode exits with back(), and hides the skip', async () => {
+    const source = (await readScreenSource()) as string;
+
+    // Edit mode arrived from somewhere — the Rank screen — and must return there. A resolver
+    // replace would answer `chart` and strip the back stack the captain came in on.
+    expect(source, 'no editing mode is read from the route params').toMatch(
+      /mode\s*===\s*'edit'|mode\s*===\s*"edit"/,
+    );
+    expect(source, 'edit mode never calls router.back()').toMatch(/router\s*\.\s*back\s*\(\s*\)/);
+    // And the first run must still hand the decision to the resolver, not to a literal route.
+    expect(source, 'the first run no longer replaces to the resolver’s destination').toMatch(
+      /router\s*\.\s*replace\([^)]*resolveDestination/,
+    );
+
+    // "Skip — choose for me" beside a name the captain already has reads as "discard my name".
+    expect(source, 'the skip is not hidden in edit mode').toMatch(/editing\s*\?\s*null\s*:/);
+  });
+});
+
+/** Parses the screen as TSX. Local to this block so the tests above keep their text-only stance. */
+function tsFor(source: string) {
+  return tsModule.createSourceFile(
+    SCREEN_PATH,
+    source,
+    tsModule.ScriptTarget.Latest,
+    true,
+    tsModule.ScriptKind.TSX,
+  );
+}
+
+/** The source text of every `useState(...)` initializer in the screen. */
+function useStateInitializers(file: import('typescript').SourceFile): string[] {
+  const found: string[] = [];
+  const visit = (node: import('typescript').Node): void => {
+    if (
+      tsModule.isCallExpression(node) &&
+      tsModule.isIdentifier(node.expression) &&
+      node.expression.text === 'useState'
+    ) {
+      const argument = node.arguments[0];
+      found.push(argument === undefined ? '' : argument.getText(file));
+    }
+    tsModule.forEachChild(node, visit);
+  };
+  visit(file);
+  return found;
+}

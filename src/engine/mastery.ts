@@ -1,11 +1,24 @@
 /**
  * Dual-rate mastery meters, the mastery threshold, and unlock resolution (T-010).
  *
- * PLAN.md §Sea chart, ports, and mastery: range drills fill a skill's meter at full rate;
- * correct answers in real duels fill the matching skill at half rate — so a duel-only player
- * still advances, just more slowly. Crossing a threshold (`MASTERY_THRESHOLD_CORRECT` weighted
- * corrects at `>= MASTERY_MIN_ACCURACY` accuracy) unlocks that skill's next cannon and lifts the
- * fog on the next island.
+ * Range drills and duel answers both fill a skill's meter at full rate. Crossing a threshold
+ * (`MASTERY_THRESHOLD_CORRECT` weighted corrects at `>= MASTERY_MIN_ACCURACY` accuracy) unlocks
+ * that skill's next cannon and lifts the fog on the next island.
+ *
+ * **The dual rate is retained as a mechanism and is currently 1:1** — PLAN.md's "duels fill at half
+ * rate" was overruled by the owner on 2026-07-30 because it hid progress: at half rate, opening the
+ * next island took ~20 correct duel answers and nothing on the chart moved in between. See
+ * `MASTERY_RATE_DUEL` in `tuning.ts` for the full reasoning. `applyAnswer` still takes a source and
+ * still reads two constants, so re-separating them is a one-line tuning change rather than a
+ * refactor.
+ *
+ * ## One skill opens the next island; every skill earns the check
+ *
+ * These are deliberately different marks and `services/chart.ts` keeps them apart. `resolveUnlocks`
+ * lifts the fog on island `I` as soon as **one** skill of its predecessor is mastered — that is the
+ * gate, and it is meant to be reachable. `ChartNode.cleared` (the green tick) needs **every**
+ * in-band skill the island teaches, and it is the completionist mark, not the gate. Loosening the
+ * tick to match the gate would delete the only thing on the map that says "finished".
  *
  * Mastery is stored as raw counters (`weightedCorrect`, `correct`, `attempts`); the 0-100 meter
  * and the boolean threshold check are both derived from those counters, never stored themselves
@@ -30,7 +43,10 @@ import {
 
 /** A single skill's mastery counters. Plain and serialisable — no methods, no derived fields. */
 export interface SkillMastery {
-  /** Weighted correct-answer total: range answers count `MASTERY_RATE_RANGE`, duel answers count `MASTERY_RATE_DUEL`. */
+  /**
+   * Weighted correct-answer total: range answers count `MASTERY_RATE_RANGE`, duel answers count
+   * `MASTERY_RATE_DUEL`. Both are 1 today; the weighting survives so the rates stay tunable.
+   */
   readonly weightedCorrect: number;
   /** Raw correct-answer count, for accuracy. */
   readonly correct: number;

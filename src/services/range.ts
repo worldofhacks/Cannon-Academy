@@ -31,6 +31,7 @@
  */
 import { getIsland, getSkill } from '@content/index';
 import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
+import { GRADE_BANDS } from '@content/schemas';
 import { startDrill, type DrillSession } from '@engine/drill';
 import { emptyMastery, isMastered, meterPercent, type SkillMastery } from '@engine/mastery';
 import { maxGradeForBand } from '@engine/placement';
@@ -132,17 +133,52 @@ function masteryFor(captain: Captain, skillId: SkillId): SkillMastery {
   return captain.mastery[skillId] ?? emptyMastery;
 }
 
+// ── The curriculum ceiling, as ONE rule (A-058's lesson, applied to practice) ─────────────────
+//
+// `services/loadout.ts` learned this the hard way: the band gated ACQUISITION in five places, every
+// one of them had to remember, and one forgot — a chest granted `nine_pounder` to a K-1 captain and
+// the duel asked them "How many tens are in 807?". The fix was to gate at the ONE place questions
+// are chosen, so a grant path added tomorrow inherits the ceiling without knowing it exists.
+//
+// The range's equivalent single place is the SKILL, because a drill asks `templatesForSkill(skill)`
+// and nothing else. `asksInBand` is the cannon-shaped sibling of the function below and could not
+// be reused directly — it takes a `Cannon` and reads `getSkill(cannon.skill)`, and the range never
+// has a cannon in hand — but the RULE is deliberately identical, including the part that matters
+// most: **a missing or corrupt band fails CLOSED**. `engine/mastery.ts:121` reads an absent band as
+// `POSITIVE_INFINITY`, which is safe there only because a skill must be mastered before it unlocks
+// anything; the same reading here would offer division to a captain the app has not placed yet.
+
+/**
+ * Whether the questions this skill generates are inside `band`'s ceiling.
+ *
+ * Total over every input, including the ones a save can really carry. `maxGradeForBand` THROWS for
+ * `null`, for `undefined`, and for a band string an older build wrote under a different name — and
+ * a throw reaching the range screen is a red box in front of a five-year-old, not a safety
+ * property. So the band is validated here and anything unrecognised answers `false`: no band, no
+ * drills. The screen then shows its "No drills ready" panel and the way back to the chart, which is
+ * a state a child can act on.
+ */
+export function skillInBand(skillId: SkillId, band: GradeBand | null | undefined): boolean {
+  if (band === null || band === undefined) return false;
+  if (!(GRADE_BANDS as readonly unknown[]).includes(band)) return false;
+  return getSkill(skillId).minGrade <= maxGradeForBand(band);
+}
+
 /**
  * The skills an island's gunnery range trains, in catalog order.
  *
  * Straight from the island record — a superset would let a child grind a skill the island does
  * not teach, and a subset silently strands the cannon that skill unlocks.
+ *
+ * `band` is OPTIONAL and omitting it returns the island's whole authored list. That is the catalog
+ * query (`range.test.ts` AC-1 pins the unfiltered equality), not the offer a child sees: every
+ * caller that puts drills in front of someone passes a band, and `trainingCatalog` — which is what
+ * the screen actually reads — has no way to omit one.
  */
-export function rangeSkills(islandId: IslandId, band?: GradeBand): readonly SkillId[] {
+export function rangeSkills(islandId: IslandId, band?: GradeBand | null): readonly SkillId[] {
   const skills = getIsland(islandId).rangeSkills;
   if (band === undefined) return skills;
-  const maxGrade = maxGradeForBand(band);
-  return skills.filter((skillId) => getSkill(skillId).minGrade <= maxGrade);
+  return skills.filter((skillId) => skillInBand(skillId, band));
 }
 
 /**
@@ -162,15 +198,20 @@ export function openDrill(input: {
   readonly rng: Rng;
   readonly length?: number;
 }): DrillSession {
+  // The ceiling, and it THROWS rather than returning empty — the opposite posture to the screen's.
+  // `openDrill` is only ever reached from a card a child pressed, so an out-of-band skill arriving
+  // here means a caller built an offer the band filter should already have removed. Failing loudly
+  // is what keeps that a test failure instead of a lesson three years early; `range-band.test.ts`
+  // AC-5 pins the throw for a null band, for a corrupt one, and for an over-grade skill.
   const gradeBand = input.captain.gradeBand;
-  const maxGrade = maxGradeForBand(gradeBand);
-  if (getSkill(input.skillId).minGrade > maxGrade) {
+  if (!skillInBand(input.skillId, gradeBand)) {
     throw new RangeError(
-      `openDrill: '${input.skillId}' exceeds the ${gradeBand} grade ceiling of ${maxGrade}`,
+      `openDrill: '${input.skillId}' (minGrade ${getSkill(input.skillId).minGrade}) is outside the ` +
+        `${JSON.stringify(gradeBand)} grade ceiling`,
     );
   }
 
-  const drillable = rangeSkills(input.islandId, gradeBand as GradeBand);
+  const drillable = rangeSkills(input.islandId, gradeBand);
   if (!drillable.includes(input.skillId)) {
     throw new RangeError(
       `openDrill: '${input.skillId}' is not trained at ${input.islandId} — its range drills ${

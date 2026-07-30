@@ -103,6 +103,45 @@ export const cannonWeapon: Record<CannonId, CannonWeaponLook> = {
   long_nine: { displayName: null, enabled: false, unavailableLabel: null },
 };
 
+// ── An owned gun the band cannot fire yet ─────────────────────────────────────────────────────
+//
+// A K-1 captain can win `nine_pounder` from a chest and OWN it, while the duel refuses to arm it
+// (A-058). The gun deck shows that gun rather than hiding it: the child earned it, and a reward
+// that disappears from the one screen where rewards live reads as the game taking it back. This is
+// the same call the sea chart makes by keeping a locked island's name and skill glyph under fog,
+// and the Harbor makes by leaving an unaffordable ship on the shelf with a progress meter.
+//
+// Two rules govern the words below.
+//
+//  1. **No grade number.** A five-year-old does not know what grade 2 means, and a number is a
+//     verdict they cannot act on. Adults get that context on the Rank screen, not here.
+//  2. **Waiting, not broken.** `harborShortfallMessage` turns "you cannot afford this" into "About
+//     four more duels" — a refusal re-stated as something arriving. The gun deck's obstacle is not
+//     coins and cannot be counted in duels, so the forward fact is growth rather than a tally.
+
+/**
+ * The chip on a gun that is owned but cannot sail yet.
+ *
+ * Deliberately the same two words as the Harbor's *"Not yet, Captain"* sheet, and the deliberate
+ * opposite of `harborRevealOwnedLabel`'s "YOURS — FLYING NOW": one pill, one of two states, learned
+ * by position rather than by reading.
+ */
+export const CANNON_NOT_YET_CHIP = 'NOT YET';
+
+/** The line on the card. "Yours" first, because the point is that nothing was taken away. */
+export const CANNON_NOT_YET_MESSAGE = 'Yours. You will grow into it.';
+
+/**
+ * What the card announces to a screen reader — the whole state, in one sentence.
+ *
+ * The skill is named BEFORE the state on purpose. The gun is kept on screen so a child can look
+ * forward to it, and "what it teaches" is the entire content of that anticipation; a label that led
+ * with the refusal would make the row a rejection notice read aloud.
+ */
+export function cannonNotYetLabel(displayName: string, skillName: string): string {
+  return `${displayName}, ${skillName}. Yours, not yet — you will grow into it.`;
+}
+
 /**
  * Temperament, rendered. The boards give each temper a colour, a badge shape and a one-word gloss
  * a five-year-old can act on — "steady", "normal", "risky" — rather than the engine's term.

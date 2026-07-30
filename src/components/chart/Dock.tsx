@@ -1,37 +1,52 @@
 /**
- * The bottom dock — what the live island is, how far along it the captain is, and the two ways in.
+ * The dock — the chart's one band of verbs, and the only bottom bar there is.
  *
- * `board.ts` measures the band exactly: 126pt tall, 12pt of padding, a 27.5pt header row, a 10pt
- * gap and a 64.5pt button row. Those four add up to the 126, which is why the dock is a fixed band
- * rather than a flexed one — the arithmetic IS the design, and letting it flex would let the
- * buttons eat the meter on a short screen.
+ * The voyage map used to get a different, smaller bar with a single "Zoom in" button, because it
+ * was the secondary view. It is the only view now, so it carries the full dock: the island's name
+ * and meter, and Practice / Guns / Fight. Nothing the close chart could do was dropped.
+ *
+ * `board.ts` measures the dock exactly: 134pt tall, 12pt of padding, a 26pt header row, a 12pt gap
+ * and a 72pt button row. Those four add up to the 134, which is why the dock is a fixed band rather
+ * than a flexed one — the arithmetic IS the design, and letting it flex would let the buttons eat
+ * the meter on a short screen. `chartHubControlLayout` derives its button row from the same four
+ * numbers, so the pure model and the rendered band cannot drift apart.
+ *
+ * Three controls, not five. The designer's split moved rank and coins into the header (*"the dock
+ * is for doing, the header is for having"*), which dissolves the whole A-048/A-049 squeeze: three
+ * buttons across 351pt is comfortable where five was negative-slack, so the labels are back at the
+ * board's own 16/18pt beside a real icon instead of shrunk to 10.5 under one.
  *
  * The mastery meter's ten cells are the island's own progress: the mean of `meterPercent` across
  * everything its range teaches. The engine owns the percentage; this only decides how many boxes
  * that fills, which is a drawing decision and belongs here.
  */
-import { Pressable, Text, View } from 'react-native';
+import { Image, Pressable, Text, View } from 'react-native';
 
 import type { Island, SkillId } from '@content/schemas';
 import { emptyMastery, meterPercent, type SkillMastery } from '@engine/mastery';
 
 import type { HubControl } from '../../services/flow';
-import { DOCK, islandGlyph } from './board';
+import { DOCK, WAYPOINT_PARTS, islandGlyph } from './board';
 import { chart } from './palette';
+import { Poly } from '../Poly';
+import { sprite } from '../../theme/sprites';
 import { font } from '../../theme/tokens';
-
-/**
- * The two ways off this screen. The board draws icons, not words, in these slots; `⚔` is
- * emoji-capable and needs U+FE0E or iOS repaints it in colour and ignores `color`.
- */
-const FIGHT_ICON = '\u2694\uFE0E';
-const RANGE_ICON = '\u25CE';
 
 interface DockProps {
   readonly island: Island;
   readonly mastery: Partial<Record<SkillId, SkillMastery>>;
-  /** A closed island can still be described. It just cannot be sailed to. */
+  /** A closed island can still be described. It just cannot be fought at. */
   readonly fogged: boolean;
+  /**
+   * How far the next island is, in whole duels — or `null` once the chain is finished.
+   *
+   * It rides in the header row's own line, beside the meter, because the two say different things
+   * and a child needs both: the meter is the COMPLETIONIST mark (every in-band skill of this island
+   * mastered, which is what earns the green tick), while this is the GATE (one skill mastered, which
+   * is what lifts the fog). Ten cells that fill at a fifth of the speed of the thing they appear to
+   * be measuring is how "I won and nothing happened" happens.
+   */
+  readonly nextIslandCount: number | null;
   readonly insetBottom: number;
   readonly typeScale: number;
   readonly controls: readonly HubControl[];
@@ -42,6 +57,7 @@ export function ChartDock({
   island,
   mastery,
   fogged,
+  nextIslandCount,
   insetBottom,
   typeScale,
   controls,
@@ -56,7 +72,7 @@ export function ChartDock({
         `box-shadow: 0 -4px 0 rgba(0,0,0,.08)` sits ABOVE the dock, so it is a lip behind it rather
         than a border inside it — and a CSS box-shadow occupies no layout. The negative margin
         cancels the padding that makes room for it, so the lip paints over the map's last 4pt and
-        the dock still occupies exactly the 126 the board's `inset: … 126px` reserves for it.
+        the dock still occupies exactly the 134 the board reserves for it.
       */}
       <View
         style={{
@@ -73,9 +89,8 @@ export function ChartDock({
       <View
         style={{
           height: DOCK.height * typeScale,
-          paddingHorizontal: pad,
-          paddingTop: pad,
-          paddingBottom: pad,
+          padding: pad,
+          gap: DOCK.gap * typeScale,
           borderTopLeftRadius: DOCK.radius * typeScale,
           borderTopRightRadius: DOCK.radius * typeScale,
           backgroundColor: chart.parchment,
@@ -86,7 +101,7 @@ export function ChartDock({
             height: DOCK.headerHeight * typeScale,
             flexDirection: 'row',
             alignItems: 'center',
-            gap: DOCK.gap * typeScale,
+            gap: 8 * typeScale,
           }}
         >
           <View
@@ -125,6 +140,31 @@ export function ChartDock({
             {island.displayName}
           </Text>
 
+          {nextIslandCount === null ? null : (
+            <View
+              style={{
+                paddingHorizontal: DOCK.nextChip.padX * typeScale,
+                paddingVertical: DOCK.nextChip.padY * typeScale,
+                borderRadius: 999,
+                backgroundColor: chart.live,
+              }}
+            >
+              <Text
+                numberOfLines={1}
+                style={{
+                  fontFamily: font.bodyBold,
+                  fontSize: DOCK.nextChip.size * typeScale,
+                  lineHeight: DOCK.nextChip.size * typeScale * 1.3,
+                  letterSpacing: DOCK.nextChip.size * DOCK.nextChip.tracking * typeScale,
+                  // Ink on amber is 6.90. White on amber is one of the four project-banned pairs.
+                  color: chart.ink,
+                }}
+              >
+                {nextIslandCount === 1 ? 'NEXT ISLE: 1 DUEL' : `NEXT ISLE: ${nextIslandCount} DUELS`}
+              </Text>
+            </View>
+          )}
+
           <View style={{ flexDirection: 'row', gap: DOCK.meter.gap * typeScale }}>
             {Array.from({ length: DOCK.meter.cells }, (_, i) => (
               <View
@@ -141,59 +181,20 @@ export function ChartDock({
         </View>
 
         {/*
-          Five square targets, at the geometry `flow.ts` already computed — NOT `flex: 1` with a
-          `minWidth`, which is what overflowed the band.
-
-          The arithmetic: the 64pt tap-target floor across five controls needs 322.5pt, and a 375pt
-          phone leaves 351 inside the dock's 12pt inset. That fits with 7.1pt gaps — which is
-          precisely what `chartHubControlLayout` derives — but the row was drawn with `DOCK.gap`
-          (10), needing 362.5, and `minWidth` stops flex from shrinking anything. So the last button
-          hung off the screen and every label truncated to "Har…", "G…", "Fi…".
-
-          Every computed gap here has been wrong, so the row no longer computes one. `flow.ts` derives
-          spacing from `viewport.width − 2 × 12` — 351 at a 375pt phone — but the rendered row
-          measures **327**: a second 12pt inset sits between the screen and this row that the pure
-          geometry cannot see. Four gaps × the 6pt difference is 24pt of overflow, which pinned Fight
-          flush to x=375 with no right padding while Harbor kept its 24 on the left. Reading the gap
-          back off `control.x` reproduced the same error, because those x values come from the same
-          351 assumption.
-
-          Measuring showed the deeper problem: five targets at the 64pt floor are **320pt of button**,
-          and a 320pt iPhone SE leaves ~272pt of row. No gap arithmetic fixes that — the buttons
-          themselves do not fit, and `space-between` has no slack to distribute, so they simply
-          overran the edge.
-
-          So `control.width` is now a CEILING, not a fixed size: `flex: 1` with `maxWidth` lets flex
-          divide whatever row actually exists, equally, and clamps at the board's 64pt on a screen wide
-          enough to grant it. Never `minWidth` — that was the original overflow, because it forbids
-          the shrinking that keeps the last button on screen.
-
-          **Documented trade-off:** at 375pt this yields ~62pt targets rather than 64, and narrower
-          phones go lower. The boards set 64 as a floor for small hands, so five controls in this band
-          is a demo affordance in tension with that floor at phone widths — the honest fixes are two
-          rows (the dock must then grow past the board's 126) or the board's own two controls. Flagged
-          for the owner in A-049 rather than silently clipped.
-
-          The labels STAY. A-038 froze a visible-label contract on these buttons — a demo viewer has
-          to see where each one goes — so the fix is to stack the label under the icon instead of
-          beside it. Side by side, an icon plus "Practice" needs well over 64pt and truncates; in a
-          column both fit inside the square with room to spare (A-048).
+          The board's own `flex: 1 / 1 / 1.2` row. `control.width` already encodes that ratio —
+          `flow.ts` derives it from the same weights and the same 12pt inset — so it is used as the
+          flex GROW factor rather than as a fixed width. That way the row always fills the band
+          exactly, and on a phone too narrow to grant every control its 64pt floor the ratios
+          flatten toward equal instead of the last button hanging off the screen, which is the
+          failure mode `minWidth` produced in A-049.
         */}
-        <View
-          style={{
-            flexDirection: 'row',
-            // Centred, not left-packed. `maxWidth` caps each target, so on a tablet or desktop the
-            // group stops growing well before the column does — 365pt of buttons in a 1154pt band —
-            // and the leftover has to go somewhere. Left-packed it looked like a rendering error.
-            // On a phone there is no leftover, so this is a no-op there (A-050).
-            justifyContent: 'center',
-            gap: DOCK.controlGap * typeScale,
-            marginTop: DOCK.gap * typeScale,
-          }}
-        >
+        <View style={{ flex: 1, flexDirection: 'row', gap: DOCK.controlGap * typeScale }}>
           {controls.map((control) => {
-            const disabled = fogged && control.id === 'duel';
+            if (control.surface !== 'dock') return null;
             const primary = control.id === 'duel';
+            const disabled = fogged && primary;
+            const labelSize = (primary ? DOCK.primaryTextSize : DOCK.secondaryTextSize) * typeScale;
+
             return (
               <Pressable
                 key={control.id}
@@ -204,31 +205,31 @@ export function ChartDock({
                 accessibilityLabel={control.accessibilityLabel}
                 style={({ pressed }) => [
                   {
-                    flex: 1,
-                    maxWidth: control.width,
-                    height: control.height,
+                    flexGrow: control.width,
+                    flexShrink: 1,
+                    flexBasis: 0,
                     borderRadius: DOCK.buttonRadius * typeScale,
-                    backgroundColor: primary ? chart.gold : chart.white,
+                    backgroundColor: primary ? chart.live : chart.white,
                     borderBottomWidth: DOCK.buttonShadowDy * typeScale,
-                    borderBottomColor: primary ? chart.liveShadow : chart.purseShadow,
+                    borderBottomColor: primary ? chart.liveShadow : chart.whiteShadow,
                     alignItems: 'center',
                     justifyContent: 'center',
-                    gap: 2 * typeScale,
+                    gap: 4 * typeScale,
                     opacity: disabled ? 0.45 : 1,
-                    paddingHorizontal: 2 * typeScale,
+                    paddingHorizontal: 4 * typeScale,
                   },
                   pressed ? { transform: [{ translateY: 2 }], borderBottomWidth: 1 } : null,
                 ]}
               >
-                <DockIcon id={control.id} primary={primary} typeScale={typeScale} />
+                <DockIcon id={control.id} typeScale={typeScale} />
                 <Text
                   numberOfLines={1}
                   adjustsFontSizeToFit
                   style={{
                     fontFamily: font.displayBold,
-                    fontSize: DOCK.controlLabelSize * typeScale,
-                    lineHeight: DOCK.controlLabelSize * typeScale * 1.15,
-                    color: primary ? chart.ink : chart.inkMuted,
+                    fontSize: labelSize,
+                    lineHeight: labelSize * 1.15,
+                    color: chart.ink,
                   }}
                 >
                   {control.label}
@@ -245,110 +246,65 @@ export function ChartDock({
 }
 
 /**
- * The mark on a dock button. Icons, not words — see the row above.
+ * The mark on a dock button, in a 26pt-tall box — the board's own three.
  *
- * `harbor` and `rank` previously had no branch here at all, so they rendered as empty tiles once the
- * labels came off. Both are drawn from Views for the same reason `CannonMark` is: every glyph that
- * reads as "coins" or "ladder" is emoji-capable, and an emoji ignores `color` on iOS, so a muted
+ * Practice reuses the gunnery range's buoy ring, Guns is one of the two rasters the board permits,
+ * and Fight is the rival's purple sail with a shot beside it. Not glyphs: every character that
+ * reads as "cannon" or "duel" is emoji-capable, and an emoji ignores `color` on iOS, so a muted
  * mark would come back full-colour and out of palette.
  */
-function DockIcon({
-  id,
-  primary,
-  typeScale,
-}: {
-  readonly id: HubControl['id'];
-  readonly primary: boolean;
-  readonly typeScale: number;
-}) {
-  const ink = primary ? chart.ink : chart.inkMuted;
-  const size = (primary ? DOCK.primaryIconSize : DOCK.secondaryIconSize) * typeScale;
+function DockIcon({ id, typeScale }: { readonly id: HubControl['id']; readonly typeScale: number }) {
+  const box = DOCK.iconBox * typeScale;
 
-  switch (id) {
-    case 'duel':
-      return <Text style={{ fontSize: size, lineHeight: size * 1.2, color: ink }}>{FIGHT_ICON}</Text>;
-    case 'range':
-      return <Text style={{ fontSize: size, lineHeight: size * 1.2, color: ink }}>{RANGE_ICON}</Text>;
-    case 'gun-deck':
-      return <CannonMark size={size} ink={ink} />;
-    case 'harbor':
-      return <CoinStackMark size={size} ink={ink} />;
-    case 'rank':
-      return <LadderMark size={size} ink={ink} />;
+  if (id === 'gun-deck') {
+    return (
+      <View style={{ height: box, justifyContent: 'center' }}>
+        <Image source={sprite.cannon} style={{ width: 28 * typeScale, height: box }} resizeMode="contain" />
+      </View>
+    );
   }
-}
 
-/** Three stacked coins — the harbour is where coins are spent. */
-function CoinStackMark({ size, ink }: { size: number; ink: string }) {
-  const coin = size * 0.32;
-  return (
-    <View style={{ width: size, height: size, justifyContent: 'center', alignItems: 'center' }}>
-      {[0, 1, 2].map((i) => (
+  if (id === 'duel') {
+    return (
+      <View style={{ height: box, flexDirection: 'row', alignItems: 'flex-end', gap: 4 * typeScale }}>
+        <Poly
+          points={WAYPOINT_PARTS.rival.sail.points}
+          width={20 * typeScale}
+          height={24 * typeScale}
+          fill={chart.rivalMast}
+        />
         <View
-          key={i}
           style={{
-            width: size * (0.9 - i * 0.12),
-            height: coin,
+            width: 8 * typeScale,
+            height: 8 * typeScale,
             borderRadius: 999,
-            backgroundColor: ink,
-            marginTop: i === 0 ? 0 : -coin * 0.34,
-            opacity: 1 - i * 0.18,
+            backgroundColor: chart.ink,
+            marginBottom: 8 * typeScale,
           }}
         />
-      ))}
-    </View>
-  );
-}
+      </View>
+    );
+  }
 
-/** Three ascending bars — the rank ladder climbs. */
-function LadderMark({ size, ink }: { size: number; ink: string }) {
-  const bar = size * 0.24;
   return (
     <View
       style={{
-        width: size,
-        height: size,
-        flexDirection: 'row',
-        alignItems: 'flex-end',
-        justifyContent: 'space-between',
+        width: box,
+        height: box,
+        borderRadius: 999,
+        backgroundColor: chart.buoyRing,
+        borderWidth: 5 * typeScale,
+        borderColor: chart.buoyBand,
+        alignItems: 'center',
+        justifyContent: 'center',
       }}
     >
-      {[0.45, 0.72, 1].map((h) => (
-        <View
-          key={h}
-          style={{ width: bar, height: size * h, borderRadius: bar * 0.35, backgroundColor: ink }}
-        />
-      ))}
-    </View>
-  );
-}
-
-/**
- * A cannon, drawn from two blocks rather than typed.
- *
- * Every glyph that reads as a cannon is emoji-capable, and an emoji ignores `color` on iOS — so a
- * muted icon would come back full-colour and out of palette. Two Views cost less than that risk,
- * and they are the same flat-block vocabulary `duel/Ship.tsx` already builds a whole ship from.
- */
-function CannonMark({ size, ink }: { size: number; ink: string }) {
-  return (
-    <View style={{ width: size, height: size, justifyContent: 'flex-end' }}>
       <View
         style={{
-          width: size,
-          height: size * 0.34,
-          borderRadius: size * 0.1,
-          backgroundColor: ink,
-          marginBottom: size * 0.06,
-        }}
-      />
-      <View
-        style={{
-          width: size * 0.34,
-          height: size * 0.34,
+          width: 8 * typeScale,
+          height: 8 * typeScale,
           borderRadius: 999,
-          backgroundColor: ink,
-          marginLeft: size * 0.16,
+          backgroundColor: chart.buoyBand,
         }}
       />
     </View>

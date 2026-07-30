@@ -7,6 +7,28 @@
  * It inspects inline callbacks and locally resolvable extracted callbacks. Calls to Reanimated
  * primitives and unshadowed worklet-safe ECMAScript intrinsics are allowed; calls to captured,
  * imported-from-elsewhere, or unresolved JavaScript helpers are rejected.
+ *
+ * ── Amendment, turn 9: four callbacks became seven ─────────────────────────────────────────────
+ * The inventory below is an EXACT list on purpose — a new animation must be added deliberately and
+ * reviewed for worklet safety, never appear because someone slipped one in. So a rebuild that adds
+ * motion has to amend it in the same change, with the reason written down. This is that amendment.
+ *
+ * `Cannon Academy Sea Chart.dc.html` replaced the chart with two views, and its stylesheet declares
+ * nine keyframes where the previous board had four. The delta, one line each:
+ *
+ *   + `Sea.tsx::swellStyle`     `sc-swell` — sixteen drifting swell dashes across the two screens.
+ *   + `Sea.tsx::dashStyle`      `sc-dash`  — the five crawling route dashes.
+ *   + `Kraken.tsx::humpStyle`   `sc-hump`  — the sea monster between the two fogged islands.
+ *   + `Waypoint.tsx::bobStyle`  `sc-bob`   — the chests and the rival sails, on the ship's keyframe.
+ *   − `Station.tsx::riseStyle`  the `SAIL HERE ▸` chip is gone; the new board says `YOU ARE HERE`
+ *                               in a static gold chip under the live island's name, and its
+ *                               `sc-rise` keyframe is declared but applied to nothing on either
+ *                               screen (owner ruling 11), so nothing rose to replace it.
+ *
+ * Each entry is a CALL SITE, not an instance: `swellStyle` is one `useAnimatedStyle` inside one
+ * `Swell` component that renders sixteen times. Every one of the seven was written with its pixel
+ * values hoisted out of the worklet body, which is what the per-callback tests below then prove
+ * rather than assume.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -442,11 +464,15 @@ function workletsIn(relativePath: string, text: string): readonly Worklet[] {
 const WORKLETS = chartSourceFiles(CHART_ROOT).flatMap((path) =>
   workletsIn(relative(REPO_ROOT, path), readFileSync(path, 'utf8')),
 );
+/** Sorted by file path, then by source order within the file — see `chartSourceFiles`/`workletsIn`. */
 const CURRENT_SHIPPED_WORKLETS = [
   'src/components/chart/ChartShip.tsx::bobStyle',
   'src/components/chart/Fog.tsx::driftStyle',
+  'src/components/chart/Kraken.tsx::humpStyle',
+  'src/components/chart/Sea.tsx::swellStyle',
+  'src/components/chart/Sea.tsx::dashStyle',
   'src/components/chart/Station.tsx::ringStyle',
-  'src/components/chart/Station.tsx::riseStyle',
+  'src/components/chart/Waypoint.tsx::bobStyle',
 ] as const;
 
 const ALIASED_UNSAFE_FIXTURES = [
@@ -499,11 +525,11 @@ const JS_THREAD_REANIMATED_FIXTURES = [
 ] as const;
 
 describe('A-018 — chart Reanimated worklet safety', () => {
-  it('spec(A-018:AC-1) inventories exactly the four currently shipped chart useAnimatedStyle callbacks', () => {
+  it('spec(A-018:AC-1) inventories exactly the seven currently shipped chart useAnimatedStyle callbacks', () => {
     const inventory = WORKLETS.map((worklet) => `${worklet.relativePath}::${worklet.binding}`);
 
     expect(inventory).toStrictEqual(CURRENT_SHIPPED_WORKLETS);
-    expect(new Set(inventory).size).toBe(4);
+    expect(new Set(inventory).size).toBe(CURRENT_SHIPPED_WORKLETS.length);
   });
 
   describe.each(WORKLETS)('$relativePath::$binding', ({ inspectionError, unsafeCalls }) => {

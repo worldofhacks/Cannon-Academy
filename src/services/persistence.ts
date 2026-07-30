@@ -69,6 +69,39 @@ function normalizeMercyState(raw: unknown): MercyState {
   return { recentPlayerCorrect, consecutiveLosses, forcedMisfiresRemaining };
 }
 
+/**
+ * The chart-walkthrough beat, defaulted for any save written before it existed.
+ *
+ * Deliberately NOT part of `isBaseCaptain` and NOT a reason to bump `SCHEMA_VERSION` — the same
+ * ruling that governs `seenCannons` and `ownedSkins`. Requiring it would reject every save written
+ * before this shipped, and `hydrate` answers a rejected save with `emptyCaptain()`: a returning
+ * captain would lose their band, their name, their flag, their coins and their rank, and to a child
+ * that is indistinguishable from the game deleting them. A missing resume index costs one replayed
+ * beat; the alternative costs the save.
+ */
+function normalizeOnboardingBeat(raw: unknown): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return 0;
+  return Math.max(0, Math.floor(raw));
+}
+
+/**
+ * A tour replay never survives a relaunch — this reads `false` for every save, always.
+ *
+ * It is not a normaliser that happens to be strict; it is the rule that clears an ABANDONED
+ * replay, and it lives here because `hydrate` is the one place a launch decides what the captain
+ * was doing. A captain who force-quits halfway through walking the tutorial a second time relaunches
+ * onto their chart with everything intact, rather than into a tour they walked away from. The board's
+ * RESUME rule is about a FIRST run — a child interrupted mid-onboarding — and that case is carried
+ * by `hasCompletedOnboarding` being false, which this cannot touch.
+ *
+ * Like `onboardingBeat`, it is absent from `isBaseCaptain` and costs no `SCHEMA_VERSION` bump: a
+ * save written before today must not be rejected, because `hydrate` answers a rejected save with
+ * `emptyCaptain()` and that is the game deleting a real captain.
+ */
+function normalizeReplayingTour(): boolean {
+  return false;
+}
+
 function normalizeNextPurchaseSequence(raw: unknown): number {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) return 0;
   const sequence = Math.floor(raw);
@@ -137,6 +170,8 @@ function normalizeCaptain(raw: Record<string, unknown>): Captain {
     ...base,
     seenCannons: Array.isArray(base.seenCannons) ? base.seenCannons : [],
     ...normalizeSkins(raw),
+    onboardingBeat: normalizeOnboardingBeat(raw.onboardingBeat),
+    replayingTour: normalizeReplayingTour(),
     mercyState: normalizeMercyState(raw.mercyState),
     rewardReceipts: normalizeRewardReceipts(raw.rewardReceipts),
     nextPurchaseSequence: normalizeNextPurchaseSequence(raw.nextPurchaseSequence),
@@ -148,6 +183,8 @@ function migrateLegacyCaptain(raw: Record<string, unknown>): Captain {
     ...(raw as Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'>),
     seenCannons: Array.isArray(raw.seenCannons) ? (raw.seenCannons as Captain['seenCannons']) : [],
     ...normalizeSkins(raw),
+    onboardingBeat: normalizeOnboardingBeat(raw.onboardingBeat),
+    replayingTour: normalizeReplayingTour(),
     mercyState: freshMercyState(),
     rewardReceipts: {},
     nextPurchaseSequence: 0,
