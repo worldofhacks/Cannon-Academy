@@ -182,6 +182,11 @@ export function ChartDock({
         <View
           style={{
             flexDirection: 'row',
+            // Centred, not left-packed. `maxWidth` caps each target, so on a tablet or desktop the
+            // group stops growing well before the column does — 365pt of buttons in a 1154pt band —
+            // and the leftover has to go somewhere. Left-packed it looked like a rendering error.
+            // On a phone there is no leftover, so this is a no-op there (A-050).
+            justifyContent: 'center',
             gap: DOCK.controlGap * typeScale,
             marginTop: DOCK.gap * typeScale,
           }}
