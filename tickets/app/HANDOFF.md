@@ -1,11 +1,100 @@
 # App track — handoff
 
-Verification date: 2026-07-29 (afternoon, America/Chicago).
+Verification date: 2026-07-29 (the A-044 reviewer-readiness snapshot, section 1 onward).
 
-**Supersedes** older noon-deadline and agent-recovery snapshots in git history.
+**Section 0 below is a later addendum, verified 2026-07-30**, and supersedes anything it contradicts.
+Everything from section 1 down is the A-044 snapshot, kept intact because its assertions are frozen.
 
-Live ticket lifecycle: [`tickets/INDEX.md`](../INDEX.md) only. Do not treat wave tables in
-`APP-TICKETS.md` or `STATE.md` as current.
+---
+
+## 0. Read this first — state as of 2026-07-30
+
+**Branch `app/shell`, clean, pushed. Tip: `7b65598`.** Never merge to `main` — owner PR only.
+
+Last production web deploy: **`28f4ccc`** → <https://cannon-academy.expo.app>. That deploy predates
+everything in the table below, so the hosted build does **not** yet show the restored ships, the
+Harbor, or any A-045→A-056 fix. Redeploy before demoing the URL.
+
+### Gates
+
+`tsc` clean · eslint clean · **2,330 passing / 16 failing**.
+
+Those 16 live in 6 files and are **pre-existing** — verified by stashing the session's work and
+re-running at the starting commit, which produced the identical 16:
+`duel-outcome` (6), `reviewer-readiness` (4), `engine/duel/reducer` (2),
+`victory-reward-presentation` (2), `responsive-surfaces` (1), `text-presentation-glyphs` (1).
+
+> **Run the suite single-threaded while Metro or the simulator is up:**
+> `npx vitest run --pool=forks --poolOptions.forks.singleFork=true`
+> Under load, `guided-duel` and `ticket-index` lose their CPU slice and report phantom failures —
+> 17–18 across 7–8 files. Single-threaded returns exactly the baseline 16. Do not chase those.
+
+### What shipped this session (A-045 → A-056)
+
+|                   |                                                                                                                        |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| **A-045**         | Restored the boards' composed ships; deleted 17 non-artifact rasters; installed the artifact-provenance rule as a test |
+| **A-046**         | 16 invented colours → artifact tokens (the rival was rendering **brown** against a purple board)                       |
+| **A-047**         | **Two launch-blocking bugs** — a hook-order crash on both duel routes, and the guided duel's dead cannon               |
+| **A-048/049/050** | Chart dock: overflow, padding symmetry, tablet/desktop centring; ship waterline and crossbones geometry                |
+| **A-051**         | Grade-band ceiling — green checks were **unreachable** for K–1; × and ÷ leaked onto their gun deck                     |
+| **A-052/053**     | Ship-skin system: catalog, `Captain.ownedSkins`/`equippedSkin`, persistence migration, previews fly the child's flag   |
+| **A-054**         | Five real contrast failures fixed; text colours now certified against their ground                                     |
+| **A-055**         | **Harbor rebuilt** — sells ship skins, chest removed by owner ruling                                                   |
+| **A-056**         | Harbor status bar; `pointerEvents` migrated off the deprecated prop                                                    |
+
+### Verified on device
+
+Harbor driven on an iPhone 17 (simulator udid `87AB99AA-EA03-47D5-8C1D-928C694B8BE5`). Guided duel
+played to victory end-to-end with zero console errors. Responsive measured in CSS pixels at
+320 / 375 / 768 / 1280 — no overflow, column centred, padding symmetric at all four.
+
+### Immediate next task
+
+**Rank screen** — trophy tiles + tier badge, private progress only, ladder **cut** (the designer's
+own ranking: _"K–3 never sees a ladder anyway, so shipping 2a alone is a complete product"_).
+Three of four trophies already wired (`ownedCannons`, `unlockedIslands`, mastered-skill count); the
+fourth is `ownedSkins`, which exists as of A-052.
+
+### Blocked, and on what
+
+1. **`ranks.json` → Voyager** (Cadet · Ensign · **Voyager** · Commodore · Fleet Legend).
+   `src/content/**` is **engine-track scope** — needs the engine agent or owner sign-off. One
+   display string, **no migration risk** (`rankTier` persists as a number). Until it lands, Rank
+   renders tier 3 as "Captain", colliding with the salutation used on every screen.
+2. **Purse-as-button, and dock → three controls.** Both live in the chart header and are blocked on
+   Claude Design's **sea chart redesign**, in flight. Harbor and Rank are reachable from the existing
+   dock meanwhile, so this is polish, not a prerequisite.
+3. **Guided-duel tutorial steps 2 and 3.** Brief sent (`design/GUIDED-DUEL-BRIEF.md`); the board
+   specifies step 1 of 3 only.
+
+### Design-track state (Claude Design, project `88888c12-22e4-4781-b76f-a28110506499`)
+
+Three boards live there: `Cannon Academy Design Boards`, `…Duel`, `…Harbor and Rank`. **A sea-chart
+enhancement is in flight.** Extraction method — the bundled `__bundler/template` island — is
+documented in [`design/boards/README.md`](../../design/boards/README.md); re-extract rather than
+reading the rendered page, because the runtime replaces authored transforms.
+
+Rulings settled with the designer this session, all implemented:
+
+- Gems are **badges, not stock** — selling the rare-drop item for soft currency is a monetisation
+  shape even with no money in it.
+- **Previews fly the child's flag**, not the skin's pennant — _"for a non-reader the picture is the
+  contract."_ `skin.pennant` is kept on the record, rendered by nothing, for a future flag shelf.
+- **Rank moves to the header pill**, dock to three. Rule: _"the dock is for doing, the header is for
+  having."_
+- **Ladder cut**; if it ever returns the gate is a placement rule inside onboarding's grade step, not
+  a maths puzzle (the target child solves it) and not a password.
+
+### Standing rules that were each learned the hard way
+
+- Every ticket through `/tdd-swarm`; tests frozen before implementers touch them.
+- **Verify on the simulator, not on green tests.** Three launch-blocking bugs this session were
+  invisible to 2,300 passing tests, and `react-hooks/rules-of-hooks` does **not** catch a hook below
+  an early return — `__tests__/app/hook-order.test.ts` exists because of that.
+- Commit with **explicit paths**, never `git add -A`.
+- App track must not edit `src/engine/**`, `src/content/**`, `.tdd-swarm/**`, `tickets/T-*.md`.
+- A raster ships only if byte-identical to an image embedded in a design artifact (nine files).
 
 ---
 
