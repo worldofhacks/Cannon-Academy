@@ -541,6 +541,9 @@ function GuidedDuelBody() {
             chestReceipt={captain.rewardReceipts[duelReceiptKey(view.duelId)] ?? null}
             onOpenChest={() => setChestOpen(true)}
             onLeave={leave}
+            // Not "Back to the chart": the coached tour of the chart comes next, so naming the
+            // destination here promised a screen the following one is not yet.
+            leaveLabel="Let’s go!"
           />
         ) : null}
 

@@ -178,6 +178,14 @@ interface VictoryProps {
   readonly chestOpen: boolean;
   readonly onOpenChest: () => void;
   readonly onLeave: () => void;
+  /**
+   * The exit's copy. Defaults to naming the destination, because in an ordinary duel that IS where
+   * the button goes and a child who cannot read the words still learns the shape of the sentence.
+   *
+   * The guided duel overrides it: what follows there is the coached tour of the chart, not the
+   * chart itself, so "Back to the chart" promised something the next screen did not deliver.
+   */
+  readonly leaveLabel?: string;
 }
 
 export function VictoryPanel({
@@ -189,6 +197,7 @@ export function VictoryPanel({
   chestOpen,
   onOpenChest,
   onLeave,
+  leaveLabel = 'Back to the chart',
 }: VictoryProps) {
   const receipt = chestReceipt;
   const ceremony = chestOpen && receipt !== null ? projectChestCeremony(receipt, rewards) : null;
@@ -257,8 +266,13 @@ export function VictoryPanel({
         )}
       </Pressable>
 
-      <Pressable onPress={onLeave} style={({ pressed }) => [s.primaryButton, pressed && s.buttonPressed]}>
-        <Text style={s.primaryButtonText}>Back to the chart</Text>
+      <Pressable
+        onPress={onLeave}
+        accessibilityRole="button"
+        accessibilityLabel={leaveLabel}
+        style={({ pressed }) => [s.primaryButton, pressed && s.buttonPressed]}
+      >
+        <Text style={s.primaryButtonText}>{leaveLabel}</Text>
       </Pressable>
     </View>
   );
