@@ -232,15 +232,27 @@ describe('A-034 cannon identity', () => {
     }
   });
 
+  /**
+   * Re-baselined for owner ruling D-10 (2026-07-31, `tickets/app/OWNER-RULINGS.md`): a captain
+   * starts with ONE gun, and the Culverin becomes the first gun EARNED rather than a starter.
+   * Reported from a real playthrough — the guided duel arms one gun and the first unscripted duel
+   * handed the child two.
+   *
+   * A-034's own subject is untouched and is what the loop below still sweeps: every gun a band is
+   * PLACED with must be playable at that band, and the only non-starters allowed in are D-9's two
+   * exceptions. The three literals moved because the catalog's starter set shrank from two to one;
+   * `expectedPlacementCannons` is derived from the rule and needed no edit, and the two agreeing
+   * is the point of asserting both.
+   */
   it('spec(A-034:AC-5) each grade band placement grants playable starters plus only the approved exceptions', () => {
     expect(sorted(resolvePlacement('k_1').unlockedCannons)).toEqual(
-      sorted(['swivel_gun', 'culverin'] as CannonId[]),
+      sorted(['swivel_gun'] as CannonId[]),
     );
     expect(sorted(resolvePlacement('g2_3').unlockedCannons)).toEqual(
-      sorted(['swivel_gun', 'culverin', 'six_pounder'] as CannonId[]),
+      sorted(['swivel_gun', 'six_pounder'] as CannonId[]),
     );
     expect(sorted(resolvePlacement('g4_5').unlockedCannons)).toEqual(
-      sorted(['swivel_gun', 'culverin', 'six_pounder', 'twelve_pounder'] as CannonId[]),
+      sorted(['swivel_gun', 'six_pounder', 'twelve_pounder'] as CannonId[]),
     );
 
     for (const band of GRADE_BANDS) {

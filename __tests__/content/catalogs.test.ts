@@ -94,6 +94,10 @@ const CANNON_TABLE: Record<CannonId, CannonRow> = {
     maxGrade: 1,
     unlock: { kind: 'starter' },
   },
+  // D-10 (2026-07-31, `tickets/app/OWNER-RULINGS.md`) — a captain starts with ONE gun. The
+  // Culverin left `starter` for the range unlock on the skill the Swivel Gun already teaches, so
+  // it is the FIRST gun a captain earns rather than one they are handed. Damage, temperament,
+  // timer and grade span are untouched: the ruling moved WHEN it arrives, not what it is.
   culverin: {
     skill: 'add_within_10',
     damageMin: 4,
@@ -102,7 +106,7 @@ const CANNON_TABLE: Record<CannonId, CannonRow> = {
     timerMs: 20_000,
     minGrade: 0,
     maxGrade: 1,
-    unlock: { kind: 'starter' },
+    unlock: { kind: 'range', island: 'port_sumwich', tier: 1 },
   },
   // T-029 / D-7 — invented (not in PLAN.md armory); range payoff for add_within_10
   saker: {
@@ -237,8 +241,12 @@ const ISLAND_TABLE: Record<
 > = {
   port_sumwich: {
     // T-029 / D-7 — add_within_10 joins the lane; saker is its paying range unlock
+    // D-10 — culverin joins the list because AC-9 below requires every RANGE cannon to be listed
+    // by the one island it names, and the Culverin now names this one. It is inert for unlocking:
+    // `unlocksCannons` is read only to hand a NEWLY-earned island its entry gun, and Port Sumwich
+    // is the chain root (`requiresIsland === undefined`), so it is never in an unlock delta.
     rangeSkills: ['add_within_10', 'add_within_20', 'sub_within_20', 'two_step_add_sub'],
-    unlocksCannons: ['saker', 'six_pounder', 'chain_shot', 'double_broadside'],
+    unlocksCannons: ['culverin', 'saker', 'six_pounder', 'chain_shot', 'double_broadside'],
   },
   // A-060 — Isla Products is a PLACE, not a difficulty tier: it teaches GROUPING at whatever level
   // the captain's band can be asked. `repeated_addition` is the K-1 rung of that concept and
@@ -570,13 +578,37 @@ describe('AC-4 — recoil is exactly the three documented values and zero everyw
 
 // --- AC-5: the starter loadout is a real choice from minute one --------------------------------
 
-describe('AC-5 — the starter loadout is two K-skill cannons with different profiles', () => {
-  it('spec(T-006:AC-5) exactly swivel_gun and culverin have unlock.kind === "starter"', () => {
+/**
+ * Re-baselined for owner ruling D-10 (2026-07-31) — `tickets/app/OWNER-RULINGS.md`.
+ *
+ * T-006:AC-5 was written as "two starter cannons that are a real choice" (PLAN.md's MVP checklist,
+ * twice). A real playthrough found the cost of taking that literally: the guided duel arms ONE gun
+ * (`services/guidedDuel.ts`), and the first unscripted duel then handed the child two, one of which
+ * they had done nothing to earn. The owner ruled the Swivel Gun is the only starter and the
+ * Culverin is the first gun a captain EARNS, on the same `add_within_10` the tutorial just taught.
+ *
+ * **The AC's substance survives the ruling and is still asserted below**: the choice is still two
+ * `add_within_10` guns with genuinely different profiles — reliable 8–12 against volatile 4–16 —
+ * and it is still available inside the first mastery rather than deep in the game. What moved is
+ * WHEN the second one arrives, which is the ruling's whole content. Only the starter COUNT is
+ * re-baselined; the contrast assertions are byte-identical.
+ */
+describe('AC-5 — the opening pair is two K-skill cannons with different profiles (D-10: one is earned)', () => {
+  it('spec(T-006:AC-5) exactly swivel_gun has unlock.kind === "starter"', () => {
     const starters = sorted(cannons.filter((c) => c.unlock.kind === 'starter').map((c) => c.id));
-    expect(starters).toEqual(sorted(['culverin', 'swivel_gun'] as CannonId[]));
+    expect(starters).toEqual(sorted(['swivel_gun'] as CannonId[]));
   });
 
-  it('spec(T-006:AC-5) both starters teach add_within_10 and open at grade 0', () => {
+  it('spec(T-006:AC-5) D-10 — the culverin is the first EARNED gun, on the starter’s own skill', () => {
+    const culverin = findCannon('culverin');
+    const swivel = findCannon('swivel_gun');
+    // Same skill as the starter: nothing new has to be learned to earn it, which is what makes it
+    // the first reward rather than the first wall.
+    expect(culverin.skill).toBe(swivel.skill);
+    expect(culverin.unlock).toEqual({ kind: 'range', island: 'port_sumwich', tier: 1 });
+  });
+
+  it('spec(T-006:AC-5) both opening cannons teach add_within_10 and open at grade 0', () => {
     for (const id of ['swivel_gun', 'culverin'] as const) {
       const cannon = findCannon(id);
       expect(cannon.skill, `${id} skill`).toBe('add_within_10');
@@ -584,7 +616,7 @@ describe('AC-5 — the starter loadout is two K-skill cannons with different pro
     }
   });
 
-  it('spec(T-006:AC-5) the two starters offer genuinely different damage profiles', () => {
+  it('spec(T-006:AC-5) the two opening cannons offer genuinely different damage profiles', () => {
     const swivel = findCannon('swivel_gun');
     const culverin = findCannon('culverin');
 

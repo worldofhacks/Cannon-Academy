@@ -126,7 +126,10 @@ export function CannonTray({ cannons, gradeBand, onPick }: CannonTrayProps) {
 const s = StyleSheet.create({
   wrap: { flex: 1, padding: space[3], gap: space[2] },
   head: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 2 },
-  title: { ...type.title, fontSize: 17, color: color.inkDark },
+  // `lineHeight` travels with the overridden `fontSize`: the display steps are absolute points
+  // sized for their own step, and 17pt under `title`'s 31 would be a 1.82 em box. `ceil(17 × 1.602)`
+  // — see the ratio note in `theme/tokens.ts`.
+  title: { ...type.title, fontSize: 17, lineHeight: 28, color: color.inkDark },
   chevron: {
     width: 26,
     height: 26,

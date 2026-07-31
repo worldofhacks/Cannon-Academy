@@ -11,6 +11,12 @@
  * `unlock`. T-032 owns the suite rewrite for the amended T-011 AC-2 / AC-4 / AC-5 cannon rules;
  * A-034 owns the D-9 placement exceptions in `resolvePlacement`.
  *
+ * Owner ruling D-10 (2026-07-31): amends the CATALOG, not this module's rule. `culverin` left
+ * `unlock.kind: "starter"` for a `range` unlock, so "starters reachable at this band" now names
+ * ONE cannon instead of two. Reported from a real playthrough — the guided duel arms one gun and
+ * the first unscripted duel handed the child two. `expectedCannonIds` below is derived from the
+ * rule and needed no edit; only the ticket's own literal examples moved, each marked at its site.
+ *
  * This module is asymmetric in its failure modes (ticket dispatch, and PLAN.md's mercy language):
  * placing a child too HIGH makes their first duel unwinnable — the exact "convince a six-year-old
  * they're bad at maths" outcome the whole game guards against. Placing them too LOW is merely
@@ -126,12 +132,15 @@ describe('AC-1 — maxGrade resolves per grade band', () => {
 });
 
 // =================================================================================================
-describe('AC-2 — k_1 unlocks exactly the two starter cannons (D-6)', () => {
-  it('spec(T-011:AC-2) spec(T-032:AC-2) unlockedCannons is exactly swivel_gun and culverin', () => {
+describe('AC-2 — k_1 unlocks exactly the starter cannon (D-6, amended by D-10)', () => {
+  it('spec(T-011:AC-2) spec(T-032:AC-2) unlockedCannons is exactly swivel_gun', () => {
     // Ticket's own named example — kept literal because AC-2 states it explicitly.
-    // Range guns (six_pounder, chain_shot, …) are earned through mastery, not placement.
+    // Range guns (culverin, saker, six_pounder, …) are earned through mastery, not placement.
+    // D-10 (2026-07-31): the Culverin was in this literal until the owner ruled a captain starts
+    // with ONE gun and the Culverin is the first gun EARNED. The rule AC-2 states — "starters
+    // reachable at this band, and nothing else" — is unchanged; the catalog's starter set shrank.
     const placement = resolvePlacement('k_1');
-    expect(sorted(placement.unlockedCannons)).toEqual(sorted(['swivel_gun', 'culverin'] as CannonId[]));
+    expect(sorted(placement.unlockedCannons)).toEqual(sorted(['swivel_gun'] as CannonId[]));
   });
 
   it('spec(T-011:AC-2) spec(T-032:AC-2) the literal set agrees with the catalog-derived expectation for maxGrade 1', () => {
@@ -181,8 +190,9 @@ describe('AC-4 — g4_5 unlocks starters plus D-9 exceptions and every island', 
   it('spec(T-011:AC-4) spec(T-032:AC-3) unlockedCannons equals starters plus six_pounder and twelve_pounder', () => {
     const placement = resolvePlacement('g4_5');
     expect(sorted(placement.unlockedCannons)).toEqual(expectedCannonIds('g4_5'));
+    // D-10: one starter, not two. The two D-9 exceptions beside it are untouched by that ruling.
     expect(sorted(placement.unlockedCannons)).toEqual(
-      sorted(['swivel_gun', 'culverin', 'six_pounder', 'twelve_pounder'] as CannonId[]),
+      sorted(['swivel_gun', 'six_pounder', 'twelve_pounder'] as CannonId[]),
     );
   });
 
@@ -206,8 +216,9 @@ describe('AC-5 — g2_3 unlocks starters plus six_pounder; other range and chest
   it('spec(T-011:AC-5) spec(T-032:AC-3) unlockedCannons equals the D-9 set for maxGrade 3', () => {
     const placement = resolvePlacement('g2_3');
     expect(sorted(placement.unlockedCannons)).toEqual(expectedCannonIds('g2_3'));
+    // D-10: one starter, not two. D-9's Six-Pounder for this band is untouched by that ruling.
     expect(sorted(placement.unlockedCannons)).toEqual(
-      sorted(['swivel_gun', 'culverin', 'six_pounder'] as CannonId[]),
+      sorted(['swivel_gun', 'six_pounder'] as CannonId[]),
     );
   });
 
@@ -589,9 +600,9 @@ describe('T-032 Definition of Done', () => {
     expect(missing).toEqual([]);
   });
 
-  it('dod(T-032:5) resolvePlacement(k_1).unlockedCannons is exactly the two starters', () => {
+  it('dod(T-032:5) resolvePlacement(k_1).unlockedCannons is exactly the starter (D-10: one, not two)', () => {
     expect(sorted(resolvePlacement('k_1').unlockedCannons)).toEqual(
-      sorted(['swivel_gun', 'culverin'] as CannonId[]),
+      sorted(['swivel_gun'] as CannonId[]),
     );
   });
 

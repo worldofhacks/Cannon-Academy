@@ -4,7 +4,7 @@
     "displayName": "Port Sumwich",
     "order": 0,
     "rangeSkills": ["add_within_10", "add_within_20", "sub_within_20", "two_step_add_sub"],
-    "unlocksCannons": ["saker", "six_pounder", "chain_shot", "double_broadside"]
+    "unlocksCannons": ["culverin", "saker", "six_pounder", "chain_shot", "double_broadside"]
   },
   {
     "id": "isla_products",

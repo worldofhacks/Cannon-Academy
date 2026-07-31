@@ -109,6 +109,75 @@ describe('design fidelity — duel screen vs the measured board', () => {
     }
   });
 
+  /**
+   * Every display step clears its own face's line box (2026-07-31).
+   *
+   * A captain reported the cannon name in `CannonTray` shearing off at the top. The four Baloo
+   * steps were on 1.20–1.31 ratios, carried over from the HTML boards (this very file transcribes
+   * the boards' chips at `size * 1.3`, line 150) — ratios a browser fallback face survives and this
+   * one does not. `includeFontPadding` is Android-only; on iOS the fix is the line box.
+   *
+   * The threshold is `UIFont.lineHeight` = `(ascender - descender + lineGap) / unitsPerEm`, which
+   * is 1.6020 em for Baloo 2 ExtraBold — an enormous ascent for Latin because Baloo 2 is a
+   * multi-script family and reserves headroom for Devanagari. It is also the exact branch condition
+   * in React Native's own `Libraries/Text/Text/RCTTextShadowView.mm`:
+   *
+   *     if (maximumLineHeight < maximumFontLineHeight) { return; }
+   *     CGFloat baseLineOffset = maximumLineHeight / 2.0 - maximumFontLineHeight / 2.0;
+   *
+   * At or above it RN centers the face's own box inside the line and no ink can fall outside;
+   * below it RN skips centering entirely and correctness depends on which glyphs are in the word.
+   *
+   * **Read from the shipped TTF, not transcribed.** A hardcoded 1.602 would be a copy of the font
+   * that stops being true the first time the font package is bumped — the same L-012 failure the
+   * fixture-derived assertions above exist to avoid.
+   */
+  it('spec(A-013:AC-4) every type step clears its own font’s line box', () => {
+    const metrics = fontLineBoxEm();
+    const short: string[] = [];
+    for (const [name, step] of Object.entries(type)) {
+      if (!('fontFamily' in step) || !('lineHeight' in step)) continue;
+      const em = metrics.get(step.fontFamily);
+      // Only the faces this repo ships are measurable; a step on an unshipped family is a
+      // different bug and `app/_layout.tsx` is where it would be caught.
+      if (em === undefined) continue;
+      const required = Math.ceil(step.fontSize * em);
+      if (step.lineHeight < required) {
+        short.push(name);
+        continue;
+      }
+      expect(
+        step.lineHeight,
+        `type.${name} (${step.fontFamily} ${step.fontSize}pt) needs lineHeight >= ${required} ` +
+          `(${em.toFixed(4)} em) or React Native stops centering the glyph run`,
+      ).toBeGreaterThanOrEqual(required);
+    }
+    // The exemption is named and bounded rather than absent, so a third short step cannot join
+    // quietly and a fixed one cannot leave this list stale. See the docblock above.
+    expect(short.sort()).toEqual(['chip', 'eyebrow']);
+  });
+
+  /**
+   * The two exempt steps, bounded.
+   *
+   * `chip` and `eyebrow` are Nunito at 10/13 — 1.300 against that face's 1.3640 em box, short by
+   * 0.64pt. Left alone deliberately when the display steps were fixed: no clipping was reported on
+   * them, they are body family rather than the Baloo family the report was about, and a point on
+   * every chip moves pill geometry on every screen in the app. Bounded here so the exemption is a
+   * measured 0.64pt rather than an open door — anything shorter has to come back through review.
+   */
+  it('spec(A-013:AC-4) the two exempt steps are short by under a point, not by a design', () => {
+    const metrics = fontLineBoxEm();
+    for (const name of ['chip', 'eyebrow'] as const) {
+      const step = type[name];
+      const em = metrics.get(step.fontFamily);
+      if (em === undefined) continue;
+      const shortfall = step.fontSize * em - step.lineHeight;
+      expect(shortfall, `type.${name} shortfall`).toBeGreaterThan(0);
+      expect(shortfall, `type.${name} shortfall`).toBeLessThan(1);
+    }
+  });
+
   it('spec(A-013:AC-4) the tap-target floor is not violated by the board itself', () => {
     // A sanity check on our own constant: if the design's own controls are smaller than the floor
     // we claim to enforce, one of the two is wrong and we should find out here, not on a device.
@@ -542,3 +611,44 @@ describe('design fidelity — the sea chart vs board 9', () => {
     expect(pill).toMatch(/\{tier \+ 1\}/);
   });
 });
+
+/**
+ * `(ascender - descender + lineGap) / unitsPerEm` for every face `theme/tokens.ts` names, read out
+ * of the shipped `.ttf` — the same number iOS reports as `UIFont.lineHeight`.
+ *
+ * Hand-rolled rather than a dependency: this needs two tables out of the TrueType directory (`head`
+ * for `unitsPerEm`, `hhea` for the vertical metrics) and adding a font-parsing package to run one
+ * assertion would be the larger change.
+ */
+function fontLineBoxEm(): ReadonlyMap<string, number> {
+  const roots = [
+    ['Baloo2_800ExtraBold', '@expo-google-fonts/baloo-2/800ExtraBold/Baloo2_800ExtraBold.ttf'],
+    ['Baloo2_600SemiBold', '@expo-google-fonts/baloo-2/600SemiBold/Baloo2_600SemiBold.ttf'],
+    ['Baloo2_500Medium', '@expo-google-fonts/baloo-2/500Medium/Baloo2_500Medium.ttf'],
+    ['Nunito_800ExtraBold', '@expo-google-fonts/nunito/800ExtraBold/Nunito_800ExtraBold.ttf'],
+    ['Nunito_700Bold', '@expo-google-fonts/nunito/700Bold/Nunito_700Bold.ttf'],
+    ['Nunito_600SemiBold', '@expo-google-fonts/nunito/600SemiBold/Nunito_600SemiBold.ttf'],
+  ] as const;
+
+  const out = new Map<string, number>();
+  for (const [family, relative] of roots) {
+    const path = fileURLToPath(new URL(`../../node_modules/${relative}`, import.meta.url));
+    if (!existsSync(path)) continue;
+    const buffer = readFileSync(path);
+    const tables = new Map<string, number>();
+    const tableCount = buffer.readUInt16BE(4);
+    for (let i = 0; i < tableCount; i += 1) {
+      const entry = 12 + i * 16;
+      tables.set(buffer.toString('ascii', entry, entry + 4), buffer.readUInt32BE(entry + 8));
+    }
+    const head = tables.get('head');
+    const hhea = tables.get('hhea');
+    if (head === undefined || hhea === undefined) continue;
+    const unitsPerEm = buffer.readUInt16BE(head + 18);
+    const ascender = buffer.readInt16BE(hhea + 4);
+    const descender = buffer.readInt16BE(hhea + 6);
+    const lineGap = buffer.readInt16BE(hhea + 8);
+    out.set(family, (ascender - descender + lineGap) / unitsPerEm);
+  }
+  return out;
+}

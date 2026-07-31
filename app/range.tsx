@@ -1873,7 +1873,14 @@ const s = StyleSheet.create({
     lineHeight: PICK.glyph.textSize + 4,
     color: color.inkDark,
   },
-  rackName: { ...type.title, fontSize: PICK.nameSize, color: color.inkDark },
+  // The only `type` spread on this screen that did not carry its own line box. `title`'s 31 is
+  // sized for 19pt; at `PICK.nameSize` it has to come down with it (`theme/tokens.ts` ratio note).
+  rackName: {
+    ...type.title,
+    fontSize: PICK.nameSize,
+    lineHeight: Math.ceil(PICK.nameSize * 1.602),
+    color: color.inkDark,
+  },
   rackDifficulty: { ...type.chip, color: color.inkDarkMuted, marginTop: 2 },
   miniRack: { flexDirection: 'row', gap: PICK.rack.gap, marginTop: 6 },
   miniSlot: {

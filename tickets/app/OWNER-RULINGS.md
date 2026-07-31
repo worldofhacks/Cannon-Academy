@@ -158,3 +158,59 @@ They therefore have two intentional, band-specific acquisition paths; every othe
 remains mastery-earned, and the Nine-Pounder remains chest-only. **A-032** owns the complete
 band-by-cannon policy audit; **A-034** owns the placement/presentation change that surfaces those
 difficulties and weapons.
+
+---
+
+## D-10 — A captain starts with ONE gun; the Culverin is the first gun earned (2026-07-31)
+
+**Reported from a real playthrough.** The owner: _"after the demo walkthrough, when the user does
+his first real non walkthrough duel, he still has 2 guns instead of starting with 1, he should not
+have the culverin gun yet."_
+
+**What was wrong.** `swivel_gun` and `culverin` were both `unlock.kind: "starter"`, so
+`resolvePlacement` granted both and `setGradeBand` equipped both. Meanwhile the guided duel arms
+exactly one gun (`src/services/guidedDuel.ts`, `playerLoadout: ['swivel_gun']`). The tutorial
+taught one gun and the first real duel handed the child two — a discontinuity on the very first
+unscripted screen, and one the child had done nothing to earn.
+
+**The ruling.** `swivel_gun` is the **only** starter. `culverin` becomes
+`{ kind: "range", island: "port_sumwich", tier: 1 }` on `add_within_10` — the same skill the
+Swivel Gun teaches — so it is the **first gun a captain earns**, paid out by the first mastery.
+Nothing new has to be learned to earn it, which is what makes it a reward rather than a wall.
+
+**Narrow supersession of D-6, not a replacement.** D-6's rule is unchanged: placement grants
+starters only, mastery grants the rest. The catalog now declares one starter instead of two.
+D-9's two band-specific exceptions (Six-Pounder for grades 2–3, Twelve-Pounder for grades 4–5)
+are untouched — they are what keeps an older band's opening tray a real choice.
+
+**What a fresh captain of each band now holds** (measured through `commitGradeBand`):
+
+| band   | owned & equipped at onboarding                       | starters |
+|--------|------------------------------------------------------|----------|
+| `k_1`  | `swivel_gun`                                         | 1        |
+| `g2_3` | `swivel_gun`, `six_pounder` (D-9)                    | 1        |
+| `g4_5` | `swivel_gun`, `six_pounder`, `twelve_pounder` (D-9)  | 1        |
+
+Every band is non-empty, so `resolveDestination` never diverts a fresh captain to the gun deck and
+`stores/duel.ts` never has to fall back on an empty loadout. K-1's opening tray is a single
+`add_within_10` gun, which is strictly safer for A-058 than the two it carried before.
+
+**Known consequence — the first mastery pays three guns at K-1.** Mastering `add_within_10` now
+grants `culverin` **and** `saker` (D-7 made the Saker the paying range unlock on the same skill),
+and at `k_1` it also opens Isla Products, whose entry cannon `grapeshot` is granted with it. That
+is three guns landing at once against a three-slot tray, on a captain who owns one. Grant order is
+`culverin, saker, grapeshot`, so the Culverin reads first on the victory panel.
+
+The ordering that reads best, if the owner wants the Culverin to land alone: move the Saker off
+`add_within_10` and onto `add_within_20` (tier 1), making the Port Sumwich ladder one gun per
+skill step — Swivel Gun to start, Culverin for adding to 10, Saker and Six-Pounder for adding to
+20. **Not done here**, because `tickets/T-029.md` AC-2 is a frozen ticket contract that pins
+`saker.skill === 'add_within_10'` and D-7 explicitly named the Saker as the K-1 practice lane's
+payoff. Retiring that needs an owner ruling of its own. Note also that `unlock.tier` is validated
+by the schema and read by no engine code, so tiers alone cannot stage this.
+
+### Ownership
+
+`src/content/cannons.json` and `src/content/islands.json` are engine-track scope per
+`COORDINATION.md`. The owner authorised these two edits directly for this fix; no engine module
+changed.

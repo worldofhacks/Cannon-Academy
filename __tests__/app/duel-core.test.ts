@@ -11,8 +11,9 @@
  *
  * ── The traps deliberately closed ─────────────────────────────────────────────────────────────
  *
- *  1. **Both starters share one skill.** `swivel_gun` and `culverin` are both `add_within_10`, so
- *     a reducer with that skill hardcoded passes any starters-only test of AC-1. This is L-020's
+ *  1. **Both opening guns share one skill.** `swivel_gun` and `culverin` are both `add_within_10`
+ *     — D-10 made the second one earned rather than placed, and did not move it off the skill — so
+ *     a reducer with that skill hardcoded passes any opening-lane test of AC-1. This is L-020's
  *     shape exactly — two things that agree today, and a test that measures the coincidence. The
  *     skill assertions therefore sweep the WHOLE catalog, where the nine skills genuinely differ.
  *  2. **Their damage bands nest.** `swivel_gun` is 8–12 and `culverin` is 4–16, so every legal
@@ -125,19 +126,36 @@ const DUEL_ACTION_TYPES = everyMemberOf<DuelAction['type']>()([
 
 // ── Fixtures, all derived from the catalog and from tuning ───────────────────────────────────
 
-/** The guns placement actually grants (owner ruling D-6). Derived — never a written-down pair. */
-const STARTERS: readonly Cannon[] = cannons.filter((c) => c.unlock.kind === 'starter');
+/**
+ * The opening lane: the placement starter (owner ruling D-6) and every gun sharing its skill that
+ * a grade-0 captain can hold. Derived — never a written-down pair.
+ *
+ * This read used to be `unlock.kind === 'starter'`, which named the same two guns until owner
+ * ruling D-10 (2026-07-31, `tickets/app/OWNER-RULINGS.md`) made the Culverin the first gun a
+ * captain EARNS instead of a second starter, and the fixture stopped resolving. Nothing the file
+ * asserts was about the unlock KIND: traps 1 and 2 below need two guns that share one skill and
+ * whose damage bands nest, and the opening lane is what supplies that pair before and after the
+ * ruling. Widening the derivation rather than pinning `['swivel_gun', 'culverin']` keeps L-012's
+ * rule — the expected set is computed from a property, not transcribed.
+ */
+const OPENING_LANE: readonly Cannon[] = (() => {
+  const starter = requireCannon(
+    cannons.find((c) => c.unlock.kind === 'starter'),
+    'a starter cannon',
+  );
+  return cannons.filter((c) => c.skill === starter.skill && c.minGrade === starter.minGrade);
+})();
 
-/** The reliable starter: the narrow band, and therefore the discriminating one. */
-const RELIABLE_STARTER = requireCannon(
-  STARTERS.find((c) => c.temperament === 'reliable'),
-  'a reliable starter',
+/** The reliable opener — the one placement grants: the narrow band, therefore the discriminating one. */
+const RELIABLE_OPENER = requireCannon(
+  OPENING_LANE.find((c) => c.temperament === 'reliable'),
+  'a reliable cannon in the opening lane',
 );
 
-/** The volatile starter: the wide band that nests the reliable one. */
-const VOLATILE_STARTER = requireCannon(
-  STARTERS.find((c) => c.temperament === 'volatile'),
-  'a volatile starter',
+/** The volatile opener — the first gun earned: the wide band that nests the reliable one. */
+const VOLATILE_OPENER = requireCannon(
+  OPENING_LANE.find((c) => c.temperament === 'volatile'),
+  'a volatile cannon in the opening lane',
 );
 
 /**
@@ -221,7 +239,7 @@ interface Trace {
   readonly states: readonly DuelState[];
 }
 
-const TRACE_GUNS: readonly Cannon[] = [RELIABLE_STARTER, VOLATILE_STARTER, RECOIL_GUN];
+const TRACE_GUNS: readonly Cannon[] = [RELIABLE_OPENER, VOLATILE_OPENER, RECOIL_GUN];
 
 /**
  * Plays one duel to a terminal phase under a seeded policy, recording every action and every
@@ -302,7 +320,7 @@ const PHASE_SAMPLES: ReadonlyMap<DuelPhase, readonly DuelState[]> = (() => {
 
 /** Every well-formed action worth applying to `state` in the AC-5 walk, by action type. */
 function walkActions(state: DuelState): readonly DuelAction[] {
-  const cannon = state.cannon ?? RELIABLE_STARTER;
+  const cannon = state.cannon ?? RELIABLE_OPENER;
   const answer = state.question?.answer ?? 0;
   const miss = state.question === null ? answer + 1 : wrongChoice(state.question);
   const durations = [0, Math.round(cannon.timerMs / 2), cannon.timerMs, cannon.timerMs * 2];
@@ -396,9 +414,20 @@ describe('A-016 the duel itself', () => {
       expect(tray.map((c) => c.id)).toEqual(
         cannons.filter((c) => captain.equippedCannons.includes(c.id)).map((c) => c.id),
       );
-      // "Two starter cannons that are a real choice" (PLAN.md checklist item 5) has to be true at
-      // every band, not only the youngest one.
-      expect(tray.length).toBeGreaterThanOrEqual(2);
+      // Re-baselined for owner ruling D-10 (2026-07-31, `tickets/app/OWNER-RULINGS.md`).
+      //
+      // This read `>= 2` and cited PLAN.md checklist item 5, "two starter cannons that are a real
+      // choice". A real playthrough found what that cost: the guided duel arms ONE gun, and the
+      // first unscripted duel then handed the child two. The owner ruled a captain STARTS with one
+      // and earns the Culverin from the first mastery — so the choice still arrives, on the same
+      // skill the tutorial taught, but it is earned. `>= 2` is now a statement about the catalog's
+      // starter count rather than about the duel, and it was the wrong thing to pin here.
+      //
+      // What A-016 actually needs, and what survives the ruling, is the stronger property: the
+      // tray is NEVER EMPTY at any band. An empty tray is a duel screen with nothing to tap —
+      // `services/flow.ts` diverts to the gun deck on it and `stores/duel.ts` falls back to the
+      // catalog, and both of those are recoveries from a state placement must never produce.
+      expect(tray.length, `${band} must not open on an empty tray`).toBeGreaterThanOrEqual(1);
       expect(new Set(tray.map((c) => c.id)).size).toBe(tray.length);
       for (const gun of tray) {
         const isStarter = gun.unlock.kind === 'starter';
@@ -500,11 +529,11 @@ describe('A-016 the duel itself', () => {
           expect(outcome.rollDamage).toBeGreaterThanOrEqual(cannon.damageMin);
           expect(outcome.rollDamage).toBeLessThanOrEqual(cannon.damageMax);
 
-          if (cannon.id === RELIABLE_STARTER.id) narrowRolls += 1;
+          if (cannon.id === RELIABLE_OPENER.id) narrowRolls += 1;
           if (
-            cannon.id === VOLATILE_STARTER.id &&
-            (outcome.rollDamage < RELIABLE_STARTER.damageMin ||
-              outcome.rollDamage > RELIABLE_STARTER.damageMax)
+            cannon.id === VOLATILE_OPENER.id &&
+            (outcome.rollDamage < RELIABLE_OPENER.damageMin ||
+              outcome.rollDamage > RELIABLE_OPENER.damageMax)
           ) {
             outsideNarrowBand += 1;
           }
@@ -517,8 +546,8 @@ describe('A-016 the duel itself', () => {
     // direction that can: the wide gun really does roll outside the narrow gun's band.
     expect(narrowRolls).toBeGreaterThan(0);
     expect(outsideNarrowBand).toBeGreaterThan(0);
-    expect(VOLATILE_STARTER.damageMin).toBeLessThan(RELIABLE_STARTER.damageMin);
-    expect(VOLATILE_STARTER.damageMax).toBeGreaterThan(RELIABLE_STARTER.damageMax);
+    expect(VOLATILE_OPENER.damageMin).toBeLessThan(RELIABLE_OPENER.damageMin);
+    expect(VOLATILE_OPENER.damageMax).toBeGreaterThan(RELIABLE_OPENER.damageMax);
   });
 
   // ── AC-2 — four choices, the answer among them exactly once ────────────────────────────────
@@ -719,7 +748,7 @@ describe('A-016 the duel itself', () => {
   });
 
   it('spec(A-016:AC-4) being wrong costs the turn and hands back a fresh one — never the game', () => {
-    const cannon = RELIABLE_STARTER;
+    const cannon = RELIABLE_OPENER;
     const armed = askedWith(CATALOG_SEEDS[0] ?? 1, cannon);
     const missed = duelReducer(armed, {
       type: 'ANSWER',
@@ -1041,7 +1070,7 @@ describe('A-016 the duel itself', () => {
     // The other half of replayability. If the reducer measured the time itself, changing the
     // action's `elapsedMs` would change nothing, and every duel would replay to the same numbers
     // by accident rather than by construction.
-    const cannon = RELIABLE_STARTER;
+    const cannon = RELIABLE_OPENER;
     const armed = askedWith(CATALOG_SEEDS[0] ?? 1, cannon);
     const question = requireQuestion(armed);
     const fast = duelReducer(armed, { type: 'ANSWER', value: question.answer, elapsedMs: 0 });
@@ -1100,7 +1129,7 @@ describe('A-016 the duel itself', () => {
     // counter and not the other — an implementation that skipped the tally but kept the
     // scoreboard increment (or the reverse) would fail here, which is exactly the half-migration
     // the ruling could have produced.
-    for (const cannon of [RELIABLE_STARTER, VOLATILE_STARTER, RECOIL_GUN]) {
+    for (const cannon of [RELIABLE_OPENER, VOLATILE_OPENER, RECOIL_GUN]) {
       const armed = askedWith(WALK_SEEDS[1] ?? 1, cannon);
       const burned = duelReducer(armed, { type: 'TIMEOUT' });
       const entry = burned.skillTally[cannon.skill];
@@ -1141,7 +1170,7 @@ describe('A-016 the duel itself', () => {
 
   it('spec(A-016:AC-9) the rng stream is carried forward, not restarted', () => {
     for (const seed of WALK_SEEDS) {
-      const midDuel = askedWith(seed, VOLATILE_STARTER);
+      const midDuel = askedWith(seed, VOLATILE_OPENER);
       const again = duelReducer(midDuel, { type: 'RESET' });
 
       // The next duel's seed is DRAWN from the stream the last one left behind — exactly one step

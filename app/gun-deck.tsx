@@ -305,7 +305,7 @@ function GunDeckBody() {
               pressed && s.pressedDim,
             ]}
           >
-            <Text style={[s.backGlyph, { fontSize: tx(20) }]}>{ARROW_BACK}</Text>
+            <Text style={[s.backGlyph, { fontSize: tx(20), lineHeight: tx(32) }]}>{ARROW_BACK}</Text>
           </Pressable>
 
           <Text style={[s.headerTitle, { fontSize: tx(20), lineHeight: tx(26) }]} numberOfLines={1}>
@@ -324,7 +324,13 @@ function GunDeckBody() {
                     { width: ax(22), height: ax(22), borderRadius: ax(radius.nub) },
                   ]}
                 >
-                  <Text style={[s.opGlyph, owned ? s.opGlyphOwned : s.opGlyphDull, { fontSize: ax(12) }]}>
+                  <Text
+                    style={[
+                      s.opGlyph,
+                      owned ? s.opGlyphOwned : s.opGlyphDull,
+                      { fontSize: ax(12), lineHeight: ax(20) },
+                    ]}
+                  >
                     {glyph}
                   </Text>
                 </View>
@@ -346,7 +352,7 @@ function GunDeckBody() {
         ]}
       >
         <View style={[s.sectionRow, { gap: tx(8) }]}>
-          <Text style={[s.sectionTitle, { fontSize: tx(16) }]}>On the deck</Text>
+          <Text style={[s.sectionTitle, { fontSize: tx(16), lineHeight: tx(26) }]}>On the deck</Text>
           <View style={[s.countChip, { paddingVertical: tx(2), paddingHorizontal: tx(8) }]}>
             <Text style={s.countChipText}>
               {onDeck.length} OF {TRAY_CAPACITY} SLOTS
@@ -414,7 +420,7 @@ function GunDeckBody() {
         </View>
 
         <View style={[s.sectionRow, { gap: tx(8) }]}>
-          <Text style={[s.sectionTitle, { fontSize: tx(16) }]}>In the hold</Text>
+          <Text style={[s.sectionTitle, { fontSize: tx(16), lineHeight: tx(26) }]}>In the hold</Text>
           <View style={{ flex: 1 }} />
           {newCount > 0 ? (
             <View style={[s.newCountChip, { paddingVertical: tx(2), paddingHorizontal: tx(8) }]}>
@@ -502,11 +508,11 @@ function HoldCard({ slot, gradeBand, isNew, width, tx, ax, onPress }: HoldCardPr
             { width: ax(38), height: ax(38), borderRadius: ax(radius.tile) },
           ]}
         >
-          <Text style={[s.holdTileGlyph, { fontSize: ax(21) }]}>{look.glyph}</Text>
+          <Text style={[s.holdTileGlyph, { fontSize: ax(21), lineHeight: ax(34) }]}>{look.glyph}</Text>
         </View>
 
         <View style={s.holdNameCol}>
-          <Text style={[s.holdName, { fontSize: tx(13) }]} numberOfLines={1}>
+          <Text style={[s.holdName, { fontSize: tx(13), lineHeight: tx(21) }]} numberOfLines={1}>
             {cannon.displayName}
           </Text>
           <Text style={[s.holdRange, { fontSize: tx(10) }]}>{look.range}</Text>
@@ -538,7 +544,7 @@ function HoldCard({ slot, gradeBand, isNew, width, tx, ax, onPress }: HoldCardPr
         <View style={[s.holdMeta, { gap: tx(5) }]}>
           <Text style={[s.holdDifficulty, { fontSize: tx(9) }]}>{identity.difficultyLabel}</Text>
           <Text style={[s.holdFuse, { fontSize: tx(9) }]}>{identity.fuseLabel}</Text>
-          <Text style={[s.holdDamage, { fontSize: tx(13) }]}>
+          <Text style={[s.holdDamage, { fontSize: tx(13), lineHeight: tx(21) }]}>
             {cannon.damageMin}–{cannon.damageMax}
           </Text>
           <Text style={[s.holdTemper, { fontSize: tx(10) }]}>{identity.temperamentWord}</Text>
@@ -610,6 +616,14 @@ const s = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  /**
+   * Six styles below spread a display step and are then rendered at a DIFFERENT `fontSize` — the
+   * scaled sizes live at the call sites because `tx()`/`ax()` do. A display step's `lineHeight` is
+   * absolute points sized for its own step, so it has to travel with the override or the box stops
+   * matching the text: this screen was rendering 20pt in `subtitle`'s 21pt box (1.05) before the
+   * ratio fix. Each call site now passes `ceil(size × 1.602)` through the same scaler as its size.
+   * See the ratio note in `theme/tokens.ts`.
+   */
   backGlyph: { ...type.subtitle, color: color.chipInk },
   headerTitle: { ...type.display, flex: 1, color: color.parchment },
 

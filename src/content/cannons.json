@@ -26,7 +26,9 @@
     "minGrade": 0,
     "maxGrade": 1,
     "unlock": {
-      "kind": "starter"
+      "kind": "range",
+      "island": "port_sumwich",
+      "tier": 1
     }
   },
   {

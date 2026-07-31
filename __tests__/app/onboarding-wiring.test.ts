@@ -43,7 +43,9 @@ import { resolvePlacement } from '../../src/engine/placement';
 import { DESTINATIONS, resolveDestination } from '../../src/services/flow';
 import { commitGradeBand } from '../../src/services/onboarding';
 import { hydrate, persist, type KeyValueStore } from '../../src/services/persistence';
-import { createCaptainStore, emptyCaptain, type CaptainStore } from '../../src/stores/player';
+import { applyCaptainTally, createCaptainStore, emptyCaptain, type CaptainStore } from '../../src/stores/player';
+import { inBandLoadout } from '../../src/services/loadout';
+import { MASTERY_THRESHOLD_CORRECT } from '../../src/engine/tuning';
 
 /** An in-memory stand-in for AsyncStorage, exactly as `persistence.test.ts` builds it. */
 function fakeStorage(seed: Record<string, string> = {}) {
@@ -114,6 +116,76 @@ describe('A-005 onboarding wiring', () => {
           true,
         );
       }
+    }
+  });
+
+  /**
+   * Owner ruling D-10 (2026-07-31, `tickets/app/OWNER-RULINGS.md`) — a captain starts with ONE gun.
+   *
+   * Reported from a real playthrough: the guided duel arms exactly one gun
+   * (`services/guidedDuel.ts`, `playerLoadout: ['swivel_gun']`) and the first unscripted duel then
+   * handed the child two, the second of which they had done nothing to earn. `culverin` left
+   * `unlock.kind: "starter"` for a `range` unlock on `add_within_10` — the skill the Swivel Gun
+   * already teaches — so it is the first gun a captain EARNS.
+   *
+   * Driven through `commitGradeBand` rather than `resolvePlacement` on purpose: the ruling is about
+   * what a real captain holds after the picker, and the store is what equips them. D-9's two
+   * band-specific exceptions are untouched by the ruling, so the count asserted is the STARTER
+   * count, not the tray size.
+   */
+  it('spec(A-005:AC-1) D-10 — a fresh captain of every band holds exactly one starter', () => {
+    for (const band of GRADE_BANDS) {
+      const fresh = createCaptainStore();
+      commitGradeBand(fresh, band);
+      const captain = fresh.getState().captain;
+
+      const starters = captain.ownedCannons.filter(
+        (id) => cannons.find((c) => c.id === id)?.unlock.kind === 'starter',
+      );
+      expect(starters, `${band} must open on exactly one starter`).toHaveLength(1);
+      expect(captain.ownedCannons).not.toContain('culverin');
+      expect(captain.equippedCannons).not.toContain('culverin');
+    }
+  });
+
+  it('spec(A-005:AC-1) D-10 — one starter still leaves every band able to fight immediately', () => {
+    // The failure this guards: `resolveDestination` diverts a captain with an empty loadout to the
+    // gun deck, and `stores/duel.ts` falls back to the whole catalog through the band ceiling. Both
+    // are recoveries from a state the picker must never produce, and taking a gun away is exactly
+    // the change that could produce it.
+    for (const band of GRADE_BANDS) {
+      const fresh = createCaptainStore();
+      fresh.getState().setNameAndFlag('Ada', 'red');
+      commitGradeBand(fresh, band);
+      const captain = { ...fresh.getState().captain, hasFoughtGuidedDuel: true };
+
+      expect(captain.equippedCannons.length, `${band} equipped`).toBeGreaterThan(0);
+      // Equipped is not enough: the duel arms only what the band may be ASKED (A-058), so a gun
+      // the ceiling would strip is the same as no gun at all.
+      expect(inBandLoadout(captain.equippedCannons, band).length, `${band} in band`).toBeGreaterThan(0);
+      expect(resolveDestination(captain), `${band} destination`).toBe('chart');
+    }
+  });
+
+  it('spec(A-005:AC-1) D-10 — mastering add_within_10 is what grants the Culverin', () => {
+    for (const band of GRADE_BANDS) {
+      const fresh = createCaptainStore();
+      commitGradeBand(fresh, band);
+      const before = fresh.getState().captain;
+      expect(before.ownedCannons).not.toContain('culverin');
+
+      // The real path a range drill takes: answers fold into mastery, mastery resolves unlocks.
+      const after = applyCaptainTally(before, 'add_within_10', 'range', {
+        correct: MASTERY_THRESHOLD_CORRECT,
+        asked: MASTERY_THRESHOLD_CORRECT,
+      });
+
+      expect(after.ownedCannons, `${band} must earn the culverin on its first mastery`).toContain(
+        'culverin',
+      );
+      // Earned, not equipped — the gun deck (A-011) is where a captain chooses to sail it, and the
+      // tray is three slots wide. See D-10's note on the K-1 payout being three guns at once.
+      expect(after.equippedCannons).toEqual(before.equippedCannons);
     }
   });
 

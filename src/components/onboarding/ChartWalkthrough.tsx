@@ -29,20 +29,39 @@
  * `(0,0)` is, and both its header band and its dock band land where the chart actually drew them.
  * Feeding the model the window height instead would put every dock ring one safe-area inset low.
  */
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CoachBar } from './CoachBar';
 import { Spotlight } from './Spotlight';
 import { chartTourBandHeight, ringRect } from './coachBand';
+import {
+  READY,
+  READY_MOTION,
+  readySailDelay,
+  readySceneLayout,
+  type ReadySceneLayout,
+} from './readyLayout';
 import { CHART_BEATS, clampChartBeat, readyHeadline } from './script';
-import { Poly } from '../Poly';
-// The dock's own measured height — the tour's band sits directly on top of it.
-import { DOCK } from '../chart/board';
+// The dock's own measured height — the tour's band sits directly on top of it — and the chart's
+// own water, so the send-off hands over to a sea the child is about to be dropped into.
+import { DOCK, VOYAGE } from '../chart/board';
+import { SeaWater } from '../chart/Sea';
+import { Ship, type ShipCosmetics } from '../duel/Ship';
 import { chartHubControlLayout, type HubControl } from '../../services/flow';
 import { chartTourShowing } from '../../services/onboarding';
 import { captainActions, useCaptain } from '../../stores/useCaptain';
+import { REFERENCE } from '../../theme/responsive';
+import { shipCosmeticsForCaptain } from '../../theme/shipCosmetics';
 import { color, radius, type } from '../../theme/tokens';
 import { useLayout } from '../../theme/useLayout';
 
@@ -128,12 +147,19 @@ export function ChartWalkthrough() {
       <View style={StyleSheet.absoluteFill} onLayout={onLayout}>
         <ReadyScene
           captainName={captain.name}
+          // The captain's OWN ship — the equipped skin's palette flying the flag they chose at
+          // beat 4. This is the one moment in the app where "this is *your* ship" lands hardest,
+          // and a generic boat here spends it (board 5b).
+          cosmetics={shipCosmeticsForCaptain(captain)}
           cannons={captain.ownedCannons.length}
           islands={captain.unlockedIslands.length}
           ships={captain.ownedSkins.length}
           coins={captain.coins}
+          box={box}
           artScale={L.a(1)}
           typeScale={L.t(1)}
+          insetTop={insets.top}
+          insetBottom={insets.bottom}
           onSail={() => captainActions().completeOnboarding()}
         />
       </View>
@@ -211,9 +237,8 @@ export function ChartWalkthrough() {
 function ringRadiusFor(control: HubControl): number {
   return control.surface === 'dock' ? 22 : radius.pill;
 }
-
 /**
- * Beat 20.
+ * Beat 20 — the send-off, and the moment the game is handed over.
  *
  * `Sail!` is `completeOnboarding()` and nothing else. On the board it is wired to the prototype's
  * `restart`, which resets `state.i` to zero — that is canvas navigation for a designer stepping the
@@ -222,101 +247,363 @@ function ringRadiusFor(control: HubControl): number {
  *
  * `completeOnboarding()` is called from exactly here and nowhere else in the app; before this beat
  * existed the action had no caller outside two test fixtures.
+ *
+ * ## What it is made of, and why none of it is drawn here
+ *
+ * Nothing on this screen is a one-off. The ship is `duel/Ship.tsx` — the app's real 14-layer rig,
+ * hull and sheer stripe and keel and striped sails and the child's own pennant — wearing
+ * `shipCosmeticsForCaptain`, so the boat that sails out of onboarding is the boat that sails into
+ * every duel. The water is `chart/Sea.tsx`'s `SeaWater`, so the send-off's horizon is the chart's
+ * own radial gradient rather than a flat band of `sea`, and the handover reads as one place. The
+ * sky and its clouds are `duel/SeaStage.tsx`'s, at the same tokens.
+ *
+ * There *was* a `ReadyShip` here: a seven-shape boat with a plain parchment sail and no keel,
+ * transcribed from the board's own simplified thumbnail. It is deleted. A composition drawn once
+ * for one screen is exactly what makes that screen look unlike the app around it, and the owner
+ * reported it in those words.
+ *
+ * ## Filling the box
+ *
+ * Every offset this screen used to position itself with — `bottom: 186`, `bottom: 120`, `top: 96`,
+ * a `150`pt sea — was a constant about a 667pt frame. The layout is now a FLEX COLUMN whose bands
+ * come from `readySceneLayout`, which is pure and swept across four viewports by
+ * `ready-scene.test.ts`. The only absolutely positioned things left are the backdrop — sky, clouds
+ * and water — because a backdrop is not a band.
  */
 function ReadyScene({
   captainName,
+  cosmetics,
   cannons,
   islands,
   ships,
   coins,
+  box,
   artScale,
   typeScale,
+  insetTop,
+  insetBottom,
   onSail,
 }: {
   readonly captainName: string;
+  /** Resolved by the caller, so this component reads no store and stays a pure renderer. */
+  readonly cosmetics: ShipCosmetics;
   readonly cannons: number;
   readonly islands: number;
   readonly ships: number;
   readonly coins: number;
+  readonly box: { readonly w: number; readonly h: number };
   readonly artScale: number;
   readonly typeScale: number;
+  readonly insetTop: number;
+  readonly insetBottom: number;
   readonly onSail: () => void;
 }) {
-  const px = (n: number) => n * artScale;
   const tx = (n: number) => n * typeScale;
+
+  // Before the first layout pass the overlay has no box, and a full-bleed takeover that renders
+  // blank for a frame is worse than one drawn at the board's own frame and corrected a frame later.
+  // `app/chart.tsx` falls back to `FRAME` for exactly this reason.
+  const layout = readySceneLayout({
+    width: box.w || REFERENCE.width,
+    height: box.h || REFERENCE.height,
+    art: artScale,
+    type: typeScale,
+    insetTop,
+    insetBottom,
+  });
+
+  const tally: readonly { readonly label: string; readonly count: number }[] = [
+    { label: 'GUNS', count: cannons },
+    { label: 'ISLES', count: islands },
+    { label: 'SHIPS', count: ships },
+    { label: 'COINS', count: coins },
+  ];
 
   return (
     <View style={s.done}>
-      <View style={[s.doneSea, { height: px(150), borderTopWidth: px(5) }]} />
+      <ReadySky layout={layout} art={artScale} />
 
-      <View style={[s.doneTitle, { top: px(96) }]}>
+      {/*
+        The water, flush to the bottom and topped exactly where the hull meets it — `layout.sea.y`
+        is derived from the ship's own keel, which is what stops the boat floating above its sea the
+        way the board's offsets did.
+      */}
+      <View
+        style={[
+          s.doneSea,
+          { top: layout.sea.y, borderTopWidth: artScale * SEA_CREST },
+        ]}
+      >
+        <SeaWater
+          width={layout.sea.width}
+          height={Math.max(0, layout.sea.height - artScale * SEA_CREST)}
+          water={VOYAGE.water}
+        />
+      </View>
+
+      {/*
+        The column. Every height below comes from `readySceneLayout`, and they sum to the measured
+        box by construction — see that module's header.
+      */}
+      <View style={s.doneColumn}>
+        <View style={{ height: insetTop + layout.topPad }} />
+
         <Text
-          numberOfLines={2}
-          style={[s.doneHeadline, { fontSize: tx(26), lineHeight: tx(32) }]}
+          numberOfLines={READY.headlineLines}
+          style={[
+            s.doneHeadline,
+            {
+              width: layout.headline.width,
+              height: layout.headline.height,
+              fontSize: tx(26),
+              lineHeight: tx(READY.headlineLine),
+            },
+          ]}
         >
           {readyHeadline(captainName)}
         </Text>
-      </View>
 
-      <View
-        style={{
-          position: 'absolute',
-          left: '50%',
-          marginLeft: -px(70),
-          bottom: px(186),
-          width: px(140),
-          height: px(112),
-        }}
-      >
-        <ReadyShip width={px(140)} height={px(112)} />
-      </View>
+        <View style={{ height: layout.skyGap }} />
 
-      <View style={[s.doneBadges, { bottom: px(120), gap: px(12) }]}>
-        <ReadyBadge count={cannons} label="GUNS" scale={artScale} typeScale={typeScale} />
-        <ReadyBadge count={islands} label="ISLES" scale={artScale} typeScale={typeScale} />
-        <ReadyBadge count={ships} label="SHIPS" scale={artScale} typeScale={typeScale} />
-        <ReadyBadge count={coins} label="COINS" scale={artScale} typeScale={typeScale} />
-      </View>
+        {/*
+          The arrival. One beat, `motion.beat.screen`: the ship rises a swell's worth and fades in,
+          and then it is `Ship.tsx`'s own ambient bob, luff and wake from there.
 
-      <View style={{ position: 'absolute', left: px(12), right: px(12), bottom: px(32) }}>
-        <Pressable
-          onPress={onSail}
-          accessibilityRole="button"
-          accessibilityLabel="Sail, finish the tour"
-          style={({ pressed }) => [
-            s.sail,
-            { height: Math.max(px(76), 64), borderRadius: px(22), borderBottomWidth: px(6) },
-            pressed && { transform: [{ translateY: px(4) }], borderBottomWidth: px(2) },
-          ]}
-        >
-          <Text style={[s.sailLabel, { fontSize: tx(24), lineHeight: tx(30) }]}>Sail!</Text>
-        </Pressable>
+          The captain is aboard and cheering, which is the same figure the guided duel put on the
+          deck four beats ago — the send-off is a curtain call, not an introduction.
+        */}
+        <ShipArrival height={layout.ship.height} rise={artScale * READY_MOTION.shipRise}>
+          <Ship cosmetics={cosmetics} facing="right" width={layout.ship.width} captainPose="cheer" />
+        </ShipArrival>
+
+        <View style={{ height: layout.seaGap }} />
+
+        <View style={[s.doneBadges, { height: layout.badges.height, gap: layout.badgeGap }]}>
+          {tally.map((entry, index) => (
+            <Pop
+              key={entry.label}
+              delay={READY_MOTION.badgeLead + index * READY_MOTION.badgeStagger}
+            >
+              <ReadyBadge
+                count={entry.count}
+                label={entry.label}
+                size={layout.badge}
+                artScale={artScale}
+                typeScale={typeScale}
+              />
+            </Pop>
+          ))}
+        </View>
+
+        <View style={{ height: layout.badgesToSail }} />
+
+        {/* Last to settle, so the final movement on the screen is the one that says "now go". */}
+        <Settle delay={readySailDelay}>
+          <Pressable
+            onPress={onSail}
+            accessibilityRole="button"
+            accessibilityLabel="Sail, finish the tour"
+            style={({ pressed }) => [
+              s.sail,
+              {
+                width: layout.sail.width,
+                height: layout.sail.height,
+                borderRadius: artScale * 22,
+                borderBottomWidth: artScale * 6,
+              },
+              pressed && { transform: [{ translateY: artScale * 4 }], borderBottomWidth: artScale * 2 },
+            ]}
+          >
+            <Text style={[s.sailLabel, { fontSize: tx(24), lineHeight: tx(30) }]}>Sail!</Text>
+          </Pressable>
+        </Settle>
+
+        <View style={{ height: layout.bottomPad + insetBottom }} />
       </View>
     </View>
   );
+}
+
+/** The foam line where sky meets water, in design points — `SeaStage`'s own crest. */
+const SEA_CREST = 5;
+
+/**
+ * The sky's three clouds, at `SeaStage`'s tokens and opacities.
+ *
+ * Placed as fractions of the resolved sky gap rather than at fixed tops, so they drift down a tall
+ * phone with the horizon instead of clustering under the headline. Skipped entirely when the gap is
+ * too shallow to hold them — on a short viewport the sky is the band that gave up its air, and a
+ * cloud pressed against the headline is worse than no cloud.
+ */
+function ReadySky({ layout, art }: { readonly layout: ReadySceneLayout; readonly art: number }) {
+  if (layout.skyGap < art * 72) return null;
+
+  const top = layout.headline.y + layout.headline.height;
+  return (
+    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+      <View
+        style={[
+          s.cloud,
+          {
+            left: art * 18,
+            top: top + layout.skyGap * 0.2,
+            width: art * 74,
+            height: art * 18,
+            opacity: 0.85,
+          },
+        ]}
+      />
+      <View
+        style={[
+          s.cloud,
+          {
+            left: art * 46,
+            top: top + layout.skyGap * 0.1,
+            width: art * 44,
+            height: art * 15,
+            opacity: 0.85,
+          },
+        ]}
+      />
+      <View
+        style={[
+          s.cloud,
+          {
+            right: art * 22,
+            top: top + layout.skyGap * 0.44,
+            width: art * 56,
+            height: art * 15,
+            opacity: 0.7,
+          },
+        ]}
+      />
+    </View>
+  );
+}
+
+/**
+ * The ship's arrival — `motion.beat.screen`, once.
+ *
+ * `rise` and `height` are hoisted out of the worklet on purpose: a `useAnimatedStyle` body runs on
+ * the UI runtime and cannot synchronously call a JS closure, and react-native-web does not enforce
+ * that, so the crash would only ever show on a device (`Sea.tsx` documents the same trap).
+ */
+function ShipArrival({
+  height,
+  rise,
+  children,
+}: {
+  readonly height: number;
+  readonly rise: number;
+  readonly children: ReactNode;
+}) {
+  const t = useSharedValue(0);
+
+  useEffect(() => {
+    t.value = withTiming(1, { duration: READY_MOTION.shipArrive, easing: Easing.out(Easing.quad) });
+  }, [t]);
+
+  const travel = rise;
+  const style = useAnimatedStyle(() => ({
+    opacity: t.value,
+    transform: [{ translateY: travel * (1 - t.value) }],
+  }));
+
+  return <Animated.View style={[{ height, alignSelf: 'center' }, style]}>{children}</Animated.View>;
+}
+
+/**
+ * The Harbor's `hr-pop`, unchanged: 220ms, `.72 → 1.04 → 1`.
+ *
+ * The same curve the purchase reveal uses, because a child meeting it here and again on their first
+ * skin should recognise it — the app's motion vocabulary is small on purpose.
+ */
+function Pop({ delay, children }: { readonly delay: number; readonly children: ReactNode }) {
+  const t = useSharedValue(0.72);
+
+  useEffect(() => {
+    t.value = withDelay(
+      delay,
+      withSequence(
+        withTiming(1.04, { duration: READY_MOTION.pop.up, easing: Easing.out(Easing.quad) }),
+        withTiming(1, { duration: READY_MOTION.pop.settle, easing: Easing.out(Easing.quad) }),
+      ),
+    );
+  }, [t, delay]);
+
+  // `.72` is also the "not yet" value, so the element is invisible until its own delay elapses
+  // rather than sitting on screen at three-quarter size waiting its turn.
+  const style = useAnimatedStyle(() => ({
+    opacity: t.value < 0.8 ? 0 : 1,
+    transform: [{ scale: t.value }],
+  }));
+
+  return <Animated.View style={[{ alignSelf: 'center' }, style]}>{children}</Animated.View>;
+}
+
+/**
+ * The `Sail!` button's arrival — `hr-pop`'s curve with the fade deliberately removed.
+ *
+ * This is the app's only caller of `completeOnboarding()`, and `Pop` hides its subject until its
+ * delay elapses. A button that is not drawn is a child with no way out of onboarding, and a stalled
+ * animation makes that permanent — a backgrounded tab throttling `requestAnimationFrame` is enough,
+ * and it reproduced on web. So this one never touches opacity: it is on screen and tappable from
+ * the first frame at `READY_MOTION.settleFrom`, and the delayed beat settles the last 8%.
+ *
+ * The reason to spend a whole component on the difference rather than a boolean is that the
+ * difference is a safety property, not a style — see `readyLayout.ts`'s note on `settleFrom`.
+ */
+function Settle({ delay, children }: { readonly delay: number; readonly children: ReactNode }) {
+  const t = useSharedValue<number>(READY_MOTION.settleFrom);
+
+  useEffect(() => {
+    t.value = withDelay(
+      delay,
+      withSequence(
+        withTiming(1.04, { duration: READY_MOTION.pop.up, easing: Easing.out(Easing.quad) }),
+        withTiming(1, { duration: READY_MOTION.pop.settle, easing: Easing.out(Easing.quad) }),
+      ),
+    );
+  }, [t, delay]);
+
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: t.value }] }));
+
+  return <Animated.View style={[{ alignSelf: 'center' }, style]}>{children}</Animated.View>;
 }
 
 /**
  * The board's four 56pt tiles. Its counts are drawn literals (`1 / 1 / 1 / 0`); ours are read off
  * the captain, because a tally screen that says "1 gun" to a child holding two is the first thing
  * the game tells them that is not true.
+ *
+ * `size` is the resolved tile from `readySceneLayout` rather than a scale multiplied here, so the
+ * row the model measured and the row the screen draws are the same row.
  */
 function ReadyBadge({
   count,
   label,
-  scale,
+  size,
+  artScale,
   typeScale,
 }: {
   readonly count: number;
   readonly label: string;
-  readonly scale: number;
+  readonly size: number;
+  readonly artScale: number;
   readonly typeScale: number;
 }) {
   return (
     <View
+      accessible
+      accessibilityLabel={`${count} ${label.toLowerCase()}`}
       style={[
         s.badge,
-        { width: scale * 56, height: scale * 56, borderRadius: scale * 18, borderBottomWidth: scale * 3 },
+        {
+          width: size,
+          height: size,
+          borderRadius: artScale * 18,
+          borderBottomWidth: artScale * 3,
+        },
       ]}
     >
       <Text style={[s.badgeCount, { fontSize: typeScale * 20, lineHeight: typeScale * 24 }]}>
@@ -329,72 +616,6 @@ function ReadyBadge({
   );
 }
 
-/** The board's ship, at its own vertex coordinates. Composed — `sprites.test.ts` allows no new raster. */
-function ReadyShip({ width, height }: { readonly width: number; readonly height: number }) {
-  const u = width / 140;
-  return (
-    <View style={{ width, height }}>
-      <Poly
-        points="0,0 100,0 68,50 100,100 0,100"
-        width={24 * u}
-        height={12 * u}
-        fill={color.amber}
-        style={{ position: 'absolute', left: 66 * u, bottom: 100 * u }}
-      />
-      <View
-        style={{
-          position: 'absolute',
-          left: 64 * u,
-          bottom: 40 * u,
-          width: 6 * u,
-          height: 62 * u,
-          borderRadius: 3 * u,
-          backgroundColor: color.wood,
-        }}
-      />
-      <Poly
-        points="100,0 100,100 0,88 0,12"
-        width={40 * u}
-        height={24 * u}
-        fill={color.parchment}
-        style={{ position: 'absolute', left: 24 * u, bottom: 76 * u }}
-      />
-      <Poly
-        points="100,0 100,100 0,92 0,8"
-        width={48 * u}
-        height={32 * u}
-        fill={color.white}
-        style={{ position: 'absolute', left: 16 * u, bottom: 44 * u }}
-      />
-      <View
-        style={{
-          position: 'absolute',
-          left: 8 * u,
-          bottom: 34 * u,
-          width: 122 * u,
-          height: 7 * u,
-          borderRadius: 4 * u,
-          backgroundColor: color.deck,
-        }}
-      />
-      <Poly
-        points="0,0 100,0 90,100 9,100"
-        width={140 * u}
-        height={36 * u}
-        fill={color.woodLight}
-        style={{ position: 'absolute', left: 0, bottom: 0 }}
-      />
-      <Poly
-        points="0,0 100,0 90,100 9,100"
-        width={140 * u}
-        height={11 * u}
-        fill={color.woodDeep}
-        style={{ position: 'absolute', left: 0, bottom: 0 }}
-      />
-    </View>
-  );
-}
-
 const s = StyleSheet.create({
   skipTarget: { justifyContent: 'center' },
   /** The coach slab's own pair — `parchment` on `inkDark` — so the pill certifies itself rather
@@ -402,18 +623,34 @@ const s = StyleSheet.create({
   skipPill: { backgroundColor: color.inkDark, alignItems: 'center', justifyContent: 'center' },
   skipLabel: { fontFamily: type.body.fontFamily, color: color.parchment },
 
-  done: { flex: 1, backgroundColor: color.seaFoam, overflow: 'hidden' },
+  /**
+   * The sky, at `SeaStage`'s own token rather than the board's `seaFoam`.
+   *
+   * The board paints the whole send-off `#43B4E0` and stands the headline on it at 6.25 — legal,
+   * but it is the SEA's colour, so a screen whose entire point is a boat on water had the same
+   * blue above and below the horizon. `skyTop` is what every duel's sky is, and it carries
+   * `inkDark` at 10.9.
+   */
+  done: { flex: 1, backgroundColor: color.skyTop, overflow: 'hidden' },
   doneSea: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
+    // A ground under the gradient, so a frame drawn before the SVG lands is water and not sky.
     backgroundColor: color.sea,
-    borderTopColor: color.seaFoam,
+    borderTopColor: color.foam,
+    overflow: 'hidden',
   },
-  doneTitle: { position: 'absolute', left: 0, right: 0, paddingHorizontal: 16 },
-  doneHeadline: { fontFamily: type.display.fontFamily, color: color.inkDark, textAlign: 'center' },
-  doneBadges: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center' },
+  cloud: { position: 'absolute', borderRadius: radius.pill, backgroundColor: color.white },
+  doneColumn: { flex: 1 },
+  doneHeadline: {
+    fontFamily: type.display.fontFamily,
+    color: color.inkDark,
+    textAlign: 'center',
+    alignSelf: 'center',
+  },
+  doneBadges: { flexDirection: 'row', alignSelf: 'center', alignItems: 'center' },
   badge: {
     backgroundColor: color.parchment,
     borderBottomColor: '#C9AE7E',

@@ -199,19 +199,71 @@ export const font = {
   bodyMedium: 'Nunito_600SemiBold',
 } as const;
 
+/**
+ * ## Why every Baloo step is `ceil(fontSize × 1.602)` (2026-07-31)
+ *
+ * A captain reported the cannon name in `CannonTray` shearing off at the top. The four display
+ * steps were 1.20–1.31 — ratios that are unremarkable for a normal Latin face and wrong for this
+ * one. `includeFontPadding` is Android-only; on iOS the fix is the line box.
+ *
+ * **Measured, from the shipped `Baloo2_800ExtraBold.ttf` and from React Native's own source —
+ * not chosen for being round.** `unitsPerEm 1000`, `hhea.ascender 1078`, `hhea.descender −524`,
+ * `lineGap 0`. So `UIFont.lineHeight` for this face is exactly **1.6020 em**. That ascent is
+ * enormous for Latin because Baloo 2 is a multi-script family — the headroom is reserved for
+ * Devanagari matras, and every Latin-only consumer inherits the bill.
+ *
+ * Two thresholds fall out, and the tokens now clear the second rather than gambling on the first:
+ *
+ *  1. **1.235 em — where ink starts being lost.** Below `UIFont.lineHeight`, RN skips its
+ *     centering pass entirely (`RCTTextShadowView.mm:161`, `if (maximumLineHeight <
+ *     maximumFontLineHeight) return;`) and TextKit anchors the baseline at `lineHeight − descent`.
+ *     The tallest ink this app renders is 0.711 em (the dot of `i`; caps reach 0.602), so ink
+ *     survives only while `lineHeight ≥ 0.711 + 0.524 = 1.235 em`. Laid out through TextKit
+ *     against the real face, the old tokens measured:
+ *
+ *       | step       | was    | ratio | ink clearance at the top |
+ *       |------------|--------|-------|--------------------------|
+ *       | `display`  | 30/36  | 1.200 | **−1.33pt — clipped**    |
+ *       | `glyph`    | 32/40  | 1.250 | +5.91pt (operators only) |
+ *       | `title`    | 19/24  | 1.263 | +0.49pt                  |
+ *       | `subtitle` | 16/21  | 1.313 | +1.62pt                  |
+ *
+ *     `display` was already cutting ink. `title` and `subtitle` were inside the threshold by less
+ *     than two points — a margin that depends on which glyphs are in the word and on how the
+ *     rasteriser rounds the baseline, and that any call site lowering `fontSize` under an
+ *     inherited absolute `lineHeight` destroys outright (`gun-deck.tsx` was rendering 20pt text
+ *     in this file's 21pt box: 1.05).
+ *
+ *  2. **1.602 em — where clipping stops being possible.** At or above `UIFont.lineHeight` RN
+ *     applies `baseLineOffset = (lineHeight − fontLineHeight) / 2` and centers the face's own box
+ *     inside the line. There is no ink outside that box, on either platform, for any string.
+ *
+ * The tokens take (2). A design token that is correct by half a point is the bug, not the fix.
+ *
+ * **The rule this creates:** a call site that overrides `fontSize` on a display step MUST override
+ * `lineHeight` with it — `ceil(size × 1.602)` — because these are absolute points, not multiples.
+ * That was already true and already violated; the sites are fixed alongside this change.
+ *
+ * Nunito's box is 1.3640 em (`hhea` 1011 / −353). `body` (1.615) and `caption` (1.583) clear it;
+ * `chip` and `eyebrow` sit at 1.300, 0.64pt short at 10pt. Left alone deliberately: they are body
+ * family, no clipping was reported on them, and raising them moves chip geometry on every screen.
+ * `src/components/chart/*` and `src/theme/questionTypography.ts` set their own line heights from
+ * `font.displayBold` without reading this scale and are still on 1.15–1.30 ratios; both are
+ * out of scope here and neither is reachable from this file.
+ */
 export const type = {
   /** Screen title. */
-  display: { fontFamily: font.displayBold, fontSize: 30, lineHeight: 36 },
+  display: { fontFamily: font.displayBold, fontSize: 30, lineHeight: 49 },
   /**
    * The cannon tray's operator glyph, and the largest single character in the game. Measured at
    * 32 on the board. It existed only as a hardcoded `fontSize: 32` at the call site until the
    * design fixture noticed there was no token within 1pt of it.
    */
-  glyph: { fontFamily: font.displayBold, fontSize: 32, lineHeight: 40 },
+  glyph: { fontFamily: font.displayBold, fontSize: 32, lineHeight: 52 },
   /** Card headline. */
-  title: { fontFamily: font.displayBold, fontSize: 19, lineHeight: 24 },
+  title: { fontFamily: font.displayBold, fontSize: 19, lineHeight: 31 },
   /** Sub-headline inside a card. */
-  subtitle: { fontFamily: font.displayBold, fontSize: 16, lineHeight: 21 },
+  subtitle: { fontFamily: font.displayBold, fontSize: 16, lineHeight: 26 },
   /** Default reading size. */
   body: { fontFamily: font.bodySemi, fontSize: 13, lineHeight: 21 },
   /** Small print — board annotations, helper text. */
