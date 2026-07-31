@@ -179,5 +179,22 @@
       "island": "grandline",
       "tier": 1
     }
+  },
+  {
+    "id": "grapeshot",
+    "displayName": "Grapeshot",
+    "skill": "repeated_addition",
+    "damageMin": 11,
+    "damageMax": 17,
+    "temperament": "standard",
+    "recoilDamage": 0,
+    "timerMs": 15000,
+    "minGrade": 1,
+    "maxGrade": 2,
+    "unlock": {
+      "kind": "range",
+      "island": "isla_products",
+      "tier": 1
+    }
   }
 ]

@@ -149,7 +149,7 @@ const VALID_ENEMY: Record<string, unknown> = {
 // --- AC-1: the id sets ---------------------------------------------------------------------
 
 describe('id unions', () => {
-  it('spec(T-003:AC-1) SKILL_IDS lists the nine skill ids in ticket order with no duplicates', () => {
+  it('spec(T-003:AC-1) SKILL_IDS lists the ten skill ids in ticket order with no duplicates', () => {
     expect(SKILL_IDS).toEqual([
       'add_within_10',
       'add_within_20',
@@ -160,13 +160,14 @@ describe('id unions', () => {
       'div_facts',
       'fractions_int',
       'multi_digit_order_ops',
+      'repeated_addition', // A-060 — the K-1 grouping rung of Isla Products
     ]);
     expect(new Set(SKILL_IDS).size).toBe(SKILL_IDS.length);
     const unionMatchesArray: Exact<SkillId, (typeof SKILL_IDS)[number]> = true;
     expect(unionMatchesArray).toBe(true);
   });
 
-  it('spec(T-003:AC-1) CANNON_IDS lists the eleven cannon ids in ticket order with no duplicates', () => {
+  it('spec(T-003:AC-1) CANNON_IDS lists the twelve cannon ids in ticket order with no duplicates', () => {
     expect(CANNON_IDS).toEqual([
       'swivel_gun',
       'culverin',
@@ -179,6 +180,7 @@ describe('id unions', () => {
       'double_broadside',
       'powder_keg',
       'long_nine',
+      'grapeshot', // A-060 — invented range payoff for repeated_addition, at Isla Products
     ]);
     expect(new Set(CANNON_IDS).size).toBe(CANNON_IDS.length);
     const unionMatchesArray: Exact<CannonId, (typeof CANNON_IDS)[number]> = true;

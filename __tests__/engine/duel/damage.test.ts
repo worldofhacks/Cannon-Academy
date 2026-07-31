@@ -331,8 +331,8 @@ describe(
       }
       expect(violations.slice(0, 5)).toEqual([]);
       // L-017: a passing assertion over an unswept domain is no evidence at all.
-      expect(samples).toBe(5_500); // 11 cannons × elapsed × shots (T-029)
-      expect(ALL_CANNONS.length).toBe(11); // T-029 / D-7 added saker
+      expect(samples).toBe(6_000); // 12 cannons × elapsed × shots (T-029 saker, A-060 grapeshot)
+      expect(ALL_CANNONS.length).toBe(12); // T-029 / D-7 added saker; A-060 added grapeshot
     });
 
     // spec(T-008:AC-15)
@@ -356,7 +356,7 @@ describe(
         }
       }
       expect(violations.slice(0, 5)).toEqual([]);
-      expect(samples).toBe(5_500); // 11 cannons × elapsed × shots (T-029)
+      expect(samples).toBe(6_000); // 12 cannons × elapsed × shots (T-029 saker, A-060 grapeshot)
     });
 
     // spec(T-008:AC-15)
@@ -526,8 +526,8 @@ describe('T-008 resolveShot — the Perfect Shot bonus', { timeout: 60000 }, () 
     const seven = await shotsWith(BASE_BALLS_PER_VOLLEY + 6);
     vi.resetModules();
 
-    expect(one.length).toBe(550); // 11 cannons × 10 elapsed × 5 seeds (T-029)
-    expect(seven.length).toBe(550);
+    expect(one.length).toBe(600); // 12 cannons × 10 elapsed × 5 seeds (T-029, A-060)
+    expect(seven.length).toBe(600);
 
     // L-014: prove the mutation is LIVE before trusting the verdict. `ballCount` must track
     // the mutated constant, or the mock never took effect and this test proves nothing.
@@ -901,7 +901,7 @@ describe(
           }
         }
       }
-      expect(samples).toBe(5_500); // 11 cannons × elapsed × shots (T-029)
+      expect(samples).toBe(6_000); // 12 cannons × elapsed × shots (T-029 saker, A-060 grapeshot)
     });
 
     // spec(T-008:AC-14)

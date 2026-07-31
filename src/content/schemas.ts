@@ -23,6 +23,11 @@ export const SKILL_IDS = [
   'div_facts',
   'fractions_int',
   'multi_digit_order_ops',
+  // The K-1 rung of Isla Products' grouping concept. Appended rather than filed beside the other
+  // addition skills because SKILL_IDS is read as an ordered transcription by
+  // `__tests__/content/schemas.test.ts`, and because `skills.json` order decides Rank-screen row
+  // order — a late entry joins the existing `+` group instead of opening a new row.
+  'repeated_addition',
 ] as const;
 export type SkillId = (typeof SKILL_IDS)[number];
 
@@ -38,6 +43,9 @@ export const CANNON_IDS = [
   'double_broadside',
   'powder_keg',
   'long_nine',
+  // Isla Products' K-1 range payoff, on `repeated_addition`. Appended so the catalog order every
+  // tray and rival loadout renders in is unchanged for the guns that were already there.
+  'grapeshot',
 ] as const;
 export type CannonId = (typeof CANNON_IDS)[number];
 

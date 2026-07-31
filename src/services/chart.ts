@@ -12,7 +12,7 @@
  * node tells a child the game is one island long. The fog IS the promise that there is more.
  */
 import { islands, getIsland, getSkill } from '@content/index';
-import type { Island, SkillId } from '@content/schemas';
+import type { GradeBand, Island, IslandId, SkillId } from '@content/schemas';
 import { emptyMastery, isMastered, type SkillMastery } from '@engine/mastery';
 import { maxGradeForBand } from '@engine/placement';
 import {
@@ -22,10 +22,18 @@ import {
   MASTERY_THRESHOLD_CORRECT,
 } from '@engine/tuning';
 
+import { islandGlyph } from '../components/chart/board';
 import type { Captain } from '../stores/player';
+import { SKILL_GLYPH } from '../theme/rankPresentation';
 
 export interface ChartNode {
   readonly island: Island;
+  /**
+   * The operator this captain will actually be asked here — see `islandGlyphForCaptain`. Carried on
+   * the node rather than looked up at the call site so the chart cannot label a five-year-old's map
+   * with a symbol their duel will never use.
+   */
+  readonly glyph: string;
   /** True when the captain cannot enter. Fogged islands are shown, never hidden. */
   readonly fogged: boolean;
   /** The captain's ship is drawn here. */
@@ -64,6 +72,7 @@ export function chartNodes(captain: Captain): readonly ChartNode[] {
       const inBand = island.rangeSkills.filter((skill) => getSkill(skill).minGrade <= maxGrade);
       return {
         island,
+        glyph: islandGlyphForCaptain(island.id, captain.gradeBand),
         fogged,
         isCurrent: captain.currentIsland === island.id,
         // An island with nothing age-appropriate to teach is not "cleared" by vacuous truth —
@@ -222,4 +231,32 @@ export function chartProgress(captain: Captain, nodes: readonly ChartNode[]): Ch
         ? `${next.displayName} opens after about one more duel.`
         : `${next.displayName} opens after about ${spell(duelsToOpen)} more duels.`,
   };
+}
+
+/**
+ * The operator a captain will actually be asked at an island — not the island's headline operator.
+ *
+ * `board.ts`'s `islandGlyph` is the BOARD's label: Isla Products is `×` because that is what the
+ * drawing says. That was true while an island taught one thing to everybody. It stopped being true
+ * the moment islands started teaching the same concept at a level matched to the band: a `k_1`
+ * captain now sails to Isla Products and is asked `2 + 2 + 2`, so labelling their map `×` shows a
+ * five-year-old the one symbol A-051 exists to keep away from them, and promises maths the duel
+ * will never actually ask.
+ *
+ * So the glyph is derived from the hardest skill the captain is ELIGIBLE for at that island —
+ * hardest, because that is the one the island is really teaching them, and eligibility is the same
+ * `maxGradeForBand` ceiling `asksInBand` uses at the point questions are chosen (A-058).
+ *
+ * Falls back to the board's own label when a captain has no band yet, which is the only state that
+ * can reach here without one and is the state `resolveDestination` immediately routes away from.
+ */
+export function islandGlyphForCaptain(islandId: IslandId, band: GradeBand | null): string {
+  if (band === null) return islandGlyph[islandId];
+  const ceiling = maxGradeForBand(band);
+  const inBand = getIsland(islandId)
+    .rangeSkills.map((id) => getSkill(id))
+    .filter((skill) => skill.minGrade <= ceiling)
+    .sort((a, b) => b.minGrade - a.minGrade);
+  const hardest = inBand[0];
+  return hardest === undefined ? islandGlyph[islandId] : SKILL_GLYPH[hardest.id];
 }

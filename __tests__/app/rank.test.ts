@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 import { islands, ranks, skills } from '@content/index';
-import type { SkillId } from '@content/schemas';
+import type { GradeBand, SkillId } from '@content/schemas';
 import { applyAnswer, emptyMastery, isMastered, meterPercent } from '@engine/mastery';
 import { maxGradeForBand } from '@engine/placement';
 import { rankTierForWins } from '@engine/ranks';
@@ -97,6 +97,23 @@ function fullMeterButNotMastered() {
 
 function masteryFor(ids: readonly SkillId[], value: ReturnType<typeof masteredMastery>) {
   return Object.fromEntries(ids.map((id) => [id, value]));
+}
+
+/**
+ * The skills a band is actually served, in catalog order — exactly what `skillProgress` rows.
+ *
+ * Derived rather than listed. A-060 added `repeated_addition` (grade 1) so K-1 is served FOUR
+ * skills rather than three, and the assertions below are about the shape of the grouping, not
+ * about a catalog census that goes stale every time the curriculum grows.
+ */
+function inBandSkillIds(band: GradeBand): readonly SkillId[] {
+  const maxGrade = maxGradeForBand(band);
+  return skills.filter((skill) => skill.minGrade <= maxGrade).map((skill) => skill.id);
+}
+
+/** The in-band skills that share one operation glyph — the skills one row is measured over. */
+function rowSkillIds(band: GradeBand, glyph: string): readonly SkillId[] {
+  return inBandSkillIds(band).filter((id) => SKILL_GLYPH[id] === glyph);
 }
 
 describe('A-012 rank ladder', () => {
@@ -316,12 +333,19 @@ describe('A-012 skill rows are operations, not catalog rows', () => {
     // lock." `skillProgress` returns THREE rows there, because the catalog splits addition by
     // range. Grouping by operation satisfies the board without a service change.
     const progress = skillProgress(captain({ gradeBand: 'k_1' }));
-    expect(progress).toHaveLength(3);
+    // Every K-1 catalog skill gets a progress ROW; the board's rule is about the two rendered
+    // GROUPS, and that is what the grouping has to deliver however many skills feed it. A-060's
+    // `repeated_addition` is the case that separates the two claims: it is a fourth K-1 skill and
+    // it must not become a third tile.
+    expect(progress.map((row) => row.skillId)).toEqual([...inBandSkillIds('k_1')]);
+    expect(progress.length).toBeGreaterThan(2);
 
     const rows = rankSkillRows(progress);
     expect(rows.map((row) => row.glyph)).toEqual(['+', '−']);
-    expect(rows[0]?.skillIds).toEqual(['add_within_10', 'add_within_20']);
-    expect(rows[1]?.skillIds).toEqual(['sub_within_20']);
+    expect(rows[0]?.skillIds).toEqual([...rowSkillIds('k_1', '+')]);
+    expect(rows[1]?.skillIds).toEqual([...rowSkillIds('k_1', '−')]);
+    // Non-vacuity: the `+` row really is aggregating, which is the whole reason it exists.
+    expect(rows[0]?.skillIds.length).toBeGreaterThan(1);
   });
 
   it('spec(A-012:AC-3) the grade-band ceiling survives the grouping', () => {
@@ -360,9 +384,14 @@ describe('A-012 skill rows are operations, not catalog rows', () => {
   it('spec(A-012:AC-3) a row is mastered only when every skill under it is', () => {
     // `some` would let the + row tick itself the moment addition-within-10 was done, telling a
     // child they had finished something they had not.
+    const plus = rowSkillIds('k_1', '+');
+    expect(plus.length, 'the + row must aggregate to have anything to prove').toBeGreaterThan(1);
+
     const half = captain({
       gradeBand: 'k_1',
-      mastery: masteryFor(['add_within_10'], masteredMastery()),
+      // Every skill under the row but one — so `some` ticks and `every` does not, whatever the
+      // catalog's addition skills happen to be today.
+      mastery: masteryFor(plus.slice(0, -1), masteredMastery()),
     });
     const halfRow = rankSkillRows(skillProgress(half)).find((row) => row.glyph === '+');
     expect(halfRow?.mastered).toBe(false);
@@ -370,7 +399,7 @@ describe('A-012 skill rows are operations, not catalog rows', () => {
 
     const whole = captain({
       gradeBand: 'k_1',
-      mastery: masteryFor(['add_within_10', 'add_within_20'], masteredMastery()),
+      mastery: masteryFor(plus, masteredMastery()),
     });
     const wholeRow = rankSkillRows(skillProgress(whole)).find((row) => row.glyph === '+');
     expect(wholeRow?.mastered).toBe(true);
@@ -386,7 +415,7 @@ describe('A-012 skill rows are operations, not catalog rows', () => {
     expect(meterPercent(full)).toBe(100);
     expect(isMastered(full)).toBe(false);
 
-    const c = captain({ gradeBand: 'k_1', mastery: masteryFor(['add_within_10', 'add_within_20'], full) });
+    const c = captain({ gradeBand: 'k_1', mastery: masteryFor(rowSkillIds('k_1', '+'), full) });
     const row = rankSkillRows(skillProgress(c)).find((r) => r.glyph === '+');
     expect(row?.meterPercent).toBe(100);
     expect(row?.mastered).toBe(false);

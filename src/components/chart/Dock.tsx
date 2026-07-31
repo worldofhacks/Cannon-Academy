@@ -26,7 +26,7 @@ import type { Island, SkillId } from '@content/schemas';
 import { emptyMastery, meterPercent, type SkillMastery } from '@engine/mastery';
 
 import type { HubControl } from '../../services/flow';
-import { DOCK, WAYPOINT_PARTS, islandGlyph } from './board';
+import { DOCK, WAYPOINT_PARTS } from './board';
 import { chart } from './palette';
 import { Poly } from '../Poly';
 import { sprite } from '../../theme/sprites';
@@ -34,6 +34,8 @@ import { font } from '../../theme/tokens';
 
 interface DockProps {
   readonly island: Island;
+  /** The operator THIS captain meets here (`ChartNode.glyph`), not the board's fixed label. */
+  readonly glyph: string;
   readonly mastery: Partial<Record<SkillId, SkillMastery>>;
   /** A closed island can still be described. It just cannot be fought at. */
   readonly fogged: boolean;
@@ -55,6 +57,7 @@ interface DockProps {
 
 export function ChartDock({
   island,
+  glyph,
   mastery,
   fogged,
   nextIslandCount,
@@ -122,7 +125,7 @@ export function ChartDock({
                 color: chart.ink,
               }}
             >
-              {islandGlyph[island.id]}
+              {glyph}
             </Text>
           </View>
 

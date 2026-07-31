@@ -233,6 +233,7 @@ export default function Chart() {
 
         <ChartDock
           island={focus.island}
+          glyph={focus.glyph}
           mastery={captain.mastery}
           fogged={focus.fogged}
           nextIslandCount={progress.nextIndex < 0 ? null : progress.duelsToOpen}

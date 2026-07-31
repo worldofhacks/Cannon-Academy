@@ -11,8 +11,8 @@
     "displayName": "Isla Products",
     "order": 1,
     "requiresIsland": "port_sumwich",
-    "rangeSkills": ["mult_facts"],
-    "unlocksCannons": ["twelve_pounder"]
+    "rangeSkills": ["repeated_addition", "mult_facts"],
+    "unlocksCannons": ["grapeshot", "twelve_pounder"]
   },
   {
     "id": "quotient_cove",

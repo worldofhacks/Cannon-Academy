@@ -50,7 +50,7 @@ import { cannons, getCannon, getSkill, islands, skills } from '@content/index';
 import type { Cannon, CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
 import { GRADE_BANDS } from '@content/schemas';
 import { maxGradeForBand } from '@engine/placement';
-import { TRAY_CAPACITY } from '@engine/tuning';
+import { MASTERY_THRESHOLD_CORRECT, TRAY_CAPACITY } from '@engine/tuning';
 
 import { resolveDuelContext } from '../../src/services/duelContext';
 import { DESTINATIONS } from '../../src/services/flow';
@@ -75,6 +75,9 @@ const SEEDS: readonly number[] = [7, 1_009, 65_537];
 
 /** Enough steps for any duel at any island to reach a terminal phase. */
 const STEP_CAP = 800;
+
+/** Multiplication and division as WORDS — the half a glyph scan misses (A-060). */
+const OPERATOR_WORDS = /\b(multipl(y|ied|ies|ication)|times|divid(e|ed|es)|division)\b/i;
 
 /** Which skill authored a template id — so a question can be traced to its skill, not its cannon. */
 const SKILL_BY_TEMPLATE_ID: ReadonlyMap<string, SkillId> = new Map(
@@ -259,6 +262,10 @@ describe('A-058 the duel obeys the band picked at onboarding', () => {
       for (const seed of SEEDS) {
         for (const question of playDuel(captain, islandId, seed).asked) {
           expect(question.text).not.toMatch(/[×÷]/);
+          // The WORDS as well as the glyphs. The two `startsWith` checks below are a naming
+          // convention rather than a guarantee — A-060's `repeated_addition` is legitimate grade-1
+          // grouping content that walks past both — so what a child reads is checked directly.
+          expect(question.text).not.toMatch(OPERATOR_WORDS);
           expect(skillOf(question).startsWith('mult_')).toBe(false);
           expect(skillOf(question).startsWith('div_')).toBe(false);
           asked += 1;
@@ -272,6 +279,69 @@ describe('A-058 the duel obeys the band picked at onboarding', () => {
     const beyond = skills.filter((s) => s.id.startsWith('mult_') || s.id.startsWith('div_'));
     expect(beyond.length).toBeGreaterThan(0);
     for (const skill of beyond) expect(skill.minGrade).toBeGreaterThan(maxGradeForBand('k_1'));
+  });
+
+  it('spec(A-058:AC-1) spec(A-060:AC-1) the SECOND island a K-1 captain opens is × and ÷ free too', () => {
+    // The sweep above runs over `captain.unlockedIslands`, which for a freshly placed k_1 captain
+    // is one island. That was fine while a k_1 captain could never open another — which is the bug
+    // A-060 fixed. Now they can, so the sweep's domain is no longer the map a five-year-old sees,
+    // and the island they sail ON to has to be swept as well or the ceiling is untested exactly
+    // where the new content lives.
+    const store = onboarded('k_1');
+    // The real path, through the store: master Port Sumwich's first skill (which lifts Isla
+    // Products' fog), then the new island's own K-1 skill (which pays out its gun).
+    store.getState().recordRangeAnswers('add_within_10', {
+      correct: MASTERY_THRESHOLD_CORRECT,
+      asked: MASTERY_THRESHOLD_CORRECT,
+    });
+    store.getState().recordRangeAnswers('repeated_addition', {
+      correct: MASTERY_THRESHOLD_CORRECT,
+      asked: MASTERY_THRESHOLD_CORRECT,
+    });
+
+    const progressed = store.getState().captain;
+    expect(
+      progressed.unlockedIslands.length,
+      'a k_1 captain who mastered everything they were offered never left port',
+    ).toBeGreaterThan(1);
+
+    // The new gun is owned, in band, and takes a tray slot — an island a child can reach but has
+    // nothing to fire at is the same wall wearing a different hat.
+    const owned = inBandLoadout(progressed.ownedCannons, 'k_1');
+    expect(owned).toContain('grapeshot');
+    const deck: readonly CannonId[] = [
+      'grapeshot' as CannonId,
+      ...owned.filter((id) => id !== 'grapeshot'),
+    ].slice(0, TRAY_CAPACITY);
+    store.getState().equipCannons(deck);
+    const captain = store.getState().captain;
+    expect(trayCannons(captain).map((c) => c.id)).toContain('grapeshot');
+
+    let asked = 0;
+    const islandsPlayed = new Set<IslandId>();
+    const skillsSeen = new Set<SkillId>();
+    for (const islandId of captain.unlockedIslands) {
+      for (const seed of SEEDS) {
+        const played = playDuel(captain, islandId, seed);
+        expect(played.refused, `${islandId} refused a gun inside the k_1 ceiling`).toEqual([]);
+        expect(played.asked.length, `${islandId}@${seed} asked nothing`).toBeGreaterThan(0);
+        for (const question of played.asked) {
+          expect(question.text, `k_1 @ ${islandId} was shown '${question.text}'`).not.toMatch(/[×÷]/);
+          expect(question.text).not.toMatch(OPERATOR_WORDS);
+          expectInBand(question, 'k_1', `k_1 @ ${islandId}`);
+          skillsSeen.add(skillOf(question));
+          asked += 1;
+        }
+        islandsPlayed.add(islandId);
+      }
+    }
+
+    // Non-vacuity: the sweep really left Port Sumwich, really fired the new gun, and really drew
+    // from the new pool. Any one of those failing would make the assertions above free.
+    expect(islandsPlayed.size, 'the sweep never left Port Sumwich').toBeGreaterThan(1);
+    expect(islandsPlayed).toContain('isla_products');
+    expect(skillsSeen).toContain('repeated_addition');
+    expect(asked).toBeGreaterThan(SEEDS.length);
   });
 
   // ── AC-2 — the ceiling holds however the gun got equipped ───────────────────────────────────

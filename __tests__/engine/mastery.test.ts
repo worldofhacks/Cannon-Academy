@@ -61,7 +61,8 @@ import {
   MASTERY_METER_MAX,
 } from '@engine/tuning';
 import type { CannonId, IslandId, SkillId } from '@content/schemas';
-import { cannons, islands, getIsland } from '@content/index';
+import { cannons, islands, getIsland, getSkill } from '@content/index';
+import { maxGradeForBand } from '@engine/placement';
 import { createCaptainStore, emptyCaptain } from '../../src/stores/player';
 
 // --- Shared fixtures & helpers ---------------------------------------------------------------
@@ -412,7 +413,17 @@ describe('isMastered', () => {
 // ============================================================================================
 
 describe('resolveUnlocks', () => {
-  it('spec(A-027:AC-3) K-1 mastery of add_within_10 earns its cannon without opening Isla Products', () => {
+  it('spec(A-027:AC-3) spec(A-060:AC-1) K-1 mastery of add_within_10 earns its cannon AND opens Isla Products', () => {
+    // REVERSED BY THE OWNER (A-060). This test used to assert `not.toContain('isla_products')`,
+    // and it was passing — which is precisely what made it the bug report. The band rule
+    // `resolveUnlocks` applies is right (refuse an island that teaches nothing in band, or a
+    // five-year-old is served multiplication); the CONTENT was wrong. Isla Products taught only
+    // `mult_facts` (minGrade 3), and nothing at all existed between grade 1 and grade 3, so a
+    // `k_1` captain mastered Port Sumwich and this function returned `[]` forever.
+    //
+    // A-060 makes the island a PLACE rather than a difficulty tier: it teaches GROUPING at
+    // whatever rung the band can be asked, and `repeated_addition` (minGrade 1) is the K-1 rung.
+    // What must NOT change is the ceiling — the assertions below re-check it directly.
     const resolveBandUnlocks = resolveUnlocks as unknown as (input: {
       readonly gradeBand: 'k_1';
       readonly mastery: Partial<Record<SkillId, SkillMastery>>;
@@ -428,10 +439,27 @@ describe('resolveUnlocks', () => {
     });
 
     expect(result.cannons).toContain('saker');
-    expect(result.islands).not.toContain('isla_products');
+    expect(result.islands).toContain('isla_products');
+
+    // The ceiling, stated as the reason the island opened: it opened because it teaches something
+    // a grade-1 captain may be asked, and NOT because the band gate was loosened. `mult_facts` is
+    // still out of reach, and so is the gun that fires it.
+    const inBand = getIsland('isla_products').rangeSkills.filter(
+      (id) => getSkill(id).minGrade <= maxGradeForBand('k_1'),
+    );
+    expect(inBand.length, 'isla_products teaches a k_1 captain nothing').toBeGreaterThan(0);
+    expect(inBand).not.toContain('mult_facts');
+    expect(result.cannons).not.toContain('twelve_pounder');
+
+    // And an island whose whole curriculum is still above the band stays shut, so this is a
+    // content fix rather than the band check being deleted.
+    expect(result.islands).not.toContain('quotient_cove');
   });
 
-  it('spec(A-027:AC-3) the player-store tally grants K-1 Saker while keeping Isla Products closed', () => {
+  it('spec(A-027:AC-3) spec(A-060:AC-1) the player-store tally grants K-1 Saker AND opens Isla Products', () => {
+    // Same reversal as above, driven through the store rather than the pure function — this is the
+    // path the range screen really takes, and it is where the owner watched a five-year-old master
+    // Port Sumwich and stay put.
     const store = createCaptainStore({
       ...emptyCaptain(),
       gradeBand: 'k_1',
@@ -445,7 +473,11 @@ describe('resolveUnlocks', () => {
 
     const captain = store.getState().captain;
     expect(captain.ownedCannons).toContain('saker');
-    expect(captain.unlockedIslands).not.toContain('isla_products');
+    expect(captain.unlockedIslands).toContain('isla_products');
+    // The ceiling is untouched: the multiplication gun is still not theirs, and the island beyond
+    // — which teaches only division — is still fogged.
+    expect(captain.ownedCannons).not.toContain('twelve_pounder');
+    expect(captain.unlockedIslands).not.toContain('quotient_cove');
   });
 
   it('spec(A-027:AC-4) a mastered eligible predecessor opens its next eligible island without revoking a prior higher-band placement unlock', () => {

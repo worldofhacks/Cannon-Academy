@@ -36,6 +36,7 @@ import fractionsIntRaw from '../content/templates/fractions_int.json';
 import multFactsRaw from '../content/templates/mult_facts.json';
 import multiDigitOrderOpsRaw from '../content/templates/multi_digit_order_ops.json';
 import placeValueCompareRaw from '../content/templates/place_value_compare.json';
+import repeatedAdditionRaw from '../content/templates/repeated_addition.json';
 import subWithin20Raw from '../content/templates/sub_within_20.json';
 import twoStepAddSubRaw from '../content/templates/two_step_add_sub.json';
 
@@ -65,6 +66,7 @@ export const TEMPLATE_POOLS: Record<SkillId, readonly Template[]> = {
   div_facts: pool('div_facts', divFactsRaw),
   fractions_int: pool('fractions_int', fractionsIntRaw),
   multi_digit_order_ops: pool('multi_digit_order_ops', multiDigitOrderOpsRaw),
+  repeated_addition: pool('repeated_addition', repeatedAdditionRaw),
 };
 
 /**

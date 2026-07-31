@@ -120,6 +120,10 @@ export const SKILL_GLYPH: Readonly<Record<SkillId, string>> = {
   div_facts: '÷',
   fractions_int: '½',
   multi_digit_order_ops: '( )',
+  // `+`, and it is the whole point: repeated addition is grouping written as addition, so it joins
+  // the existing `+` row rather than opening a third one. A K-1 captain who has started Isla
+  // Products still sees exactly two rows on the Rank screen.
+  repeated_addition: '+',
 };
 
 /** Ten segments, matching the harbor's coin meter and the board's own Rank meters. */

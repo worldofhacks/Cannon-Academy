@@ -1,0 +1,100 @@
+[
+  {
+    "id": "repeated_addition_two_groups",
+    "skill": "repeated_addition",
+    "text": "{a} + {a} = ?",
+    "params": {
+      "a": [2, 10]
+    },
+    "constraints": ["a + a <= 20"],
+    "answerExpr": "a + a",
+    "distractors": ["(a + a) + a", "(a + a) - a", "(a + a) + 1"]
+  },
+  {
+    "id": "repeated_addition_three_groups",
+    "skill": "repeated_addition",
+    "text": "{a} + {a} + {a} = ?",
+    "params": {
+      "a": [2, 6]
+    },
+    "constraints": ["a + a + a <= 20"],
+    "answerExpr": "a + a + a",
+    "distractors": ["(a + a + a) + a", "(a + a + a) - a", "(a + a + a) + 1"]
+  },
+  {
+    "id": "repeated_addition_four_groups",
+    "skill": "repeated_addition",
+    "text": "{a} + {a} + {a} + {a} = ?",
+    "params": {
+      "a": [2, 5]
+    },
+    "constraints": ["a + a + a + a <= 20"],
+    "answerExpr": "a + a + a + a",
+    "distractors": ["(a + a + a + a) + a", "(a + a + a + a) - a", "(a + a + a + a) + 1"]
+  },
+  {
+    "id": "repeated_addition_five_groups",
+    "skill": "repeated_addition",
+    "text": "{a} + {a} + {a} + {a} + {a} = ?",
+    "params": {
+      "a": [2, 4]
+    },
+    "constraints": ["a + a + a + a + a <= 20"],
+    "answerExpr": "a + a + a + a + a",
+    "distractors": [
+      "(a + a + a + a + a) + a",
+      "(a + a + a + a + a) - a",
+      "(a + a + a + a + a) + 1"
+    ]
+  },
+  {
+    "id": "repeated_addition_paired_groups",
+    "skill": "repeated_addition",
+    "text": "({a} + {a}) + ({a} + {a}) = ?",
+    "params": {
+      "a": [2, 5]
+    },
+    "constraints": ["a + a + a + a <= 20"],
+    "answerExpr": "(a + a) + (a + a)",
+    "distractors": [
+      "((a + a) + (a + a)) + a",
+      "((a + a) + (a + a)) - a",
+      "((a + a) + (a + a)) + 1"
+    ]
+  },
+  {
+    "id": "repeated_addition_sum_first",
+    "skill": "repeated_addition",
+    "text": "? = {a} + {a} + {a}",
+    "params": {
+      "a": [2, 6]
+    },
+    "constraints": ["a + a + a <= 20"],
+    "answerExpr": "a + a + a",
+    "distractors": ["(a + a + a) + a", "(a + a + a) - a", "(a + a + a) + 1"]
+  },
+  {
+    "id": "repeated_addition_missing_last_group",
+    "skill": "repeated_addition",
+    "text": "{a} + {a} + ? = {c}",
+    "params": {
+      "a": [2, 6],
+      "c": [6, 20]
+    },
+    "constraints": ["c >= a + a", "c - a - a >= 1", "c - a - a <= 10"],
+    "answerExpr": "c - a - a",
+    "distractors": ["(c - a - a) + 1", "(c - a - a) - 1", "(c - a - a) + 2"]
+  },
+  {
+    "id": "repeated_addition_missing_first_group",
+    "skill": "repeated_addition",
+    "text": "? + {a} + {a} = {c}",
+    "params": {
+      "a": [2, 6],
+      "c": [6, 20]
+    },
+    "constraints": ["c >= a + a", "c - a - a >= 1", "c - a - a <= 10"],
+    "answerExpr": "c - a - a",
+    "distractors": ["(c - a - a) + 1", "(c - a - a) - 1", "(c - a - a) + 2"]
+  }
+]

@@ -61,5 +61,12 @@
     "minGrade": 5,
     "maxGrade": 5,
     "symbolicOnly": false
+  },
+  {
+    "id": "repeated_addition",
+    "displayName": "Adding equal groups",
+    "minGrade": 1,
+    "maxGrade": 2,
+    "symbolicOnly": true
   }
 ]

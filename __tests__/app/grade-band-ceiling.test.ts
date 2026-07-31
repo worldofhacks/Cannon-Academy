@@ -24,11 +24,16 @@ import { getIsland, getSkill, islands, skills } from '../../src/content/index';
 import type { GradeBand, IslandId, SkillId } from '../../src/content/schemas';
 import { maxGradeForBand } from '../../src/engine/placement';
 import { chartNodes } from '../../src/services/chart';
+import { TEMPLATE_POOLS } from '../../src/services/templatePools';
 import { emptyCaptain } from '../../src/stores/player';
 import type { Captain } from '../../src/stores/player';
 import { MASTERY_THRESHOLD_CORRECT } from '../../src/engine/tuning';
 
 const BANDS: readonly GradeBand[] = ['k_1', 'g2_3', 'g4_5'];
+
+/** The two ways multiplication or division can reach a child: the glyph, and the word. */
+const OPERATOR_GLYPHS = /[×÷]/;
+const OPERATOR_WORDS = /\b(multipl(y|ied|ies|ication)|times|divid(e|ed|es)|division)\b/i;
 
 /**
  * A captain at `band` with `mastered` fully mastered and everything else untouched.
@@ -150,5 +155,113 @@ describe('A-051 grade-band ceiling', () => {
     const reachable = skills.filter((s) => s.minGrade <= maxGrade).map((s) => s.id);
     expect(reachable.some((id) => id.startsWith('mult_'))).toBe(false);
     expect(reachable.some((id) => id.startsWith('div_'))).toBe(false);
+  });
+
+  it('spec(A-051:AC-3) spec(A-060:AC-2) no K-1 template PRINTS multiplication, whatever its skill is called', () => {
+    // The test above measures skill IDS. That is a NAMING CONVENTION, not a guarantee, and A-060
+    // is the case that proves it: `repeated_addition` is grade-1 grouping content — the K-1 rung of
+    // Isla Products — and it walks straight past a `startsWith('mult_')` check. Multiplication
+    // arriving early under an innocent id would be invisible to every assertion in this file.
+    //
+    // So the same claim is made again over the authored CORPUS, where it is a statement about what
+    // a five-year-old actually sees on the glass rather than about how a skill was named.
+    const maxGrade = maxGradeForBand('k_1');
+    const reachable = skills.filter((s) => s.minGrade <= maxGrade);
+    expect(reachable.length, 'K-1 is served no curriculum at all').toBeGreaterThan(1);
+
+    let inspected = 0;
+    for (const skill of reachable) {
+      const pool = TEMPLATE_POOLS[skill.id];
+      expect(pool.length, `${skill.id} is offered at K-1 with no authored templates`).toBeGreaterThan(0);
+      expect(skill.displayName, `${skill.id}'s own name shows an operator`).not.toMatch(OPERATOR_GLYPHS);
+      expect(skill.displayName, `${skill.id}'s own name says multiply/divide/times`).not.toMatch(
+        OPERATOR_WORDS,
+      );
+      for (const template of pool) {
+        expect(
+          template.text,
+          `${skill.id}/${template.id} prints an operator the K-1 curriculum has not introduced`,
+        ).not.toMatch(OPERATOR_GLYPHS);
+        expect(
+          template.text,
+          `${skill.id}/${template.id} names multiplication or division in words`,
+        ).not.toMatch(OPERATOR_WORDS);
+        inspected += 1;
+      }
+    }
+    expect(inspected, 'no template was inspected').toBeGreaterThan(reachable.length);
+
+    // Non-vacuity, and the reason this is a CEILING rather than a corpus that happens to be clean:
+    // the glyphs really are in the corpus, and every file carrying one sits above the K-1 ceiling.
+    const carriers = skills.filter((s) => TEMPLATE_POOLS[s.id].some((t) => OPERATOR_GLYPHS.test(t.text)));
+    expect(carriers.length, 'no template anywhere prints × or ÷ — this test measures nothing').toBeGreaterThan(
+      0,
+    );
+    for (const skill of carriers) expect(skill.minGrade).toBeGreaterThan(maxGrade);
+  });
+
+  it('spec(A-051:AC-1) spec(A-060:AC-1) Isla Products is reachable at K-1, and clearable there', () => {
+    // The A-060 complaint, in this file's own vocabulary. `inBandSkills` returning `[]` here is
+    // exactly the state that made `resolveUnlocks` return `[]` forever: an island whose whole
+    // curriculum sits above the band is an island the band can never be granted.
+    const reachable = inBandSkills('isla_products', 'k_1');
+    expect(
+      reachable.length,
+      'Isla Products teaches a k_1 captain nothing — there is no content between grade 1 and grade 3',
+    ).toBeGreaterThan(0);
+    // ...and it is reachable because a LOWER rung was authored, not because the ceiling moved.
+    expect(reachable).not.toContain('mult_facts');
+    for (const id of reachable) expect(getSkill(id).minGrade).toBeLessThanOrEqual(maxGradeForBand('k_1'));
+
+    const node = chartNodes(captainWith('k_1', reachable)).find((n) => n.island.id === 'isla_products');
+    expect(node?.cleared).toBe(true);
+
+    // The scope of this cut: the island AFTER it still teaches nothing in band, and the vacuous-
+    // truth guard above must keep it unticked.
+    expect(inBandSkills('quotient_cove', 'k_1')).toEqual([]);
+  });
+});
+
+describe('A-051 the chart labels an island with what THIS captain will be asked', () => {
+  it('spec(A-051:AC-4) a K-1 captain never sees × or ÷ on the map, even on an island that teaches them', async () => {
+    const { chartNodes, islandGlyphForCaptain } = await import('../../src/services/chart');
+    const { commitGradeBand } = await import('../../src/services/onboarding');
+    const { createCaptainStore } = await import('../../src/stores/player');
+
+    // The hole this closes. `board.ts`'s `islandGlyph` is the BOARD's label — Isla Products is `×`
+    // because the drawing says so, and that was true while an island taught one thing to everybody.
+    // Once it started teaching repeated addition at K-1, a five-year-old could sail to an island the
+    // chart captioned with the one symbol A-051 exists to keep away from them.
+    const store = createCaptainStore();
+    commitGradeBand(store, 'k_1');
+    const captain = { ...store.getState().captain, unlockedIslands: ['port_sumwich', 'isla_products'] as const };
+
+    const nodes = chartNodes({ ...captain, unlockedIslands: [...captain.unlockedIslands] });
+
+    // ENTERABLE islands only, and the distinction is the ruling rather than a convenience.
+    //
+    // A fogged node keeps the board's own glyph on purpose: board 9a says "a silhouette, a name and
+    // a skill glyph survive the fog on every locked node, because anticipation is the whole point of
+    // a map". A `÷` a child cannot reach is a promise about later, not instruction now — the same
+    // reason A-051's original scope was the gun deck's operator row, a thing a child USES.
+    //
+    // An island they can sail to is instruction. That one has to speak their band.
+    const enterable = nodes.filter((node) => !node.fogged);
+    expect(enterable.length, 'nothing enterable — the sweep would pass vacuously').toBeGreaterThan(1);
+    for (const node of enterable) {
+      expect(node.glyph, `${node.island.id} is enterable and shows ${node.glyph} at K-1`).not.toMatch(
+        /[×÷]/,
+      );
+    }
+
+    // And the fogged ones DO still carry the board's label, which is what makes the line above a
+    // scope decision rather than an accident of there being no glyphs anywhere.
+    expect(nodes.find((n) => n.island.id === 'quotient_cove')?.glyph).toBe('÷');
+
+    // Non-vacuous: the same island really does say `×` to a band that will be asked multiplication,
+    // so this is measuring the band and not simply an absence of glyphs everywhere.
+    expect(islandGlyphForCaptain('isla_products', 'k_1')).toBe('+');
+    expect(islandGlyphForCaptain('isla_products', 'g2_3')).toBe('×');
+    expect(islandGlyphForCaptain('quotient_cove', 'g4_5')).toBe('÷');
   });
 });

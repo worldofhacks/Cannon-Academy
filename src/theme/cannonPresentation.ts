@@ -82,6 +82,13 @@ export const cannonLook: Record<CannonId, CannonLook> = {
     arc: 'flat',
     spectacle: 'LIGHTNING',
   },
+  /**
+   * Isla Products' K-1 gun. A grapeshot round is many identical small shot fired as one volley,
+   * which is the concept the skill teaches, and the glyph is `+` for the same reason the skill's
+   * templates only ever print `+`: a five-year-old meets equal groups as addition, not as `×`.
+   * It shares `saker`'s deliberate restraint — the reach is new, the shot art is not.
+   */
+  grapeshot: { glyph: '+', range: 'groups', projectile: 'iron', arc: 'standard', spectacle: null },
 };
 
 /** Special-weapon row on the tray — Double-Shot stays unavailable until T-022 ships. */
@@ -101,6 +108,7 @@ export const cannonWeapon: Record<CannonId, CannonWeaponLook> = {
   },
   powder_keg: { displayName: null, enabled: false, unavailableLabel: null },
   long_nine: { displayName: null, enabled: false, unavailableLabel: null },
+  grapeshot: { displayName: null, enabled: false, unavailableLabel: null },
 };
 
 // ── An owned gun the band cannot fire yet ─────────────────────────────────────────────────────

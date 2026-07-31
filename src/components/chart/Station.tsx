@@ -28,7 +28,7 @@ import Animated, {
 
 import type { IslandId } from '@content/schemas';
 
-import { RING, islandGlyph } from './board';
+import { RING } from './board';
 import { stationPresentation, targetSlop, type StationState } from './layout';
 import { chart } from './palette';
 import type { ChartNode } from '../../services/chart';
@@ -106,7 +106,7 @@ export function StationMarker({
 }: MarkerProps) {
   const presentation = stationPresentation(node, state, requirement);
   const label = node.island.displayName;
-  const glyph = islandGlyph[node.island.id];
+  const glyph = node.glyph;
 
   const head =
     presentation.markerHead === 'cleared' ? (

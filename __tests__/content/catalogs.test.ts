@@ -82,7 +82,7 @@ interface CannonRow {
   readonly unlock: Cannon['unlock'];
 }
 
-/** `Record<CannonId, …>` — the type system, not a hand-count, proves all eleven rows are present. */
+/** `Record<CannonId, …>` — the type system, not a hand-count, proves all twelve rows are present. */
 const CANNON_TABLE: Record<CannonId, CannonRow> = {
   swivel_gun: {
     skill: 'add_within_10',
@@ -195,6 +195,19 @@ const CANNON_TABLE: Record<CannonId, CannonRow> = {
     maxGrade: 5,
     unlock: { kind: 'range', island: 'grandline', tier: 1 },
   },
+  // A-060 — invented (not in PLAN.md armory). Isla Products' K-1 range payoff, on the
+  // `repeated_addition` rung of that island's grouping concept. Its fuse and band match the other
+  // grade-1 guns (`six_pounder`, `chain_shot`) because it is asked at the same reading age.
+  grapeshot: {
+    skill: 'repeated_addition',
+    damageMin: 11,
+    damageMax: 17,
+    temperament: 'standard',
+    timerMs: 15_000,
+    minGrade: 1,
+    maxGrade: 2,
+    unlock: { kind: 'range', island: 'isla_products', tier: 1 },
+  },
 };
 
 /**
@@ -214,6 +227,7 @@ const RECOIL_TABLE: Record<CannonId, number> = {
   double_broadside: 5,
   powder_keg: 8,
   long_nine: 10,
+  grapeshot: 0, // A-060 invented — standard, zero recoil
 };
 
 /** AC-14: the exact island → range-skills / unlocked-cannons assignment T-010 and T-011 assume. */
@@ -226,7 +240,15 @@ const ISLAND_TABLE: Record<
     rangeSkills: ['add_within_10', 'add_within_20', 'sub_within_20', 'two_step_add_sub'],
     unlocksCannons: ['saker', 'six_pounder', 'chain_shot', 'double_broadside'],
   },
-  isla_products: { rangeSkills: ['mult_facts'], unlocksCannons: ['twelve_pounder'] },
+  // A-060 — Isla Products is a PLACE, not a difficulty tier: it teaches GROUPING at whatever level
+  // the captain's band can be asked. `repeated_addition` is the K-1 rung of that concept and
+  // `grapeshot` is its range payoff; `mult_facts` / `twelve_pounder` remain the grade-3 rung.
+  // Without an in-band skill here a `k_1` captain could master Port Sumwich forever and
+  // `resolveUnlocks` would return `[]` — there was no content at all between grade 1 and grade 3.
+  isla_products: {
+    rangeSkills: ['repeated_addition', 'mult_facts'],
+    unlocksCannons: ['grapeshot', 'twelve_pounder'],
+  },
   quotient_cove: { rangeSkills: ['div_facts'], unlocksCannons: ['mortar'] },
   fraction_reef: { rangeSkills: ['fractions_int'], unlocksCannons: ['powder_keg'] },
   grandline: { rangeSkills: ['multi_digit_order_ops'], unlocksCannons: ['long_nine'] },
@@ -422,17 +444,17 @@ describe('AC-1 — the catalog module loads and every entry is schema-valid', ()
 // --- AC-2: cardinality and id uniqueness, per catalog ------------------------------------------
 
 describe('AC-2 — every catalog has exactly its ids, once each', () => {
-  it('spec(T-006:AC-2) cannons has exactly the 11 CannonId values with no duplicates', () => {
-    expect(cannons).toHaveLength(11);
-    expect(CANNON_IDS).toHaveLength(11);
+  it('spec(T-006:AC-2) cannons has exactly the 12 CannonId values with no duplicates', () => {
+    expect(cannons).toHaveLength(12);
+    expect(CANNON_IDS).toHaveLength(12);
     const ids = cannons.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(sorted(ids)).toEqual(sorted(CANNON_IDS));
   });
 
-  it('spec(T-006:AC-2) skills has exactly 9 entries covering every SkillId with no duplicates', () => {
-    expect(skills).toHaveLength(9);
-    expect(SKILL_IDS).toHaveLength(9);
+  it('spec(T-006:AC-2) skills has exactly 10 entries covering every SkillId with no duplicates', () => {
+    expect(skills).toHaveLength(10);
+    expect(SKILL_IDS).toHaveLength(10);
     const ids = skills.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(sorted(ids)).toEqual(sorted(SKILL_IDS));
@@ -595,9 +617,14 @@ describe('AC-6 — skill grade bands are legal and symbolicOnly is derived from 
     expect(skill.maxGrade).toBeLessThanOrEqual(5);
   });
 
-  it('spec(T-006:AC-6) exactly the three K-1 skills are symbolic-only', () => {
+  it('spec(T-006:AC-6) exactly the four K-1 skills are symbolic-only', () => {
+    // `repeated_addition` joined them in A-060: it is `minGrade: 1`, so the derived rule above
+    // (`symbolicOnly === minGrade < 2`) already forces the flag, and its templates print nothing
+    // but digits and `+`.
     const symbolic = sorted(skills.filter((s) => s.symbolicOnly).map((s) => s.id));
-    expect(symbolic).toEqual(sorted(['add_within_10', 'add_within_20', 'sub_within_20'] as SkillId[]));
+    expect(symbolic).toEqual(
+      sorted(['add_within_10', 'add_within_20', 'sub_within_20', 'repeated_addition'] as SkillId[]),
+    );
   });
 
   it('spec(T-006:AC-6) the skill bands together cover grades 0 through 5 with no gap', () => {
