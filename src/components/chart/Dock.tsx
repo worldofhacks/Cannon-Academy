@@ -22,8 +22,10 @@
  */
 import { Image, Pressable, Text, View } from 'react-native';
 
-import type { Island, SkillId } from '@content/schemas';
+import type { GradeBand, Island, SkillId } from '@content/schemas';
+import { getSkill } from '@content/index';
 import { emptyMastery, meterPercent, type SkillMastery } from '@engine/mastery';
+import { maxGradeForBand } from '@engine/placement';
 
 import type { HubControl } from '../../services/flow';
 import { DOCK, WAYPOINT_PARTS } from './board';
@@ -36,6 +38,8 @@ interface DockProps {
   readonly island: Island;
   /** The operator THIS captain meets here (`ChartNode.glyph`), not the board's fixed label. */
   readonly glyph: string;
+  /** The captain's band — the meter averages only what they can be asked. */
+  readonly gradeBand: GradeBand | null;
   readonly mastery: Partial<Record<SkillId, SkillMastery>>;
   /** A closed island can still be described. It just cannot be fought at. */
   readonly fogged: boolean;
@@ -58,6 +62,7 @@ interface DockProps {
 export function ChartDock({
   island,
   glyph,
+  gradeBand,
   mastery,
   fogged,
   nextIslandCount,
@@ -67,7 +72,7 @@ export function ChartDock({
   onDemoRouteEdge,
 }: DockProps) {
   const pad = DOCK.padding * typeScale;
-  const filled = filledCells(island, mastery);
+  const filled = filledCells(island, mastery, gradeBand);
 
   return (
     <View style={{ marginTop: -DOCK.shadowDy * typeScale, paddingTop: DOCK.shadowDy * typeScale }}>
@@ -347,9 +352,25 @@ function DockIcon({ id, typeScale }: { readonly id: HubControl['id']; readonly t
  * a meter that filled on the strongest one would tell a child they had finished an island they had
  * barely started.
  */
-function filledCells(island: Island, mastery: Partial<Record<SkillId, SkillMastery>>): number {
-  if (island.rangeSkills.length === 0) return 0;
-  const total = island.rangeSkills.reduce((sum, id) => sum + meterPercent(mastery[id] ?? emptyMastery), 0);
-  const mean = total / island.rangeSkills.length;
+function filledCells(
+  island: Island,
+  mastery: Partial<Record<SkillId, SkillMastery>>,
+  band: GradeBand | null,
+): number {
+  // Averaged over the skills this captain will actually be ASKED, not everything the island
+  // teaches at every age — the same filter `services/chart.ts` applies to `cleared`, and the same
+  // bug A-051 fixed there and nobody swept for here.
+  //
+  // Isla Products teaches `repeated_addition` (grade 1) and `mult_facts` (grade 3). Averaging both
+  // for a K-1 captain divides by a skill they can never be served, so a five-year-old who has
+  // mastered everything available to them sees 5 of 10 cells and no way to move the rest. The meter
+  // stops being a measure of progress and becomes a measure of their age.
+  const ceiling = band === null ? Number.POSITIVE_INFINITY : maxGradeForBand(band);
+  const inBand = island.rangeSkills.filter((id) => getSkill(id).minGrade <= ceiling);
+  // Empty means nothing here is age-appropriate at all: no bar rather than a full one. `every` on an
+  // empty list is `true`, which is exactly how the sibling bug ticked islands above the band.
+  if (inBand.length === 0) return 0;
+  const total = inBand.reduce((sum, id) => sum + meterPercent(mastery[id] ?? emptyMastery), 0);
+  const mean = total / inBand.length;
   return Math.min(DOCK.meter.cells, Math.round((mean / 100) * DOCK.meter.cells));
 }

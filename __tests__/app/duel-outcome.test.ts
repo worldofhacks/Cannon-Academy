@@ -546,3 +546,34 @@ function firstWinCountAtTier(tier: number): number {
   }
   throw new Error(`no win count reaches rank tier ${tier}`);
 }
+
+describe('A-008 the rival hull never counts upward', () => {
+  it('spec(A-008:AC-7) a killing blow shows the hull it had, never the damage that killed it', async () => {
+    const { projectRivalHullForTest } = await import('../../src/stores/duel');
+    if (projectRivalHullForTest === undefined) return;
+
+    // Reported from a real duel at Isla Products: a rival on 2 hull "jumped to 16 before going to
+    // 0". The old projection rebuilt the pre-shot hull as `enemyHull + damage`, which is only true
+    // while the shot is survivable — the engine clamps `enemyHull` at zero, so an overkill rebuilt
+    // as `0 + 16` and the HUD counted UP on the killing blow.
+    const lethal = projectRivalHullForTest({
+      enemyHull: 0,
+      phase: 'fly',
+      damageToEnemy: 16,
+      previousRivalHull: 2,
+    });
+    expect(lethal, 'the hull invented a value it never had').toBe(2);
+    expect(lethal).toBeLessThanOrEqual(2);
+
+    // A survivable hit still holds the pre-shot value, which is the whole point of the beat: the
+    // blocks come off on impact, not on launch.
+    expect(
+      projectRivalHullForTest({ enemyHull: 30, phase: 'fly', damageToEnemy: 15, previousRivalHull: 45 }),
+    ).toBe(45);
+
+    // And once the ball lands, the truth wins.
+    expect(
+      projectRivalHullForTest({ enemyHull: 30, phase: 'impact', damageToEnemy: 15, previousRivalHull: 45 }),
+    ).toBe(30);
+  });
+});

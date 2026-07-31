@@ -236,18 +236,35 @@ function readOutcome(core: CoreDuelState): LegacyOutcome | null {
   return core.phase === 'resolvePlayer' ? core.outcome : null;
 }
 
+/**
+ * The rival's hull as the HUD should show it — held at its pre-shot value while the ball is in the
+ * air, so the blocks come off on IMPACT rather than on launch.
+ *
+ * That beat matters: the whole premise is "your answer became a cannonball", and a hull that drops
+ * the instant you tap decouples the cause from the effect. Board beat 11 teaches by counting the
+ * blocks that vanish.
+ *
+ * **It reads the PREVIOUS projection rather than reconstructing.** The old version returned
+ * `core.enemyHull + outcome.damageToEnemy`, which is only the pre-shot hull while the shot is not
+ * lethal — the engine clamps `enemyHull` at zero, so a killing blow reconstructed as
+ * `0 + damage` and the HUD counted UP before it died. Reported from a real duel: a rival on 2 hull
+ * jumped to 16 and then to 0. `previous` is what was actually on screen a frame ago, so it cannot
+ * invent a number that never existed.
+ */
 function projectRivalHull(
   core: CoreDuelState,
   phase: DuelPhase,
   outcome: LegacyOutcome | null,
+  previous?: DuelState,
 ): number {
   if (
     core.phase === 'resolvePlayer' &&
     outcome !== null &&
     outcome.damageToEnemy > 0 &&
-    (phase === 'perfect' || phase === 'fly')
+    (phase === 'perfect' || phase === 'fly') &&
+    previous !== undefined
   ) {
-    return core.enemyHull + outcome.damageToEnemy;
+    return previous.rivalHull;
   }
   return core.enemyHull;
 }
@@ -296,7 +313,7 @@ function projectLegacy(adapter: AdapterState, previous?: DuelState): DuelState {
     question: app.question,
     picked: null,
     playerHull: core.playerHull,
-    rivalHull: projectRivalHull(core, adapter.phase, outcome),
+    rivalHull: projectRivalHull(core, adapter.phase, outcome, previous),
     playerMax: previous?.playerMax ?? core.playerHull,
     rivalMax: previous?.rivalMax ?? core.enemyMaxHull,
     turn: core.volleyNumber,
@@ -567,3 +584,19 @@ export function createDuelStore(
     },
   };
 }
+
+/**
+ * `projectRivalHull` as a pure function of the four values it actually depends on, exported for the
+ * regression test. The real call site threads `CoreDuelState` and `DuelState`, neither of which a
+ * headless test can build cheaply — and the rule being protected is arithmetic, not plumbing.
+ */
+export function projectRivalHullForTest(input: {
+  readonly enemyHull: number;
+  readonly phase: DuelPhase;
+  readonly damageToEnemy: number;
+  readonly previousRivalHull: number;
+}): number {
+  const inFlight = input.phase === 'perfect' || input.phase === 'fly';
+  return inFlight && input.damageToEnemy > 0 ? input.previousRivalHull : input.enemyHull;
+}
+
