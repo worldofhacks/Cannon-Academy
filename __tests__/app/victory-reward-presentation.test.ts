@@ -431,7 +431,11 @@ describe('A-022 settlement reaches presentation and the existing gun deck', () =
     const slots = deckSlots(store.getState().captain);
 
     expect(outcome.applied).toBe(true);
-    expect(outcome.unlockedCannons).toEqual(['chain_shot']);
+    // `chain_shot` from mastering `sub_within_20`, and Grapeshot because that same mastery opens
+    // Isla Products, which now grants its entry cannon (re-baselined 2026-07-30 — `unlocksCannons`
+    // was declared on every island and read by nothing, making acquisition circular at a new
+    // island). Asserted as a set: the panel's contract is which cannons it shows, not their order.
+    expect([...outcome.unlockedCannons].sort()).toEqual(['chain_shot', 'grapeshot']);
     expect(projected.cannons.map((cannon) => cannon.id)).toEqual(outcome.unlockedCannons);
     for (const cannon of projected.cannons) {
       expect(store.getState().captain.ownedCannons).toContain(cannon.id);

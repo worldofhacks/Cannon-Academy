@@ -30,7 +30,7 @@
  * as a precondition that the predecessor island itself is unlocked. Do not add that precondition
  * — a frozen test pins the literal reading.
  */
-import { cannons, getIsland, getSkill, islands } from '@content/index';
+import { cannons, getCannon, getIsland, getSkill, islands } from '@content/index';
 import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
 import { maxGradeForBand } from '@engine/placement';
 import {
@@ -119,7 +119,8 @@ function masteredSkillIds(mastery: Readonly<Partial<Record<SkillId, SkillMastery
  * present in the corresponding input list (idempotent delta semantics — safe to apply after
  * every answer without duplicating unlocks).
  *
- * - Cannons: every catalog cannon whose `unlock.kind === 'range'` and whose `skill` is mastered.
+ * - Cannons: every catalog cannon whose `unlock.kind === 'range'` and whose `skill` is mastered,
+ *   PLUS one entry cannon for each island unlocked in this same delta (see below).
  * - Islands: every catalog island `I` with `requiresIsland === J` where at least one skill in
  *   `J.rangeSkills` is mastered. This reads `unlockedIslands` only to exclude `I` itself from the
  *   delta — never as a precondition that `J` is unlocked (see module docs above).
@@ -150,5 +151,43 @@ export function resolveUnlocks(input: {
     })
     .map((i) => i.id);
 
-  return { cannons: newCannons, islands: newIslands };
+  /**
+   * One cannon per island earned, and it is what closes the loop.
+   *
+   * `island.unlocksCannons` has been declared on all five islands since the catalog was written and
+   * was consumed by NOTHING — `content/index.ts` only validated that the ids exist. So a cannon
+   * could only ever be earned by mastering its own skill, which is circular at a new island: the
+   * gun that teaches grouping arrived only once you had already mastered grouping. A captain
+   * therefore reached Isla Products holding nothing that could ask its questions, and duelling
+   * there taught them nothing new.
+   *
+   * Arriving now hands you the island's entry gun, so the loop reads: master a skill → the next
+   * island opens AND its cannon arrives → its questions are new → mastery grows → the next island
+   * opens. The range stops being a mandatory gate and goes back to being the accelerator it was
+   * built as (full rate against the duel rate).
+   *
+   * **One, not all.** Port Sumwich alone lists four; granting every one would hand a fresh captain
+   * five guns for three tray slots and leave nothing to earn on the island they are standing on.
+   * The rest stay on the mastery path, which is the within-island progression.
+   *
+   * **The lowest in-band grade**, because that is the gun the island is teaching you WITH. An
+   * out-of-band one would be a reward the duel then refuses to arm (A-058), which the gun deck
+   * would have to explain away as "NOT YET" on the very screen celebrating it.
+   *
+   * Only for islands earned in this delta — placement has its own grant rule (starters plus the
+   * D-9 exceptions) and pre-unlocks up to three islands at the top band, so folding these in there
+   * would overfill the tray on the first launch.
+   */
+  const entryCannons = newIslands.flatMap((islandId) => {
+    const granted = getIsland(islandId)
+      .unlocksCannons.map((id) => getCannon(id))
+      .filter(
+        (c) => c.minGrade <= maxGrade && !alreadyCannons.has(c.id) && !newCannons.includes(c.id),
+      )
+      .sort((a, b) => a.minGrade - b.minGrade || a.id.localeCompare(b.id));
+    const entry = granted[0];
+    return entry === undefined ? [] : [entry.id];
+  });
+
+  return { cannons: [...newCannons, ...new Set(entryCannons)], islands: newIslands };
 }

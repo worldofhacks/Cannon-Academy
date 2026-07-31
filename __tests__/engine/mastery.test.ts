@@ -60,8 +60,8 @@ import {
   MASTERY_RATE_DUEL,
   MASTERY_METER_MAX,
 } from '@engine/tuning';
-import type { CannonId, IslandId, SkillId } from '@content/schemas';
-import { cannons, islands, getIsland, getSkill } from '@content/index';
+import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
+import { cannons, islands, getCannon, getIsland, getSkill } from '@content/index';
 import { maxGradeForBand } from '@engine/placement';
 import { createCaptainStore, emptyCaptain } from '../../src/stores/player';
 
@@ -91,14 +91,39 @@ const sortIds = <T extends string>(ids: readonly T[]): T[] => [...ids].sort();
  * mechanism the ticket specifies, not a hardcoded id list — it is correct for today's catalog
  * and stays correct after T-029 adds skills/cannons.
  */
+/**
+ * The cannons a mastery map should yield — BOTH sources, since 2026-07-30.
+ *
+ * Re-baselined by owner ruling. `resolveUnlocks` used to return range-unlock cannons alone, which
+ * made acquisition circular at a new island: the gun that teaches an island's skill could only be
+ * earned by already having mastered that skill, so a captain arrived holding nothing able to ask
+ * the questions there. Earning an island now also grants ONE entry cannon from its declared
+ * `unlocksCannons` — a field that had sat in the catalog since it was written, validated by
+ * `content/index.ts` and read by nothing.
+ *
+ * The helper re-derives both rules rather than hard-coding the union, so it still fails if either
+ * one drifts.
+ */
 function expectedNewCannons(
   masteredSkills: ReadonlySet<SkillId>,
   alreadyUnlocked: readonly CannonId[],
+  gradeBand?: GradeBand,
 ): CannonId[] {
   const already = new Set(alreadyUnlocked);
-  return cannons
+  const fromMastery = cannons
     .filter((c) => c.unlock.kind === 'range' && masteredSkills.has(c.skill) && !already.has(c.id))
     .map((c) => c.id);
+
+  const ceiling = gradeBand === undefined ? Number.POSITIVE_INFINITY : maxGradeForBand(gradeBand);
+  const fromIslands = expectedNewIslands(masteredSkills, []).flatMap((islandId) => {
+    const entry = getIsland(islandId)
+      .unlocksCannons.map((id) => getCannon(id))
+      .filter((c) => c.minGrade <= ceiling && !already.has(c.id) && !fromMastery.includes(c.id))
+      .sort((a, b) => a.minGrade - b.minGrade || a.id.localeCompare(b.id))[0];
+    return entry === undefined ? [] : [entry.id];
+  });
+
+  return [...fromMastery, ...new Set(fromIslands)];
 }
 
 /**
@@ -566,10 +591,15 @@ describe('resolveUnlocks', () => {
     const firstPass = resolveUnlocks({ mastery, unlockedCannons: [], unlockedIslands: [] });
     expect(firstPass.cannons.length).toBeGreaterThan(0); // sanity: something did unlock
 
+    // BOTH deltas are threaded back, which is what the real caller does (`applyCaptainTally`
+    // applies islands and cannons together). Re-baselined 2026-07-30: replaying with a stale island
+    // list is no longer a reachable state, because earning an island now also grants its entry
+    // cannon — so a second pass that still called the island "new" would correctly offer the next
+    // gun on that island's list, and the test would be asserting a state the game cannot produce.
     const secondPass = resolveUnlocks({
       mastery,
       unlockedCannons: firstPass.cannons, // six_pounder already recorded as unlocked
-      unlockedIslands: [],
+      unlockedIslands: firstPass.islands,
     });
     expect(secondPass.cannons).toEqual([]);
   });

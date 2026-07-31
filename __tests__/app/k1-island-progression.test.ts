@@ -325,7 +325,13 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
     const outcome = commitDrill(store, session);
     expect(outcome.applied).toBe(true);
     expect(outcome.mastered, 'a perfect drill from empty must master the skill').toBe(true);
-    expect(outcome.unlockedCannons, 'mastering the new skill paid nothing').toContain(NEW_CANNON);
+    // NOT asserted on the drill's delta any more. Re-baselined 2026-07-30: earning an island now
+    // grants its entry cannon, so by the time a captain drills the new skill they already hold
+    // Grapeshot and the drill correctly pays no cannon. That change is the whole point — the old
+    // acquisition path was circular (the gun that teaches the skill required mastering the skill),
+    // which is why a captain reached this island with nothing able to ask its questions.
+    //
+    // What matters is unchanged and asserted below: they OWN it, it is in band, and it fires here.
 
     // Owned, in band, and on the deck.
     const won = store.getState().captain;

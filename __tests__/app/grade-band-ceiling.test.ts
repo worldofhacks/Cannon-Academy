@@ -265,3 +265,43 @@ describe('A-051 the chart labels an island with what THIS captain will be asked'
     expect(islandGlyphForCaptain('quotient_cove', 'g4_5')).toBe('÷');
   });
 });
+
+describe('A-051 the game loop hands you a gun for the island it opens', () => {
+  it('spec(A-051:AC-5) earning an island grants one in-band cannon that can ask its questions', async () => {
+    const { applyCaptainTally, createCaptainStore } = await import('../../src/stores/player');
+    const { commitGradeBand } = await import('../../src/services/onboarding');
+    const { asksInBand } = await import('../../src/services/loadout');
+    const { getCannon, getIsland } = await import('../../src/content/index');
+
+    // Driven through `applyCaptainTally`, which is what a real win goes through — it applies the
+    // unlock delta itself, so this measures the captain the game actually produces rather than a
+    // delta computed beside it.
+    const store = createCaptainStore();
+    commitGradeBand(store, 'k_1');
+    let captain = store.getState().captain;
+    const before = new Set(captain.ownedCannons);
+    expect(captain.unlockedIslands).toEqual(['port_sumwich']);
+
+    let wins = 0;
+    while (wins < 8 && !captain.unlockedIslands.includes('isla_products')) {
+      captain = applyCaptainTally(captain, 'add_within_10', 'duel', { correct: 4, asked: 4 });
+      wins += 1;
+    }
+
+    expect(captain.unlockedIslands, 'the second island never opened').toContain('isla_products');
+    expect(wins, 'a five-year-old should not grind for this').toBeLessThanOrEqual(4);
+
+    // `island.unlocksCannons` was declared on every island and read by NOTHING, so a cannon could
+    // only be earned by mastering its own skill — circular at a new island, and the reason a
+    // captain reached Isla Products holding nothing that could ask its questions.
+    const gained = captain.ownedCannons.filter((id) => !before.has(id));
+    const entry = gained.filter((id) => getIsland('isla_products').unlocksCannons.includes(id));
+    expect(entry, 'earning the island granted no cannon of its own, or granted several').toHaveLength(1);
+
+    // It must be a gun the duel will actually arm. An out-of-band grant is a reward the tray
+    // refuses (A-058) — celebrated on one screen and denied on the next.
+    const gun = getCannon(entry[0]!);
+    expect(asksInBand(gun, 'k_1'), `${gun.id} cannot be fired at k_1`).toBe(true);
+    expect(getIsland('isla_products').rangeSkills).toContain(gun.skill);
+  });
+});
