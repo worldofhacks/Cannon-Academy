@@ -388,7 +388,27 @@ export interface IsleTag {
 }
 
 /** Every column is this wide, and its head disc overlaps the island's bottom edge by this much. */
-export const ISLE_TAG = { width: 108, overlap: 12 } as const;
+export const ISLE_TAG = {
+  /**
+   * The board's measured column, kept because it is what centres a tag on its island — the tags
+   * are positioned from it and `design-fidelity` asserts that centring.
+   *
+   * It is NOT a clamp on the drawing. It was measured against the board's own placeholder text,
+   * and every real island name (12–13 characters, needing ~128pt) truncated inside it. The pill
+   * sizes to its text; this is only where its midpoint sits.
+   */
+  width: 108,
+  /**
+   * How wide a name pill may actually grow, as a share of the board's width.
+   *
+   * A bound rather than a fixed size, because the constraint is the WATER, not the text: a pill
+   * centred near the left or right edge must not sail off the map. 0.62 of 375 is 232pt, which
+   * clears the longest catalog name with room and still cannot reach either shore from any island
+   * centre the board places.
+   */
+  maxWidth: 375 * 0.62,
+  overlap: 12,
+} as const;
 
 const voyageIsleTags: readonly IsleTag[] = voyageIsles.map((isle) => ({
   x: isle.x + isle.w / 2 - ISLE_TAG.width / 2,

@@ -36,6 +36,7 @@ import { StationMarker, type MarkerLook } from './Station';
 import { VoyageWaypoint } from './Waypoint';
 import { Counter } from './Chips';
 import {
+  ISLE_TAG,
   PLACE_COUNT,
   SHIP,
   STATIONS,
@@ -241,7 +242,23 @@ export function VoyageMap({
             key={node.island.id}
             node={node}
             state={stationState(node, STATIONS[i] ?? { silhouette: false }, i === live)}
-            position={{ left: mapX(frame, tag.x), top: mapY(frame, tag.y), width: art(frame, tag.w) }}
+            // Centred on the tag column, with NO fixed width.
+            //
+            // `tag.w` is the board's 108pt column, measured against the board's own placeholder
+            // text. The real island names are 12–13 characters and need ~128pt, so a fixed column
+            // truncated every one of them — "Port Su…", "Quotie…", "Fractio…" — along with the
+            // captions beneath. A map a child navigates by name has to say the names.
+            //
+            // The model keeps `tag.x`/`tag.w` (and `design-fidelity` keeps asserting the column is
+            // centred on its island); only the DRAWING stops being clamped by it. The pill sizes to
+            // its text and is centred on the column's midpoint, bounded so it can never exceed the
+            // board and run off the water.
+            position={{
+              left: mapX(frame, tag.x + tag.w / 2),
+              top: mapY(frame, tag.y),
+              transform: [{ translateX: '-50%' }],
+              maxWidth: art(frame, ISLE_TAG.maxWidth),
+            }}
             look={look}
             typeScale={typeScale}
             sub={subCaption({ index: i, live, nextIsland, nextCaption, last, fogged: node.fogged })}
