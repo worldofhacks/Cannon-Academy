@@ -29,19 +29,21 @@
  * `(0,0)` is, and both its header band and its dock band land where the chart actually drew them.
  * Feeding the model the window height instead would put every dock ring one safe-area inset low.
  */
-import { useCallback } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CoachBar } from './CoachBar';
-import { chartTourBandHeight } from './coachBand';
+import { Spotlight } from './Spotlight';
+import { chartTourBandHeight, ringRect } from './coachBand';
 import { CHART_BEATS, clampChartBeat, readyHeadline } from './script';
 import { Poly } from '../Poly';
 // The dock's own measured height — the tour's band sits directly on top of it.
 import { DOCK } from '../chart/board';
+import { chartHubControlLayout, type HubControl } from '../../services/flow';
 import { chartTourShowing } from '../../services/onboarding';
 import { captainActions, useCaptain } from '../../stores/useCaptain';
-import { color, type } from '../../theme/tokens';
+import { color, radius, type } from '../../theme/tokens';
 import { useLayout } from '../../theme/useLayout';
 
 /**
@@ -87,6 +89,13 @@ export function ChartWalkthrough() {
   const L = useLayout();
   const insets = useSafeAreaInsets();
   const captain = useCaptain((s) => s.captain);
+  const [box, setBox] = useState({ w: 0, h: 0 });
+
+  const onLayout = useCallback((e: LayoutChangeEvent) => {
+    const { width: nextW, height: nextH } = e.nativeEvent.layout;
+    setBox((prev) => (prev.w === nextW && prev.h === nextH ? prev : { w: nextW, h: nextH }));
+  }, []);
+
   const beatIndex = clampChartBeat(captain.onboardingBeat);
   const advance = useCallback(() => {
     captainActions().setOnboardingBeat(clampChartBeat(captainActions().captain.onboardingBeat) + 1);
@@ -99,9 +108,24 @@ export function ChartWalkthrough() {
   const beat = CHART_BEATS[beatIndex] ?? CHART_BEATS[0];
   if (beat === undefined) return null;
 
+  // The chart under this is still perfectly usable while the box is unmeasured — one frame with no
+  // ring is better than a ring drawn at (0,0) and then jumping.
+  const measured = box.w > 0 && box.h > 0;
+  // The FULL measured height, deliberately — not `box.h - reserved`.
+  //
+  // The reserved coach band sits ABOVE the dock, and the map is the flex child, so reserving it
+  // shortens the MAP and leaves the dock exactly where it was. Trimming the model's frame by the
+  // band therefore lifted every modelled dock control by ~150pt, which is how beat 18's ring ended
+  // up drawing a box around open water in the bottom-right corner.
+  //
+  // (It was correct while the band sat below the dock, which is what it was written against. Moving
+  // the band is what invalidated it — a good reminder that a correction term is only as true as the
+  // layout it was measured in.)
+  const controls = measured ? chartHubControlLayout({ width: box.w, height: box.h }).controls : [];
+
   if (beat.id === 'done') {
     return (
-      <View style={StyleSheet.absoluteFill}>
+      <View style={StyleSheet.absoluteFill} onLayout={onLayout}>
         <ReadyScene
           captainName={captain.name}
           cannons={captain.ownedCannons.length}
@@ -117,7 +141,7 @@ export function ChartWalkthrough() {
   }
 
   return (
-    <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+    <View style={StyleSheet.absoluteFill} pointerEvents="box-none" onLayout={onLayout}>
       {/*
         Rule NEVER BLOCK: *"a tutorial that refuses a tap teaches a child that the screen is
         broken; one that accepts every tap teaches that the screen is safe."* So the whole frame
@@ -131,26 +155,16 @@ export function ChartWalkthrough() {
         accessibilityLabel={`${beat.coach.line} Tap to continue.`}
       />
 
-      {/*
-        NO SPOTLIGHT RINGS ON THE CHART, by owner ruling, and the reason is worth keeping.
-
-        `chartHubControlLayout` models a screen with no tour band. When the tour is running the
-        chart reserves a band above the dock, so the real layout and the model diverge, and the
-        rings drew boxes around empty water. A `-insets.bottom` correction here used to paper over
-        it while the band sat BELOW the dock; moving the band above it made that correction wrong,
-        which is how a ring ended up circling nothing in the bottom-right corner.
-
-        The honest fix is to make the hub model tour-aware so the rings derive from the layout that
-        is actually on screen. Until then they are removed rather than approximated: a gold ring
-        around empty sea teaches a pre-reader that the game points at nothing, which is worse than
-        no ring at all. The coach lines still name what to look at — "Three buttons. Fight is the
-        big one." — and the dock is right there under them.
-
-        There is also no skip row here. The frame-wide tap catcher above advances on every tap
-        (rule NEVER BLOCK), so a skip control inside it was unreachable — every tap on it simply
-        advanced one beat, which reads exactly like a dead button. The grade picker and the guided
-        duel still carry a working skip; this screen is four taps from done.
-      */}
+      {controls
+        .filter((control) => (beat.spotlights as readonly string[]).includes(control.id))
+        .map((control) => (
+          <Spotlight
+            key={control.id}
+            rect={ringRect(control, insets)}
+            cornerRadius={ringRadiusFor(control)}
+            hand={beat.spotlights.length === 1}
+          />
+        ))}
 
       {/*
         Anchored to the top of the DOCK, because the chart now reserves the tour's band above the
@@ -189,6 +203,15 @@ export function ChartWalkthrough() {
  * height is what the chart reserved, and a control tucked inside it would either squeeze the line
  * or overhang the band.
  */
+/**
+ * The dock buttons are cards and the header controls are pills, so a single radius would ring one
+ * of them wrong. Matched to the surface rather than to the id, so a control that moves band keeps
+ * the right ring.
+ */
+function ringRadiusFor(control: HubControl): number {
+  return control.surface === 'dock' ? 22 : radius.pill;
+}
+
 /**
  * Beat 20.
  *

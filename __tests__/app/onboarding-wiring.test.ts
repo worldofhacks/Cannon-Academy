@@ -645,8 +645,14 @@ describe('A-005 the chart walkthrough reserves its coach band', () => {
     expect(chart, 'the reserved band is not a flex child of the screen column').toMatch(
       /tourBand > 0 \? <View style=\{\{ height: tourBand \}\} \/> : null/,
     );
-    // And the inset must not be paid twice — once by the dock and again by the band beneath it.
-    expect(chart).toMatch(/insetBottom=\{tourBand > 0 \? 0 : insets\.bottom\}/);
+    // The dock owns the home indicator, unconditionally.
+    //
+    // Re-baselined by owner ruling on 2026-07-30. The band used to be reserved BELOW the dock, so
+    // the band held the inset and the dock was handed zero to stop it being paid twice. That left
+    // the dock floating mid-screen above a strip of open water — the owner reported it as the dock
+    // "in the middle of the page" — so the band moved ABOVE the dock and the dock is the footer
+    // again. Whichever element is last in the column owns the inset; that is now the dock.
+    expect(chart).toMatch(/insetBottom=\{insets\.bottom\}/);
   });
 
   it('spec(A-005:AC-3) the rings still land on the real controls once insets are taken', async () => {
@@ -993,12 +999,17 @@ describe('A-005 the tour replays whole', () => {
     );
     expect(overlay).not.toMatch(/if \(captain\.hasCompletedOnboarding\) return/);
 
-    // The grown-up's skip advances to the send-off rather than tearing the overlay down: every tap
-    // on this screen goes forward, and `completeOnboarding` keeps its single caller.
-    expect(overlay).toMatch(/const FINAL_BEAT = CHART_BEATS\.length - 1/);
-    expect(overlay).toMatch(/setOnboardingBeat\(FINAL_BEAT\)/);
+    // The chart tour carries NO skip, by owner ruling on 2026-07-30, and its absence is asserted
+    // rather than merely unmentioned.
+    //
+    // It was unreachable by construction. Rule NEVER BLOCK puts a frame-wide tap catcher over this
+    // overlay so every tap advances a beat — so a skip control inside it advanced one beat, which
+    // is indistinguishable from a dead button, and the owner reported it as exactly that. The grade
+    // picker and the guided duel keep working skips; this screen is four taps from done.
+    expect(overlay, 'the chart tour grew a skip again').not.toMatch(/FINAL_BEAT/);
+    expect(overlay, 'the chart tour grew a skip again').not.toMatch(/TourSkip/);
     const { CHART_BEATS } = await import('../../src/components/onboarding/script');
-    expect(CHART_BEATS[CHART_BEATS.length - 1]?.id, 'the skip lands somewhere with no exit').toBe('done');
+    expect(CHART_BEATS[CHART_BEATS.length - 1]?.id, 'the tour ends somewhere with no exit').toBe('done');
   });
 });
 
@@ -1087,7 +1098,7 @@ describe('A-005 the grown-up skip', () => {
     expect(after.hasCompletedOnboarding).toBe(true);
   });
 
-  it('spec(A-005:AC-3) all three skips are adult-facing, and every one clears the 64pt floor', async () => {
+  it('spec(A-005:AC-3) both remaining skips are adult-facing, and every one clears the 64pt floor', async () => {
     const { TOUR_SKIP } = await import('../../src/components/onboarding/script');
     const picker = await readSource('../../app/onboarding.tsx');
     const duel = await readSource('../../app/guided-duel.tsx');
@@ -1128,8 +1139,9 @@ describe('A-005 the grown-up skip', () => {
     // have been dead there, because slop above the sea band never reaches this view's parent.
     expect(duel).toMatch(/const SKIP_CHIP_HEIGHT = 22/);
     expect(duel).toMatch(/skipTarget: \{[\s\S]{0,160}height: MIN_TAP_TARGET/);
-    // The overlay's is a floor-height row, reserved rather than floated.
-    expect(overlay).toMatch(/Math\.max\(MIN_TAP_TARGET, px\(TOUR_SKIP_ROW\)\)/);
+    // There is deliberately no third skip: the chart tour's was removed (see above), so this
+    // asserts the two that exist rather than a count that would quietly pass if one vanished.
+    expect(overlay, 'the chart tour must not reserve a skip row').not.toMatch(/TOUR_SKIP_ROW/);
   });
 });
 
