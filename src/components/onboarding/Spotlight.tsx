@@ -35,6 +35,9 @@ export interface SpotlightRect {
 const RING_WIDTH = 4;
 const RING_INSET = 4;
 
+/** The board's `ob-hand` disc. Named because the hand is anchored off its own height. */
+const HAND_SIZE = 30;
+
 export function Spotlight({
   rect,
   /** Board `border-radius:22px` on the stage ring, `999` where it wraps a pill. */
@@ -60,10 +63,20 @@ export function Spotlight({
           borderColor: color.gold,
         }}
       />
+      {/*
+        Top-right, and the triangle is why.
+
+        `PointingHand` carries a DOWNWARD triangle, so it only reads as pointing when it sits above
+        what it names. Anchored below the ring it pointed away from the control — at the dock, where
+        the ring is already at the bottom of the screen, it aimed the hand off the frame entirely.
+
+        It also bobs 9pt downward on its loop, which is a nudge toward the target from above and a
+        retreat from it below. The gesture and the geometry have to agree.
+      */}
       {hand ? (
         <PointingHand
           left={rect.x + rect.width - 8}
-          top={rect.y + rect.height - 6}
+          top={rect.y - RING_INSET - HAND_SIZE + 4}
         />
       ) : null}
     </View>
@@ -95,8 +108,8 @@ function PointingHand({ left, top }: { readonly left: number; readonly top: numb
           position: 'absolute',
           left,
           top,
-          width: 30,
-          height: 30,
+          width: HAND_SIZE,
+          height: HAND_SIZE,
           borderRadius: 999,
           backgroundColor: color.gold,
           borderBottomWidth: 3,

@@ -126,23 +126,42 @@ export function ChartDock({
             </Text>
           </View>
 
-          <Text
-            numberOfLines={1}
-            style={{
-              flex: 1,
-              minWidth: 0,
-              fontFamily: font.displayBold,
-              fontSize: DOCK.titleSize * typeScale,
-              lineHeight: DOCK.titleSize * typeScale * 1.25,
-              color: chart.ink,
-            }}
-          >
-            {island.displayName}
-          </Text>
+          {/*
+            The name yields the whole row while the chip is up.
+
+            Three fixed-width things do not fit this row at a phone width: the glyph tile, the
+            "NEXT ISLE" chip and the ten-cell meter. The name already collapsed to zero pixels
+            whenever the chip appeared — it was `flex: 1` against two rigid neighbours — so
+            rendering it was buying a gap and nothing else. Dropping it reclaims that gap for the
+            chip, which is the thing a child can act on. The island's name is on its own node on
+            the map directly above, and its glyph is still in this row.
+          */}
+          {nextIslandCount === null ? (
+            <Text
+              numberOfLines={1}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                fontFamily: font.displayBold,
+                fontSize: DOCK.titleSize * typeScale,
+                lineHeight: DOCK.titleSize * typeScale * 1.25,
+                color: chart.ink,
+              }}
+            >
+              {island.displayName}
+            </Text>
+          ) : (
+            <View style={{ flex: 1, minWidth: 0 }} />
+          )}
 
           {nextIslandCount === null ? null : (
             <View
               style={{
+                // Shrinks before the meter does. The meter is a COUNT — a clipped tenth cell is a
+                // lie about how far the island is done — whereas this chip degrades to an ellipsis
+                // and stays honest.
+                flexShrink: 1,
+                minWidth: 0,
                 paddingHorizontal: DOCK.nextChip.padX * typeScale,
                 paddingVertical: DOCK.nextChip.padY * typeScale,
                 borderRadius: 999,
@@ -160,12 +179,19 @@ export function ChartDock({
                   color: chart.ink,
                 }}
               >
-                {nextIslandCount === 1 ? 'NEXT ISLE: 1 DUEL' : `NEXT ISLE: ${nextIslandCount} DUELS`}
+                {/*
+                  "NEXT" rather than "NEXT ISLE": the row has to hold this chip AND ten meter cells
+                  at a phone width, and the longer form truncated to "NEXT ISLE: 2 D…". A chip that
+                  degrades to an ellipsis is a chip a child cannot read, and the meter beside it is
+                  not negotiable — so the copy gets shorter rather than the count getting clipped.
+                */}
+                {nextIslandCount === 1 ? 'NEXT: 1 DUEL' : `NEXT: ${nextIslandCount} DUELS`}
               </Text>
             </View>
           )}
 
-          <View style={{ flexDirection: 'row', gap: DOCK.meter.gap * typeScale }}>
+          {/* `flexShrink: 0`: ten cells or none. A clipped meter miscounts the island. */}
+          <View style={{ flexShrink: 0, flexDirection: 'row', gap: DOCK.meter.gap * typeScale }}>
             {Array.from({ length: DOCK.meter.cells }, (_, i) => (
               <View
                 key={i}

@@ -1065,7 +1065,8 @@ export const DOCK = {
   /** Ten mastery cells, 12pt square, radius 3, 4pt apart. */
   meter: { cells: 10, size: 12, radius: 3, gap: 4 },
   /**
-   * The `NEXT ISLE: 2 DUELS` chip, in the same header row as the name and the meter.
+   * The `NEXT: 2 DUELS` chip, in the same header row as the meter (and the name, when there is
+   * room for it — see `Dock.tsx`, which drops the name while this chip is up).
    *
    * Not the board's — the board has nothing that says how close the next island is, which is why a
    * captain could win a duel and see the screen unchanged. It uses the board's own small-pill
