@@ -128,6 +128,21 @@ export const color = {
    */
   sailStripe: '#D93A2E',
 
+  // ── Light-surface planks. ──────────────────────────────────────────────────
+  /**
+   * Sunk parchment — the boards' quiet/empty card ground. Inlined as `#F0E2C8` in
+   * `app/rank.tsx` and `app/harbor.tsx` since A-012 (both carry a TODO pointing here); named now
+   * because the rival-fleet board uses it twice more (unmet card fill, PIRATE/BONE badge fill —
+   * `Cannon Academy Rival Fleet.dc.html` 3a/3b, A-067).
+   */
+  surfaceSunk: '#F0E2C8',
+  /**
+   * The plank shadow under a parchment pill or disc (`box-shadow: 0 Npx 0 #C9AE7E` on the
+   * boards). Fleet board 3a: the coin pill's plank and the unmet card's cream “?” disc shadow,
+   * and the BONE legend chip's rim (A-067).
+   */
+  parchmentPlank: '#C9AE7E',
+
   // ── Characters. ────────────────────────────────────────────────────────────
   /** The captain's coat — also the default of the four coat swatches. */
   captainCoat: '#1E5A8A',
@@ -140,6 +155,72 @@ export const color = {
   iron: '#3E4A57',
   ironDeep: '#22303C',
 
+  // ── The rival fleet (A-067). ───────────────────────────────────────────────
+  // Board: `Cannon Academy Rival Fleet.dc.html` (project 88888c12…), sections 3a/3b — the
+  // `HULLS` `[hull, hullDeep]` and `SAIL_FILL` tables plus the KINDS legend chips, transcribed
+  // hex-for-hex. Five kind families paint every generated rival; the shared timber mast and the
+  // card grounds ride along. None of these is, or may ever alias, `sailStripe` — the red
+  // vertical stripe stays the player's alone (D-12).
+  /** HULLS.pirate[0]. */
+  fleetPirateHull: '#4A3B5C',
+  /** HULLS.pirate[1]. */
+  fleetPirateHullDeep: '#33284A',
+  /** SAIL_FILL.pirate. */
+  fleetPirateSail: '#6C4BD6',
+  /** HULLS.skeleton[0]. */
+  fleetBoneHull: '#C9BCA0',
+  /** HULLS.skeleton[1] — also the skeleton ship's mast, per the board's `build()`. */
+  fleetBoneHullDeep: '#A2957C',
+  /** SAIL_FILL.skeleton. */
+  fleetBoneSail: '#EDE4CE',
+  /** HULLS.ghost[0]. */
+  fleetGhostHull: '#5A7A72',
+  /** HULLS.ghost[1]. */
+  fleetGhostHullDeep: '#3E5A54',
+  /** SAIL_FILL.ghost. */
+  fleetGhostSail: '#BFE8D4',
+  /** HULLS.shark[0]. */
+  fleetSharkHull: '#3F6B86',
+  /** HULLS.shark[1]. */
+  fleetSharkHullDeep: '#2A4C61',
+  /** SAIL_FILL.shark. */
+  fleetSharkSail: '#9FD4EC',
+  /** HULLS.kraken[0]. */
+  fleetKrakenHull: '#7A3F8F',
+  /** HULLS.kraken[1]. */
+  fleetKrakenHullDeep: '#5E2A6E',
+  /** SAIL_FILL.kraken. */
+  fleetKrakenSail: '#F5A9D2',
+  /** The non-skeleton mast timber — board `build()`: `kind === 'skeleton' ? … : '#5C4A3A'`. */
+  fleetMast: '#5C4A3A',
+  /** KINDS.shark legend chip — the one legend hex with no earlier token name. */
+  fleetSharkChip: '#7FCDEC',
+  /** 3a met-card sea plate (also the crew reference's sky, board 3c). */
+  fleetCardSea: '#B9E2F5',
+  /** 3a unmet-card sea plate — greyed water for a rival not yet met. */
+  fleetCardSeaUnmet: '#DDE5EC',
+  /** KINDS.ghost badge fill. */
+  fleetGhostBadge: '#DFF3E6',
+  /** KINDS.shark badge fill. */
+  fleetSharkBadge: '#DCEEF8',
+  /** KINDS.kraken badge fill. */
+  fleetKrakenBadge: '#FBDDEC',
+
+  // ── Locked terrain. ────────────────────────────────────────────────────────
+  /**
+   * The desaturated palette a still-fogged island wears on `Cannon Academy Arrival.dc.html`
+   * (beat A's destination, and fog-lift step 1's "from" state before colour floods in). Measured
+   * off that board's `destSand/destGrass/destTrunk/destFrond` group; the deep sand partner is the
+   * board's `#D8CBB2`, which already lives above as `parchmentEdge` and is not duplicated here.
+   * Decorative terrain only — never behind text. Named per the boards' own terrain-group note so
+   * the chart's locked-island drawing can adopt them without a re-measure.
+   */
+  lockedSand: '#EFE3CB',
+  lockedGrass: '#9FC79C',
+  lockedGrassDeep: '#7FA57D',
+  lockedTrunk: '#9A8468',
+  lockedFrond: '#8FB08C',
+
   // ── Duel HUD. Semantic names on top of the palette above, so a re-skin ─────
   // touches one line each rather than every gauge.
   hullRemaining: '#2FB65E',
@@ -147,6 +228,42 @@ export const color = {
   hullCritical: '#F09A92',
   timerTrack: '#1C3648',
   timerFill: '#FFD23F',
+
+  // ── The island encounter (A-066). ──────────────────────────────────────────
+  // Source: `Cannon Academy Island Encounter.dc.html`, same project as above. Only hexes the
+  // boards had never used before enter here; the encounter's octopus is `krakenPink`/`krakenDeep`,
+  // its parrot is `success`/`successDeep` with a `sailStripe` bandana, and its gull is
+  // `parchment`/`white`/`inkBright` — all referenced by their existing names, not re-added.
+  /** Nipper the crab — body and claws (board host recipe). */
+  crabShell: '#E8613C',
+  /** The crab body's `inset 0 -6px 0` underside shade. */
+  crabShellDeep: '#B8462A',
+  /** Tumble the turtle — the shell. */
+  turtleShell: '#2E7D6B',
+  /** The shell's inset shade. */
+  turtleShellDeep: '#1E5A4C',
+  /** The encounter vignette's little sky, behind every host. */
+  hostSky: '#B9E2F5',
+  /** Beach sand — the vignette's ground and the scrimmed island's ring. */
+  sand: '#F2E1B8',
+  /** Island grass mounds (also the turtle's head and flippers, per the board). */
+  islandGrass: '#7ED07A',
+  /** The mounds' `inset 0 -6px 0` shade. */
+  islandGrassDeep: '#5FA149',
+  /** Palm fronds — deeper than `islandGrass` so a palm separates from its mound. */
+  palmFrond: '#2F9E5C',
+  /** The distant rock silhouette in the encounter scene. */
+  driftRock: '#5A7288',
+  /** The encounter card's 8pt drop — parchment's deeper edge (`box-shadow 0 8px 0`). */
+  parchmentShadow: '#C9AE7E',
+  /** Sunken parchment — inset panels on parchment. Inlined app-wide before it had a name. */
+  parchmentSunk: '#F0E2C8',
+  /**
+   * The gentle-miss amber — the board's `~` tile fill, one step warmer than `amber`. The
+   * encounter's "no wrong outcome" rule hangs on this: a missed riddle turns THIS colour,
+   * never a red.
+   */
+  amberSoft: '#F0A315',
 } as const;
 
 /** 4pt base. Every gap in the UI is a multiple of this. */

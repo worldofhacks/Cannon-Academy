@@ -29,6 +29,26 @@
  * `Swell` component that renders sixteen times. Every one of the seven was written with its pixel
  * values hoisted out of the worklet body, which is what the per-callback tests below then prove
  * rather than assume.
+ *
+ * ── Amendment, A-065: the arrival ceremony (`Cannon Academy Arrival.dc.html`) ──────────────────
+ * The board's four arrival beats add thirteen call sites, one line each:
+ *
+ *   + `ArrivalCeremony.tsx::chromeStyle`    beat D — header/dock fade to 35% under the iris.
+ *   + `ArrivalCeremony.tsx::glowDotStyle`   beat A — trail dots light cream→gold behind the hull.
+ *   + `ArrivalCeremony.tsx::floodClipStyle` beat B — the circular colour reveal's expanding disc.
+ *   + `ArrivalCeremony.tsx::floodArtStyle`  beat B — its counter-translated island copy.
+ *   + `ArrivalCeremony.tsx::ringStyle`      beat B — the marker's standing `sc-ring` pulse.
+ *   + `ArrivalCeremony.tsx::popStyle`       beat B — the gold marker's spring-overshoot drop-in.
+ *   + `ArrivalCeremony.tsx::sparkStyle`     beat B — the one 620ms spark ring.
+ *   + `ArrivalCeremony.tsx::bannerStyle`    beat C/D — banner slide-in and the handoff's tuck.
+ *   + `ArrivalCeremony.tsx::apertureStyle`  beat D — the spyglass iris's shrinking aperture.
+ *   + `ArrivalCeremony.tsx::rimStyle`       beat D — the brass rim tracking the aperture's edge.
+ *   + `ChartShip.tsx::wakeStyle`            beat A — the three stern lozenges, under way only.
+ *   + `Dock.tsx::fightRingStyle`            beat C — the Fight button's only-ring gold pulse.
+ *   + `Fog.tsx::partStyle`                  beat B — the fog disc splitting into two half-discs.
+ *
+ * Every one was written with its pixel values hoisted out of the worklet body, same as the seven
+ * before it, and the per-callback specs below prove it for all twenty-one.
  */
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative } from 'node:path';
@@ -466,11 +486,29 @@ const WORKLETS = chartSourceFiles(CHART_ROOT).flatMap((path) =>
 );
 /** Sorted by file path, then by source order within the file — see `chartSourceFiles`/`workletsIn`. */
 const CURRENT_SHIPPED_WORKLETS = [
+  // A-065: the arrival ceremony's ten call sites, in ArrivalCeremony.tsx's own source order —
+  // the file's header maps each one to its board beat, and the amendment note above says why.
+  'src/components/chart/ArrivalCeremony.tsx::chromeStyle',
+  'src/components/chart/ArrivalCeremony.tsx::glowDotStyle',
+  'src/components/chart/ArrivalCeremony.tsx::floodClipStyle',
+  'src/components/chart/ArrivalCeremony.tsx::floodArtStyle',
+  'src/components/chart/ArrivalCeremony.tsx::ringStyle',
+  'src/components/chart/ArrivalCeremony.tsx::popStyle',
+  'src/components/chart/ArrivalCeremony.tsx::sparkStyle',
+  'src/components/chart/ArrivalCeremony.tsx::bannerStyle',
+  'src/components/chart/ArrivalCeremony.tsx::apertureStyle',
+  'src/components/chart/ArrivalCeremony.tsx::rimStyle',
   'src/components/chart/ChartShip.tsx::bobStyle',
   // A-063: the sail — the ship animates berth-to-berth along the trail curve, pre-sampled into
   // plain captured number arrays and interpolated on the UI runtime. The deliberate eighth entry.
   'src/components/chart/ChartShip.tsx::sailStyle',
+  // A-065 beat A: the three wake lozenges behind the stern, gated on `sailProgress < 1`.
+  'src/components/chart/ChartShip.tsx::wakeStyle',
+  // A-065 beat C: the Fight button's gold pulse — the beat's ONLY ring (the amber card's law).
+  'src/components/chart/Dock.tsx::fightRingStyle',
   'src/components/chart/Fog.tsx::driftStyle',
+  // A-065 beat B: the fog disc parting into two half-discs, `420ms ease-out · ±26px + fade`.
+  'src/components/chart/Fog.tsx::partStyle',
   'src/components/chart/Kraken.tsx::humpStyle',
   'src/components/chart/Sea.tsx::swellStyle',
   // A-063 amendment, correcting a stale name: the close chart's crawling route dash died with
@@ -532,7 +570,7 @@ const JS_THREAD_REANIMATED_FIXTURES = [
 ] as const;
 
 describe('A-018 — chart Reanimated worklet safety', () => {
-  it('spec(A-018:AC-1) inventories exactly the seven currently shipped chart useAnimatedStyle callbacks', () => {
+  it('spec(A-018:AC-1) inventories exactly the currently shipped chart useAnimatedStyle callbacks, by name', () => {
     const inventory = WORKLETS.map((worklet) => `${worklet.relativePath}::${worklet.binding}`);
 
     expect(inventory).toStrictEqual(CURRENT_SHIPPED_WORKLETS);

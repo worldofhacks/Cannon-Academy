@@ -101,6 +101,95 @@ export function IsleFog({
   );
 }
 
+/** `border-radius: 50% 0 0 50%` — the left half-disc; mirrored for the right. */
+const HALF_LEFT: CornerPercents = [50, 0, 0, 50];
+const HALF_RIGHT: CornerPercents = [0, 50, 50, 0];
+
+/**
+ * One half of the parting fog disc — arrival board, fog-lift step 1: *"The single fog disc becomes
+ * two half-discs that slide apart left and right. Splitting rather than fading is what makes it
+ * read as curtains opening."* `420ms ease-out · translateX ±26px + fade`.
+ */
+function PartingHalf({
+  left,
+  top,
+  width,
+  height,
+  radii,
+  dx,
+  ms,
+}: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+  radii: CornerPercents;
+  dx: number;
+  ms: number;
+}) {
+  const part = useSharedValue(0);
+
+  useEffect(() => {
+    part.value = withTiming(1, { duration: ms, easing: Easing.out(Easing.quad) });
+  }, [part, ms]);
+
+  // `dx` is a number captured by value — the worklet calls nothing (see `useDrift` above).
+  const partStyle = useAnimatedStyle(() => ({
+    opacity: 0.9 * (1 - part.value),
+    transform: [{ translateX: dx * part.value }],
+  }));
+
+  return (
+    <Animated.View pointerEvents="none" style={[{ position: 'absolute', left, top }, partStyle]}>
+      <Blob radii={radii} width={width} height={height} fill={chart.fog} opacity={1} />
+    </Animated.View>
+  );
+}
+
+/**
+ * The fog lift's opening move (A-065 beat B): the island's whole fog circle, re-drawn as two
+ * halves sliding apart. Mounted by `VoyageMap` for exactly the fog-lift beat — the standing
+ * `IsleFog` above renders every OTHER fogged island untouched, and by the time these halves have
+ * faded the beat still owns the screen, so nothing pops back.
+ */
+export function IsleFogParting({
+  frame,
+  isle,
+  splitDx,
+  ms,
+}: {
+  frame: MapFrame;
+  isle: { readonly x: number; readonly y: number; readonly w: number; readonly h: number };
+  /** ±26 board px — `FOG_LIFT.partDx`, handed down so the timing table stays in one file. */
+  splitDx: number;
+  ms: number;
+}) {
+  const bleedX = art(frame, ISLE_FOG_BLEED.x);
+  const bleedY = art(frame, ISLE_FOG_BLEED.y);
+  const left = mapX(frame, isle.x) - bleedX;
+  const top = mapY(frame, isle.y) - bleedY;
+  const w = art(frame, isle.w) + bleedX * 2;
+  const h = art(frame, isle.h) + bleedY * 2;
+  // The board's halves overlap the split line a little (78 of 148), so no seam shows at frame one.
+  const halfW = w * 0.53;
+  const dx = art(frame, splitDx);
+
+  return (
+    <>
+      <PartingHalf left={left} top={top} width={halfW} height={h} radii={HALF_LEFT} dx={-dx} ms={ms} />
+      <PartingHalf
+        left={left + w - halfW}
+        top={top}
+        width={halfW}
+        height={h}
+        radii={HALF_RIGHT}
+        dx={dx}
+        ms={ms}
+      />
+    </>
+  );
+}
+
 /**
  * The close chart's fog bank: two soft banks, a gradient wash, and whatever node sits in it.
  *

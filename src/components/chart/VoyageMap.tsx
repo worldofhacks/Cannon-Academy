@@ -23,11 +23,20 @@
  * read as a route arriving rather than a line stopping.
  */
 import { View } from 'react-native';
+import type { SharedValue } from 'react-native-reanimated';
 
 import type { IslandId } from '@content/schemas';
 
+import {
+  CeremonyMarker,
+  CeremonyTrailGlow,
+  FloodReveal,
+  FOG_LIFT,
+  type ArrivalBeat,
+  type GlowDotSpec,
+} from './ArrivalCeremony';
 import { CompassRose } from './Compass';
-import { IsleFog } from './Fog';
+import { IsleFog, IsleFogParting } from './Fog';
 import { VoyageIsle } from './Isle';
 import { Kraken } from './Kraken';
 import { ChartShip } from './ChartShip';
@@ -168,6 +177,7 @@ export function VoyageMap({
   nextCaption,
   typeScale,
   sail,
+  ceremony,
   onTravel,
   onWaypoint,
 }: {
@@ -184,6 +194,17 @@ export function VoyageMap({
   typeScale: number;
   /** The voyage under way (or last completed): one key naming one run, and its two isle indices. */
   sail: { readonly key: string; readonly from: number; readonly to: number } | null;
+  /**
+   * The arrival ceremony's map-space beats (A-065), or `null` for every ordinary render. While it
+   * runs, the arrival island is HELD asleep through the sail (fog whole, marker slate — the store
+   * already opened it, but the screen has not earned the reveal yet), then wakes on the board's
+   * own three fog-lift steps. `progress` is the chart's shared sail clock, for the trail lighting.
+   */
+  ceremony: {
+    readonly islandIndex: number;
+    readonly beat: ArrivalBeat;
+    readonly progress: SharedValue<number>;
+  } | null;
   /** Sails the captain to an island. It does NOT start a fight — see `app/chart.tsx`. */
   onTravel: (id: IslandId) => void;
   onWaypoint: (kind: WaypointKind, island: IslandId) => void;
@@ -193,6 +214,36 @@ export function VoyageMap({
   const liveIsle = VOYAGE.isles[live] ?? VOYAGE.isles[0];
   const legs = legsFor(nodes);
   const last = nodes.length - 1;
+
+  // ── The arrival ceremony's map beats (A-065) ─────────────────────────────────────────────────
+  // The store opens the island the moment it is earned; the SCREEN holds it asleep until the fog
+  // lift — through the sail the destination keeps its whole fog and its slate marker, so the one
+  // bright thing on the map is the ship (the amber card's "one glow per beat").
+  const arrivalIsle = ceremony === null ? undefined : VOYAGE.isles[ceremony.islandIndex];
+  const sleepIndex =
+    ceremony !== null && (ceremony.beat === 'sailing' || ceremony.beat === 'fog-lift')
+      ? ceremony.islandIndex
+      : -1;
+  const fogWholeIndex = ceremony !== null && ceremony.beat === 'sailing' ? ceremony.islandIndex : -1;
+  const fogPartIndex = ceremony !== null && ceremony.beat === 'fog-lift' ? ceremony.islandIndex : -1;
+  // The trail lights gold dot by dot as the hull passes — lit behind, never ahead, because each
+  // dot's own `t` is compared against the shared sail clock. Sailing back up-chain crosses the
+  // printed leg with `t` reversed, exactly as the ship itself does.
+  const glow = (() => {
+    if (ceremony === null || sail === null || sail.from === sail.to) return null;
+    const fromTag = VOYAGE.isleTags[sail.from];
+    const toTag = VOYAGE.isleTags[sail.to];
+    if (fromTag === undefined || toTag === undefined) return null;
+    const leg = Math.min(sail.from, sail.to);
+    const forward = sail.from < sail.to;
+    const a = nodeCentre(forward ? fromTag : toTag);
+    const b = nodeCentre(forward ? toTag : fromTag);
+    const dots: GlowDotSpec[] = trailDots(leg, a, b, TRAIL_LOOK.sailed.size).map((dot, i, all) => {
+      const t = (i + 1) / (all.length + 1);
+      return { x: mapX(frame, dot.x), y: mapY(frame, dot.y), t: forward ? t : 1 - t };
+    });
+    return { dots, progress: ceremony.progress };
+  })();
 
   // The ship's anchor is the DESTINATION berth whenever a sail names one — not the live island.
   // During an arrival the captain's `currentIsland` is still the island they are leaving (it
@@ -232,30 +283,92 @@ export function VoyageMap({
       {legs.map((leg) => (
         <TrailRun key={leg.key} frame={frame} dots={leg.dots} color={leg.color} opacity={leg.opacity} />
       ))}
+      {glow === null ? null : (
+        <CeremonyTrailGlow frame={frame} dots={glow.dots} progress={glow.progress} />
+      )}
 
       {VOYAGE.isles.map((isle, i) => (
-        <VoyageIsle key={isle.x} isle={isle} frame={frame} locked={nodes[i]?.fogged === true} />
+        <VoyageIsle
+          key={isle.x}
+          isle={isle}
+          frame={frame}
+          locked={nodes[i]?.fogged === true || i === sleepIndex}
+        />
       ))}
+      {/*
+        Fog-lift step 2: colour floods the arrival island through an expanding circular reveal —
+        the OPEN drawing, clipped, over the sleeping one underneath. From the banner beat on the
+        island simply renders open above, so the flood's end state and the plain render agree.
+      */}
+      {ceremony !== null && ceremony.beat === 'fog-lift' && arrivalIsle !== undefined ? (
+        <FloodReveal frame={frame} isle={arrivalIsle}>
+          <VoyageIsle isle={arrivalIsle} frame={frame} locked={false} />
+        </FloodReveal>
+      ) : null}
       {/*
         Fog is drawn wherever a node is fogged, at a thickness derived from how far out the island
         is. The board hangs a `fogged` flag on three of its five isles — its own captain's state —
         and transcribed as an optional field it meant Port Sumwich and Isla Products could never
         draw fog at all, which is precisely the state a fresh K-1 captain is in.
       */}
-      {VOYAGE.isles.map((isle, i) =>
-        nodes[i]?.fogged !== true ? null : (
-          <IsleFog key={`fog-${isle.x}`} frame={frame} isle={isle} fog={isleFog(i)} />
-        ),
-      )}
+      {VOYAGE.isles.map((isle, i) => {
+        // The ceremony's arrival island keeps its WHOLE fog through the sail, then parts it as two
+        // half-discs at the fog lift (step 1). Every other island's weather is untouched.
+        if (i === fogPartIndex) {
+          return (
+            <IsleFogParting
+              key={`fog-${isle.x}`}
+              frame={frame}
+              isle={isle}
+              splitDx={FOG_LIFT.partDx}
+              ms={FOG_LIFT.partMs}
+            />
+          );
+        }
+        if (nodes[i]?.fogged !== true && i !== fogWholeIndex) return null;
+        return <IsleFog key={`fog-${isle.x}`} frame={frame} isle={isle} fog={isleFog(i)} />;
+      })}
 
       {nodes.map((node, i) => {
         const tag = VOYAGE.isleTags[i];
         if (tag === undefined) return null;
+        // The ceremony owns the arrival island's marker for ALL its beats — slate through the
+        // sail, the gold pop + spark + standing pulse at the fog lift, and gold with NO ring from
+        // the banner beat on, when the Fight button holds the only glow (AC-3). The real
+        // `StationMarker` would pulse whenever the island reads `current`, which is exactly the
+        // second ring the amber card bans.
+        if (ceremony !== null && i === ceremony.islandIndex) {
+          return (
+            <CeremonyMarker
+              key={node.island.id}
+              beat={ceremony.beat}
+              glyph={node.glyph}
+              name={node.island.displayName}
+              look={look}
+              typeScale={typeScale}
+              position={{
+                left: mapX(frame, tag.x + tag.w / 2),
+                top: mapY(frame, tag.y),
+                transform: [{ translateX: '-50%' }],
+                maxWidth: art(frame, ISLE_TAG.maxWidth),
+              }}
+            />
+          );
+        }
+        // Beat A's other half: while the ship is under way it is the one bright thing, so the
+        // departure island's live ring stands down for the length of the sail.
+        const baseState = stationState(node, STATIONS[i] ?? { silhouette: false }, i === live);
+        const state =
+          ceremony !== null && ceremony.beat === 'sailing' && baseState === 'current'
+            ? node.cleared
+              ? 'cleared'
+              : 'available'
+            : baseState;
         return (
           <StationMarker
             key={node.island.id}
             node={node}
-            state={stationState(node, STATIONS[i] ?? { silhouette: false }, i === live)}
+            state={state}
             // Centred on the tag column, with NO fixed width.
             //
             // `tag.w` is the board's 108pt column, measured against the board's own placeholder

@@ -20,7 +20,15 @@
  * everything its range teaches. The engine owns the percentage; this only decides how many boxes
  * that fills, which is a drawing decision and belongs here.
  */
+import { useEffect } from 'react';
 import { Image, Pressable, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from 'react-native-reanimated';
 
 import type { GradeBand, Island, SkillId } from '@content/schemas';
 import { getSkill } from '@content/index';
@@ -28,7 +36,7 @@ import { emptyMastery, meterPercent, type SkillMastery } from '@engine/mastery';
 import { maxGradeForBand } from '@engine/placement';
 
 import type { HubControl } from '../../services/flow';
-import { DOCK, WAYPOINT_PARTS } from './board';
+import { DOCK, RING, WAYPOINT_PARTS } from './board';
 import { chart } from './palette';
 import { Poly } from '../Poly';
 import { sprite } from '../../theme/sprites';
@@ -58,6 +66,12 @@ interface DockProps {
   readonly typeScale: number;
   readonly controls: readonly HubControl[];
   readonly onDemoRouteEdge: (edgeId: string) => void;
+  /**
+   * The arrival ceremony's beat-C handoff (A-065): from the banner beat on, the Fight button takes
+   * the ONLY gold ring on the screen — *"the banner says where you are, the dock says what to do
+   * next, and only that button glows."* The one prop this ticket may add to the dock.
+   */
+  readonly highlightFight?: boolean;
 }
 
 export function ChartDock({
@@ -71,6 +85,7 @@ export function ChartDock({
   typeScale,
   controls,
   onDemoRouteEdge,
+  highlightFight = false,
 }: DockProps) {
   const pad = DOCK.padding * typeScale;
   const filled = filledCells(island, mastery, gradeBand);
@@ -260,6 +275,9 @@ export function ChartDock({
                   pressed ? { transform: [{ translateY: 2 }], borderBottomWidth: 1 } : null,
                 ]}
               >
+                {primary && highlightFight ? (
+                  <FightRing radius={DOCK.buttonRadius * typeScale} />
+                ) : null}
                 <DockIcon id={control.id} typeScale={typeScale} />
                 <Text
                   numberOfLines={1}
@@ -281,6 +299,54 @@ export function ChartDock({
       {/* The dock is the last thing on the screen, so it is what has to hold the home indicator. */}
       <View style={{ height: insetBottom, backgroundColor: chart.parchment }} />
     </View>
+  );
+}
+
+/** How far the Fight ring swells past the button — a rectangle at the marker's 1.5× would leave the dock. */
+const FIGHT_RING = { from: 0.96, to: 1.1 } as const;
+
+/**
+ * Beat C's only glow (A-065): a gold ring pulsing on the Fight button, on the marker ring's own
+ * `sc-ring` clock (`RING.ms`), with the swell tamed for a rectangle. Rendered only while the
+ * ceremony says so, so the resting dock is exactly yesterday's dock.
+ */
+function FightRing({ radius }: { readonly radius: number }) {
+  const pulse = useSharedValue(0);
+
+  useEffect(() => {
+    pulse.value = withRepeat(
+      withTiming(1, { duration: RING.ms, easing: Easing.out(Easing.quad) }),
+      -1,
+      false,
+    );
+  }, [pulse]);
+
+  // Hoisted numbers only — a `useAnimatedStyle` body runs on the UI runtime and calls no closures.
+  const from = FIGHT_RING.from;
+  const span = FIGHT_RING.to - FIGHT_RING.from;
+  const opacityFrom = RING.opacityFrom;
+  const fightRingStyle = useAnimatedStyle(() => ({
+    opacity: opacityFrom * (1 - pulse.value),
+    transform: [{ scale: from + span * pulse.value }],
+  }));
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        {
+          position: 'absolute',
+          left: 0,
+          right: 0,
+          top: 0,
+          bottom: 0,
+          borderRadius: radius,
+          borderWidth: 3,
+          borderColor: chart.gold,
+        },
+        fightRingStyle,
+      ]}
+    />
   );
 }
 

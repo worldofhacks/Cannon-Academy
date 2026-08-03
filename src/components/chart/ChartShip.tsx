@@ -38,16 +38,41 @@ import Animated, {
   withRepeat,
   withSequence,
   withTiming,
+  type SharedValue,
 } from 'react-native-reanimated';
 
 import { SHIP, TRAIL } from './board';
 import { art, type MapFrame } from './layout';
+import { chart } from './palette';
 import { sprite } from '../../theme/sprites';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
 
 const ROTATE = SHIP.bob.rotateDeg;
+
+/**
+ * The hull's lean while under way — arrival board beat A: *"rotate 18° along the tangent, +6° over
+ * the resting bob. No bob loop while under way — a moving ship should not also be idling."* Signed
+ * by direction of travel so sailing back up-chain leans the other way.
+ */
+export const SAIL_LEAN = 18;
+
+/**
+ * Beat A's wake: *"Three white lozenges behind the stern, each smaller and fainter: 22×7 at .8,
+ * 17×6 at .5, 12×5 at .26. They scale down and slide back as the ship passes, 500ms each."*
+ * Authored against the arrival board's own 52pt-wide hull box, so the sizes ride `width / 52`.
+ */
+export const WAKE = {
+  ms: 500,
+  boardShipW: 52,
+  driftX: 14,
+  lozenges: [
+    { dx: 10, bottom: 11, w: 22, h: 7, opacity: 0.8 },
+    { dx: 26, bottom: 8, w: 17, h: 6, opacity: 0.5 },
+    { dx: 40, bottom: 6, w: 12, h: 5, opacity: 0.26 },
+  ],
+} as const;
 
 /**
  * One sail, berth to berth. Long enough to read as a voyage, short enough that a child who tapped
@@ -144,13 +169,6 @@ export function ChartShip({
   const w = art(frame, width);
   const h = w * SHIP.aspect;
 
-  // Hoisted out of the worklet. `art()` is a JS closure and a `useAnimatedStyle` body runs on the
-  // UI runtime, where calling one crashes the first frame — invisibly to react-native-web.
-  const rise = art(frame, SHIP.bob.riseY);
-  const bobStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: -rise * bob.value }, { rotate: `${-ROTATE + 2 * ROTATE * bob.value}deg` }],
-  }));
-
   // At 1 the ship sits exactly on `left`/`top`; a sail rewinds it to 0 (the departure berth) and
   // plays it forward once. Keyed on the run's identity, NOT on the progress or the geometry: the
   // same key re-rendering mid-sail must not touch the tween (AC-3).
@@ -161,6 +179,25 @@ export function ChartShip({
     sailProgress.value = 0;
     sailProgress.value = withTiming(1, { duration: SAIL_MS, easing: Easing.inOut(Easing.quad) });
   }, [sailKey, sailProgress]);
+
+  // Hoisted out of the worklet. `art()` is a JS closure and a `useAnimatedStyle` body runs on the
+  // UI runtime, where calling one crashes the first frame — invisibly to react-native-web.
+  const rise = art(frame, SHIP.bob.riseY);
+  // A-065 beat A: while under way the hull LEANS and does not bob; at rest it bobs and does not
+  // lean. `settle` blends the two over the sail's last 8% so the arrival reads as the ship easing
+  // back into its idle — "the ship settles into its bob (stillness hands attention over)".
+  const lean = sail === null || sail.forward ? SAIL_LEAN : -SAIL_LEAN;
+  const bobStyle = useAnimatedStyle(() => {
+    const p = sailProgress.value;
+    const settle = p >= 1 ? 1 : p <= 0.92 ? 0 : (p - 0.92) / 0.08;
+    const rest = -ROTATE + 2 * ROTATE * bob.value;
+    return {
+      transform: [
+        { translateY: -rise * bob.value * settle },
+        { rotate: `${lean * (1 - settle) + rest * settle}deg` },
+      ],
+    };
+  });
 
   // The curve, pre-sampled into plain captured numbers — the worklet may hold arrays of numbers
   // and call Reanimated's own `interpolate`, and nothing else. The endpoints are canonicalised to
@@ -191,6 +228,20 @@ export function ChartShip({
     ],
   }));
 
+  // The wake's shared clock. It loops for pennies; each lozenge's own worklet gates its opacity on
+  // `sailProgress < 1`, so at rest the wake simply is not there (beat A ships no idle spray).
+  const wakePhase = useSharedValue(0);
+  useEffect(() => {
+    wakePhase.value = withRepeat(
+      withTiming(1, { duration: WAKE.ms, easing: Easing.out(Easing.quad) }),
+      -1,
+      false,
+    );
+  }, [wakePhase]);
+
+  const wakeRatio = w / WAKE.boardShipW;
+  const forward = sail === null || sail.forward;
+
   return (
     <Animated.View pointerEvents="none" style={[{ position: 'absolute', left, top, width: w, height: h }, sailStyle]}>
       {/* No blur in React Native, so the board's `drop-shadow(0 4px 5px …)` becomes the flat
@@ -206,9 +257,64 @@ export function ChartShip({
           backgroundColor: `rgba(20, 40, 60, ${SHIP.shadow.opacity})`,
         }}
       />
+      {/* Behind the stern, INSIDE the sailing view — the wake travels with the hull, like the
+          shadow, and mirrors when the ship sails back up-chain. */}
+      {WAKE.lozenges.map((loz) => (
+        <WakeLozenge
+          key={loz.dx}
+          left={forward ? -loz.dx * wakeRatio : w + loz.dx * wakeRatio - loz.w * wakeRatio}
+          bottom={loz.bottom * wakeRatio}
+          width={loz.w * wakeRatio}
+          height={loz.h * wakeRatio}
+          base={loz.opacity}
+          drift={(forward ? -WAKE.driftX : WAKE.driftX) * wakeRatio}
+          phase={wakePhase}
+          sailProgress={sailProgress}
+        />
+      ))}
       <Animated.View style={[FILL, bobStyle]}>
         <Image source={sprite.ship01} style={{ width: w, height: h }} resizeMode="contain" />
       </Animated.View>
     </Animated.View>
+  );
+}
+
+/** One white wake lozenge — `ar-wake`: scale 1 → .4, slide back, fade, 500ms, while under way. */
+function WakeLozenge({
+  left,
+  bottom,
+  width,
+  height,
+  base,
+  drift,
+  phase,
+  sailProgress,
+}: {
+  left: number;
+  bottom: number;
+  width: number;
+  height: number;
+  base: number;
+  drift: number;
+  phase: SharedValue<number>;
+  sailProgress: SharedValue<number>;
+}) {
+  const wakeStyle = useAnimatedStyle(() => {
+    const t = phase.value;
+    const underway = sailProgress.value < 1 ? 1 : 0;
+    return {
+      opacity: underway * base * (1 - t),
+      transform: [{ translateX: drift * t }, { scale: 1 - 0.6 * t }],
+    };
+  });
+
+  return (
+    <Animated.View
+      pointerEvents="none"
+      style={[
+        { position: 'absolute', left, bottom, width, height, borderRadius: 999, backgroundColor: chart.white },
+        wakeStyle,
+      ]}
+    />
   );
 }

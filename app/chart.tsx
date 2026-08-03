@@ -1,18 +1,26 @@
 import { router, useIsFocused } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import Animated, { Easing, useSharedValue, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { IslandId } from '@content/schemas';
 import { rankForWins, rankTierForWins } from '@engine/ranks';
 
+import {
+  ArrivalCeremonyOverlay,
+  BANNER,
+  CEREMONY,
+  useCeremonyChrome,
+  type ArrivalBeat,
+} from '../src/components/chart/ArrivalCeremony';
 import { SAIL_MS } from '../src/components/chart/ChartShip';
 import { ChartDock } from '../src/components/chart/Dock';
 import { HeaderPill } from '../src/components/chart/HeaderPill';
 import { SeaWater } from '../src/components/chart/Sea';
 import { VoyageMap } from '../src/components/chart/VoyageMap';
-import { FRAME, HEADER, VOYAGE, type WaypointKind } from '../src/components/chart/board';
-import { focusIndex, type MapFrame } from '../src/components/chart/layout';
+import { FRAME, HEADER, SHIP, VOYAGE, type WaypointKind } from '../src/components/chart/board';
+import { art, focusIndex, mapY, type MapFrame } from '../src/components/chart/layout';
 import { chart } from '../src/components/chart/palette';
 import { ChartWalkthrough, useChartTourBand } from '../src/components/onboarding/ChartWalkthrough';
 import { ResponsiveFrame } from '../src/components/ResponsiveFrame';
@@ -78,10 +86,17 @@ import { useLayout } from '../src/theme/useLayout';
  * becomes current, and one beat later the duel opens through the same push edge every other fight
  * on this screen uses. A travel tap, a loss, a band ceiling — no new island, no auto-battle, the
  * chart behaves exactly as it did yesterday.
+ *
+ * ── The arrival ceremony (A-065) ───────────────────────────────────────────────────────────────
+ * The A-063 tail (`set current → 600ms → push`) grew into the board's four beats
+ * (`Cannon Academy Arrival.dc.html`): SAILING (the upgraded sail), FOG LIFT (the island wakes,
+ * and the earned island becomes current exactly here), BANNER (parchment card, tap-to-skip), and
+ * the HANDOFF (banner tucks, spyglass iris closes, THEN the push). `ceremonyAdvance` +
+ * `ceremonyHoldMs` below are the whole state machine, pure and closure-free so the frozen suite
+ * drives them headless; `enterBeat` inside the component is the one place they meet timers. The
+ * encounter slot (A-066) sits between banner-out and the iris, gated on `captain.seenEncounters`.
+ * A plain travel tap plans a travel, which never enters a beat — today's bare sail, untouched.
  */
-
-/** The pause between the arrival sail ending and the duel opening — one breath, not a cut. */
-const ARRIVAL_BEAT_MS = 600;
 
 export interface SailPlan {
   readonly kind: 'travel' | 'arrival';
@@ -120,6 +135,79 @@ export function sailPlan(
     return { kind: 'travel', fromId: prev.currentIsland, toId: next.currentIsland };
   }
   return null;
+}
+
+/**
+ * The ceremony's one transition rule (A-065). Pure and closure-free like `sailPlan` above, for the
+ * same reason: `chart-sail.test.ts` lifts it out and drives every edge headless.
+ *
+ * Timers walk the beats in board order. A TAP is beat C's skip — *"Tapping anywhere skips to the
+ * handoff"* — and only beat C's: the sail and the fog lift are not skippable, the encounter is its
+ * own interactive surface, and the iris IS the handoff. Both the tap and the timer leave the
+ * banner through the same door, so the skip path and the natural path are one path (AC-4), and
+ * that door forks on the seen-latch: a first landing meets its encounter between banner-out and
+ * the iris; a return visit goes straight to the iris (AC-5).
+ */
+export function ceremonyAdvance(
+  beat: ArrivalBeat,
+  event: 'timer' | 'tap' | 'encounter-done',
+  encounterSeen: boolean,
+): ArrivalBeat | null {
+  if (event === 'tap') {
+    return beat === 'banner' ? (encounterSeen ? 'iris' : 'encounter') : null;
+  }
+  if (event === 'encounter-done') {
+    return beat === 'encounter' ? 'iris' : null;
+  }
+  if (beat === 'sailing') return 'fog-lift';
+  if (beat === 'fog-lift') return 'banner';
+  if (beat === 'banner') return encounterSeen ? 'iris' : 'encounter';
+  if (beat === 'iris') return 'battle';
+  return null;
+}
+
+/**
+ * How long each beat holds before its timer fires — the board's own boundaries: 1800 (the sail),
+ * 3080, 4600, then the handoff's `tuckLead + iris`. `null` is a beat with no clock: the encounter
+ * waits for its card's `onDone`, and `battle` is the push itself. The table rides in as a
+ * parameter so this stays closure-free for the lifted-declaration harness.
+ */
+export function ceremonyHoldMs(
+  beat: ArrivalBeat,
+  t: {
+    readonly sailMs: number;
+    readonly fogLiftMs: number;
+    readonly bannerMs: number;
+    readonly tuckLeadMs: number;
+    readonly irisMs: number;
+  },
+): number | null {
+  if (beat === 'sailing') return t.sailMs;
+  if (beat === 'fog-lift') return t.fogLiftMs;
+  if (beat === 'banner') return t.bannerMs;
+  if (beat === 'iris') return t.tuckLeadMs + t.irisMs;
+  return null;
+}
+
+/**
+ * Where the banner's top edge really goes (AC-2). The board authors `top 96` on a 375 frame and
+ * demands *"never overlaps header (26–78), ship, or dock"* — but the app contain-fits the map, and
+ * art compresses faster than type: on a 320pt-class phone the board's own 96 would graze the
+ * resting hull. So the placement is the board's number CLAMPED against the live berth (with `gap`
+ * of daylight), and the header floor wins over the berth ceiling because a banner under the header
+ * is unreadable while a banner grazing a hull is merely snug. The floor is the header's own edge —
+ * flush is not overlap, and on the SE class that flush point is what buys the berth its clearance.
+ * Closure-free: every pixel arrives as a parameter.
+ */
+export function bannerTopPx(
+  baseTopPx: number,
+  heightPx: number,
+  headerBottomPx: number,
+  berthTopPx: number,
+  gapPx: number,
+): number {
+  const clamped = Math.min(baseTopPx, berthTopPx - gapPx - heightPx);
+  return Math.max(clamped, headerBottomPx);
 }
 
 export default function Chart() {
@@ -193,6 +281,71 @@ export default function Chart() {
     [],
   );
 
+  // ── The ceremony driver (A-065): shared values + timeouts, in this screen ───────────────────
+  // One state names the beat under way; one shared value is the sail clock the map's trail
+  // lighting reads; every timer runs through `arrivalTimer`, so the unmount cleanup above and the
+  // new-voyage supersede below retire a ceremony the same way they retire the old auto-battle.
+  const [ceremony, setCeremony] = useState<{
+    islandId: IslandId;
+    islandIndex: number;
+    beat: ArrivalBeat;
+  } | null>(null);
+  const ceremonyProgress = useSharedValue(1);
+
+  const enterBeat = useCallback(
+    function step(run: { islandId: IslandId; islandIndex: number }, beat: ArrivalBeat): void {
+      // A beat entered by ANY door (timer, skip, encounter-done) first clears the pending clock,
+      // which is what makes the skip path and the natural path end in exactly one push (AC-4).
+      if (arrivalTimer.current !== null) {
+        clearTimeout(arrivalTimer.current);
+        arrivalTimer.current = null;
+      }
+      if (beat === 'battle') {
+        // The handoff lands: the same `chart→duel` push edge as every other fight on this screen,
+        // reachable only from the iris timer — once per ceremony.
+        setCeremony(null);
+        router.push('/duel');
+        return;
+      }
+      setCeremony({ islandId: run.islandId, islandIndex: run.islandIndex, beat });
+      if (beat === 'fog-lift') {
+        // The A-063 completion write, now at the fog lift (the dock's name and meter swap the
+        // moment the island wakes). Advance the snapshot FIRST, so making the earned island
+        // current cannot read back into the differ as a travel tap and replay the sail (AC-3).
+        seen.current = { currentIsland: run.islandId, unlockedIslands: seen.current.unlockedIslands };
+        captainActions().setCurrentIsland(run.islandId);
+      }
+      const hold = ceremonyHoldMs(beat, { sailMs: SAIL_MS, ...CEREMONY });
+      if (hold === null) return;
+      arrivalTimer.current = setTimeout(() => {
+        arrivalTimer.current = null;
+        // The seen-latch is read at transition time, not ceremony start: A-066's card sets it
+        // during the encounter, and a latch read early would loop a captain back into the chat.
+        const met = captainActions().captain.seenEncounters.includes(run.islandId);
+        const nextBeat = ceremonyAdvance(beat, 'timer', met);
+        if (nextBeat !== null) step(run, nextBeat);
+      }, hold);
+    },
+    [],
+  );
+
+  // Beat C's card: "Tapping anywhere skips to the handoff."
+  const skipCeremony = useCallback(() => {
+    if (ceremony === null) return;
+    const met = captainActions().captain.seenEncounters.includes(ceremony.islandId);
+    const nextBeat = ceremonyAdvance(ceremony.beat, 'tap', met);
+    if (nextBeat === null) return;
+    enterBeat({ islandId: ceremony.islandId, islandIndex: ceremony.islandIndex }, nextBeat);
+  }, [ceremony, enterBeat]);
+
+  // The encounter's exit leads into the iris (AC-5) — and nowhere else.
+  const ceremonyEncounterDone = useCallback(() => {
+    if (ceremony === null) return;
+    const nextBeat = ceremonyAdvance(ceremony.beat, 'encounter-done', true);
+    if (nextBeat === null) return;
+    enterBeat({ islandId: ceremony.islandId, islandIndex: ceremony.islandIndex }, nextBeat);
+  }, [ceremony, enterBeat]);
+
   const unlockedKey = captain.unlockedIslands.join(',');
   useEffect(() => {
     // Unfocused, the chart must neither animate nor navigate: a victory settles `unlockedIslands`
@@ -209,27 +362,26 @@ export default function Chart() {
     const from = nodes.findIndex((n) => n.island.id === plan.fromId);
     const to = nodes.findIndex((n) => n.island.id === plan.toId);
     if (from < 0 || to < 0) return;
-    // A new voyage supersedes any pending auto-battle: a captain who taps elsewhere during the
-    // beat has changed their mind, and the duel must not open under them.
+    // A new voyage supersedes any pending auto-battle — and any ceremony mid-flight: a captain
+    // who taps elsewhere during a beat has changed their mind, and the duel must not open under
+    // them.
     if (arrivalTimer.current !== null) {
       clearTimeout(arrivalTimer.current);
       arrivalTimer.current = null;
     }
+    setCeremony(null);
     const key = `${plan.kind}:${plan.fromId}>${plan.toId}`;
     setSailRun((current) => (current !== null && current.key === key ? current : { key, from, to }));
     if (plan.kind !== 'arrival') return;
-    // Then the battle begins: the sail completes, the earned island becomes current, and one beat
-    // later the duel opens — the same `chart→duel` push edge as every other fight on this screen.
-    arrivalTimer.current = setTimeout(() => {
-      // Advance the snapshot FIRST, so making the earned island current cannot read back into the
-      // differ as a travel tap and replay the sail (AC-3).
-      seen.current = { currentIsland: plan.toId, unlockedIslands: seen.current.unlockedIslands };
-      captainActions().setCurrentIsland(plan.toId);
-      arrivalTimer.current = setTimeout(() => {
-        arrivalTimer.current = null;
-        router.push('/duel');
-      }, ARRIVAL_BEAT_MS);
-    }, SAIL_MS);
+    // Then the ceremony begins (A-065): the four beats walk `ceremonyAdvance` on `enterBeat`'s
+    // timers, the earned island becomes current at the fog lift, and the handoff's iris ends in
+    // the same `chart→duel` push edge as every other fight on this screen.
+    ceremonyProgress.value = 0;
+    ceremonyProgress.value = withTiming(1, {
+      duration: SAIL_MS,
+      easing: Easing.inOut(Easing.quad),
+    });
+    enterBeat({ islandId: plan.toId, islandIndex: to }, 'sailing');
   }, [isFocused, captain.currentIsland, unlockedKey]);
 
   const live = focusIndex(nodes);
@@ -270,6 +422,13 @@ export default function Chart() {
    */
   const tourBand = useChartTourBand();
 
+  // Beat D fades the header and dock to 35% — "they are not part of the place you are entering."
+  // The worklets live in `ArrivalCeremony.tsx` so the inventory suite sees them; the chart only
+  // applies the styles to its two chrome bands.
+  const ceremonyBeat = ceremony === null ? null : ceremony.beat;
+  const headerChromeStyle = useCeremonyChrome(ceremonyBeat);
+  const dockChromeStyle = useCeremonyChrome(ceremonyBeat);
+
   const focus = nodes[live];
   // After every hook, so the hook order cannot depend on it. An empty catalog is unrenderable and
   // should say so rather than draw an ocean with nothing in it.
@@ -289,6 +448,28 @@ export default function Chart() {
   // so the compass, the counter chip and the fog band stay against the screen rather than the board.
   const slack = { x: Math.max(0, (box.w - board.width) / 2), y: Math.max(0, box.h - board.height) };
   const rank = rankForWins(captain.wins);
+
+  // ── The ceremony's render inputs ─────────────────────────────────────────────────────────────
+  const ceremonyNode = ceremony === null ? undefined : nodes[ceremony.islandIndex];
+  const ceremonyIsle = ceremony === null ? undefined : VOYAGE.isles[ceremony.islandIndex];
+  // Beat C onward, the Fight button is gold and carries the only ring (AC-3).
+  const ceremonyFightGold =
+    ceremony !== null &&
+    (ceremony.beat === 'banner' || ceremony.beat === 'encounter' || ceremony.beat === 'iris');
+  // The banner's top: the board's 96, clamped against the live berth by `bannerTopPx` (AC-2).
+  const ceremonyBannerTop = (() => {
+    const baseTop = insets.top + (BANNER.top - FRAME.statusBar) * L.type;
+    if (ceremonyIsle === undefined || !mapReady) return baseTop;
+    const bannerHeight = (BANNER.padY * 2 + BANNER.plate + BANNER.shadowDy) * L.type;
+    const headerBottom =
+      insets.top + (HEADER.top - FRAME.statusBar + HEADER.height + HEADER.shadowDy) * L.type;
+    const berthTop =
+      insets.top +
+      slack.y +
+      mapY(frame, ceremonyIsle.y + ceremonyIsle.h / 2) -
+      (art(frame, VOYAGE.ship.width) * SHIP.aspect) / 2;
+    return bannerTopPx(baseTop, bannerHeight, headerBottom, berthTop, BANNER.clearGap * L.type);
+  })();
 
   return (
     <ResponsiveFrame surface="world">
@@ -327,6 +508,15 @@ export default function Chart() {
                 nextCaption={progress.caption}
                 typeScale={L.type}
                 sail={sailRun}
+                ceremony={
+                  ceremony === null
+                    ? null
+                    : {
+                        islandIndex: ceremony.islandIndex,
+                        beat: ceremony.beat,
+                        progress: ceremonyProgress,
+                      }
+                }
                 onTravel={travel}
                 onWaypoint={openWaypoint}
               />
@@ -344,18 +534,21 @@ export default function Chart() {
         */}
         {tourBand > 0 ? <View style={{ height: tourBand }} /> : null}
 
-        <ChartDock
-          island={focus.island}
-          glyph={focus.glyph}
-          gradeBand={captain.gradeBand}
-          mastery={captain.mastery}
-          fogged={focus.fogged}
-          nextIslandCount={progress.nextIndex < 0 ? null : progress.duelsToOpen}
-          insetBottom={insets.bottom}
-          typeScale={L.type}
-          controls={hubLayout.controls}
-          onDemoRouteEdge={onDemoRouteEdge}
-        />
+        <Animated.View style={dockChromeStyle}>
+          <ChartDock
+            island={focus.island}
+            glyph={focus.glyph}
+            gradeBand={captain.gradeBand}
+            mastery={captain.mastery}
+            fogged={focus.fogged}
+            nextIslandCount={progress.nextIndex < 0 ? null : progress.duelsToOpen}
+            insetBottom={insets.bottom}
+            typeScale={L.type}
+            controls={hubLayout.controls}
+            onDemoRouteEdge={onDemoRouteEdge}
+            highlightFight={ceremonyFightGold}
+          />
+        </Animated.View>
         {/* The dock is the footer again, so it keeps the home indicator. */}
 
         {/*
@@ -363,13 +556,16 @@ export default function Chart() {
           chart a full-bleed map and puts the pill on top at `z-index: 3`. Drawn last so it paints
           over the water without needing a z-index React Native does not have.
         */}
-        <View
-          style={{
-            position: 'absolute',
-            left: HEADER.inset * L.type,
-            right: HEADER.inset * L.type,
-            top: insets.top + (HEADER.top - FRAME.statusBar) * L.type,
-          }}
+        <Animated.View
+          style={[
+            {
+              position: 'absolute',
+              left: HEADER.inset * L.type,
+              right: HEADER.inset * L.type,
+              top: insets.top + (HEADER.top - FRAME.statusBar) * L.type,
+            },
+            headerChromeStyle,
+          ]}
         >
           <HeaderPill
               name={captain.name}
@@ -384,7 +580,27 @@ export default function Chart() {
               controls={hubLayout.controls}
             onDemoRouteEdge={onDemoRouteEdge}
           />
-        </View>
+        </Animated.View>
+
+        {/*
+          The ceremony's screen layer — banner, encounter slot, iris, and beat C's tap-to-skip
+          surface. Rendered over the header on purpose: the geometry above guarantees the two
+          never overlap, and the iris's dark surround must cover the whole screen.
+        */}
+        {ceremony === null || ceremonyNode === undefined ? null : (
+          <ArrivalCeremonyOverlay
+            beat={ceremony.beat}
+            islandId={ceremonyNode.island.id}
+            islandName={ceremonyNode.island.displayName}
+            glyph={ceremonyNode.glyph}
+            typeScale={L.type}
+            width={screen.w || FRAME.width}
+            height={screen.h || FRAME.height}
+            bannerTop={ceremonyBannerTop}
+            onSkip={skipCeremony}
+            onEncounterDone={ceremonyEncounterDone}
+          />
+        )}
 
         {/*
           Onboarding beats 17–20 — the coached tour of this screen, and the last thing onboarding
