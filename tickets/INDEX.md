@@ -74,6 +74,10 @@ README, HANDOFF, or STATE — those documents link here.
 | A-062 | app | A win advances the voyage — no island is replayed to open the next | review-passed | G8 | A-027 | main | [A-062](app/A-062.md) |
 | A-063 | app | The ship sails to the island it just earned, and the next battle begins | review-passed | G8 | A-018 | main | [A-063](app/A-063.md) |
 | A-064 | app | A generated fleet — twenty golden ships from board-sanctioned primitives | review-passed | G8 | A-045, A-052 | main | [A-064](app/A-064.md) |
+| A-065 | app | The arrival ceremony — fog lift, banner, and the spyglass iris | review-passed | G9 | A-063 | main | [A-065](app/A-065.md) |
+| A-066 | app | The island encounter — one riddle, no wrong outcome, adjusted to the band | review-passed | G9 | A-062 | main | [A-066](app/A-066.md) |
+| A-067 | app | The rival fleet shelf — twenty ships, met the honest way | review-passed | G9 | A-064 | main | [A-067](app/A-067.md) |
+| A-068 | app | Deck crew — a sailor on every rival deck, built from nine shapes | review-passed | G9 | A-067 | main | [A-068](app/A-068.md) |
 | T-001 | engine | Seeded mulberry32 PRNG with pure, state-threaded draw helpers | review-passed | 1 | none | ticket/T-001-seeded-prng | [T-001](T-001.md) |
 | T-002 | engine | Safe arithmetic expression and constraint predicate evaluator (no eval) | review-passed | 1 | none | ticket/T-002-safe-expr-eval | [T-002](T-002.md) |
 | T-003 | engine | Content zod schemas, id unions, and engine question types | review-passed | 1 | none | ticket/T-003-schemas-and-types | [T-003](T-003.md) |

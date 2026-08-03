@@ -169,6 +169,8 @@ function normalizeCaptain(raw: Record<string, unknown>): Captain {
   return {
     ...base,
     seenCannons: Array.isArray(base.seenCannons) ? base.seenCannons : [],
+    seenEncounters: Array.isArray(base.seenEncounters) ? base.seenEncounters : [],
+    metRivals: Array.isArray(base.metRivals) ? base.metRivals : [],
     ...normalizeSkins(raw),
     onboardingBeat: normalizeOnboardingBeat(raw.onboardingBeat),
     replayingTour: normalizeReplayingTour(),
@@ -182,6 +184,10 @@ function migrateLegacyCaptain(raw: Record<string, unknown>): Captain {
   return {
     ...(raw as Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'>),
     seenCannons: Array.isArray(raw.seenCannons) ? (raw.seenCannons as Captain['seenCannons']) : [],
+    seenEncounters: Array.isArray(raw.seenEncounters)
+      ? (raw.seenEncounters as Captain['seenEncounters'])
+      : [],
+    metRivals: Array.isArray(raw.metRivals) ? (raw.metRivals as Captain['metRivals']) : [],
     ...normalizeSkins(raw),
     onboardingBeat: normalizeOnboardingBeat(raw.onboardingBeat),
     replayingTour: normalizeReplayingTour(),

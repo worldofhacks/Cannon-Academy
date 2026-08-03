@@ -62,6 +62,14 @@ export interface Captain {
   ownedSkins: string[];
   /** The skin currently sailing. `null` means the starter, so an untouched save needs no migration. */
   equippedSkin: string | null;
+  /**
+   * Islands whose first-landing encounter (A-066) has played. A latch, not a receipt: it is both
+   * the shown-once guard and the coin-payout idempotency, because `duel:`/`purchase:` are the only
+   * receipt key kinds A-041 admits. Tolerated-as-absent — same ruling as `seenCannons`.
+   */
+  seenEncounters: IslandId[];
+  /** Generated-fleet ship ids the captain has actually fought (A-067) — drives the shelf's MET count. */
+  metRivals: string[];
   rankTier: number;
   wins: number;
   currentIsland: IslandId | null;
@@ -188,6 +196,8 @@ export function emptyCaptain(): Captain {
     unlockedIslands: [],
     ownedSkins: [DEFAULT_SKIN_ID],
     equippedSkin: null,
+    seenEncounters: [],
+    metRivals: [],
     rankTier: 0,
     wins: 0,
     currentIsland: null,
