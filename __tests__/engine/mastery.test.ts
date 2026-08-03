@@ -9,18 +9,22 @@
  *
  * HOW THIS SUITE IS BUILT — read before editing.
  * -----------------------------------------------------------------------------------------
- * T-029 is queued to add a new grade-0 skill (`sub_within_10`) and a third starter cannon, which
- * will grow `SKILL_IDS` / `CANNON_IDS` and the catalog. Nothing here asserts a count of skills,
- * cannons, or islands, and nothing hardcodes "the" set of range-unlock cannons for a skill —
- * every unlock-resolution expectation is *derived* from the real catalog (`@content/index`) by
- * re-stating the ticket's own unlock rule ("every cannon whose `unlock.kind === 'range'` and
- * whose `skill` is now mastered"; "every island `I` with `requiresIsland === J` where at least
- * one skill in `J.rangeSkills` is mastered") as a query over `cannons` / `islands`, rather than
- * copying a literal id list. Adding a skill/cannon changes what the derivation returns without
- * invalidating the test (L-012: assert the mechanism, not a projection of it). Two ids —
- * `add_within_20` and `port_sumwich` — are still named directly in a couple of tests, exactly
- * where the ticket text itself pins a concrete worked example (AC-10, AC-12); each such use is
- * commented at the call site.
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): islands carry a per-band curriculum (`islandCurriculumFor(islandId, band)`), the
+ * shared `rangeSkills` / `unlocksCannons` fields no longer exist, and the island half of
+ * `resolveUnlocks` reads THE BAND'S OWN CELL — failing CLOSED when no band is supplied (there
+ * is no shared curriculum left to fall back to). The island-rule derivations below therefore
+ * take a band, and the no-band tests assert emptiness rather than the old "no ceiling" reading.
+ *
+ * Nothing here asserts a count of skills, cannons, or islands, and nothing hardcodes "the" set
+ * of range-unlock cannons for a skill — every unlock-resolution expectation is *derived* from
+ * the real catalog (`@content/index`) by re-stating the unlock rule ("every cannon whose
+ * `unlock.kind === 'range'` and whose `skill` is now mastered"; "every island `I` with
+ * `requiresIsland === J` where at least one skill of `J`'s cell for the band is mastered") as a
+ * query over `cannons` / `islands`, rather than copying a literal id list. Adding a skill/cannon
+ * changes what the derivation returns without invalidating the test (L-012: assert the
+ * mechanism, not a projection of it). A few ids are still named directly, exactly where a
+ * ticket's text pins a concrete worked example; each such use is commented at the call site.
  *
  * L-006 drove the original dual-rate tests: "drill fills faster than duel" is trivially satisfied
  * by near-identical rates, so every rate assertion pinned the exact `2x` relationship. **RE-BASELINED
@@ -65,7 +69,7 @@ import {
   MASTERY_METER_MAX,
 } from '@engine/tuning';
 import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
-import { cannons, islands, getCannon, getIsland, getSkill } from '@content/index';
+import { cannons, islands, getCannon, getSkill, islandCurriculumFor } from '@content/index';
 import { maxGradeForBand } from '@engine/placement';
 import { createCaptainStore, emptyCaptain } from '../../src/stores/player';
 
@@ -118,9 +122,12 @@ function expectedNewCannons(
     .filter((c) => c.unlock.kind === 'range' && masteredSkills.has(c.skill) && !already.has(c.id))
     .map((c) => c.id);
 
-  const ceiling = gradeBand === undefined ? Number.POSITIVE_INFINITY : maxGradeForBand(gradeBand);
-  const fromIslands = expectedNewIslands(masteredSkills, []).flatMap((islandId) => {
-    const entry = getIsland(islandId)
+  // D-14: no band, no island delta, no entry cannons — fail closed, like the module under test.
+  if (gradeBand === undefined) return fromMastery;
+
+  const ceiling = maxGradeForBand(gradeBand);
+  const fromIslands = expectedNewIslands(masteredSkills, [], gradeBand).flatMap((islandId) => {
+    const entry = islandCurriculumFor(islandId, gradeBand)
       .unlocksCannons.map((id) => getCannon(id))
       .filter((c) => c.minGrade <= ceiling && !already.has(c.id) && !fromMastery.includes(c.id))
       .sort((a, b) => a.minGrade - b.minGrade || a.id.localeCompare(b.id))[0];
@@ -131,22 +138,24 @@ function expectedNewCannons(
 }
 
 /**
- * Re-derives the ticket's own island-unlock rule: every island `I` whose `requiresIsland === J`
- * where at least one of `J.rangeSkills` is mastered, minus whatever is already unlocked. Note
- * the rule as stated depends only on `J.rangeSkills` mastery, never on whether `J` itself is
- * already in `alreadyUnlocked` — see the dedicated test below that exercises exactly that.
+ * Re-derives the island-unlock rule under D-14: every island `I` whose `requiresIsland === J`
+ * where at least one skill of `J`'s CELL FOR THE BAND (`islandCurriculumFor`) is mastered, minus
+ * whatever is already unlocked. Note the rule depends only on that cell's mastery, never on
+ * whether `J` itself is already in `alreadyUnlocked` — see the dedicated test below. With no
+ * band there is no cell to read, so the delta is empty (fail closed).
  */
 function expectedNewIslands(
   masteredSkills: ReadonlySet<SkillId>,
   alreadyUnlocked: readonly IslandId[],
+  gradeBand?: GradeBand,
 ): IslandId[] {
+  if (gradeBand === undefined) return [];
   const already = new Set(alreadyUnlocked);
   return islands
     .filter((i) => {
       if (already.has(i.id)) return false;
       if (i.requiresIsland === undefined) return false;
-      const predecessor = getIsland(i.requiresIsland);
-      return predecessor.rangeSkills.some((s) => masteredSkills.has(s));
+      return islandCurriculumFor(i.requiresIsland, gradeBand).skills.some((s) => masteredSkills.has(s));
     })
     .map((i) => i.id);
 }
@@ -480,18 +489,20 @@ describe('resolveUnlocks', () => {
     expect(result.cannons).toContain('saker');
     expect(result.islands).toContain('isla_products');
 
-    // The ceiling, stated as the reason the island opened: it opened because it teaches something
-    // a grade-1 captain may be asked, and NOT because the band gate was loosened. `mult_facts` is
-    // still out of reach, and so is the gun that fires it.
-    const inBand = getIsland('isla_products').rangeSkills.filter(
+    // The ceiling, stated as the reason the island opened: it opened because ITS K-1 CELL
+    // (D-14 — `islandCurriculumFor`) teaches something a grade-1 captain may be asked, and NOT
+    // because the band gate was loosened. `mult_facts` is still out of reach, and so is the gun
+    // that fires it.
+    const inBand = islandCurriculumFor('isla_products', 'k_1').skills.filter(
       (id) => getSkill(id).minGrade <= maxGradeForBand('k_1'),
     );
     expect(inBand.length, 'isla_products teaches a k_1 captain nothing').toBeGreaterThan(0);
     expect(inBand).not.toContain('mult_facts');
     expect(result.cannons).not.toContain('twelve_pounder');
 
-    // And an island whose whole curriculum is still above the band stays shut, so this is a
-    // content fix rather than the band check being deleted.
+    // And the chain is still a CHAIN (D-14 re-baseline): Quotient Cove now teaches K-1 its own
+    // cell, but it stays shut in THIS delta because its predecessor's K-1 cell (Isla Products,
+    // subtraction within 10) is not yet mastered — one rung at a time, never two for one skill.
     expect(result.islands).not.toContain('quotient_cove');
   });
 
@@ -513,13 +524,15 @@ describe('resolveUnlocks', () => {
     const captain = store.getState().captain;
     expect(captain.ownedCannons).toContain('saker');
     expect(captain.unlockedIslands).toContain('isla_products');
-    // The ceiling is untouched: the multiplication gun is still not theirs, and the island beyond
-    // — which teaches only division — is still fogged.
+    // The ceiling is untouched: the multiplication gun is still not theirs, and the island
+    // beyond stays fogged in this delta — its predecessor's K-1 cell is not yet mastered.
     expect(captain.ownedCannons).not.toContain('twelve_pounder');
     expect(captain.unlockedIslands).not.toContain('quotient_cove');
   });
 
   it('spec(A-027:AC-4) a mastered eligible predecessor opens its next eligible island without revoking a prior higher-band placement unlock', () => {
+    // D-14 re-baseline: the skill mastered is the predecessor's OWN g2_3 cell —
+    // `place_value_compare`, Port Sumwich's g2_3 rung under the atlas (`islandCurriculumFor`).
     const priorHigherBandIsland: IslandId = 'fraction_reef';
     const store = createCaptainStore({
       ...emptyCaptain(),
@@ -527,7 +540,7 @@ describe('resolveUnlocks', () => {
       unlockedIslands: ['port_sumwich', priorHigherBandIsland],
     });
 
-    store.getState().recordRangeAnswers('add_within_20', {
+    store.getState().recordRangeAnswers('place_value_compare', {
       correct: MASTERY_THRESHOLD_CORRECT,
       asked: MASTERY_THRESHOLD_CORRECT,
     });
@@ -618,16 +631,18 @@ describe('resolveUnlocks', () => {
     expect(secondPass.cannons).toEqual([]);
   });
 
-  it('spec(T-010:AC-12) mastering a port_sumwich range skill lifts the fog on isla_products only, not further', () => {
-    // `port_sumwich` / its immediate successor are named directly because AC-12's text pins
-    // this exact worked example. `add_within_20` is one of port_sumwich's rangeSkills.
-    const portSumwich = getIsland('port_sumwich');
-    expect(portSumwich.rangeSkills).toContain('add_within_20');
+  it('spec(T-010:AC-12) mastering port_sumwich\'s K-1 cell lifts the fog on isla_products only, not further', () => {
+    // `port_sumwich` / its immediate successor are named directly because AC-12's text pins this
+    // worked example. D-14 re-baseline: the skill is the predecessor's K-1 CELL skill
+    // (`islandCurriculumFor`), and the band rides along — no band would mean no delta at all.
+    const cell = islandCurriculumFor('port_sumwich', 'k_1');
+    expect(cell.skills).toContain('add_within_10');
 
-    const masteredSkills = new Set<SkillId>(['add_within_20']);
+    const masteredSkills = new Set<SkillId>(['add_within_10']);
     const mastery = masteryMapFor([...masteredSkills]);
 
     const result = resolveUnlocks({
+      gradeBand: 'k_1',
       mastery,
       unlockedCannons: [],
       unlockedIslands: ['port_sumwich'],
@@ -636,42 +651,43 @@ describe('resolveUnlocks', () => {
     const immediateSuccessor = islands.find((i) => i.requiresIsland === 'port_sumwich');
     expect(immediateSuccessor).toBeDefined();
     expect(result.islands).toEqual([immediateSuccessor?.id]);
-    expect(result.islands).toEqual(expectedNewIslands(masteredSkills, ['port_sumwich']));
+    expect(result.islands).toEqual(expectedNewIslands(masteredSkills, ['port_sumwich'], 'k_1'));
   });
 
-  it("spec(T-010:AC-12) mastering only ONE of an island's several rangeSkills is enough — not all are required", () => {
-    // port_sumwich lists 3 rangeSkills; master exactly one of the others (not add_within_20)
-    // and confirm the fog still lifts. This is the "at least one" half of the rule — a
-    // stricter "requires every rangeSkill" implementation would fail this.
-    const portSumwich = getIsland('port_sumwich');
-    expect(portSumwich.rangeSkills.length).toBeGreaterThan(1);
-    const oneOfSeveral = portSumwich.rangeSkills[1];
-    expect(oneOfSeveral).toBeDefined();
+  it("spec(T-010:AC-12) the island rule is `some` over the cell's skills — one mastered cell skill is enough", () => {
+    // D-14 note: every cell in today's atlas lists exactly one skill, so "at least one, not all"
+    // has no two-skill catalog case to bite on — but the MECHANISM is still `some`, and this
+    // pins it via the derivation helper so a future multi-skill cell inherits the rule proven.
+    const cellSkill = islandCurriculumFor('port_sumwich', 'g2_3').skills[0];
+    expect(cellSkill).toBeDefined();
 
-    const masteredSkills = new Set<SkillId>([oneOfSeveral as SkillId]);
+    const masteredSkills = new Set<SkillId>([cellSkill as SkillId]);
     const mastery = masteryMapFor([...masteredSkills]);
 
-    const result = resolveUnlocks({ mastery, unlockedCannons: [], unlockedIslands: ['port_sumwich'] });
-    expect(result.islands).toEqual(expectedNewIslands(masteredSkills, ['port_sumwich']));
+    const result = resolveUnlocks({
+      gradeBand: 'g2_3',
+      mastery,
+      unlockedCannons: [],
+      unlockedIslands: ['port_sumwich'],
+    });
+    expect(result.islands).toEqual(expectedNewIslands(masteredSkills, ['port_sumwich'], 'g2_3'));
     expect(result.islands.length).toBeGreaterThan(0);
   });
 
-  it('spec(T-010:AC-12) the island rule keys off J.rangeSkills mastery alone, independent of whether J itself is already unlocked', () => {
-    // Notable/ambiguous point (flagged in the report): the rule as specified ("every island I
-    // with requiresIsland === J where at least one skill in J.rangeSkills is mastered") does
-    // not condition on J itself being a member of unlockedIslands — unlockedIslands is used
-    // only for the delta-exclusion of I, never as a gate on J. This test proves the literal
-    // rule: mastering isla_products's rangeSkill while NEITHER port_sumwich NOR isla_products
-    // is in unlockedIslands still lifts the fog on isla_products's successor.
-    const islaProducts = getIsland('isla_products');
-    const [firstSkill] = islaProducts.rangeSkills;
+  it("spec(T-010:AC-12) the island rule keys off the predecessor cell's mastery alone, independent of whether J itself is already unlocked", () => {
+    // Notable/ambiguous point (flagged in the report): the rule does not condition on J itself
+    // being a member of unlockedIslands — unlockedIslands is used only for the delta-exclusion
+    // of I, never as a gate on J. This test proves the literal rule: mastering isla_products's
+    // K-1 cell skill while NEITHER port_sumwich NOR isla_products is in unlockedIslands still
+    // lifts the fog on isla_products's successor.
+    const [firstSkill] = islandCurriculumFor('isla_products', 'k_1').skills;
     expect(firstSkill).toBeDefined();
 
     const masteredSkills = new Set<SkillId>([firstSkill as SkillId]);
     const mastery = masteryMapFor([...masteredSkills]);
 
-    const result = resolveUnlocks({ mastery, unlockedCannons: [], unlockedIslands: [] });
-    expect(result.islands).toEqual(expectedNewIslands(masteredSkills, []));
+    const result = resolveUnlocks({ gradeBand: 'k_1', mastery, unlockedCannons: [], unlockedIslands: [] });
+    expect(result.islands).toEqual(expectedNewIslands(masteredSkills, [], 'k_1'));
 
     const successor = islands.find((i) => i.requiresIsland === 'isla_products');
     if (successor !== undefined) {
@@ -680,11 +696,12 @@ describe('resolveUnlocks', () => {
   });
 
   it('spec(T-010:AC-13) mastering a skill whose island is never a requiresIsland target unlocks no islands', () => {
-    // The last island in the chain (order max, nothing requires it) — mastering its rangeSkill
+    // The last island in the chain (order max, nothing requires it) — mastering its cell skill
     // must not fabricate an island unlock out of nowhere.
     const lastIsland = [...islands].sort((a, b) => b.order - a.order)[0];
     expect(lastIsland).toBeDefined();
-    const skillOfLast = lastIsland?.rangeSkills[0];
+    const skillOfLast =
+      lastIsland === undefined ? undefined : islandCurriculumFor(lastIsland.id, 'g4_5').skills[0];
     if (skillOfLast === undefined) {
       // No skill to test against defensively; nothing to assert.
       expect(true).toBe(true);
@@ -692,23 +709,39 @@ describe('resolveUnlocks', () => {
     }
     const masteredSkills = new Set<SkillId>([skillOfLast]);
     const mastery = masteryMapFor([...masteredSkills]);
+    const result = resolveUnlocks({ gradeBand: 'g4_5', mastery, unlockedCannons: [], unlockedIslands: [] });
+    expect(result.islands).toEqual(expectedNewIslands(masteredSkills, [], 'g4_5'));
+  });
+
+  it('spec(A-070:AC-5) with NO band, the island delta and its entry cannons are empty — fail closed, not "no ceiling"', () => {
+    // D-14: there is no shared curriculum for a band-less save to fall back onto. Master every
+    // skill in the catalog and the island half still answers nothing; only the mastery-earned
+    // range cannons (which hang off the captain's own skills, not island content) come back.
+    const everySkillId = new Set<SkillId>(cannons.map((c) => c.skill));
+    const mastery = masteryMapFor([...everySkillId]);
+
     const result = resolveUnlocks({ mastery, unlockedCannons: [], unlockedIslands: [] });
-    expect(result.islands).toEqual(expectedNewIslands(masteredSkills, []));
+    expect(result.islands).toEqual([]);
+    expect(sortIds(result.cannons)).toEqual(
+      sortIds(cannons.filter((c) => c.unlock.kind === 'range').map((c) => c.id)),
+    );
   });
 
   it('spec(T-010:AC-14) resolving twice, merging the first result into the inputs, yields empty on the second call (idempotence)', () => {
     // Strongest form: master every skill at once so every cannon- and island-unlock branch
-    // fires on the first call, then prove none of it duplicates on the second.
+    // fires on the first call, then prove none of it duplicates on the second. Band supplied,
+    // because since D-14 the island branch only fires for a real band.
     const everySkillId = new Set<SkillId>([
       ...cannons.map((c) => c.skill),
-      ...islands.flatMap((i) => i.rangeSkills),
+      ...islands.flatMap((i) => islandCurriculumFor(i.id, 'g4_5').skills),
     ]);
     const mastery = masteryMapFor([...everySkillId]);
 
-    const first = resolveUnlocks({ mastery, unlockedCannons: [], unlockedIslands: [] });
+    const first = resolveUnlocks({ gradeBand: 'g4_5', mastery, unlockedCannons: [], unlockedIslands: [] });
     expect(first.cannons.length + first.islands.length).toBeGreaterThan(0); // sanity
 
     const second = resolveUnlocks({
+      gradeBand: 'g4_5',
       mastery,
       unlockedCannons: [...first.cannons],
       unlockedIslands: [...first.islands],

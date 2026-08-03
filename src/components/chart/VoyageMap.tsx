@@ -343,7 +343,7 @@ export function VoyageMap({
               key={node.island.id}
               beat={ceremony.beat}
               glyph={node.glyph}
-              name={node.island.displayName}
+              name={node.displayName}
               look={look}
               typeScale={typeScale}
               position={{

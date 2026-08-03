@@ -4,6 +4,12 @@
  * The chart persists `captain.currentIsland`, but the live duel must honor per-island hull tuning
  * and refuse fogged or missing placement. Pure resolution lives in `src/services/duelContext.ts`;
  * `app/duel.tsx` consumes it and never hardcodes Port Sumwich as a silent fallback.
+ *
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): `islandName` is the island's cell name FOR THE CAPTAIN'S BAND
+ * (`islandCurriculumFor`), so the name assertions read the fixture captain's own band; and
+ * `bandForIsland` — which used to pick a band tall enough for the island's shared skills — is a
+ * plain deterministic spread, because every island now teaches every band.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,7 +17,7 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { cannons, getCannon, getIsland, islands } from '@content/index';
+import { getCannon, getIsland, islandCurriculumFor, islands } from '@content/index';
 import type { GradeBand, IslandId } from '@content/schemas';
 import { ENEMY_HULL_BY_ISLAND } from '@engine/tuning';
 
@@ -52,13 +58,12 @@ type DuelStoreApi = {
 const RELIABLE_STARTER = getCannon('swivel_gun');
 
 function bandForIsland(islandId: IslandId): GradeBand {
-  const island = getIsland(islandId);
-  const needed = cannons
-    .filter((cannon) => island.rangeSkills.includes(cannon.skill))
-    .reduce((max, cannon) => Math.max(max, cannon.minGrade), 0);
-  if (needed >= 4) return 'g4_5';
-  if (needed >= 2) return 'g2_3';
-  return 'k_1';
+  // D-14 (re-baselined by A-070): every island teaches EVERY band its own cell, so any real band
+  // is duel-legal anywhere — the old "pick a band tall enough for the island's shared skills"
+  // derivation has nothing left to measure. A deterministic per-island spread survives so the
+  // suite still exercises more than one band's reading of the atlas.
+  const bands: readonly GradeBand[] = ['k_1', 'g2_3', 'g4_5'];
+  return bands[getIsland(islandId).order % bands.length]!;
 }
 
 function captain(over: Partial<Captain> = {}): Captain {
@@ -226,11 +231,13 @@ describe('A-029 island-aware duel context', () => {
 
   it('spec(A-029:AC-4) valid context exposes the current island display name', async () => {
     const { resolveDuelContext } = await loadDuelContext();
-    const ctx = resolveDuelContext(captain({ currentIsland: 'fraction_reef' }));
+    const sailing = captain({ currentIsland: 'fraction_reef' });
+    const ctx = resolveDuelContext(sailing);
     expect(ctx.ok).toBe(true);
     if (!ctx.ok) return;
-    expect(ctx.islandName).toBe(getIsland('fraction_reef').displayName);
-    expect(ctx.islandName).not.toBe(getIsland('port_sumwich').displayName);
+    // The BAND-TRUE name (D-14): the duel header calls the sea what this captain's chart does.
+    expect(ctx.islandName).toBe(islandCurriculumFor('fraction_reef', sailing.gradeBand).displayName);
+    expect(ctx.islandName).not.toBe(islandCurriculumFor('port_sumwich', sailing.gradeBand).displayName);
   });
 
   it('spec(A-029:AC-4) duel.tsx HUD and intro copy name the current island', () => {
@@ -257,7 +264,8 @@ describe('A-029 island-aware duel context', () => {
     const again = duelReducer(mid, { type: 'RESET' });
 
     expect(again.islandId).toBe('quotient_cove');
-    expect(again.islandName).toBe(getIsland('quotient_cove').displayName);
+    // RESET keeps the context's own band-true name (D-14) — the thing the property protects.
+    expect(again.islandName).toBe(ctx.islandName);
     expect(again.rivalHull).toBe(ENEMY_HULL_BY_ISLAND.quotient_cove);
     expect(again.rivalMax).toBe(ENEMY_HULL_BY_ISLAND.quotient_cove);
     expect(again.duelId).not.toBe(started.duelId);

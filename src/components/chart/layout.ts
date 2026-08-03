@@ -141,7 +141,7 @@ export function stationPresentation(
   state: StationState,
   requirement: string | null,
 ): StationPresentation {
-  const label = node.island.displayName;
+  const label = node.displayName;
 
   switch (state) {
     case 'current':

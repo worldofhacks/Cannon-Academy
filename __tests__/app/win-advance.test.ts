@@ -1,19 +1,21 @@
 /**
  * A-062 — a win advances the voyage; no island is replayed to open the next.
  *
- * Owner ruling D-11 (2026-08-02, `tickets/app/OWNER-RULINGS.md`): winning a duel on an island
- * immediately opens the next band-eligible island in the chain. One win, one new island, and the
- * voyage moves. This is a narrow supersession — it replaces mastery as the gate for ISLAND FOG
- * only. Everything else stands and is asserted here alongside the new behaviour:
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): five islands for every band, each band its own curriculum. The old fixpoints this
+ * suite pinned — "K-1 reach is exactly two", "g2_3 stops at Quotient Cove" — described the
+ * one-shared-curriculum world, where the band was a fence across the chain. Under the atlas the
+ * fence moves into the curriculum itself (`islandCurriculumFor`), so their successors are:
  *
- *   - **The band gate is not negotiable.** A win never opens an island that teaches nothing
- *     inside the captain's band (AC-2). K-1's reachable set stays exactly
- *     `[port_sumwich, isla_products]` however many wins — the A-060 fixpoint, now held for the
- *     right reason.
- *   - **The entry cannon still lands with its island** (AC-3), exactly once, replay-safe under
- *     the `duel:<id>` receipt — or we recreate the circular-acquisition bug.
- *   - **Only wins advance** (AC-4): a lost duel and a sub-mastery drill lift no fog, and
- *     mastery-driven cannon unlocks through `resolveUnlocks` are untouched.
+ *   - **Every band's reach is exactly five** (A-070 AC-1): four settled frontier wins walk the
+ *     whole chain, at every band, through the REAL spine.
+ *   - **The entry cannon still lands with its island** — now the BAND'S OWN cell gun, one per
+ *     arrival, its skill taught to that band by that island, receipt-idempotent (A-070 AC-3,
+ *     the A-062 AC-3 property swept across the atlas).
+ *   - **Only wins advance** (AC-4, unchanged): a lost duel and a sub-mastery drill lift no fog.
+ *   - **No band fails OPEN** (A-070 AC-5): a captain the app never placed gets no island and no
+ *     gun from a win — fail closed replaces the old "no ceiling" reading, because there is no
+ *     shared curriculum left to fall back to.
  *
  * Every settlement here is driven through the REAL spine — `commitGradeBand` places the captain
  * exactly as `app/onboarding.tsx` does, and `settleDuelRewards` is the one seam every finished
@@ -25,8 +27,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { getCannon, getIsland, getSkill } from '@content/index';
-import type { GradeBand, IslandId } from '@content/schemas';
+import { getCannon, islandCurriculumFor } from '@content/index';
+import type { CannonId, GradeBand, IslandId } from '@content/schemas';
 import { advanceOnWin } from '@engine/mastery';
 import { maxGradeForBand } from '@engine/placement';
 import { MASTERY_THRESHOLD_CORRECT } from '@engine/tuning';
@@ -37,6 +39,15 @@ import { settleDuelRewards } from '../../src/services/rewardSettlement';
 import { createCaptainStore, type CaptainStore } from '../../src/stores/player';
 
 const BANDS: readonly GradeBand[] = ['k_1', 'g2_3', 'g4_5'];
+
+/** The chain in `requiresIsland` order — the walk D-14 promises every band in full. */
+const CHAIN: readonly IslandId[] = [
+  'port_sumwich',
+  'isla_products',
+  'quotient_cove',
+  'fraction_reef',
+  'grandline',
+];
 
 /** A captain placed the way `app/onboarding.tsx` places one — through `commitGradeBand`. */
 function onboarded(band: GradeBand): CaptainStore {
@@ -73,8 +84,32 @@ function winOne(store: CaptainStore, at: IslandId, duelId = mintDuelId()) {
   });
 }
 
-describe('A-062 a win advances the voyage', () => {
-  // ── AC-1 — one win, one new island, at every band ────────────────────────────────────────────
+/**
+ * The `everReachableIslands` fixpoint over `advanceOnWin` — the D-14 restatement of the old
+ * A-060 reach computation: start from placement, keep winning anywhere open, collect until
+ * nothing new opens.
+ */
+function everReachableIslands(band: GradeBand): readonly IslandId[] {
+  const store = onboarded(band);
+  let reach = new Set<IslandId>(store.getState().captain.unlockedIslands);
+  for (;;) {
+    const before = reach.size;
+    for (const at of [...reach]) {
+      const captain = store.getState().captain;
+      const delta = advanceOnWin(at, band, captain.unlockedIslands, captain.ownedCannons);
+      for (const islandId of delta.islands) {
+        winOne(store, at);
+        reach = new Set(store.getState().captain.unlockedIslands);
+        void islandId;
+      }
+    }
+    reach = new Set(store.getState().captain.unlockedIslands);
+    if (reach.size === before) return [...reach].sort();
+  }
+}
+
+describe('A-062 a win advances the voyage (re-baselined to D-14 by A-070)', () => {
+  // ── AC-1 — one win, one new island, at every band, all the way to island five ────────────────
 
   it('spec(A-062:AC-1) a K-1 captain who wins ONCE on Port Sumwich holds Isla Products — and not via mastery', () => {
     const store = onboarded('k_1');
@@ -95,69 +130,47 @@ describe('A-062 a win advances the voyage', () => {
     expect(anyMastered).toBe(false);
   });
 
-  it('spec(A-062:AC-1) winning the frontier island opens the next band-eligible island immediately, at every band', () => {
-    const walk: Record<GradeBand, readonly { at: IslandId; opens: IslandId }[]> = {
-      k_1: [{ at: 'port_sumwich', opens: 'isla_products' }],
-      g2_3: [{ at: 'isla_products', opens: 'quotient_cove' }],
-      g4_5: [
-        { at: 'quotient_cove', opens: 'fraction_reef' },
-        { at: 'fraction_reef', opens: 'grandline' },
-      ],
-    };
-
+  it('spec(A-070:AC-1) every band reaches all five islands in exactly four frontier wins, through the real spine', () => {
     for (const band of BANDS) {
       const store = onboarded(band);
-      for (const step of walk[band]) {
-        expect(store.getState().captain.unlockedIslands, `${band} starts without ${step.opens}`).not.toContain(
-          step.opens,
+      // D-14: placement opens island one ONLY, for every band — the voyage is won, never granted.
+      expect(store.getState().captain.unlockedIslands, `${band} placement`).toEqual(['port_sumwich']);
+
+      for (let step = 0; step < CHAIN.length - 1; step += 1) {
+        const at = CHAIN[step]!;
+        const opens = CHAIN[step + 1]!;
+        expect(store.getState().captain.unlockedIslands, `${band} before win ${step + 1}`).not.toContain(
+          opens,
         );
-        const outcome = winOne(store, step.at);
+        const outcome = winOne(store, at);
         expect(outcome.applied).toBe(true);
-        expect(outcome.unlockedIslands, `${band}: one win at ${step.at} must open ${step.opens}`).toContain(
-          step.opens,
+        expect(outcome.unlockedIslands, `${band}: win ${step + 1} at ${at} must open ${opens}`).toContain(
+          opens,
         );
-        expect(store.getState().captain.unlockedIslands).toContain(step.opens);
       }
+
+      const captain = store.getState().captain;
+      expect([...captain.unlockedIslands].sort(), `${band} after four wins`).toEqual([...CHAIN].sort());
+
+      // Win five: the chain is finished — a win at the last island opens nothing and breaks nothing.
+      const fifth = winOne(store, 'grandline');
+      expect(fifth.unlockedIslands, `${band} chain end`).toEqual([]);
+      expect(store.getState().captain.unlockedIslands).toHaveLength(CHAIN.length);
     }
   });
 
-  // ── AC-2 — the band gate survives instant advancement ────────────────────────────────────────
-
-  it('spec(A-062:AC-2) K-1 reach is exactly two islands no matter how many wins — the A-060 fixpoint holds', () => {
-    const store = onboarded('k_1');
-    winOne(store, 'port_sumwich');
-
-    // Grind both open islands well past any pacing argument. Quotient Cove must stay shut the
-    // whole time: it teaches only `div_facts`, and nothing it teaches is inside the K-1 ceiling.
-    for (let round = 0; round < 4; round += 1) {
-      winOne(store, 'port_sumwich');
-      winOne(store, 'isla_products');
+  it('spec(A-070:AC-1) the everReachableIslands fixpoint is ALL FIVE at every band — the D-14 restatement of the A-060 fixpoint', () => {
+    for (const band of BANDS) {
+      expect(everReachableIslands(band), band).toEqual([...CHAIN].sort());
     }
-
-    const captain = store.getState().captain;
-    expect([...captain.unlockedIslands].sort()).toEqual(['isla_products', 'port_sumwich']);
-
-    // The refusal is the band filter, stated as the reason: the successor teaches nothing in band.
-    const ceiling = maxGradeForBand('k_1');
-    expect(
-      getIsland('quotient_cove').rangeSkills.some((skill) => getSkill(skill).minGrade <= ceiling),
-    ).toBe(false);
-    const advance = advanceOnWin('isla_products', 'k_1', captain.unlockedIslands, captain.ownedCannons);
-    expect(advance.islands).toEqual([]);
-    expect(advance.cannons).toEqual([]);
   });
 
-  it('spec(A-062:AC-2) g2_3 stops at Quotient Cove, and a win behind the frontier re-opens nothing', () => {
+  // ── AC-2 — delta semantics survive the atlas ─────────────────────────────────────────────────
+
+  it('spec(A-062:AC-2) a win behind the frontier re-opens nothing and duplicates nothing', () => {
     const store = onboarded('g2_3');
+    winOne(store, 'port_sumwich');
     winOne(store, 'isla_products');
-    for (let i = 0; i < 3; i += 1) winOne(store, 'quotient_cove');
-
-    // Fraction Reef teaches grade-4 fractions only — out of band for g2_3, shut forever.
-    expect([...store.getState().captain.unlockedIslands].sort()).toEqual([
-      'isla_products',
-      'port_sumwich',
-      'quotient_cove',
-    ]);
 
     // Delta semantics: winning where the successor is already open advances nothing and
     // duplicates nothing.
@@ -165,24 +178,33 @@ describe('A-062 a win advances the voyage', () => {
     const outcome = winOne(store, 'port_sumwich');
     expect(outcome.unlockedIslands).toEqual([]);
     expect(store.getState().captain.unlockedIslands).toEqual(before);
+
+    const captain = store.getState().captain;
+    const advance = advanceOnWin('port_sumwich', 'g2_3', captain.unlockedIslands, captain.ownedCannons);
+    expect(advance.islands).toEqual([]);
+    expect(advance.cannons).toEqual([]);
   });
 
-  // ── AC-3 — the entry cannon lands with its island, exactly once ──────────────────────────────
+  // ── AC-3 — the entry cannon lands with its island, exactly once, from the band's own cell ────
 
-  it('spec(A-062:AC-3) Grapeshot arrives with Isla Products, once, and a replayed duelId grants nothing twice', () => {
+  it('spec(A-062:AC-3) the Dinghy Gun arrives with a K-1 Isla Products, once, and a replayed duelId grants nothing twice', () => {
     const store = onboarded('k_1');
-    expect(store.getState().captain.ownedCannons).not.toContain('grapeshot');
+    expect(store.getState().captain.ownedCannons).not.toContain('dinghy_gun');
 
     const duelId = 'duel-a62ac3';
     const first = winOne(store, 'port_sumwich', duelId);
     expect(first.applied).toBe(true);
     expect(first.unlockedIslands).toContain('isla_products');
-    expect(first.unlockedCannons).toContain('grapeshot');
+    // D-14: the arrival gun is the BAND'S cell gun — subtraction within 10, the island's own
+    // K-1 teaching — never the old shared list's grapeshot.
+    expect(first.unlockedCannons).toContain('dinghy_gun');
+    expect(first.unlockedCannons).not.toContain('grapeshot');
 
     const captain = store.getState().captain;
-    expect(captain.ownedCannons.filter((id) => id === 'grapeshot')).toHaveLength(1);
+    expect(captain.ownedCannons.filter((id) => id === 'dinghy_gun')).toHaveLength(1);
     // The arrival gun asks the island's own questions inside the band — that is what it is FOR.
-    expect(getCannon('grapeshot').minGrade).toBeLessThanOrEqual(maxGradeForBand('k_1'));
+    expect(getCannon('dinghy_gun').minGrade).toBeLessThanOrEqual(maxGradeForBand('k_1'));
+    expect(islandCurriculumFor('isla_products', 'k_1').skills).toContain(getCannon('dinghy_gun').skill);
 
     // Settlement replay of the same duelId is a durable no-op: no island, no gun, no win.
     const replay = winOne(store, 'port_sumwich', duelId);
@@ -190,25 +212,51 @@ describe('A-062 a win advances the voyage', () => {
     expect(replay.unlockedIslands).toEqual([]);
     expect(replay.unlockedCannons).toEqual([]);
     const after = store.getState().captain;
-    expect(after.ownedCannons.filter((id) => id === 'grapeshot')).toHaveLength(1);
+    expect(after.ownedCannons.filter((id) => id === 'dinghy_gun')).toHaveLength(1);
     expect(after.unlockedIslands.filter((id) => id === 'isla_products')).toHaveLength(1);
     expect(after.wins).toBe(captain.wins);
   });
 
-  it('spec(A-062:AC-3) every opened island arrives holding one in-band entry cannon, at the older bands too', () => {
-    const top = onboarded('g4_5');
-    const first = winOne(top, 'quotient_cove');
-    expect(first.unlockedIslands).toContain('fraction_reef');
-    expect(first.unlockedCannons).toContain('powder_keg');
-    const second = winOne(top, 'fraction_reef');
-    expect(second.unlockedIslands).toContain('grandline');
-    expect(second.unlockedCannons).toContain('long_nine');
+  it('spec(A-070:AC-3) every band\'s four arrivals each land exactly one in-band gun whose skill that island teaches THAT band', () => {
+    for (const band of BANDS) {
+      const store = onboarded(band);
+      const ceiling = maxGradeForBand(band);
 
-    const mid = onboarded('g2_3');
-    const opened = winOne(mid, 'isla_products');
-    expect(opened.unlockedIslands).toContain('quotient_cove');
-    expect(opened.unlockedCannons).toContain('mortar');
-    expect(getCannon('mortar').minGrade).toBeLessThanOrEqual(maxGradeForBand('g2_3'));
+      for (let step = 0; step < CHAIN.length - 1; step += 1) {
+        const at = CHAIN[step]!;
+        const opens = CHAIN[step + 1]!;
+        const before = store.getState().captain;
+        const ownedBefore = new Set<CannonId>(before.ownedCannons);
+
+        // The ARRIVAL delta, from the engine helper the settlement calls: exactly one gun rides
+        // with the island. (The settlement may ALSO roll a chest gun on the same win — a separate
+        // reward with its own receipt — so the exactly-one property is asserted at the seam that
+        // owns it.)
+        const delta = advanceOnWin(at, band, before.unlockedIslands, before.ownedCannons);
+        expect(delta.islands, `${band} arrival ${opens}`).toEqual([opens]);
+        expect(delta.cannons, `${band} arrival ${opens} grants one gun`).toHaveLength(1);
+        const gun = getCannon(delta.cannons[0]!);
+        expect(ownedBefore.has(gun.id), `${band} ${opens}: ${gun.id} must be NEW`).toBe(false);
+
+        // …it is a gun the island pays THIS band…
+        const cell = islandCurriculumFor(opens, band);
+        expect(cell.unlocksCannons, `${band} ${opens}: cell pays ${gun.id}`).toContain(gun.id);
+
+        // …its skill is one the island teaches THIS band, inside the band's ceiling.
+        expect(cell.skills, `${band} ${opens}: ${gun.id} asks the island's own questions`).toContain(
+          gun.skill,
+        );
+        expect(gun.minGrade, `${band} ${opens}: ${gun.id} is in band`).toBeLessThanOrEqual(ceiling);
+
+        // And the REAL spine pays that gun with the arrival. (A settled win can grant more than
+        // the entry gun — the chest roll and the mastery lane both pay through the same commit —
+        // but the ARRIVAL's own delta is exactly the one cell gun, pinned above at the seam that
+        // owns it.)
+        const outcome = winOne(store, at);
+        expect(outcome.unlockedIslands, `${band} spine arrival ${opens}`).toEqual([opens]);
+        expect(outcome.unlockedCannons, `${band} spine pays ${gun.id}`).toContain(gun.id);
+      }
+    }
   });
 
   // ── AC-4 — only wins advance ─────────────────────────────────────────────────────────────────
@@ -239,7 +287,7 @@ describe('A-062 a win advances the voyage', () => {
     const store = onboarded('k_1');
     store.getState().recordRangeAnswers('add_within_10', { correct: 5, asked: 6 });
     expect(store.getState().captain.unlockedIslands).toEqual(['port_sumwich']);
-    expect(store.getState().captain.ownedCannons).not.toContain('grapeshot');
+    expect(store.getState().captain.ownedCannons).not.toContain('dinghy_gun');
 
     // D-11 is a narrow supersession: `resolveUnlocks` keeps paying range cannons on mastery —
     // the practice lane still accelerates the arsenal, it just no longer holds the map hostage.
@@ -252,53 +300,65 @@ describe('A-062 a win advances the voyage', () => {
     expect(captain.ownedCannons).toContain('saker');
   });
 
-  // ── AC-5 — the dock meter tells the truth ────────────────────────────────────────────────────
+  // ── AC-5 — null band fails closed at the engine and through the spine (A-070) ────────────────
 
-  it('spec(A-062:AC-5) the chart promises exactly ONE duel while a next island exists, at every band', () => {
+  it('spec(A-070:AC-5) a band-less captain gets no island and no gun from a win — fail closed, not "no ceiling"', () => {
+    // The engine helper, directly: null band is a captain the app never placed, and D-14 leaves
+    // them no shared curriculum to fall back onto.
+    const advance = advanceOnWin('port_sumwich', null, ['port_sumwich'], []);
+    expect(advance.islands).toEqual([]);
+    expect(advance.cannons).toEqual([]);
+
+    // And through the settlement spine: an unplaced store settles a win without moving the map.
+    const store = createCaptainStore();
+    expect(store.getState().captain.gradeBand).toBeNull();
+    const outcome = winOne(store, 'port_sumwich');
+    expect(outcome.applied).toBe(true);
+    expect(outcome.unlockedIslands).toEqual([]);
+    expect(outcome.unlockedCannons).toEqual([]);
+  });
+
+  // ── AC-5 (A-062) — the dock meter tells the truth, now all the way down the chain ────────────
+
+  it('spec(A-062:AC-5) the chart promises exactly ONE duel while a next island exists — at every band, every step', () => {
     for (const band of BANDS) {
       const store = onboarded(band);
-      const captain = store.getState().captain;
-      const progress = chartProgress(captain, chartNodes(captain));
-
-      expect(progress.nextIndex, `${band} has a next island to promise`).toBeGreaterThanOrEqual(0);
-      expect(progress.next, band).not.toBeNull();
-      // The dock chip renders `NEXT: 1 DUEL` exactly when this count is 1 (`Dock.tsx`).
-      expect(progress.duelsToOpen, band).toBe(1);
-      expect(progress.caption, band).toBe('1 DUEL TO OPEN');
-      expect(progress.message, band).not.toBeNull();
+      // Four steps of promise, one per remaining island — D-14: no band's caption ever dead-ends
+      // before island five.
+      for (let step = 0; step < CHAIN.length - 1; step += 1) {
+        const captain = store.getState().captain;
+        const progress = chartProgress(captain, chartNodes(captain));
+        expect(progress.nextIndex, `${band} step ${step} has a next island`).toBeGreaterThanOrEqual(0);
+        expect(progress.next, band).not.toBeNull();
+        // The dock chip renders `NEXT: 1 DUEL` exactly when this count is 1 (`Dock.tsx`).
+        expect(progress.duelsToOpen, band).toBe(1);
+        expect(progress.caption, band).toBe('1 DUEL TO OPEN');
+        expect(progress.message, band).not.toBeNull();
+        winOne(store, CHAIN[step]!);
+      }
     }
   });
 
-  it('spec(A-062:AC-5) no caption dead-ends: once no win can open anything, the promise goes away', () => {
-    // K-1 fully advanced: Quotient Cove is out of band, so a win can NEVER open it — the chart
-    // must stop counting rather than promise a duel that pays nothing.
-    const store = onboarded('k_1');
-    winOne(store, 'port_sumwich');
-    const captain = store.getState().captain;
-    const progress = chartProgress(captain, chartNodes(captain));
-    expect(progress.nextIndex).toBe(-1);
-    expect(progress.next).toBeNull();
-    expect(progress.duelsToOpen).toBe(0);
-    expect(progress.caption).toBeNull();
-    expect(progress.message).toBeNull();
+  it('spec(A-062:AC-5) the promise goes away exactly when the voyage completes — five islands open, nothing to count', () => {
+    for (const band of BANDS) {
+      const store = onboarded(band);
+      for (let step = 0; step < CHAIN.length - 1; step += 1) winOne(store, CHAIN[step]!);
 
-    // The top band at the end of the chain: the voyage-complete state keeps the same hidden copy.
-    const top = onboarded('g4_5');
-    winOne(top, 'quotient_cove');
-    winOne(top, 'fraction_reef');
-    const done = top.getState().captain;
-    expect(done.unlockedIslands).toHaveLength(5);
-    const doneProgress = chartProgress(done, chartNodes(done));
-    expect(doneProgress.nextIndex).toBe(-1);
-    expect(doneProgress.caption).toBeNull();
-    expect(doneProgress.message).toBeNull();
+      const done = store.getState().captain;
+      expect(done.unlockedIslands, band).toHaveLength(5);
+      const progress = chartProgress(done, chartNodes(done));
+      expect(progress.nextIndex, band).toBe(-1);
+      expect(progress.next, band).toBeNull();
+      expect(progress.duelsToOpen, band).toBe(0);
+      expect(progress.caption, band).toBeNull();
+      expect(progress.message, band).toBeNull();
+    }
   });
 
   // ── AC-7 — the tutorial is choreographed, not earned ─────────────────────────────────────────
   //
-  // D-11 applies to REAL wins. A K-1 captain's whole reach is two islands; if the scripted
-  // tutorial victory consumed the advance, the win→sail→next-battle beat could never fire for
-  // that band — their one arrival would be spent before their first free duel.
+  // D-11 applies to REAL wins. The tutorial's scripted victory must not consume the first
+  // arrival — the win→sail→next-battle beat belongs to the first free duel, at every band.
 
   it('spec(A-062:AC-7) a held settlement pays everything except the voyage — the tutorial opens no fog', () => {
     const store = onboarded('k_1');

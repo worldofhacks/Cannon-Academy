@@ -13,7 +13,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { ClipPath, Defs, G, Polygon, Rect } from 'react-native-svg';
 
-import { cannons, getIsland, getSkill, islands } from '@content/index';
+import { cannons, getSkill, islandCurriculumFor, islands } from '@content/index';
 import type { CannonId, IslandId, SkillId } from '@content/schemas';
 import { type DrillSession } from '@engine/drill';
 import { emptyMastery, isMastered, meterPercent } from '@engine/mastery';
@@ -378,7 +378,9 @@ function SkillPicker({
       {groups.map((group) => (
         <View key={group.islandId} style={s.pickGroup}>
           <Text style={s.pickGroupTitle}>
-            {getIsland(group.islandId).displayName}
+            {/* The island's name FOR THIS CAPTAIN'S BAND (D-14 / A-070): the rack header must call
+                the island what the captain's own chart calls it. */}
+            {islandCurriculumFor(group.islandId, gradeBand).displayName}
             {group.isCurrentIsland ? ' · you are here' : ''}
           </Text>
           {group.entries.map((entry) => {
@@ -414,7 +416,7 @@ function SkillPicker({
                 }
                 accessibilityRole="button"
                 accessibilityLabel={`${difficulty.accessibilityDescription} at ${
-                  getIsland(entry.islandId).displayName
+                  islandCurriculumFor(entry.islandId, gradeBand).displayName
                 }, ${smashed} of ${PICK.rack.count} bottles smashed`}
                 style={({ pressed }) => [s.rackRow, done && s.rackRowDone, pressed && s.pressed]}
               >
@@ -1663,6 +1665,8 @@ function RoundEndPanel({
   const meter = outcome?.meterPercent ?? meterPercent(round.session.mastery);
   const unlockedCannons = outcome?.unlockedCannons ?? [];
   const unlockedIslands = outcome?.unlockedIslands ?? [];
+  // For the fog-lift card's island name — band-true (D-14 / A-070), same read as the chart's.
+  const gradeBand = useCaptain((c) => c.captain.gradeBand);
 
   const stats: readonly { readonly n: string; readonly label: string; readonly ink: string }[] = [
     { n: `${smashed}`, label: ROUND_END.stats.labels[0], ink: ROUND_END.stats.smashedInk },
@@ -1714,7 +1718,7 @@ function RoundEndPanel({
       {unlockedIslands.map((id) => (
         <View key={id} style={s.fogCard}>
           <Text style={s.rewardKicker}>THE FOG LIFTS</Text>
-          <Text style={s.rewardName}>{getIsland(id).displayName} is on the chart.</Text>
+          <Text style={s.rewardName}>{islandCurriculumFor(id, gradeBand).displayName} is on the chart.</Text>
         </View>
       ))}
 

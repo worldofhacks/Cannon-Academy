@@ -40,6 +40,14 @@
  *     literal and the derivation cannot silently drift apart.
  *
  * Traceability: every test cites `spec(T-011:AC-n)` and, where D-6 applies, `spec(T-032:AC-n)`.
+ *
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070), following the standing stale-rate precedent: the island expectations here had
+ * already been left stale against the 2026-07-30 prefix rule (nine red specs pinning the older
+ * "every eligible island" reading), and D-14 replaces both eras at once. Placement now opens
+ * **the chain's root and nothing else, for every band** — the band chooses what every island
+ * TEACHES (`islandCurriculumFor`), never how much of the map is free, and D-11 wins open the
+ * rest. The island oracle below derives that law; the cannon rules (D-6/D-9/D-10) are untouched.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -50,7 +58,7 @@ import { describe, expect, it } from 'vitest';
 import { resolvePlacement } from '@engine/placement';
 import { CANNON_IDS, GRADE_BANDS, ISLAND_IDS } from '@content/schemas';
 import type { Cannon, CannonId, GradeBand, Island, IslandId } from '@content/schemas';
-import { cannons, getCannon, getIsland, getSkill, islands, skills } from '@content/index';
+import { cannons, getCannon, getIsland, getSkill, islandCurriculumFor, islands, skills } from '@content/index';
 import { BOT_ACCURACY_BAND_BY_GRADE } from '@engine/tuning';
 
 // -----------------------------------------------------------------------------------------------
@@ -85,17 +93,26 @@ function expectedCannonIds(band: GradeBand): CannonId[] {
     .sort();
 }
 
-/** Ticket rule: "at least one rangeSkills entry has skill.minGrade <= maxGrade". */
-function isIslandEligible(island: Island, maxGrade: number): boolean {
-  return island.rangeSkills.some((skillId) => getSkill(skillId).minGrade <= maxGrade);
+/**
+ * D-14 rule: an island is placement-eligible for a band when ITS CELL for that band teaches
+ * something inside the ceiling — the fail-closed stop `resolvePlacement` keeps as a tripwire
+ * (a lawful A-069 catalog never trips it).
+ */
+function isIslandEligible(island: Island, band: GradeBand): boolean {
+  return islandCurriculumFor(island.id, band).skills.some(
+    (skillId) => getSkill(skillId).minGrade <= MAX_GRADE_BY_BAND[band],
+  );
 }
 
-/** Catalog-derived expectation, in island `order` — the shape AC-6's prefix property requires. */
-function expectedIslandIds(maxGrade: number): IslandId[] {
-  return [...islands]
-    .filter((i) => isIslandEligible(i, maxGrade))
-    .sort((a, b) => a.order - b.order)
-    .map((i) => i.id);
+/**
+ * Catalog-derived expectation under D-14: **the chain's root, and the root only**, for every
+ * band — provided the root's cell teaches this band something. Everything after the root is
+ * opened by wins (D-11), so it may never appear in a placement.
+ */
+function expectedIslandIds(band: GradeBand): IslandId[] {
+  const root = islands.find((i) => i.requiresIsland === undefined);
+  if (root === undefined || !isIslandEligible(root, band)) return [];
+  return [root.id];
 }
 
 const sorted = <T extends string>(xs: readonly T[]): T[] => [...xs].sort();
@@ -186,7 +203,7 @@ describe('AC-3 — chest-drop cannons are never pre-unlocked, at every band', ()
 });
 
 // =================================================================================================
-describe('AC-4 — g4_5 unlocks starters plus D-9 exceptions and every island', () => {
+describe('AC-4 — g4_5 unlocks starters plus D-9 exceptions and the chain root (D-14)', () => {
   it('spec(T-011:AC-4) spec(T-032:AC-3) unlockedCannons equals starters plus six_pounder and twelve_pounder', () => {
     const placement = resolvePlacement('g4_5');
     expect(sorted(placement.unlockedCannons)).toEqual(expectedCannonIds('g4_5'));
@@ -203,11 +220,13 @@ describe('AC-4 — g4_5 unlocks starters plus D-9 exceptions and every island', 
     }
   });
 
-  it('spec(T-011:AC-4) spec(T-032:AC-4) unlockedIslands equals every island in the catalog', () => {
+  it('spec(T-011:AC-4) spec(T-032:AC-4) unlockedIslands is the chain root only (D-14)', () => {
+    // re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md, applied by A-070): the old "every
+    // island in the catalog" reading spent a g4_5 captain's whole voyage at onboarding. Every
+    // band now starts at the same port and wins its way forward (D-11).
     const placement = resolvePlacement('g4_5');
-    expect(sorted(placement.unlockedIslands)).toEqual(sorted(ISLAND_IDS));
-    expect(placement.unlockedIslands).toHaveLength(ISLAND_IDS.length);
-    expect(sorted(placement.unlockedIslands)).toEqual(sorted(expectedIslandIds(5)));
+    expect([...placement.unlockedIslands]).toEqual(['port_sumwich']);
+    expect(sorted(placement.unlockedIslands)).toEqual(sorted(expectedIslandIds('g4_5')));
   });
 });
 
@@ -264,7 +283,7 @@ describe('AC-6 — unlocked islands form a contiguous prefix, with port_sumwich 
     'spec(T-011:AC-6) spec(T-032:AC-4) %s unlockedIslands agrees with the catalog-derived expectation',
     (band) => {
       const placement = resolvePlacement(band);
-      expect(sorted(placement.unlockedIslands)).toEqual(sorted(expectedIslandIds(MAX_GRADE_BY_BAND[band])));
+      expect(sorted(placement.unlockedIslands)).toEqual(sorted(expectedIslandIds(band)));
     },
   );
 });
@@ -276,9 +295,9 @@ describe('AC-7 — k_1 unlocks only the first island', () => {
     expect([...placement.unlockedIslands]).toEqual(['port_sumwich']);
   });
 
-  it('spec(T-011:AC-7) spec(T-032:AC-4) agrees with the catalog-derived expectation for maxGrade 1', () => {
+  it('spec(T-011:AC-7) spec(T-032:AC-4) agrees with the catalog-derived expectation for k_1', () => {
     const placement = resolvePlacement('k_1');
-    expect(sorted(placement.unlockedIslands)).toEqual(expectedIslandIds(1));
+    expect(sorted(placement.unlockedIslands)).toEqual(expectedIslandIds('k_1'));
   });
 });
 
@@ -470,10 +489,10 @@ describe('Dimension sweep — every island x every band agrees with the ticket r
   it.each(CASES)(
     'spec(T-011:AC-6) spec(T-011:AC-7) spec(T-032:AC-4) band=%s island=%s membership matches the rule',
     (band, id) => {
+      // D-14: membership is "is the chain's root, and the root's cell teaches this band" —
+      // never a function of how much the band already knows.
       const placement = resolvePlacement(band);
-      const island = getIsland(id);
-      const maxGrade = MAX_GRADE_BY_BAND[band];
-      const shouldBeUnlocked = island.rangeSkills.some((s) => getSkill(s).minGrade <= maxGrade);
+      const shouldBeUnlocked = expectedIslandIds(band).includes(id);
       expect(placement.unlockedIslands.includes(id)).toBe(shouldBeUnlocked);
     },
   );

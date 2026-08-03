@@ -27,6 +27,16 @@
  *
  * D-10's known consequence is asserted at the foot of this file rather than left to a reviewer to
  * discover: the first mastery pays three guns at K-1.
+ *
+ * ## Re-baselined for owner ruling D-14 (2026-08-02, applied by A-070)
+ *
+ * Island content is now the island's CELL for the captain's band (`islandCurriculumFor`) — the
+ * shared `rangeSkills`/`unlocksCannons` no longer exist, and `resolveUnlocks` fails CLOSED
+ * without a band (no cell to read, no island, no entry gun). Three consequences land here:
+ * the catalog reads go through Port Sumwich's k_1 cell; the fog-lift spec passes the band the
+ * engine now requires; and the island gun that rides the first mastery is `dinghy_gun` — the
+ * K-1 cell's own entry cannon for Isla Products (Take-Away Bay) — where the shared world paid
+ * `grapeshot`. The lane's contract is unchanged: the K-1 practice lane pays, via the Saker.
  */
 import { describe, expect, it } from 'vitest';
 
@@ -34,7 +44,7 @@ import { resolvePlacement } from '@engine/placement';
 import { resolveUnlocks, type SkillMastery } from '@engine/mastery';
 import { MASTERY_THRESHOLD_CORRECT, TRAY_CAPACITY } from '@engine/tuning';
 import type { SkillId } from '@content/schemas';
-import { getCannon, getIsland } from '@content/index';
+import { getCannon, islandCurriculumFor } from '@content/index';
 
 const AT_THRESHOLD: SkillMastery = Object.freeze({
   weightedCorrect: MASTERY_THRESHOLD_CORRECT,
@@ -51,15 +61,15 @@ function masteryMapFor(masteredSkills: readonly SkillId[]): Partial<Record<Skill
 }
 
 describe('T-029 / D-7 — K-1 practice lane pays', () => {
-  it('spec(T-029:AC-1) port_sumwich.rangeSkills includes add_within_10', () => {
-    expect(getIsland('port_sumwich').rangeSkills).toContain('add_within_10');
+  it("spec(T-029:AC-1) port_sumwich's k_1 cell includes add_within_10", () => {
+    expect(islandCurriculumFor('port_sumwich', 'k_1').skills).toContain('add_within_10');
   });
 
   it('spec(T-029:AC-2,AC-3) saker is a range unlock on add_within_10 at port_sumwich', () => {
     const saker = getCannon('saker');
     expect(saker.skill).toBe('add_within_10');
     expect(saker.unlock).toEqual({ kind: 'range', island: 'port_sumwich', tier: 1 });
-    expect(getIsland('port_sumwich').unlocksCannons).toContain('saker');
+    expect(islandCurriculumFor('port_sumwich', 'k_1').unlocksCannons).toContain('saker');
   });
 
   it('spec(T-029:AC-4) mastering only add_within_10 unlocks saker, not starters or chests', () => {
@@ -81,7 +91,10 @@ describe('T-029 / D-7 — K-1 practice lane pays', () => {
   });
 
   it('spec(T-029:AC-5) mastering add_within_10 still lifts Isla Products fog (accepted; band-gating governs content)', () => {
+    // D-14: `resolveUnlocks` fails closed without a band — there is no shared curriculum left to
+    // read — so the lane's fog lift is asserted the way the app reaches it: with the k_1 band.
     const { islands: newlyUnlocked } = resolveUnlocks({
+      gradeBand: 'k_1',
       mastery: masteryMapFor(['add_within_10']),
       unlockedCannons: [],
       unlockedIslands: ['port_sumwich'],
@@ -101,11 +114,10 @@ describe('T-029 / D-7 — K-1 practice lane pays', () => {
    *
    * At `k_1` the first mastery pays THREE guns against a three-slot tray, on a captain who owns
    * one: `culverin` and `saker` both hang off `add_within_10` (D-7 put the Saker there), and
-   * mastering it also opens Isla Products, whose entry cannon `grapeshot` comes with the island
-   * (`resolveUnlocks`' "one cannon per island earned"). Grant ORDER is catalog order, so the
-   * Culverin — the gun the ruling is about — reads first on the victory panel.
-   *
-   * `g2_3` and `g4_5` already hold Isla Products from placement, so they receive two.
+   * mastering it also opens Isla Products, whose K-1 entry cannon `dinghy_gun` comes with the
+   * island (D-14: the entry gun is the BAND'S OWN cell gun — Take-Away Bay pays the Dinghy Gun,
+   * where the shared world paid `grapeshot`). Grant ORDER is catalog order, so the Culverin —
+   * the gun the ruling is about — reads first on the victory panel.
    *
    * If this count needs to come down, the change is the Saker's SKILL, not the Culverin's unlock
    * and not `unlock.tier` (which no engine code reads). See D-10 in `tickets/app/OWNER-RULINGS.md`.
@@ -119,7 +131,7 @@ describe('T-029 / D-7 — K-1 practice lane pays', () => {
       unlockedIslands: P.unlockedIslands,
     });
 
-    expect(newlyUnlocked).toEqual(['culverin', 'saker', 'grapeshot']);
+    expect(newlyUnlocked).toEqual(['culverin', 'saker', 'dinghy_gun']);
     expect(newIslands).toEqual(['isla_products']);
     expect(newlyUnlocked[0]).toBe('culverin');
     expect(newlyUnlocked.length).toBeGreaterThan(TRAY_CAPACITY - P.unlockedCannons.length);

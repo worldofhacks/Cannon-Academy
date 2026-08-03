@@ -1,7 +1,14 @@
-/** A-027 — a captain's grade band is a ceiling, never a suggestion. */
+/**
+ * A-027 — a captain's grade band is a ceiling, never a suggestion.
+ *
+ * RE-BASELINED under owner ruling D-14 (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied by
+ * A-070): the shared `island.rangeSkills` no longer exists — an island's drillable skills are
+ * its cell for the captain's band (`islandCurriculumFor`), and the ceiling expectations below
+ * are derived from the cells.
+ */
 import { describe, expect, it } from 'vitest';
 
-import { getSkill, islands } from '@content/index';
+import { getSkill, islandCurriculumFor, islands } from '@content/index';
 import type { GradeBand, IslandId, SkillId } from '@content/schemas';
 import { answerDrill } from '@engine/drill';
 import { createRng } from '@engine/rng';
@@ -45,13 +52,15 @@ describe('A-027 band-safe gunnery range', () => {
   });
 
   it.each(['k_1', 'g2_3', 'g4_5'] as const)(
-    'spec(A-027:AC-2) %s receives only catalog-ordered skills at or below its ceiling from every island',
+    'spec(A-027:AC-2) %s receives only its own cell, in teaching order, at or below its ceiling from every island',
     (band) => {
       const maxGrade = MAX_GRADE_BY_BAND[band];
       for (const island of islands) {
-        const expected = island.rangeSkills.filter((skillId) => getSkill(skillId).minGrade <= maxGrade);
+        const expected = islandCurriculumFor(island.id, band).skills.filter(
+          (skillId) => getSkill(skillId).minGrade <= maxGrade,
+        );
         const actual = rangeSkills(island.id, band);
-        expect(actual, `${band}/${island.id} must preserve filtered catalog order`).toEqual(expected);
+        expect(actual, `${band}/${island.id} must preserve the cell's teaching order`).toEqual(expected);
         for (const skillId of actual) {
           expect(getSkill(skillId).minGrade, `${band}/${island.id}/${skillId}`).toBeLessThanOrEqual(maxGrade);
         }
@@ -75,12 +84,20 @@ describe('A-027 band-safe gunnery range', () => {
   );
 
   it('spec(A-027:AC-5) synchronously refuses an explicitly requested skill above the K-1 ceiling', () => {
+    // D-14: the over-ceiling content lives in ANOTHER band's cell of the same island — a caller
+    // requesting it at k_1 (a spoofed card, a stale offer) must still be refused at the door.
     const maxGrade = MAX_GRADE_BY_BAND.k_1;
     const island = islands.find((candidate) =>
-      candidate.rangeSkills.some((skillId) => getSkill(skillId).minGrade > maxGrade),
+      islandCurriculumFor(candidate.id, 'g4_5').skills.some(
+        (skillId) => getSkill(skillId).minGrade > maxGrade,
+      ),
     );
-    const skillId = island?.rangeSkills.find((candidate) => getSkill(candidate).minGrade > maxGrade);
-    expect(island, 'catalog must contain an island with content above the K-1 ceiling').toBeDefined();
+    const skillId = island
+      ? islandCurriculumFor(island.id, 'g4_5').skills.find(
+          (candidate) => getSkill(candidate).minGrade > maxGrade,
+        )
+      : undefined;
+    expect(island, 'catalog must contain a cell with content above the K-1 ceiling').toBeDefined();
     expect(skillId, 'catalog must contain a skill above the K-1 ceiling').toBeDefined();
 
     expect(() =>

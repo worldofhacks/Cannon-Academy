@@ -4,7 +4,7 @@
  * `openGuidedDuel` passes onboarding hull/floor overrides only here; the screen owns beat timing
  * through `createGuidedScreenController` and never re-derives damage or hull.
  */
-import { getCannon, getIsland } from '@content/index';
+import { getCannon, islandCurriculumFor } from '@content/index';
 import type { Cannon, IslandId } from '@content/schemas';
 import type { DuelConfig, DuelState } from '@engine/duel/types';
 import { createScriptedOpponent, type ScriptedStep } from '@engine/opponents/scripted';
@@ -126,7 +126,10 @@ export function projectGuidedView(adapter: ReturnType<AdapterController['getStat
     beatToken: adapter.beatToken,
     duelId: core.duelId ?? '',
     islandId: core.islandId,
-    islandName: getIsland(core.islandId).displayName,
+    // The tour fights island one at k_1-equivalent content via its own scripted loadout (A-070
+    // constraint), so its banner wears the island's k_1 cell name (D-14 — `islandCurriculumFor`):
+    // the name matches the mathematics the walkthrough actually asks, whatever band was picked.
+    islandName: islandCurriculumFor(core.islandId, 'k_1').displayName,
     turn: core.volleyNumber,
     turnToken: core.turnToken,
     cannon: cannonId === null ? null : getCannon(cannonId),

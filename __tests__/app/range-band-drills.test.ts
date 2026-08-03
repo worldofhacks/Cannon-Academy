@@ -7,21 +7,25 @@
  * by reading the code, and this file applies the same standard to practice — because reading the
  * range's code is genuinely reassuring and reassurance is exactly what A-058 disproved.
  *
+ * RE-BASELINED under owner ruling D-14 (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied by
+ * A-070): an island's drillable skills are now its CELL for the captain's band
+ * (`islandCurriculumFor`) — the shared `rangeSkills` no longer exists, and the no-band catalog
+ * query it anchored is gone with it (no band, no drills, at every door).
+ *
  * The range's leak surfaces are different from the duel's and each is probed on purpose:
  *
- *  1. **An island can teach a skill its own captain may not be asked.** Port Sumwich's
- *     `rangeSkills` are `[add_within_10, add_within_20, sub_within_20, two_step_add_sub]` and the
- *     last is `minGrade: 2`. It is the FIRST island, so every K-1 captain in the game stands on it,
- *     and an unfiltered `rangeSkills` read would put a grade-2 rack on their first screen. This is
- *     also the exact shape of A-051's other bug, where `chartNodes` measured `cleared` against all
- *     four and made the green check unreachable at K-1.
+ *  1. **An island teaches DIFFERENT bands different things.** The same island carries a grade-2+
+ *     cell for g2_3 and a grade-3+ cell for g4_5 beside its K-1 cell; a call site reading the
+ *     wrong band's cell would put another child's rack on this child's first screen. That is the
+ *     atlas-era shape of A-051's bug, and the sweeps below measure the cell each band is REALLY
+ *     offered.
  *  2. **Mastery unlocks more range.** Clearing a rack can grant a cannon and lift an island's fog,
- *     and a newly-unfogged island brings its own `rangeSkills` with it. So the sweep does not test
+ *     and a newly-unfogged island brings its own cell with it. So the sweep does not test
  *     a fresh captain — it GRINDS every in-band rack to mastery, repeatedly, and re-enumerates.
- *  3. **A captain can have no band at all, or a corrupt one.** `engine/mastery.ts:121` reads an
- *     absent band as `POSITIVE_INFINITY`, the opposite of failing closed, and `persistence.ts`
- *     accepts any `typeof 'string'` as a band and passes it through `normalizeCaptain` untouched.
- *     Both are driven here, through `hydrate`, with a real serialised save.
+ *  3. **A captain can have no band at all, or a corrupt one.** `persistence.ts` accepts any
+ *     `typeof 'string'` as a band and passes it through `normalizeCaptain` untouched. Both are
+ *     driven here, through `hydrate`, with a real serialised save — and since D-14 every door
+ *     (menu, drill, unlock) reads an absent band as NOTHING rather than as no ceiling.
  *  4. **"No out-of-band drill" is satisfied by offering nothing.** Every sweep carries non-vacuity
  *     counters: racks offered, distinct skills reached, questions actually generated.
  *  5. **Asserting the rack list is not asserting the question.** The thing in front of the child is
@@ -37,7 +41,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { getIsland, getSkill, islands, skills } from '@content/index';
+import { getSkill, islandCurriculumFor, islands, skills } from '@content/index';
 import type { GradeBand, IslandId, SkillId } from '@content/schemas';
 import { GRADE_BANDS } from '@content/schemas';
 import { answerDrill, type DrillSession } from '@engine/drill';
@@ -167,35 +171,53 @@ describe('A-059 the range offers only in-band drills', () => {
           `${band} was offered ${rack.skillId} (minGrade ${getSkill(rack.skillId).minGrade}) at ` +
             `${rack.islandId}, above its grade ${maxGradeForBand(band)} ceiling`,
         ).toBeLessThanOrEqual(maxGradeForBand(band));
-        // ...and the island really does teach it. A band filter that also widened the menu would
-        // pass the line above and still put a rack on an island that does not run it.
-        expect(getIsland(rack.islandId).rangeSkills).toContain(rack.skillId);
+        // ...and the island really does teach it TO THIS BAND (D-14 — the cell, not a shared
+        // list). A band filter that also widened the menu would pass the line above and still
+        // put a rack on an island that does not run it for this child.
+        expect(islandCurriculumFor(rack.islandId, band).skills).toContain(rack.skillId);
         skillsSeen.add(rack.skillId);
         offered += 1;
       }
     }
 
-    // Non-vacuity: the sweep really reached more than one skill and more than one band's worth.
-    expect(offered).toBeGreaterThan(BANDS.length);
+    // Non-vacuity: the sweep really reached every band and more than one skill. D-14 note: a
+    // fresh captain holds the chain's root only and its cell teaches ONE skill, so the honest
+    // floor is one rack per band — the distinct-skills counter is what proves the three menus
+    // are three different cells rather than one shared list.
+    expect(offered).toBeGreaterThanOrEqual(BANDS.length);
     expect(skillsSeen.size).toBeGreaterThan(1);
   });
 
-  it('spec(A-059:AC-1) a K-1 captain is never offered the grade-2 rack their own first island teaches', () => {
-    // The reported shape, pinned on its own so a failure names the child rather than a sweep.
-    // Port Sumwich is where every captain starts and one of the four skills it teaches is above
-    // the K-1 ceiling — the same asymmetry that made A-051's green check unreachable.
-    const island = getIsland('port_sumwich');
-    expect(island.rangeSkills).toContain('two_step_add_sub');
-    expect(getSkill('two_step_add_sub').minGrade).toBeGreaterThan(maxGradeForBand('k_1'));
+  it("spec(A-059:AC-1) a K-1 captain is offered their OWN first-island cell — never another band's rack for the same island", () => {
+    // The reported shape, pinned on its own so a failure names the child rather than a sweep —
+    // re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md, applied by A-070): the shared
+    // four-skill Port Sumwich list is gone, and the island now teaches each band its own cell.
+    // The hazard keeps its exact shape: the SAME island carries grade-2+ and grade-3+ cells for
+    // the other bands, and a call site reading the wrong band's cell would put another child's
+    // rack on this child's first screen.
+    const otherBandSkills = (['g2_3', 'g4_5'] as const).flatMap(
+      (band) => islandCurriculumFor('port_sumwich', band).skills,
+    );
+    const overCeiling = otherBandSkills.filter(
+      (skillId) => getSkill(skillId).minGrade > maxGradeForBand('k_1'),
+    );
+    expect(
+      overCeiling.length,
+      "fixture: no other band's Port Sumwich cell sits above the K-1 ceiling — the probe is vacuous",
+    ).toBeGreaterThan(0);
 
     const captain = onboarded('k_1').getState().captain;
     expect(captain.unlockedIslands).toContain('port_sumwich');
 
     const racks = racksOffered(captain);
-    expect(racks.map((r) => r.skillId)).not.toContain('two_step_add_sub');
-    // ...and the three that remain really are the island's other three, so the filter removed one
-    // thing rather than everything.
-    expect(racks.map((r) => r.skillId)).toEqual(['add_within_10', 'add_within_20', 'sub_within_20']);
+    for (const skillId of overCeiling) {
+      expect(racks.map((r) => r.skillId)).not.toContain(skillId);
+    }
+    // ...and what remains is exactly the K-1 cell, so the band read removed the other bands'
+    // racks rather than everything.
+    expect(racks.map((r) => r.skillId)).toEqual([
+      ...islandCurriculumFor('port_sumwich', 'k_1').skills,
+    ]);
   });
 
   it('spec(A-059:AC-1) a K-1 captain is never offered multiplication or division, from any island', () => {
@@ -268,9 +290,9 @@ describe('A-059 the range offers only in-band drills', () => {
         ).toBeLessThanOrEqual(maxGradeForBand(band));
       }
       // ...and every island the grind unfogged is one this band can actually train at, so the
-      // sweep is not passing because nothing opened.
+      // sweep is not passing because nothing opened. The island's cell FOR THIS BAND (D-14).
       for (const islandId of after.unlockedIslands) {
-        const inBand = getIsland(islandId).rangeSkills.filter((s) => skillInBand(s, band));
+        const inBand = islandCurriculumFor(islandId, band).skills.filter((s) => skillInBand(s, band));
         expect(
           inBand.length,
           `${band} unlocked ${islandId}, which teaches it nothing it may be asked`,
@@ -321,7 +343,9 @@ describe('A-059 the range offers only in-band drills', () => {
       ...onboarded('g4_5').getState().captain,
       gradeBand: null,
     };
-    expect(bandless.unlockedIslands.length).toBeGreaterThan(1);
+    // D-14: placement opens the chain's root only, so "really holds an island" is the honest
+    // non-vacuity — an empty offer below is the band's doing, not an empty map's.
+    expect(bandless.unlockedIslands.length).toBeGreaterThan(0);
     expect(racksOffered(bandless)).toEqual([]);
 
     for (const skill of skills) {
@@ -351,7 +375,8 @@ describe('A-059 the range offers only in-band drills', () => {
       // the save, which is what makes the assertion below about the RANGE and not about storage.
       expect(result.recovered).toBe(false);
       expect(result.captain.gradeBand).toBe('kindergarten');
-      expect(result.captain.unlockedIslands.length).toBeGreaterThan(1);
+      // D-14: placement opens the root only — holding ANY island keeps the probe non-vacuous.
+      expect(result.captain.unlockedIslands.length).toBeGreaterThan(0);
 
       expect(() => racksOffered(result.captain)).not.toThrow();
       expect(racksOffered(result.captain)).toEqual([]);
@@ -369,7 +394,12 @@ describe('A-059 the range offers only in-band drills', () => {
     for (const band of BANDS) {
       const captain = onboarded(band).getState().captain;
       for (const island of islands) {
-        for (const skillId of island.rangeSkills) {
+        // Every skill ANY band's cell teaches at this island (D-14) — the atlas-era pool an
+        // out-of-band caller could plausibly name at this door.
+        const cellSkills = [
+          ...new Set(BANDS.flatMap((cellBand) => islandCurriculumFor(island.id, cellBand).skills)),
+        ];
+        for (const skillId of cellSkills) {
           if (skillInBand(skillId, band)) continue;
           // Asserting `toThrow(RangeError)` alone is NOT enough, and finding that out is the reason
           // this reads the message. `openDrill` has a second refusal — "is not trained at this
@@ -400,7 +430,12 @@ describe('A-059 the range offers only in-band drills', () => {
             .filter((r) => r.islandId === island.id)
             .map((r) => r.skillId),
         );
-        for (const skillId of island.rangeSkills) {
+        // The union of every band's cell at this island (D-14) — the whole space of skills a
+        // menu or a door could be asked about here.
+        const cellSkills = [
+          ...new Set(BANDS.flatMap((cellBand) => islandCurriculumFor(island.id, cellBand).skills)),
+        ];
+        for (const skillId of cellSkills) {
           const opens = (() => {
             try {
               openDrill({ islandId: island.id, skillId, captain, rng: createRng(5), length: 1 });
@@ -425,16 +460,20 @@ describe('A-059 the range offers only in-band drills', () => {
     }
   });
 
-  it('spec(A-059:AC-5) rangeSkills filters when handed a band and fails closed on a bad one', () => {
+  it('spec(A-059:AC-5) rangeSkills reads the band cell and fails closed on a missing or bad band', () => {
+    // D-14 re-baseline: the old tail asserted the bandless call returned "the island's whole
+    // authored list" — there is no shared list left to return, and the bandless read is now
+    // NOTHING (A-070 AC-5), the same fail-closed posture as every other door.
     for (const island of islands) {
       for (const band of BANDS) {
         const filtered = rangeSkills(island.id, band);
-        expect(filtered).toEqual(island.rangeSkills.filter((s) => skillInBand(s, band)));
+        expect(filtered).toEqual(
+          islandCurriculumFor(island.id, band).skills.filter((s) => skillInBand(s, band)),
+        );
       }
-      // A null band answers with nothing rather than throwing or with everything.
+      // A null or absent band answers with nothing rather than throwing or with everything.
       expect(rangeSkills(island.id, null)).toEqual([]);
-      // ...while the catalog query — no band at all — is still the island's whole authored list.
-      expect([...rangeSkills(island.id)]).toEqual([...island.rangeSkills]);
+      expect(rangeSkills(island.id, undefined)).toEqual([]);
     }
   });
 

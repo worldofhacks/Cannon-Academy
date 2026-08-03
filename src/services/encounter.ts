@@ -10,17 +10,18 @@
  *   * `riddleFor`         — the real generator over the authored riddle pools (never the duel's).
  *   * `completeEncounter` — the latch and the coins, one commit, no wrong outcome.
  *
- * ── The band rule (AC-3) ──────────────────────────────────────────────────────────────────────
+ * ── The band rule (AC-3, restated by D-14 / A-070) ───────────────────────────────────────────
  *
- * The riddle's skill is the island's first band-eligible `rangeSkill`, under the SAME eligibility
- * ceiling the entry cannon uses (`maxGradeForBand` over the skill's `minGrade`, exactly
- * `engine/mastery.ts`'s `teachesInBand` / `services/range.ts`'s `skillInBand`) — and, because a
- * greeting should meet a captain AT their level rather than at the island's lowest rung, "first"
- * scans the island's rungs in catalog order for one the band has not already outgrown
- * (`skill.maxGrade >= the band's own first grade`). Concretely, from the ticket's own examples:
- * a K-1 captain arriving at Isla Products is asked repeated addition; a g4_5 captain at the same
- * island — for whom every rung there is outgrown — gets the hardest in-ceiling rung, which is
- * multiplication. Nobody is EVER asked above their ceiling, in either branch.
+ * The riddle's skill comes from the island's CELL FOR THE CAPTAIN'S BAND (`islandCurriculumFor`
+ * — the one door to island content), under the SAME eligibility ceiling the entry cannon uses
+ * (`maxGradeForBand` over the skill's `minGrade`, exactly `engine/mastery.ts`'s `teachesInBand`
+ * / `services/range.ts`'s `skillInBand`) — and, because a greeting should meet a captain AT
+ * their level rather than at the cell's lowest rung, "first" scans the cell's rungs in teaching
+ * order for one the band has not already outgrown (`skill.maxGrade >= the band's own first
+ * grade`). Under the atlas each cell already teaches the captain's own mathematics — a K-1
+ * captain arriving at their island two (Take-Away Bay) is asked subtraction within 10, a g4_5
+ * captain at the same position (Product Peaks) is asked multi-digit multiplication. Nobody is
+ * EVER asked above their ceiling, in either branch.
  *
  * And the ceiling fails CLOSED, the same posture as `skillInBand` and for the same reason: a
  * `null` band is a captain the app has not placed, a corrupt band is a save an older build wrote,
@@ -36,7 +37,7 @@
  * pays without latching. A replayed completion — StrictMode's double effect, a re-observed
  * summary, a second tap — finds the latch and pays nothing.
  */
-import { getIsland, getSkill } from '@content/index';
+import { getSkill, islandCurriculumFor } from '@content/index';
 import type { GradeBand, IslandId, SkillId } from '@content/schemas';
 import { GRADE_BANDS } from '@content/schemas';
 import { maxGradeForBand } from '@engine/placement';
@@ -70,12 +71,15 @@ const BAND_FLOOR_GRADE: Record<GradeBand, number> = { k_1: 0, g2_3: 2, g4_5: 4 }
  * "ask nothing, latch and move on".
  *
  * Total over everything a save can carry: `null`, `undefined` and unrecognised band strings all
- * answer `null` (fail closed — see module docs). Within the ceiling, the island's `rangeSkills`
- * are scanned in catalog order (the catalog authors them low rung to high; `catalogs.test.ts`
- * AC-14 pins the arrays) for the first the band has not outgrown; when the whole island is below
- * the captain — every in-ceiling rung's `maxGrade` under the band's floor — the hardest
- * in-ceiling rung is asked instead, because "too easy" is merely warm and "nothing" is a host
- * with no riddle.
+ * answer `null` (fail closed — see module docs). The rungs scanned are THE BAND'S OWN CELL
+ * (D-14 — `islandCurriculumFor`): under the atlas the island already teaches this captain their
+ * own mathematics, so the scan mostly collapses onto the cell's first skill — but the ceiling
+ * clamp and the outgrown/at-level ladder both stay, because they are what fails closed when a
+ * future catalog edit breaks the law the validator enforces today. Within the ceiling, the
+ * cell's skills are scanned in teaching order for the first the band has not outgrown; when
+ * every rung is below the captain — every in-ceiling rung's `maxGrade` under the band's floor —
+ * the hardest in-ceiling rung is asked instead, because "too easy" is merely warm and "nothing"
+ * is a host with no riddle.
  */
 export function encounterSkillFor(
   islandId: IslandId,
@@ -89,7 +93,7 @@ export function encounterSkillFor(
 
   // The band filter — the entry cannon's own ceiling, applied at the one place the encounter
   // chooses a skill. Everything after this line sees only skills the band may be asked.
-  const eligible = getIsland(islandId).rangeSkills.filter(
+  const eligible = islandCurriculumFor(islandId, band).skills.filter(
     (skillId) => getSkill(skillId).minGrade <= ceiling,
   );
   if (eligible.length === 0) return null;

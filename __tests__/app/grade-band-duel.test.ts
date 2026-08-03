@@ -1,6 +1,12 @@
 /**
  * A-058 — the maths a duel asks never exceeds the band the child picked at onboarding.
  *
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): placement opens the chain's root only, and every band reaches all five islands by
+ * wins. The AC-1 band-and-island sweep now walks the whole chain through the real settlement
+ * seam before dueling, so its domain is the five-island map every band actually sails — the
+ * ceiling assertions themselves are unchanged.
+ *
  * A-051 closed two places where the ceiling only *showed* — the gun-deck operator row and the
  * chart's green check. It did not touch the duel, and the duel is where the child is actually
  * asked. Nothing in the app checked the band at duel time at all: `duelContext.ts` validates island
@@ -220,12 +226,41 @@ describe('A-058 the duel obeys the band picked at onboarding', () => {
   // ── AC-1 — a captain placed through real onboarding is only ever asked in-band maths ────────
 
   it('spec(A-058:AC-1) every question a real duel asks is inside the band, at every band and island', () => {
+    // re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md, applied by A-070): placement now
+    // opens the chain's ROOT only, for every band — the old sweep over a fresh captain's
+    // `unlockedIslands` covered the 1/2/3 placement prefix, a map that no longer exists. The
+    // sweep's domain is restored the D-14 way: four settled frontier wins walk the whole chain
+    // (A-070 AC-1), and THEN every island the captain really holds is dueled — so the ceiling is
+    // proven on all five islands of every band's own sea, not on placement's opening move.
     let asked = 0;
     const skillsSeen = new Set<SkillId>();
     const islandsPlayed = new Set<IslandId>();
 
     for (const band of BANDS) {
-      const captain = onboarded(band).getState().captain;
+      const store = onboarded(band);
+      for (let step = 0; step < islands.length; step += 1) {
+        const sailing = store.getState().captain;
+        // The frontier: the open island deepest along the catalog order — the one a win advances.
+        const frontier = [...sailing.unlockedIslands].sort(
+          (a, b) =>
+            (islands.find((i) => i.id === a)?.order ?? 0) -
+            (islands.find((i) => i.id === b)?.order ?? 0),
+        )[sailing.unlockedIslands.length - 1];
+        if (frontier === undefined) throw new Error(`grade-band-duel: ${band} holds no island`);
+        store.getState().setCurrentIsland(frontier);
+        settleDuelRewards(store, {
+          duelId: `duel-a58-${band}-${step}`,
+          seed: step,
+          won: true,
+          purseCoins: 0,
+          skillTally: {},
+        });
+      }
+      const captain = store.getState().captain;
+      expect(
+        captain.unlockedIslands.length,
+        `${band} walked the chain and did not reach all ${islands.length} islands (D-14)`,
+      ).toBe(islands.length);
 
       for (const islandId of captain.unlockedIslands) {
         for (const seed of SEEDS) {
@@ -247,10 +282,11 @@ describe('A-058 the duel obeys the band picked at onboarding', () => {
     }
 
     // Non-vacuity. Both starters are `add_within_10`, so a corpus that only ever reached one skill
-    // would be satisfied by a reducer with that skill written into it.
+    // would be satisfied by a reducer with that skill written into it. And the sweep must really
+    // have covered the whole map — all five islands, not the old placement prefix.
     expect(asked).toBeGreaterThan(BANDS.length * SEEDS.length);
     expect(skillsSeen.size).toBeGreaterThan(1);
-    expect(islandsPlayed.size).toBeGreaterThan(1);
+    expect(islandsPlayed.size).toBe(islands.length);
   });
 
   it('spec(A-058:AC-1) a K-1 duel never renders × or ÷, and never reaches a multiplication skill', () => {

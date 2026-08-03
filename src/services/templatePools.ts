@@ -33,10 +33,14 @@ import addWithin10Raw from '../content/templates/add_within_10.json';
 import addWithin20Raw from '../content/templates/add_within_20.json';
 import divFactsRaw from '../content/templates/div_facts.json';
 import fractionsIntRaw from '../content/templates/fractions_int.json';
+import longDivisionRaw from '../content/templates/long_division.json';
 import multFactsRaw from '../content/templates/mult_facts.json';
+import multiDigitMultRaw from '../content/templates/multi_digit_mult.json';
 import multiDigitOrderOpsRaw from '../content/templates/multi_digit_order_ops.json';
 import placeValueCompareRaw from '../content/templates/place_value_compare.json';
+import placeValueTeensRaw from '../content/templates/place_value_teens.json';
 import repeatedAdditionRaw from '../content/templates/repeated_addition.json';
+import subWithin10Raw from '../content/templates/sub_within_10.json';
 import subWithin20Raw from '../content/templates/sub_within_20.json';
 import twoStepAddSubRaw from '../content/templates/two_step_add_sub.json';
 
@@ -67,6 +71,12 @@ export const TEMPLATE_POOLS: Record<SkillId, readonly Template[]> = {
   fractions_int: pool('fractions_int', fractionsIntRaw),
   multi_digit_order_ops: pool('multi_digit_order_ops', multiDigitOrderOpsRaw),
   repeated_addition: pool('repeated_addition', repeatedAdditionRaw),
+  // D-14 / A-069's four new rungs, appended in SKILL_IDS order (A-070 wires the pools; the files
+  // are A-069's). Appending keeps every existing pool's file order — the replay contract — intact.
+  sub_within_10: pool('sub_within_10', subWithin10Raw),
+  place_value_teens: pool('place_value_teens', placeValueTeensRaw),
+  multi_digit_mult: pool('multi_digit_mult', multiDigitMultRaw),
+  long_division: pool('long_division', longDivisionRaw),
 };
 
 /**

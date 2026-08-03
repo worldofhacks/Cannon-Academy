@@ -4,7 +4,7 @@
  * Gameplay values are projected from `core`; this module owns beat timing and screen-facing
  * action names only.
  */
-import { getCannon, cannons, getIsland, islands } from '@content/index';
+import { getCannon, cannons, islandCurriculumFor, islands } from '@content/index';
 import type { Cannon, GradeBand, IslandId, SkillId } from '@content/schemas';
 import { GRADE_BANDS } from '@content/schemas';
 import { drawNextDuelSeed, duelReducer as coreDuelReducer } from '@engine/duel/reducer';
@@ -291,7 +291,7 @@ function projectAppState(adapter: AdapterState): StoreAppState {
   };
 }
 
-function projectLegacy(adapter: AdapterState, previous?: DuelState): DuelState {
+function projectLegacy(adapter: AdapterState, captain: Captain, previous?: DuelState): DuelState {
   const core = adapter.core;
   const app = projectAppState(adapter);
   const outcome = readOutcome(core);
@@ -306,7 +306,10 @@ function projectLegacy(adapter: AdapterState, previous?: DuelState): DuelState {
     phase: adapter.phase,
     duelId: core.duelId ?? '',
     islandId: core.islandId,
-    islandName: getIsland(core.islandId).displayName,
+    // The island's name FOR THIS CAPTAIN'S BAND (D-14 — `islandCurriculumFor`): the HUD calls the
+    // sea what the captain's own chart calls it. The omniscient fallback captain carries the top
+    // band, so the legacy boot path resolves the same `g4_5` cell it always effectively showed.
+    islandName: islandCurriculumFor(core.islandId, captain.gradeBand).displayName,
     turnToken: core.turnToken,
     rng: core.rng,
     cannon: cannonId === null ? null : getCannon(cannonId),
@@ -330,7 +333,7 @@ function projectLegacy(adapter: AdapterState, previous?: DuelState): DuelState {
 }
 
 function attachLegacyState(adapter: AdapterState, captain: Captain, previous?: DuelState): DuelState {
-  const next = projectLegacy(adapter, previous);
+  const next = projectLegacy(adapter, captain, previous);
   legacyBundles.set(next, { adapter, captain });
   return next;
 }

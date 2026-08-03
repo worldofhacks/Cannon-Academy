@@ -1,12 +1,17 @@
 /**
  * A-030 — real rival bridge: seeded bot, mercy, async turn tokens, island loadouts.
+ *
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): a rival's island loadout derives from the island's cell FOR THE CAPTAIN'S BAND
+ * (`islandCurriculumFor`) — the shared `rangeSkills` no longer exists, so the loadout oracle and
+ * the AC-7 sweep read cells. The bridge mechanics (mercy, tokens, determinism) are unchanged.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it, vi } from 'vitest';
 
-import { cannons, getCannon, getIsland, islands } from '@content/index';
+import { cannons, getCannon, islandCurriculumFor, islands } from '@content/index';
 import type { CannonId, GradeBand, IslandId } from '@content/schemas';
 import { GRADE_BANDS } from '@content/schemas';
 import { duelReducer as coreDuelReducer } from '@engine/duel/reducer';
@@ -122,8 +127,8 @@ function duelConfigForCaptain(islandId: IslandId, seed: number, cap: Captain): D
 }
 
 function expectedIslandLoadout(islandId: IslandId, band: GradeBand): readonly CannonId[] {
-  const island = getIsland(islandId);
-  const skills = new Set(island.rangeSkills);
+  // The island's cell FOR THIS BAND (D-14 — `islandCurriculumFor`), never a shared list.
+  const skills = new Set(islandCurriculumFor(islandId, band).skills);
   const maxGrade = maxGradeForBand(band);
   return cannons
     .filter((c) => skills.has(c.skill) && c.minGrade <= maxGrade)
@@ -339,12 +344,10 @@ describe('A-030 opponent bridge', () => {
     for (const band of GRADE_BANDS) {
       const maxGrade = MAX_GRADE_BY_BAND[band];
       for (const island of islands) {
-        const hasEligibleSkill = island.rangeSkills.some(
-          (skillId) => getIsland(island.id).rangeSkills.includes(skillId),
-        );
-        void hasEligibleSkill;
+        // The band's own cell (D-14) — the only skills the rival may ask at this island.
+        const cellSkills = islandCurriculumFor(island.id, band).skills;
         const eligibleCannons = cannons.filter(
-          (c) => island.rangeSkills.includes(c.skill) && c.minGrade <= maxGrade,
+          (c) => cellSkills.includes(c.skill) && c.minGrade <= maxGrade,
         );
         if (eligibleCannons.length === 0) continue;
 
@@ -358,7 +361,7 @@ describe('A-030 opponent bridge', () => {
         expect(loadout, `${band}/${island.id} order`).toEqual(expectedIslandLoadout(island.id, band));
         for (const id of loadout) {
           const cannon = getCannon(id);
-          expect(island.rangeSkills, `${band}/${island.id}/${id}`).toContain(cannon.skill);
+          expect(cellSkills, `${band}/${island.id}/${id}`).toContain(cannon.skill);
           expect(cannon.minGrade, `${band}/${island.id}/${id}`).toBeLessThanOrEqual(maxGrade);
         }
 

@@ -5,6 +5,15 @@
  * deterministic seams: `chartNodes`/`stationState` own progress state, and `stationPresentation`
  * owns the marker/accessibility/tap contract consumed by `StationMarker`. Source checks use the
  * TypeScript AST so comments, dead strings, and renamed import aliases cannot satisfy them.
+ *
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): placement opens the chain's ROOT only, for every band, and an island's content is
+ * its cell for the captain's band (`islandCurriculumFor`). Fixtures that used to get two open
+ * islands from `resolvePlacement('g2_3')` (the 2026-07-30 prefix world) now open the second
+ * island the D-11 way a real captain does — one win past placement — and `cleared` fixtures
+ * master the CELL's skills, not the retired shared `rangeSkills`. The single multi-skill spec
+ * ("every range skill except one") is replaced by its D-14 successor: cells are single-skill,
+ * so the surviving hazard is cross-band, and the tick must read the captain's OWN cell.
  */
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -13,15 +22,17 @@ import { fileURLToPath } from 'node:url';
 import * as ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { islands } from '../../src/content';
-import type { IslandId, SkillId } from '../../src/content/schemas';
+import { islands, islandCurriculumFor } from '../../src/content';
+import { GRADE_BANDS, ISLAND_IDS } from '../../src/content/schemas';
+import type { GradeBand, IslandId, SkillId } from '../../src/content/schemas';
 import { applyAnswer, emptyMastery, isMastered, type SkillMastery } from '../../src/engine/mastery';
 import { resolvePlacement } from '../../src/engine/placement';
-import { STATIONS } from '../../src/components/chart/board';
+import { ISLE_TAG, STATIONS } from '../../src/components/chart/board';
 import * as layout from '../../src/components/chart/layout';
 import { stationState } from '../../src/components/chart/layout';
-import { chartNodes, requirementText, type ChartNode } from '../../src/services/chart';
+import { chartNodes, islandGlyphForCaptain, requirementText, type ChartNode } from '../../src/services/chart';
 import { emptyCaptain, type Captain } from '../../src/stores/player';
+import { SKILL_GLYPH } from '../../src/theme/rankPresentation';
 
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
 const FIVE_STATES = ['current', 'available', 'cleared', 'locked-near', 'far-silhouette'] as const;
@@ -534,15 +545,20 @@ function markerBindingFacts(station: ts.SourceFile): MarkerBindingFacts {
 }
 
 describe('A-024 chart progress presentation', () => {
-  it('spec(A-024:AC-1) grade 2–3 placement islands stay available and uncleared before mastery', () => {
+  it('spec(A-024:AC-1) open islands stay available and uncleared before mastery', () => {
+    // D-14 re-baseline: placement opens the root only, so the second open island is the one a
+    // real g2_3 captain holds after their first win (D-11). The property is unchanged.
     const placement = resolvePlacement('g2_3');
     const currentIsland = placement.unlockedIslands[0];
     if (currentIsland === undefined) throw new Error('fixture: grade 2–3 placement opened no island');
+    const second = islands.find((island) => island.requiresIsland === currentIsland);
+    if (second === undefined) throw new Error('fixture: the chain has no island after the root');
+    const unlockedIslands: readonly IslandId[] = [currentIsland, second.id];
 
     const nodes = chartNodes(
       captain({
         gradeBand: 'g2_3',
-        unlockedIslands: [...placement.unlockedIslands],
+        unlockedIslands: [...unlockedIslands],
         currentIsland,
         mastery: {},
       }),
@@ -551,7 +567,7 @@ describe('A-024 chart progress presentation', () => {
 
     expect(available.length).toBeGreaterThan(0);
     expect(available.map((node) => node.island.id)).toEqual(
-      placement.unlockedIslands.filter((id) => id !== currentIsland),
+      unlockedIslands.filter((id) => id !== currentIsland),
     );
     expect(available.every((node) => node.cleared === false)).toBe(true);
     expect(
@@ -560,20 +576,19 @@ describe('A-024 chart progress presentation', () => {
     ).toEqual(available.map(() => 'available'));
   });
 
-  it('spec(A-024:AC-2) only a noncurrent island with every real range skill mastered is cleared', () => {
+  it('spec(A-024:AC-2) only a noncurrent island with its whole band cell mastered is cleared', () => {
     const placement = resolvePlacement('g2_3');
-    const target = islands.find((island) => placement.unlockedIslands.includes(island.id));
-    const currentIsland = placement.unlockedIslands.find((id) => id !== target?.id);
-    if (target === undefined || currentIsland === undefined) {
-      throw new Error('fixture: grade 2–3 placement needs two catalog islands');
-    }
+    const currentIsland = placement.unlockedIslands[0];
+    if (currentIsland === undefined) throw new Error('fixture: grade 2–3 placement opened no island');
+    const target = islands.find((island) => island.requiresIsland === currentIsland);
+    if (target === undefined) throw new Error('fixture: the chain has no island after the root');
 
     const nodes = chartNodes(
       captain({
         gradeBand: 'g2_3',
-        unlockedIslands: [...placement.unlockedIslands],
+        unlockedIslands: [currentIsland, target.id],
         currentIsland,
-        mastery: masteryFor(target.rangeSkills),
+        mastery: masteryFor(islandCurriculumFor(target.id, 'g2_3').skills),
       }),
     ) as readonly ProgressNode[];
     const openNoncurrent = nodes.filter((node) => !node.fogged && !node.isCurrent);
@@ -587,24 +602,32 @@ describe('A-024 chart progress presentation', () => {
     ).toEqual(openNoncurrent.filter((node) => node.island.id !== target.id).map(() => 'available'));
   });
 
-  it('spec(A-024:AC-2) mastering every range skill except one is still available, never cleared', () => {
+  it("spec(A-024:AC-2) mastering another band's skill for the island never clears it — the tick reads the captain's own cell", () => {
+    // D-14 re-baseline of "mastering every range skill except one is still available, never
+    // cleared": every atlas cell teaches ONE skill per band, so partial mastery of a cell is
+    // unrepresentable — the hazard the old spec guarded moves ACROSS bands. A tick that read any
+    // mastered record for the island, instead of the captain's own cell, would clear a g2_3
+    // captain's island because its g4_5 skill was mastered. Pin that it does not.
     const placement = resolvePlacement('g2_3');
-    const target = islands.find(
-      (island) => placement.unlockedIslands.includes(island.id) && island.rangeSkills.length > 1,
+    const currentIsland = placement.unlockedIslands[0];
+    if (currentIsland === undefined) throw new Error('fixture: grade 2–3 placement opened no island');
+    const target = islands.find((island) => island.requiresIsland === currentIsland);
+    if (target === undefined) throw new Error('fixture: the chain has no island after the root');
+    const ownSkills = islandCurriculumFor(target.id, 'g2_3').skills;
+    const otherBandSkills = islandCurriculumFor(target.id, 'g4_5').skills.filter(
+      (skill) => !ownSkills.includes(skill),
     );
-    const currentIsland = placement.unlockedIslands.find((id) => id !== target?.id);
-    if (target === undefined || currentIsland === undefined) {
-      throw new Error('fixture: placement needs a multi-skill noncurrent island');
-    }
-    const masteredSubset = target.rangeSkills.slice(0, -1);
-    expect(masteredSubset.length).toBe(target.rangeSkills.length - 1);
+    expect(
+      otherBandSkills.length,
+      'fixture: the g4_5 cell teaches nothing the g2_3 cell does not — the probe is vacuous',
+    ).toBeGreaterThan(0);
 
     const nodes = chartNodes(
       captain({
         gradeBand: 'g2_3',
-        unlockedIslands: [...placement.unlockedIslands],
+        unlockedIslands: [currentIsland, target.id],
         currentIsland,
-        mastery: masteryFor(masteredSubset),
+        mastery: masteryFor(otherBandSkills),
       }),
     ) as readonly ProgressNode[];
     const targetNode = nodeById(nodes, target.id) as ProgressNode;
@@ -617,15 +640,13 @@ describe('A-024 chart progress presentation', () => {
     const placement = resolvePlacement('g2_3');
     const id = placement.unlockedIslands[0];
     if (id === undefined) throw new Error('fixture: grade 2–3 placement opened no island');
-    const island = islands.find((candidate) => candidate.id === id);
-    if (island === undefined) throw new Error(`fixture: catalog omitted ${id}`);
 
     const nodes = chartNodes(
       captain({
         gradeBand: 'g2_3',
         unlockedIslands: [...placement.unlockedIslands],
         currentIsland: id,
-        mastery: masteryFor(island.rangeSkills),
+        mastery: masteryFor(islandCurriculumFor(id, 'g2_3').skills),
       }),
     );
 
@@ -692,7 +713,8 @@ describe('A-024 chart progress presentation', () => {
       const requirement = requirementText(row.node);
       if (requirement === null) throw new Error('fixture: fogged island has no requirement');
       const presentation = selectPresentation(row.node, row.state, requirement);
-      expect(presentation.accessibilityLabel).toContain(row.node.island.displayName);
+      // The node's BAND-TRUE name (D-14) — the only name a captain's map shows.
+      expect(presentation.accessibilityLabel).toContain(row.node.displayName);
       expect(presentation.accessibilityLabel).toContain(requirement);
     }
   });
@@ -700,26 +722,26 @@ describe('A-024 chart progress presentation', () => {
   it('spec(A-024:AC-4) five real states are exhaustive and fog wins over stale current/focus data', () => {
     const placement = resolvePlacement('g2_3');
     const first = placement.unlockedIslands[0];
-    const second = placement.unlockedIslands[1];
-    if (first === undefined || second === undefined) {
-      throw new Error('fixture: grade 2–3 placement needs two islands');
-    }
-    const firstIsland = islands.find((island) => island.id === first);
-    if (firstIsland === undefined) throw new Error(`fixture: catalog omitted ${first}`);
+    if (first === undefined) throw new Error('fixture: grade 2–3 placement opened no island');
+    // D-14: placement opens the root only; the second open island is the chain's successor, the
+    // one a real captain holds after one win (D-11).
+    const second = islands.find((island) => island.requiresIsland === first)?.id;
+    if (second === undefined) throw new Error('fixture: the chain has no island after the root');
 
     const current = chartNodes(captain({ unlockedIslands: [first], currentIsland: first }));
-    const available = chartNodes(
-      captain({ unlockedIslands: [...placement.unlockedIslands], currentIsland: first }),
-    );
+    const available = chartNodes(captain({ unlockedIslands: [first, second], currentIsland: first }));
+    // These captains carry no band, so `chartNodes` measures `cleared` against the accessor's
+    // documented null-band cell (`islandCurriculumFor(id, null)`) — master exactly that cell.
     const cleared = chartNodes(
-      captain({ unlockedIslands: [first], mastery: masteryFor(firstIsland.rangeSkills) }),
+      captain({ unlockedIslands: [first], mastery: masteryFor(islandCurriculumFor(first, null).skills) }),
     );
     const staleNear = chartNodes(captain({ unlockedIslands: [first], currentIsland: 'isla_products' }));
     const staleFar = chartNodes(captain({ unlockedIslands: [first], currentIsland: 'fraction_reef' }));
-    const foggedMasteredIsland = islands.find((island) => island.id === 'isla_products');
-    if (foggedMasteredIsland === undefined) throw new Error('fixture: catalog omitted isla_products');
     const foggedMastered = chartNodes(
-      captain({ unlockedIslands: [first], mastery: masteryFor(foggedMasteredIsland.rangeSkills) }),
+      captain({
+        unlockedIslands: [first],
+        mastery: masteryFor(islandCurriculumFor('isla_products', null).skills),
+      }),
     );
 
     const actual = [
@@ -744,19 +766,15 @@ describe('A-024 chart progress presentation', () => {
     if (selectPresentation === undefined) return;
     const placement = resolvePlacement('g2_3');
     const first = placement.unlockedIslands[0];
-    const second = placement.unlockedIslands[1];
-    if (first === undefined || second === undefined) {
-      throw new Error('fixture: grade 2–3 placement needs two islands');
-    }
-    const firstIsland = islands.find((island) => island.id === first);
-    if (firstIsland === undefined) throw new Error(`fixture: catalog omitted ${first}`);
+    if (first === undefined) throw new Error('fixture: grade 2–3 placement opened no island');
+    // D-14: the second open island is the chain's successor — one win past placement (D-11).
+    const second = islands.find((island) => island.requiresIsland === first)?.id;
+    if (second === undefined) throw new Error('fixture: the chain has no island after the root');
 
     const currentNodes = chartNodes(captain({ unlockedIslands: [first], currentIsland: first }));
-    const availableNodes = chartNodes(
-      captain({ unlockedIslands: [...placement.unlockedIslands], currentIsland: first }),
-    );
+    const availableNodes = chartNodes(captain({ unlockedIslands: [first, second], currentIsland: first }));
     const clearedNodes = chartNodes(
-      captain({ unlockedIslands: [first], mastery: masteryFor(firstIsland.rangeSkills) }),
+      captain({ unlockedIslands: [first], mastery: masteryFor(islandCurriculumFor(first, null).skills) }),
     );
     const rows: readonly {
       readonly node: ChartNode;
@@ -781,13 +799,13 @@ describe('A-024 chart progress presentation', () => {
     const normalizedLabels = presentations.map((presentation, index) => {
       const row = rows[index]!;
       return presentation.accessibilityLabel
-        .replace(row.node.island.displayName, '<island>')
+        .replace(row.node.displayName, '<island>')
         .replace(row.requirement ?? '', row.requirement === null ? '' : '<requirement>');
     });
 
     expect(
       presentations.every((presentation, index) =>
-        presentation.accessibilityLabel.includes(rows[index]!.node.island.displayName),
+        presentation.accessibilityLabel.includes(rows[index]!.node.displayName),
       ),
     ).toBe(true);
     expect(new Set(normalizedLabels).size).toBe(FIVE_STATES.length);
@@ -848,5 +866,122 @@ describe('A-024 chart progress presentation', () => {
       pressabilityExact: true,
       clearedHeadExclusive: false,
     });
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// A-071 — the atlas speaks: each band's own five names and glyphs on the chart (D-14)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+/**
+ * A-069's per-band name table (tickets/app/A-069.md), transcribed byte-for-byte. Swapping any one
+ * cell in `islands.json` reddens the sweeps below by island and band — that is the mutation this
+ * table exists to catch.
+ */
+const BAND_NAME: Record<IslandId, Record<GradeBand, string>> = {
+  port_sumwich: { k_1: 'Port Sumwich', g2_3: 'Compare Cove', g4_5: 'Factor Shoals' },
+  isla_products: { k_1: 'Take-Away Bay', g2_3: 'Two-Step Strait', g4_5: 'Product Peaks' },
+  quotient_cove: { k_1: 'Port Twenty', g2_3: 'Array Atoll', g4_5: 'Long-Divide Deep' },
+  fraction_reef: { k_1: 'Minus Lagoon', g2_3: 'Isla Products', g4_5: 'Fraction Reef' },
+  grandline: { k_1: 'Teen-Ten Harbor', g2_3: 'Quotient Cove', g4_5: 'The Grandline' },
+};
+
+/**
+ * The band-true name `chartNodes` carries on the node — the `glyph` pattern (A-070 adds the
+ * field; `Station.tsx` renders it). Read tolerantly so this file compiles on either side of that
+ * migration; the assertion itself is exact.
+ */
+const bandedName = (node: ChartNode): string | undefined =>
+  (node as ChartNode & { readonly displayName?: string }).displayName;
+
+describe('A-071 — every band sees its own five names on the chart (D-14)', () => {
+  it('spec(A-071:AC-2) the catalog names every island per band exactly as the atlas table — all 15 cells', () => {
+    for (const island of ISLAND_IDS) {
+      for (const band of GRADE_BANDS) {
+        expect(islandCurriculumFor(island, band).displayName, `${island}/${band}`).toBe(
+          BAND_NAME[island][band],
+        );
+      }
+    }
+  });
+
+  it('spec(A-071:AC-2) chartNodes hands each band its own five names, in catalog order', () => {
+    for (const band of GRADE_BANDS) {
+      const nodes = chartNodes(captain({ gradeBand: band }));
+      expect(nodes.map(bandedName), band).toEqual(ISLAND_IDS.map((id) => BAND_NAME[id][band]));
+    }
+  });
+
+  it('spec(A-071:AC-2) the water bound clears the longest atlas name at SE width — and it is a share, so Pro Max follows', () => {
+    // 0286b0e's own measurement: the board's names need ~10pt/char at the chip's type size
+    // (12–13 characters ≈ 128pt). The atlas's longest cells run 15–16 characters, so the bound
+    // must clear 16 at that rate. `maxWidth` is a SHARE of the board (0.62), not a pixel clamp,
+    // so the check at the 375 reference is the binding one: wider boards scale the bound up
+    // faster than the barely-moving type scale swells the text.
+    const names = ISLAND_IDS.flatMap((id) => GRADE_BANDS.map((band) => BAND_NAME[id][band]));
+    const longest = names.reduce((a, b) => (b.length > a.length ? b : a));
+    expect(longest).toBe('Long-Divide Deep');
+    expect(ISLE_TAG.maxWidth).toBeCloseTo(375 * 0.62);
+    expect(longest.length * 10).toBeLessThanOrEqual(ISLE_TAG.maxWidth);
+  });
+
+  it('spec(A-071:AC-2) render guard: the marker pill takes the node’s band-true name, sizes to its text, and stays inside the water bound', () => {
+    const station = readFileSync(join(REPO_ROOT, 'src/components/chart/Station.tsx'), 'utf8');
+    // Band-true label from the node itself — the `glyph` pattern — never the shared island field
+    // (which D-14 removed from the schema precisely so a call site could not keep the old world).
+    expect(station).toMatch(/const label = node\.displayName;/);
+    expect(station.includes('node.island.displayName')).toBe(false);
+    // The name chip stays one honest line and declares no width of its own: the pill hugs its
+    // text, and the ISLE_TAG.maxWidth bound at the call site is what keeps it on the water.
+    const nameChip = station.slice(station.indexOf('function NameChip'), station.indexOf('function SubChip'));
+    expect(nameChip).toContain('numberOfLines={1}');
+    expect(/\bwidth\s*:/.test(nameChip)).toBe(false);
+    const voyage = readFileSync(join(REPO_ROOT, 'src/components/chart/VoyageMap.tsx'), 'utf8');
+    expect(
+      voyage.split('maxWidth: art(frame, ISLE_TAG.maxWidth)').length - 1,
+      'both the station marker and the ceremony marker must ride the ISLE_TAG.maxWidth bound',
+    ).toBeGreaterThanOrEqual(2);
+  });
+
+  it('spec(A-071:AC-2) render guard: the dock title is the band’s own name and shrinks rather than clips', () => {
+    const dock = readFileSync(join(REPO_ROOT, 'src/components/chart/Dock.tsx'), 'utf8');
+    // The accessor is the only door — the shared field is gone from the dock entirely.
+    expect(dock).toMatch(/islandCurriculumFor\(island\.id, gradeBand\)\.displayName/);
+    expect(dock.includes('island.displayName')).toBe(false);
+    // The title holds one line and shrinks a step at SE width instead of ellipsizing —
+    // `Long-Divide Deep` and `Teen-Ten Harbor` run three characters past the old longest name.
+    const title = dock.slice(dock.indexOf('nextIslandCount === null ? ('), dock.indexOf(') : ('));
+    expect(title).toContain('numberOfLines={1}');
+    expect(title).toContain('adjustsFontSizeToFit');
+    // The meter keeps its own no-clip law (ten cells or none), and it counts the BAND's cell.
+    expect(dock).toMatch(/flexShrink: 0, flexDirection: 'row', gap: DOCK\.meter\.gap/);
+    expect(dock).toMatch(/islandCurriculumFor\(island\.id, band\)\.skills/);
+  });
+});
+
+describe('A-071 — glyph sanity across the atlas (D-14)', () => {
+  it('spec(A-071:AC-3) every cell’s headline skill carries a glyph, and no k_1 cell’s glyph is × or ÷', () => {
+    // Data-level half: straight off A-069's accessor and the skill-glyph vocabulary, so a bad
+    // authoring edit fails here whatever state the chart service is in.
+    for (const island of ISLAND_IDS) {
+      for (const band of GRADE_BANDS) {
+        const [first] = islandCurriculumFor(island, band).skills;
+        expect(first, `${island}/${band} teaches nothing`).toBeDefined();
+        const glyph = SKILL_GLYPH[first!];
+        expect(glyph, `${island}/${band} headline skill '${first}' has no glyph`).toBeTruthy();
+        if (band === 'k_1') {
+          expect(glyph, `${island} shows a k_1 captain '${glyph}'`).not.toMatch(/[×÷]/);
+        }
+      }
+    }
+  });
+
+  it('spec(A-071:AC-3) islandGlyphForCaptain is the band cell’s first-skill glyph — swept across all 15 cells', () => {
+    for (const island of ISLAND_IDS) {
+      for (const band of GRADE_BANDS) {
+        const [first] = islandCurriculumFor(island, band).skills;
+        expect(islandGlyphForCaptain(island, band), `${island}/${band}`).toBe(SKILL_GLYPH[first!]);
+      }
+    }
   });
 });

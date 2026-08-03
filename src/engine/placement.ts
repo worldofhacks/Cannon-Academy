@@ -1,28 +1,20 @@
 /**
  * Grade-band placement — turns the onboarding grade picker's answer into a starting game state.
  *
- * One pure function, called once at onboarding (T-011 / T-032). It pre-unlocks a PREFIX OF THE
- * ISLAND CHAIN sized to the player's declared band, and starter cannons only (owner ruling D-6);
- * range/chest guns are earned through their declared unlocks. Sets a starting bot accuracy band so
- * a 5th grader begins at multiplication, not `3 + 4` (PLAN.md §Sea chart).
+ * One pure function, called once at onboarding (T-011 / T-032). It pre-unlocks the FIRST ISLAND
+ * OF THE CHAIN, and starter cannons only (owner ruling D-6); range/chest guns are earned through
+ * their declared unlocks. Sets a starting bot accuracy band so a 5th grader begins at
+ * multiplication, not `3 + 4` (PLAN.md §Sea chart).
  *
- * ## What the band does and does not buy (OWNER RULE, 2026-07-30)
+ * ## What the band does and does not buy (D-14, superseding the 2026-07-30 prefix rule)
  *
- * It used to unlock every island whose maths was age-appropriate, which measured:
- *
- *   | band   | islands open at onboarding                                   |
- *   |--------|--------------------------------------------------------------|
- *   | `k_1`  | 1 — Port Sumwich                                             |
- *   | `g2_3` | 3 — Port Sumwich, Isla Products, Quotient Cove               |
- *   | `g4_5` | 5 — **the whole game**                                       |
- *
- * A 4th grader arrived at a map with nothing left to earn, and `requiresIsland` — which
- * `resolveUnlocks` honours at runtime — was never consulted at all. Two systems, one chain, one of
- * them ignoring it.
- *
- * The rule now: **the band sizes a chain prefix** (`PLACEMENT_ISLANDS_BY_BAND`) — 1 / 2 / 3 — and
- * the band governs question DIFFICULTY WITHIN an island rather than how much of the map is free.
- * Every band leaves at least two islands to sail for.
+ * Placement opens **island one only, for every band**. The band decides WHAT island one (and
+ * every island after it) teaches — each island's `curriculum` carries one complete cell per band
+ * (`islandCurriculumFor`), aligned to that band's Common Core standards — never how much of the
+ * map is free. The 2026-07-30 rule sized a prefix (1 / 2 / 3) because the shared curriculum left
+ * older bands nothing to learn on the early islands; D-14's per-band cells remove that reason,
+ * and every band now sails the same five-island voyage from the same starting port, reaching the
+ * whole map in four wins (D-11).
  *
  * Asymmetric stakes (ticket dispatch): placing a child too LOW is merely boring and recoverable.
  * Placing them too HIGH makes their first duel unwinnable. The eligibility rule below is
@@ -35,10 +27,10 @@
  * in this module, so a catalog edit (e.g. T-029's new starter cannon) changes behaviour without
  * touching this file.
  */
-import { cannons, getSkill, islands } from '@content/index';
+import { cannons, getSkill, islandCurriculumFor, islands } from '@content/index';
 import type { Cannon, CannonId, GradeBand, Island, IslandId } from '@content/schemas';
 import { GRADE_BANDS } from '@content/schemas';
-import { BOT_ACCURACY_BAND_BY_GRADE, PLACEMENT_ISLANDS_BY_BAND, TRAY_CAPACITY } from '@engine/tuning';
+import { BOT_ACCURACY_BAND_BY_GRADE, TRAY_CAPACITY } from '@engine/tuning';
 
 /** The starting game state produced from a single onboarding grade-band answer. */
 export interface Placement {
@@ -99,14 +91,18 @@ function isCannonEligible(cannon: Cannon, maxGrade: number, band: GradeBand): bo
 }
 
 /**
- * An island has something to teach at this band when ANY of its range skills is age-appropriate —
- * the minimum grade among its `rangeSkills`, not every one of them.
+ * An island has something to teach at this band when ANY skill of ITS CELL FOR THE BAND (D-14 —
+ * `islandCurriculumFor`, the one door to island content) is age-appropriate.
  *
- * This is no longer the unlock RULE (see `chainPrefix`); it is the safety stop on the prefix. An
- * island opened with nothing in-band to drill is an island a child can sail to and find empty.
+ * Under the atlas this is true by construction — A-069's validator refuses a catalog whose cells
+ * break the ceiling — but it stays as the safety stop on placement, same posture as
+ * `engine/mastery.ts`'s `teachesInBand`: an island opened with nothing in-band to drill is an
+ * island a child can sail to and find empty, and a future bad catalog should fail closed here.
  */
-function isIslandEligible(island: Island, maxGrade: number): boolean {
-  return island.rangeSkills.some((skillId) => getSkill(skillId).minGrade <= maxGrade);
+function isIslandEligible(island: Island, band: GradeBand, maxGrade: number): boolean {
+  return islandCurriculumFor(island.id, band).skills.some(
+    (skillId) => getSkill(skillId).minGrade <= maxGrade,
+  );
 }
 
 /**
@@ -145,26 +141,25 @@ function islandChain(): readonly Island[] {
 }
 
 /**
- * The prefix of the chain a band's placement opens (OWNER RULE, 2026-07-30).
+ * The islands a band's placement opens: **island one, and island one only** (D-14).
  *
- * The count comes from `PLACEMENT_ISLANDS_BY_BAND`; the ORDER comes from the chain. The prefix
- * stops early at the first island with nothing age-appropriate to teach, so the count is a ceiling
- * rather than a promise — placement can never open a door onto an empty room.
+ * The 2026-07-30 owner rule sized a chain PREFIX to the band (1 / 2 / 3 via
+ * `PLACEMENT_ISLANDS_BY_BAND`) because islands two and three taught nothing new to an older
+ * captain under the one-shared-curriculum world — arriving at Isla Products with multiplication
+ * already in hand was a door onto an empty room. D-14 removes the reason: every island now
+ * teaches EVERY band its own in-band mathematics, so island two is a real destination for a 4th
+ * grader, and pre-opening it would spend the voyage before the first win. Placement opens the
+ * chain's root; D-11 advances by wins from there — every band reaches all five islands in
+ * exactly four wins (A-070 AC-1).
  *
- * What this replaces: `islands.filter(isIslandEligible)`, which unlocked by grade alone and ignored
- * `requiresIsland` entirely. It gave `g4_5` all five islands at onboarding — the whole game, before
- * the first duel — while `resolveUnlocks` was busy honouring a chain nobody was walking.
+ * The eligibility stop stays (see `isIslandEligible`): a catalog whose FIRST island teaches this
+ * band nothing is a broken catalog, and placement opening a door onto an empty room would hide
+ * that bug from the one test tier that can catch it.
  */
 function chainPrefix(band: GradeBand, maxGrade: number): readonly Island[] {
-  const chain = islandChain();
-  const budget = Math.min(PLACEMENT_ISLANDS_BY_BAND[band], chain.length);
-  const prefix: Island[] = [];
-  for (let i = 0; i < budget; i += 1) {
-    const island = chain[i];
-    if (island === undefined || !isIslandEligible(island, maxGrade)) break;
-    prefix.push(island);
-  }
-  return prefix;
+  const root = islandChain()[0];
+  if (root === undefined || !isIslandEligible(root, band, maxGrade)) return [];
+  return [root];
 }
 
 /** Ascending by `minGrade`, then by id — a stable, deterministic ordering for cannons. */

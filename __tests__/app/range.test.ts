@@ -70,11 +70,19 @@
  * NOT ASSERTED HERE (posture-gated, `.tdd-swarm/posture.md`): anything requiring `app/range.tsx` to
  * render. The buoy, the reused `QuestionPanel`, and the meter's visual fill are design-fidelity
  * checks, verified by screenshot against the named board — not frozen tests.
+ *
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): an island's drillable skills are its CELL for the captain's band
+ * (`islandCurriculumFor`), and `rangeSkills` takes the band and fails closed without one. The
+ * fixture skill moves with the atlas — Isla Products' g2_3 cell teaches `two_step_add_sub`
+ * (paying `double_broadside`, still a `range`-unlock gun, so the unlock chain stays
+ * unambiguous) — and every rate/commit/no-cost property is unchanged.
  */
 import { describe, expect, it } from 'vitest';
 
-import { cannons, islands } from '@content/index';
-import type { CannonId, IslandId, SkillId } from '@content/schemas';
+import { cannons, islandCurriculumFor, islands } from '@content/index';
+import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
+import { GRADE_BANDS } from '@content/schemas';
 import { answerDrill, type DrillSession } from '@engine/drill';
 import { applyAnswer, emptyMastery, meterPercent } from '@engine/mastery';
 import type { Question } from '@engine/questions/types';
@@ -105,7 +113,8 @@ import { createCaptainStore, emptyCaptain, type Captain, type CaptainStore } fro
 // of the contract, so a mismatched implementation fails `tsc` as well as vitest.
 // =============================================================================================
 
-const rangeSkills: (islandId: IslandId) => readonly SkillId[] = rangeSkillsUnderTest;
+const rangeSkills: (islandId: IslandId, band: GradeBand | null | undefined) => readonly SkillId[] =
+  rangeSkillsUnderTest;
 
 const openDrill: (input: {
   readonly islandId: IslandId;
@@ -121,9 +130,9 @@ const commitDrill: (store: CaptainStore, session: DrillSession) => RangeDrillOut
 // Fixtures — every number derived from tuning or the catalog, never invented
 // =============================================================================================
 
-/** Isla Products trains exactly one skill, so its unlock chain is unambiguous (see below). */
+/** Isla Products' g2_3 cell trains exactly one skill (D-14), so its unlock chain is unambiguous. */
 const ISLAND: IslandId = 'isla_products';
-const SKILL: SkillId = 'mult_facts';
+const SKILL: SkillId = 'two_step_add_sub';
 const SEED = 9_009;
 const ELAPSED_MS = 1_000;
 
@@ -172,7 +181,8 @@ function open(captain: Captain, length: number, over: { islandId?: IslandId; ski
 function atIsland(over: Partial<Captain> = {}): Captain {
   return {
     ...emptyCaptain(),
-    // A-027: openDrill refuses null/corrupt gradeBand. Isla Products' mult_facts needs ≤ band max 3.
+    // A-027: openDrill refuses null/corrupt gradeBand. Isla Products' g2_3 cell trains
+    // `two_step_add_sub` (minGrade 2 ≤ band max 3) — D-14's atlas reading.
     gradeBand: 'g2_3',
     unlockedIslands: ['port_sumwich', ISLAND],
     currentIsland: ISLAND,
@@ -192,34 +202,44 @@ function duelFold(n: number) {
 // =============================================================================================
 
 describe('A-009 gunnery range — what is drillable', () => {
-  it('spec(A-009:AC-1) the drillable skills of an island are exactly its catalog rangeSkills', () => {
+  it('spec(A-009:AC-1) the drillable skills of an island are exactly its band cell (D-14)', () => {
     for (const island of islands) {
-      // Exact set equality, in catalog order: a superset lets a child grind a skill the island does
-      // not teach, and a subset silently strands the cannon that skill unlocks.
-      expect([...rangeSkills(island.id)], `island ${island.id}`).toEqual([...island.rangeSkills]);
+      for (const band of GRADE_BANDS) {
+        // Exact set equality, in the cell's teaching order: a superset lets a child grind a skill
+        // the island does not teach THEIR band, and a subset silently strands the cell's cannon.
+        expect([...rangeSkills(island.id, band)], `island ${island.id} band ${band}`).toEqual([
+          ...islandCurriculumFor(island.id, band).skills,
+        ]);
+      }
     }
   });
 
-  it('spec(A-009:AC-1) every drillable skill on every island opens a real question of that skill', () => {
-    // A-027 ceilings openDrill by gradeBand; use the top band so every catalog skill is eligible.
-    const captain = { ...emptyCaptain(), gradeBand: 'g4_5' as const };
-    for (const island of islands) {
-      for (const skill of island.rangeSkills) {
-        const session = open(captain, 3, { islandId: island.id, skillId: skill });
-        expect(session.skillId, `${island.id}/${skill}`).toBe(skill);
-        // A skill listed as drillable whose template pool cannot be reached throws NO_TEMPLATE out
-        // of T-007 on open — a range screen with nothing to ask. This is the loader's frozen test.
-        expect(session.current, `${island.id}/${skill} produced no question`).not.toBeNull();
-        expect(session.current?.skill).toBe(skill);
-        expect(session.current?.choices).toHaveLength(CHOICE_COUNT);
+  it('spec(A-009:AC-1) every drillable skill of every cell opens a real question of that skill', () => {
+    // Every band walks its own atlas (D-14) — a lawful catalog keeps every cell inside its
+    // band's ceiling, so each band's captain can open each of their island's drills.
+    for (const band of GRADE_BANDS) {
+      const captain = { ...emptyCaptain(), gradeBand: band };
+      for (const island of islands) {
+        for (const skill of islandCurriculumFor(island.id, band).skills) {
+          const session = open(captain, 3, { islandId: island.id, skillId: skill });
+          expect(session.skillId, `${band}/${island.id}/${skill}`).toBe(skill);
+          // A skill listed as drillable whose template pool cannot be reached throws NO_TEMPLATE
+          // out of T-007 on open — a range screen with nothing to ask. The loader's frozen test.
+          expect(session.current, `${band}/${island.id}/${skill} produced no question`).not.toBeNull();
+          expect(session.current?.skill).toBe(skill);
+          expect(session.current?.choices).toHaveLength(CHOICE_COUNT);
+        }
       }
     }
   });
 
   it('spec(A-009:AC-1) a skill this island does not train is refused, not quietly drilled', () => {
-    // `mult_facts` is real, and drillable — at Isla Products, not at Port Sumwich.
-    expect(rangeSkills('port_sumwich')).not.toContain(SKILL);
-    expect(() => open(atIsland(), SHORT, { islandId: 'port_sumwich', skillId: SKILL })).toThrow(/mult_facts/);
+    // `two_step_add_sub` is real, and drillable for g2_3 — at Isla Products' cell, not at Port
+    // Sumwich, whose g2_3 cell trains `place_value_compare` (D-14).
+    expect(rangeSkills('port_sumwich', 'g2_3')).not.toContain(SKILL);
+    expect(() => open(atIsland(), SHORT, { islandId: 'port_sumwich', skillId: SKILL })).toThrow(
+      /two_step_add_sub/,
+    );
   });
 });
 

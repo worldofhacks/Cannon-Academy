@@ -2,8 +2,16 @@
  * A-028 — cross-island training catalog and exact drill selection.
  *
  * The range picker must surface every age-eligible skill from every unlocked island, not only the
- * current island's `rangeSkills`. Pure catalog logic lives in `src/services/trainingCatalog.ts`;
+ * current island's list. Pure catalog logic lives in `src/services/trainingCatalog.ts`;
  * `app/range.tsx` consumes it and passes the chosen island/skill pair to `openDrill`.
+ *
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): an island's drillable skills are its CELL for the captain's band
+ * (`islandCurriculumFor`) — the shared `rangeSkills` no longer exists. The oracle below reads
+ * cells; the g2_3 fixtures name the cell skills (Port Sumwich trains `place_value_compare`,
+ * Isla Products `two_step_add_sub`); and the old "an island with nothing in-band yields an
+ * empty catalog" case is unrepresentable — every cell teaches every band (A-069's validator) —
+ * so the empty state is reached the way a captain can really reach it: no islands unlocked.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -11,7 +19,7 @@ import { join } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
-import { getSkill, islands } from '@content/index';
+import { getSkill, islandCurriculumFor, islands } from '@content/index';
 import type { GradeBand, IslandId, SkillId } from '@content/schemas';
 import { answerDrill } from '@engine/drill';
 import { maxGradeForBand } from '@engine/placement';
@@ -66,7 +74,8 @@ function expectedEntries(
 
   for (const island of [...islands].sort((a, b) => a.order - b.order)) {
     if (!unlocked.has(island.id)) continue;
-    for (const skillId of island.rangeSkills) {
+    // The band's own cell (D-14) — never a shared island-wide list, which no longer exists.
+    for (const skillId of islandCurriculumFor(island.id, band).skills) {
       if (seen.has(skillId)) continue;
       if (getSkill(skillId).minGrade > maxGrade) continue;
       seen.add(skillId);
@@ -151,12 +160,14 @@ describe('A-028 training catalog', () => {
     });
     const entries = flattenGroups(groups);
 
-    expect(entries.some((entry) => entry.islandId === 'port_sumwich' && entry.skillId === 'add_within_10')).toBe(
-      true,
-    );
-    expect(entries.some((entry) => entry.islandId === 'isla_products' && entry.skillId === 'mult_facts')).toBe(
-      true,
-    );
+    // The g2_3 cells (D-14): Port Sumwich trains `place_value_compare`, Isla Products
+    // `two_step_add_sub` — the earlier island's rack stays on the menu after sailing on.
+    expect(
+      entries.some((entry) => entry.islandId === 'port_sumwich' && entry.skillId === 'place_value_compare'),
+    ).toBe(true);
+    expect(
+      entries.some((entry) => entry.islandId === 'isla_products' && entry.skillId === 'two_step_add_sub'),
+    ).toBe(true);
     expect(groups.find((group) => group.islandId === 'isla_products')?.isCurrentIsland).toBe(true);
     expect(groups.find((group) => group.islandId === 'port_sumwich')?.isCurrentIsland).toBe(false);
   });
@@ -169,10 +180,11 @@ describe('A-028 training catalog', () => {
       currentIsland: 'isla_products',
       gradeBand: 'g2_3',
     });
+    // The earlier island's g2_3 warm-up (D-14): Port Sumwich's cell trains `place_value_compare`.
     const warmUp = flattenGroups(groups).find(
-      (entry) => entry.islandId === 'port_sumwich' && entry.skillId === 'add_within_10',
+      (entry) => entry.islandId === 'port_sumwich' && entry.skillId === 'place_value_compare',
     );
-    expect(warmUp, 'fixture must include port_sumwich/add_within_10').toBeDefined();
+    expect(warmUp, 'fixture must include port_sumwich/place_value_compare').toBeDefined();
 
     const session = openDrill({
       islandId: warmUp!.islandId,
@@ -181,7 +193,7 @@ describe('A-028 training catalog', () => {
       rng: createRng(28),
       length: 2,
     });
-    expect(session.skillId).toBe('add_within_10');
+    expect(session.skillId).toBe('place_value_compare');
 
     let live = session;
     while (!live.complete) {
@@ -189,7 +201,7 @@ describe('A-028 training catalog', () => {
     }
     const outcome = commitDrill(store, live);
     expect(outcome.applied).toBe(true);
-    expect(outcome.skillId).toBe('add_within_10');
+    expect(outcome.skillId).toBe('place_value_compare');
     expect(store.getState().captain.currentIsland).toBe('isla_products');
   });
 
@@ -205,10 +217,13 @@ describe('A-028 training catalog', () => {
   });
 
   it('spec(A-028:AC-5) no eligible entries yields an empty catalog', async () => {
+    // D-14 re-baseline: the old fixture ("grandline at k_1") relied on an island that taught a
+    // band nothing — a state A-069's validator now forbids (every cell teaches every band). The
+    // empty state a captain can really reach is holding no islands at all.
     const { trainingCatalog } = await loadTrainingCatalog();
     const groups = trainingCatalog({
-      unlockedIslands: ['grandline'],
-      currentIsland: 'grandline',
+      unlockedIslands: [],
+      currentIsland: null,
       gradeBand: 'k_1',
     });
     expect(flattenGroups(groups)).toEqual([]);

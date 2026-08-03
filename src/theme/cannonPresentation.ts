@@ -89,6 +89,23 @@ export const cannonLook: Record<CannonId, CannonLook> = {
    * It shares `saker`'s deliberate restraint — the reach is new, the shot art is not.
    */
   grapeshot: { glyph: '+', range: 'groups', projectile: 'iron', arc: 'standard', spectacle: null },
+  /**
+   * D-14 / A-069's four atlas entry guns (looks added by A-070, the migration ticket). Each wears
+   * its skill's own operation glyph — the same rule every gun above follows — and shares the
+   * plain-iron restraint of the other teaching guns: the mathematics is new, the shot art is not.
+   * Spectacle stays reserved for the three special-mechanic guns.
+   */
+  // Isla Products' K-1 entry gun: subtraction within 10, the − sibling of the starters' `+`.
+  dinghy_gun: { glyph: '−', range: 'to 10', projectile: 'iron', arc: 'standard', spectacle: null },
+  // The Grandline's K-1 entry gun: teens as ten-and-ones — addition-shaped (`10 + 3`), so `+`,
+  // with the range hint naming the numbers it actually asks about.
+  teen_lantern: { glyph: '+', range: 'teens', projectile: 'iron', arc: 'standard', spectacle: null },
+  // Isla Products' G4-5 entry gun: multi-digit multiplication. `high` like the twelve-pounder —
+  // the bigger × gun already arcs high, and this is the next rung of the same family.
+  carronade: { glyph: '×', range: 'big ×', projectile: 'iron', arc: 'high', spectacle: null },
+  // Quotient Cove's G4-5 entry gun: long division, the mortar's next rung — same ÷ family, same
+  // high lob.
+  stern_chaser: { glyph: '÷', range: 'long ÷', projectile: 'iron', arc: 'high', spectacle: null },
 };
 
 /** Special-weapon row on the tray — Double-Shot stays unavailable until T-022 ships. */
@@ -109,6 +126,11 @@ export const cannonWeapon: Record<CannonId, CannonWeaponLook> = {
   powder_keg: { displayName: null, enabled: false, unavailableLabel: null },
   long_nine: { displayName: null, enabled: false, unavailableLabel: null },
   grapeshot: { displayName: null, enabled: false, unavailableLabel: null },
+  // D-14 / A-069's atlas guns: plain teaching guns, no special-weapon row.
+  dinghy_gun: { displayName: null, enabled: false, unavailableLabel: null },
+  teen_lantern: { displayName: null, enabled: false, unavailableLabel: null },
+  carronade: { displayName: null, enabled: false, unavailableLabel: null },
+  stern_chaser: { displayName: null, enabled: false, unavailableLabel: null },
 };
 
 // ── An owned gun the band cannot fire yet ─────────────────────────────────────────────────────

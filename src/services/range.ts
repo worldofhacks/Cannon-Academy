@@ -29,7 +29,7 @@
  * No React import: the logic is frozen-tested headless (`__tests__/app/range.test.ts`), and the
  * screen is a thin caller.
  */
-import { getIsland, getSkill } from '@content/index';
+import { getSkill, islandCurriculumFor } from '@content/index';
 import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
 import { GRADE_BANDS } from '@content/schemas';
 import { startDrill, type DrillSession } from '@engine/drill';
@@ -144,9 +144,9 @@ function masteryFor(captain: Captain, skillId: SkillId): SkillMastery {
 // and nothing else. `asksInBand` is the cannon-shaped sibling of the function below and could not
 // be reused directly — it takes a `Cannon` and reads `getSkill(cannon.skill)`, and the range never
 // has a cannon in hand — but the RULE is deliberately identical, including the part that matters
-// most: **a missing or corrupt band fails CLOSED**. `engine/mastery.ts:121` reads an absent band as
-// `POSITIVE_INFINITY`, which is safe there only because a skill must be mastered before it unlocks
-// anything; the same reading here would offer division to a captain the app has not placed yet.
+// most: **a missing or corrupt band fails CLOSED**. Since D-14 (A-070) `engine/mastery.ts` reads
+// an absent band the same way — no cell, no island, no entry gun — so every door in the app now
+// shares this posture.
 
 /**
  * Whether the questions this skill generates are inside `band`'s ceiling.
@@ -165,20 +165,25 @@ export function skillInBand(skillId: SkillId, band: GradeBand | null | undefined
 }
 
 /**
- * The skills an island's gunnery range trains, in catalog order.
+ * The skills an island's gunnery range trains A CAPTAIN OF THIS BAND, in the cell's teaching
+ * order (D-14 — `islandCurriculumFor`, the one door to island content).
  *
- * Straight from the island record — a superset would let a child grind a skill the island does
- * not teach, and a subset silently strands the cannon that skill unlocks.
+ * Straight from the band's cell — a superset would let a child grind a skill their island does
+ * not teach them, and a subset silently strands the cannon that skill unlocks.
  *
- * `band` is OPTIONAL and omitting it returns the island's whole authored list. That is the catalog
- * query (`range.test.ts` AC-1 pins the unfiltered equality), not the offer a child sees: every
- * caller that puts drills in front of someone passes a band, and `trainingCatalog` — which is what
- * the screen actually reads — has no way to omit one.
+ * **No band, no drills** (A-070 AC-5). The pre-D-14 signature let a band-less caller read "the
+ * island's whole authored list", because one shared list existed to read; under the atlas there
+ * is no bandless truth about what an island teaches, so `null`, `undefined` and the corrupt band
+ * strings a save can carry all answer the empty list — the same fail-closed posture as
+ * `skillInBand`, and the state the range screen already renders as "No drills ready".
+ *
+ * The `skillInBand` filter survives as the runtime ceiling tripwire: a lawful catalog never
+ * trips it (A-069's validator bans over-ceiling cells), a corrupt future one fails closed.
  */
-export function rangeSkills(islandId: IslandId, band?: GradeBand | null): readonly SkillId[] {
-  const skills = getIsland(islandId).rangeSkills;
-  if (band === undefined) return skills;
-  return skills.filter((skillId) => skillInBand(skillId, band));
+export function rangeSkills(islandId: IslandId, band: GradeBand | null | undefined): readonly SkillId[] {
+  if (band === null || band === undefined) return [];
+  if (!(GRADE_BANDS as readonly unknown[]).includes(band)) return [];
+  return islandCurriculumFor(islandId, band).skills.filter((skillId) => skillInBand(skillId, band));
 }
 
 /**

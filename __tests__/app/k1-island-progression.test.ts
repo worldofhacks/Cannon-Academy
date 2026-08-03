@@ -1,25 +1,22 @@
 /**
  * A-060 — a five-year-old can leave their first island.
  *
- * THE COMPLAINT, VERBATIM: a `k_1` captain masters Port Sumwich and never unlocks anything, ever.
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): five islands for every band, each band its own curriculum.
  *
- * The diagnosis is NOT that `resolveUnlocks` is wrong. Its band rule — refuse an island that
- * teaches nothing inside the captain's ceiling — is the only thing standing between a
- * five-year-old and multiplication, and it must survive this fix untouched. The defect was in the
- * CONTENT: the chain ran
+ * THE ORIGINAL COMPLAINT, VERBATIM: a `k_1` captain masters Port Sumwich and never unlocks
+ * anything, ever. A-060's first cut fixed it by giving Isla Products ONE K-1 rung
+ * (`repeated_addition`) and pinned the scope: "Quotient Cove still does NOT open". D-14 finishes
+ * the model A-060 started — an island is a PLACE, not a difficulty tier — by giving EVERY island
+ * a complete cell per band (`islandCurriculumFor`). So the old fixpoint "K-1 reach is exactly
+ * two" becomes its five-island successor: every band's reach is exactly five, and the ceiling
+ * moves from the map into the curriculum, where A-069's validator enforces it at import.
  *
- *   port_sumwich (lowest skill grade 0) -> isla_products (3) -> quotient_cove (3) -> ...
+ * What survives of A-060 unchanged, and is still asserted here:
  *
- * and `maxGradeForBand('k_1')` is 1, so there was no content anywhere between grade 1 and grade 3.
- * `resolveUnlocks` correctly refused Isla Products and correctly returned `[]` — forever.
- *
- * THE MODEL (owner-approved): an island is a PLACE, not a difficulty tier. Isla Products teaches
- * GROUPING at whatever rung the captain's band can be asked. This file is the FIRST CUT — the K-1
- * rung of that one island — so the assertions below deliberately pin BOTH halves:
- *
- *   - Isla Products now opens for a K-1 captain, in a handful of duels, through the real services.
- *   - Quotient Cove still does NOT. The other three islands are a follow-up, and a test that let
- *     them drift open would hide the fact that this change was scoped.
+ *   - The FIRST win opens the next island (D-11), through the real services.
+ *   - Nothing a K-1 captain is shown — chart glyph, drill, duel question — prints × or ÷.
+ *   - An arrival lands a gun that can actually fire at its island (the anti-circularity rule).
  *
  * Every duel here is driven through `initialDuelStateWithContext` / `duelReducer` /
  * `applyDuelOutcome` — the same three calls `app/duel.tsx` makes — rather than by writing mastery
@@ -28,7 +25,7 @@
  */
 import { describe, expect, it } from 'vitest';
 
-import { cannons, getCannon, getIsland, getSkill, islands } from '@content/index';
+import { cannons, getCannon, getSkill, islandCurriculumFor, islands } from '@content/index';
 import type { GradeBand, IslandId, SkillId } from '@content/schemas';
 import { answerDrill } from '@engine/drill';
 import { resolveUnlocks, type SkillMastery } from '@engine/mastery';
@@ -47,15 +44,28 @@ import { TEMPLATE_POOLS } from '../../src/services/templatePools';
 import { duelReducer, initialDuelStateWithContext, type DuelState } from '../../src/stores/duel';
 import { createCaptainStore, type Captain, type CaptainStore } from '../../src/stores/player';
 
-/** The skill this ticket authored, and the gun it pays out. Named because the ticket names them. */
-const NEW_SKILL: SkillId = 'repeated_addition';
-const NEW_CANNON = 'grapeshot' as const;
+/** K-1's own rung of island two under the atlas, and the entry gun its arrival pays (D-14). */
+const K1_ISLAND_TWO_SKILL: SkillId = 'sub_within_10';
+const K1_ISLAND_TWO_CANNON = 'dinghy_gun' as const;
+
+/** A-060's authored skill and gun — still in the catalog, now Quotient Cove's g2_3 cell. */
+const A060_SKILL: SkillId = 'repeated_addition';
+const A060_CANNON = 'grapeshot' as const;
 
 /** Enough reducer steps for any duel at any island to reach a terminal phase. */
 const STEP_CAP = 800;
 
 /** How many duels a five-year-old may be asked to win before the map moves. Small on purpose. */
 const PATIENCE_DUELS = 6;
+
+/** The full chain, the reach D-14 promises every band. */
+const ALL_FIVE: readonly IslandId[] = [
+  'port_sumwich',
+  'isla_products',
+  'quotient_cove',
+  'fraction_reef',
+  'grandline',
+];
 
 /**
  * The two ways multiplication can reach a child's screen: the glyphs, and the words.
@@ -162,8 +172,9 @@ function fightAndSettle(store: CaptainStore, seed: number): Fought {
  * Every island a band can reach by mastering everything it is offered, to a fixpoint.
  *
  * This is the shape of the complaint: "what can this child EVER open". It masters only in-band
- * skills, so it can never overstate a band's reach, and it runs `resolveUnlocks` with the band so
- * the ceiling is applied exactly as the app applies it.
+ * skills FROM THE BAND'S OWN CELLS (D-14 — `islandCurriculumFor`), so it can never overstate a
+ * band's reach, and it runs `resolveUnlocks` with the band so the ceiling is applied exactly as
+ * the app applies it.
  */
 function everReachableIslands(band: GradeBand): readonly IslandId[] {
   const maxGrade = maxGradeForBand(band);
@@ -172,7 +183,7 @@ function everReachableIslands(band: GradeBand): readonly IslandId[] {
 
   for (let pass = 0; pass <= islands.length; pass += 1) {
     for (const id of unlocked) {
-      for (const skill of getIsland(id).rangeSkills) {
+      for (const skill of islandCurriculumFor(id, band).skills) {
         if (getSkill(skill).minGrade <= maxGrade) mastery[skill] = MASTERED;
       }
     }
@@ -189,7 +200,7 @@ function everReachableIslands(band: GradeBand): readonly IslandId[] {
   return unlocked;
 }
 
-describe('A-060 K-1 progression — the first island is not the last one', () => {
+describe('A-060 K-1 progression — the first island is not the last one (re-baselined to D-14)', () => {
   // ── AC-1 — the owner's complaint, as an executable sentence ──────────────────────────────────
 
   it('spec(A-060:AC-1) a fresh K-1 captain opens Isla Products by duelling — the FIRST win does it', () => {
@@ -197,8 +208,7 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
     // by A-062): winning a duel on an island immediately opens the next band-eligible island —
     // "we should remove the need to play the same island multiple times". This spec used to
     // tolerate up to 3 wins and asserted the fog lifted BECAUSE a skill was mastered; both of
-    // those pinned mastery-gated fog, which D-11 retires for island fog only. The gate that
-    // survives is the band ceiling, and the sibling spec below still holds it to the fixpoint.
+    // those pinned mastery-gated fog, which D-11 retires for island fog only.
     const store = onboarded('k_1');
     expect(store.getState().captain.unlockedIslands).toEqual(['port_sumwich']);
     expect(store.getState().captain.currentIsland).toBe('port_sumwich');
@@ -222,24 +232,28 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
     expect(opened, 'a win must open the next island immediately (D-11)').toBe(1);
   });
 
-  it('spec(A-060:AC-1) the ceiling is why it opened, and the ceiling still shuts Quotient Cove', () => {
-    // The whole risk of this change is buying progression by loosening the band gate. Stated as
-    // the two facts that would both have to be true for that to have happened.
-    const inBand = getIsland('isla_products').rangeSkills.filter(
-      (id) => getSkill(id).minGrade <= maxGradeForBand('k_1'),
-    );
-    expect(inBand, 'isla_products must teach a k_1 captain something').toContain(NEW_SKILL);
-    expect(inBand).not.toContain('mult_facts');
+  it('spec(A-070:AC-1) the K-1 reach is ALL FIVE islands — and each cell it sails is its own, inside the ceiling', () => {
+    // D-14's successor to the old "the ceiling still shuts Quotient Cove" fixpoint: the ceiling
+    // no longer closes islands, because every island now carries a K-1 cell inside the ceiling.
+    const ceiling = maxGradeForBand('k_1');
+    for (const islandId of ALL_FIVE) {
+      const cell = islandCurriculumFor(islandId, 'k_1');
+      expect(cell.skills.length, `${islandId} teaches k_1 something`).toBeGreaterThan(0);
+      for (const skill of cell.skills) {
+        expect(getSkill(skill).minGrade, `${islandId} k_1 cell skill ${skill}`).toBeLessThanOrEqual(ceiling);
+      }
+      expect(cell.skills, `${islandId} k_1 cell must not teach multiplication`).not.toContain('mult_facts');
+      expect(cell.skills, `${islandId} k_1 cell must not teach division`).not.toContain('div_facts');
+    }
 
-    // Quotient Cove teaches division and nothing else — this cut does not touch it, and a K-1
-    // captain who masters everything they are offered must still find it fogged.
-    expect(everReachableIslands('k_1')).toEqual(['port_sumwich', 'isla_products']);
+    // The fixpoint itself: what a K-1 captain can EVER open is the whole map now.
+    expect([...everReachableIslands('k_1')].sort()).toEqual([...ALL_FIVE].sort());
   });
 
   // ── AC-2 — the authored content a five-year-old is actually shown ────────────────────────────
 
   it('spec(A-060:AC-2) every repeated_addition template asks addition a K-1 child can reach', () => {
-    const pool = TEMPLATE_POOLS[NEW_SKILL];
+    const pool = TEMPLATE_POOLS[A060_SKILL];
     expect(pool.length, 'the pool must be big enough to vary').toBeGreaterThanOrEqual(6);
 
     let generated = 0;
@@ -285,16 +299,16 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
   });
 
   it('spec(A-060:AC-2) the skill reads as addition everywhere it is named, not as multiplication', () => {
-    const skill = getSkill(NEW_SKILL);
+    const skill = getSkill(A060_SKILL);
     expect(skill.minGrade).toBeLessThanOrEqual(maxGradeForBand('k_1'));
     expect(skill.displayName).not.toMatch(OPERATOR_WORDS);
     expect(skill.displayName).not.toMatch(OPERATOR_GLYPHS);
-    expect(getCannon(NEW_CANNON).displayName).not.toMatch(OPERATOR_WORDS);
+    expect(getCannon(A060_CANNON).displayName).not.toMatch(OPERATOR_WORDS);
   });
 
   // ── AC-3 — the gun, because an island with nothing to fire is still a wall ───────────────────
 
-  it('spec(A-060:AC-3) a K-1 captain earns Grapeshot at the new range and can actually fire it', () => {
+  it('spec(A-060:AC-3) a K-1 captain arrives at island two holding its entry gun, drills its own skill, and fires it there', () => {
     const store = onboarded('k_1');
 
     // Get to the island the honest way first.
@@ -305,14 +319,19 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
     }
     expect(opened, 'AC-1 is the precondition for this test and it did not hold').toBe(true);
 
-    // The range there offers the new skill to this band — and only that one.
+    // D-14: the arrival landed the K-1 cell's entry gun — subtraction within 10, the island's own
+    // K-1 teaching — so the captain holds a gun that asks the island's questions the moment the
+    // fog lifts (the anti-circularity rule A-062 introduced, now per band).
+    expect(store.getState().captain.ownedCannons).toContain(K1_ISLAND_TWO_CANNON);
+
+    // The range there offers the band's cell — and only that.
     const drillable = rangeSkills('isla_products', 'k_1');
-    expect(drillable).toEqual([NEW_SKILL]);
+    expect(drillable).toEqual([K1_ISLAND_TWO_SKILL]);
 
     sailTo(store, 'isla_products');
     let session = openDrill({
       islandId: 'isla_products',
-      skillId: NEW_SKILL,
+      skillId: K1_ISLAND_TWO_SKILL,
       captain: store.getState().captain,
       rng: createRng(5_150),
     });
@@ -325,23 +344,18 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
     const outcome = commitDrill(store, session);
     expect(outcome.applied).toBe(true);
     expect(outcome.mastered, 'a perfect drill from empty must master the skill').toBe(true);
-    // NOT asserted on the drill's delta any more. Re-baselined 2026-07-30: earning an island now
-    // grants its entry cannon, so by the time a captain drills the new skill they already hold
-    // Grapeshot and the drill correctly pays no cannon. That change is the whole point — the old
-    // acquisition path was circular (the gun that teaches the skill required mastering the skill),
-    // which is why a captain reached this island with nothing able to ask its questions.
-    //
-    // What matters is unchanged and asserted below: they OWN it, it is in band, and it fires here.
+    // The drill pays no NEW cannon here, and that is correct: the entry gun already landed with
+    // the arrival (see above) — the old acquisition path was circular, and this is its absence.
 
     // Owned, in band, and on the deck.
     const won = store.getState().captain;
-    expect(won.ownedCannons).toContain(NEW_CANNON);
-    expect(asksInBand(getCannon(NEW_CANNON), 'k_1')).toBe(true);
+    expect(won.ownedCannons).toContain(K1_ISLAND_TWO_CANNON);
+    expect(asksInBand(getCannon(K1_ISLAND_TWO_CANNON), 'k_1')).toBe(true);
 
-    store.getState().equipCannons([NEW_CANNON]);
-    expect(trayCannons(store.getState().captain).map((c) => c.id)).toEqual([NEW_CANNON]);
+    store.getState().equipCannons([K1_ISLAND_TWO_CANNON]);
+    expect(trayCannons(store.getState().captain).map((c) => c.id)).toEqual([K1_ISLAND_TWO_CANNON]);
 
-    // ...and it fires, at the island it was earned on, asking maths inside the ceiling.
+    // ...and it fires, at the island it arrived with, asking maths inside the ceiling.
     const fought = fightAndSettle(store, 5_151);
     expect(fought.asked.length, 'the duel at Isla Products asked a K-1 captain nothing').toBeGreaterThan(0);
     for (const question of fought.asked) {
@@ -349,14 +363,14 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
         OPERATOR_GLYPHS,
       );
       expect(question.text).not.toMatch(OPERATOR_WORDS);
-      expect(TEMPLATE_POOLS[NEW_SKILL].map((t) => t.id)).toContain(question.templateId);
+      expect(TEMPLATE_POOLS[K1_ISLAND_TWO_SKILL].map((t) => t.id)).toContain(question.templateId);
     }
   });
 
   it('spec(A-060:AC-3) the island has a rival a K-1 captain can meet, which is what used to throw', () => {
-    // `deriveRivalLoadout` fails CLOSED — before this ticket it threw `no age-eligible cannons for
+    // `deriveRivalLoadout` fails CLOSED — before A-060 it threw `no age-eligible cannons for
     // island 'isla_products' at band 'k_1'`, so even a hand-unlocked island was a crash rather
-    // than a duel. This is that call, at that band.
+    // than a duel. This is that call, at that band — now against the K-1 cell (D-14).
     const captain: Captain = {
       ...onboarded('k_1').getState().captain,
       unlockedIslands: ['port_sumwich', 'isla_products'],
@@ -368,25 +382,21 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
     }
   });
 
-  // ── AC-4 — the older bands are untouched ─────────────────────────────────────────────────────
+  // ── AC-4 — the older bands sail their own seas, whole (D-14) ─────────────────────────────────
 
-  it('spec(A-060:AC-4) g2_3 and g4_5 still reach everything they reached before', () => {
-    // The pre-change reach, written down: `g2_3` walked to Quotient Cove and stopped at Fraction
-    // Reef's grade-4 curriculum; `g4_5` walked the whole chain. Neither may lose a step to a
-    // change that was only ever about the bottom of the ladder.
-    expect(everReachableIslands('g2_3')).toEqual(['port_sumwich', 'isla_products', 'quotient_cove']);
-    expect(everReachableIslands('g4_5')).toEqual([
-      'port_sumwich',
-      'isla_products',
-      'quotient_cove',
-      'fraction_reef',
-      'grandline',
-    ]);
+  it('spec(A-070:AC-1) g2_3 and g4_5 each reach ALL FIVE islands — their own curriculum, the same map', () => {
+    // D-14's successor to "g2_3 walks to Quotient Cove and stops": no band stops anywhere now.
+    expect([...everReachableIslands('g2_3')].sort()).toEqual([...ALL_FIVE].sort());
+    expect([...everReachableIslands('g4_5')].sort()).toEqual([...ALL_FIVE].sort());
 
-    // The grade-3 rung of Isla Products is exactly where it was — same skill, same gun, same
-    // successor — so the island gained a rung rather than being rewritten under the older bands.
+    // Each band drills its OWN cell at island two — the same island, three different rungs.
+    expect(rangeSkills('isla_products', 'k_1')).toEqual(['sub_within_10']);
+    expect(rangeSkills('isla_products', 'g2_3')).toEqual(['two_step_add_sub']);
+    expect(rangeSkills('isla_products', 'g4_5')).toEqual(['multi_digit_mult']);
+
+    // Mastery still pays the mastered skill's range gun, and mastering a predecessor's cell
+    // still lifts the successor's fog — the mastery lane survives D-11/D-14 intact.
     for (const band of ['g2_3', 'g4_5'] as const) {
-      expect(rangeSkills('isla_products', band)).toContain('mult_facts');
       const unlocked = resolveUnlocks({
         gradeBand: band,
         mastery: { mult_facts: MASTERED },
@@ -394,28 +404,32 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
         unlockedIslands: [],
       });
       expect(unlocked.cannons).toContain('twelve_pounder');
-      expect(unlocked.islands).toContain('quotient_cove');
     }
+    // g2_3's fraction_reef cell teaches mult_facts; mastering it opens grandline for g2_3.
+    const viaMastery = resolveUnlocks({
+      gradeBand: 'g2_3',
+      mastery: { mult_facts: MASTERED },
+      unlockedCannons: [],
+      unlockedIslands: ['port_sumwich', 'isla_products', 'quotient_cove', 'fraction_reef'],
+    });
+    expect(viaMastery.islands).toContain('grandline');
 
-    // Placement is untouched at every band: this ticket added content, not a free island.
+    // Placement opens island one ONLY, at every band (D-14: the voyage is won, never granted).
     for (const band of ['k_1', 'g2_3', 'g4_5'] as const) {
-      const placed = resolvePlacement(band).unlockedIslands;
-      expect(placed, `${band} was handed an island by placement`).not.toContain('grandline');
-      expect(placed[0]).toBe('port_sumwich');
+      expect(resolvePlacement(band).unlockedIslands, band).toEqual(['port_sumwich']);
     }
-    expect([...resolvePlacement('k_1').unlockedIslands]).toEqual(['port_sumwich']);
   });
 
-  it('spec(A-060:AC-4) the new gun is acquirable at exactly the band its questions are legible at', () => {
-    const gun = getCannon(NEW_CANNON);
-    expect(gun.skill).toBe(NEW_SKILL);
+  it('spec(A-060:AC-4) the A-060 gun is acquirable at exactly the band its questions are legible at', () => {
+    const gun = getCannon(A060_CANNON);
+    expect(gun.skill).toBe(A060_SKILL);
     expect(gun.unlock).toEqual({ kind: 'range', island: 'isla_products', tier: 1 });
-    // The catalog invariant A-058 pins, restated for the new row: a gun may never be acquirable
+    // The catalog invariant A-058 pins, restated for the row: a gun may never be acquirable
     // before its own skill is legible.
     expect(getSkill(gun.skill).minGrade).toBeLessThanOrEqual(gun.minGrade);
     expect([gun.minGrade, gun.maxGrade]).toEqual([getSkill(gun.skill).minGrade, getSkill(gun.skill).maxGrade]);
     // It is a RANGE unlock, which is what makes `resolveUnlocks` grant it — a chest or starter
     // unlock would leave mastering the skill paying nothing.
-    expect(cannons.filter((c) => c.skill === NEW_SKILL).map((c) => c.id)).toEqual([NEW_CANNON]);
+    expect(cannons.filter((c) => c.skill === A060_SKILL).map((c) => c.id)).toEqual([A060_CANNON]);
   });
 });

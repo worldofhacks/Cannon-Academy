@@ -124,6 +124,22 @@ export const SKILL_GLYPH: Readonly<Record<SkillId, string>> = {
   // the existing `+` row rather than opening a third one. A K-1 captain who has started Isla
   // Products still sees exactly two rows on the Rank screen.
   repeated_addition: '+',
+  // D-14's four new rungs (A-071) — each new skill "arrives the full way … glyph". The two K-1
+  // rungs stay inside the print-safety fence (no × or ÷ before grade 2, A-051), and inside the
+  // board rule this whole table exists to satisfy — K-1 is two rows, `+` and `−`, still:
+  //
+  //   `sub_within_10` joins `sub_within_20`'s `−` row exactly as the two addition ranges share
+  //   `+` — same operation, split by range, one honest meter.
+  //
+  //   `place_value_teens` is `+` — teens-as-ten-and-ones is authored as "10 + {a}" and "1 ten
+  //   and {a} ones", addition-shaped by A-069's own definition ("no symbol beyond +"), so it
+  //   joins the `+` row the way repeated addition did: grouping written as addition.
+  sub_within_10: '−',
+  place_value_teens: '+',
+  // The two G4-5 rungs join their fact-family rows the way the range-split addition skills do:
+  // multi-digit multiplication is still `×`, long division is still `÷`.
+  multi_digit_mult: '×',
+  long_division: '÷',
 };
 
 /** Ten segments, matching the harbor's coin meter and the board's own Rank meters. */
@@ -215,7 +231,9 @@ export function rankGoalText(captain: Captain): string {
   // A captain who has never won has one job, and it is not fog. The board's own early-state copy.
   if (captain.wins === 0) {
     const here = nodes.find((node) => node.isCurrent && !node.fogged) ?? nodes.find((node) => !node.fogged);
-    if (here !== undefined) return `Win a duel at ${here.island.displayName} to sail on.`;
+    // `here.displayName`, the node's band-true name (D-14 / A-070): the goal must name the place
+    // as the captain's own chart names it, never another band's word for the same water.
+    if (here !== undefined) return `Win a duel at ${here.displayName} to sail on.`;
   }
 
   const fogged = nodes.find((node) => node.fogged);

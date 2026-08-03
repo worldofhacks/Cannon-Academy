@@ -5,8 +5,9 @@
  * captains on later islands with a single hard option. This module unions eligible skills across
  * all unlocked islands (band-filtered), preserves catalog order, and de-duplicates by skill id.
  */
-import { islands } from '@content/index';
+import { islandCurriculumFor, islands } from '@content/index';
 import type { GradeBand, IslandId, SkillId } from '@content/schemas';
+import { GRADE_BANDS } from '@content/schemas';
 
 import { skillInBand } from './range';
 
@@ -32,15 +33,22 @@ export interface TrainingGroup {
  * reached `maxGradeForBand` and THREW, and the throw landed on the range screen as a crash rather
  * than as the empty state the screen already knows how to draw.
  *
- * So the band is resolved through `skillInBand`, which fails closed: an unrecognised band offers
- * NOTHING. That is the safe direction, and it is the one `engine/mastery.ts:121` gets backwards by
- * reading an absent band as `POSITIVE_INFINITY`.
+ * So the band is validated here and resolved through `skillInBand`, both of which fail closed: an
+ * unrecognised band offers NOTHING. Since D-14 (A-070) `engine/mastery.ts` shares the posture —
+ * no band, no island, no entry gun.
  */
 export function trainingCatalog(input: {
   readonly unlockedIslands: readonly IslandId[];
   readonly currentIsland: IslandId | null;
   readonly gradeBand: GradeBand | null | undefined;
 }): readonly TrainingGroup[] {
+  // Fail closed BEFORE the cell read (D-14 / A-070 AC-5): `islandCurriculumFor` is typed over
+  // real bands plus `null`, and the arbitrary strings a save can carry must not reach it. An
+  // unrecognised band offers NOTHING — the same answer `skillInBand` gives per-skill below.
+  const band = input.gradeBand;
+  if (band === null || band === undefined) return [];
+  if (!(GRADE_BANDS as readonly unknown[]).includes(band)) return [];
+
   const unlocked = new Set(input.unlockedIslands);
   const seen = new Set<SkillId>();
   const groups: TrainingGroup[] = [];
@@ -49,11 +57,12 @@ export function trainingCatalog(input: {
     if (!unlocked.has(island.id)) continue;
 
     const entries: TrainingEntry[] = [];
-    for (const skillId of island.rangeSkills) {
+    // The band's own cell (D-14 — `islandCurriculumFor`), in the cell's teaching order.
+    for (const skillId of islandCurriculumFor(island.id, band).skills) {
       if (seen.has(skillId)) continue;
       // The ceiling, and the ONLY place this module applies one — the same `skillInBand` the drill
       // itself refuses on, so the menu and the door cannot disagree about what is offerable.
-      if (!skillInBand(skillId, input.gradeBand)) continue;
+      if (!skillInBand(skillId, band)) continue;
       seen.add(skillId);
       entries.push({ islandId: island.id, skillId });
     }

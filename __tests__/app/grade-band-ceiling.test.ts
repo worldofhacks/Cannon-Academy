@@ -1,35 +1,50 @@
 /**
  * A-051 — the curriculum ceiling holds everywhere, including where it only shows.
  *
- * Two bugs, one cause: a grade band gates what a child is ASKED in several places, and each of those
- * places had to remember to apply it. Two forgot.
+ * RE-BASELINED under owner ruling **D-14** (2026-08-02, `tickets/app/OWNER-RULINGS.md`, applied
+ * by A-070): the ceiling moved from the map into the curriculum. Every island now carries one
+ * complete cell per band (`islandCurriculumFor`), the shared `rangeSkills` no longer exists, and
+ * A-060's guarantee is restated, not weakened: no island may carry, for any band, a skill above
+ * that band's ceiling. This file is where that guarantee LIVES at the consumer level — the
+ * A-070 AC-2 sweep below walks all 15 band × island cells through every migrated door (drills,
+ * rival guns, entry cannons, encounter skills, chart glyphs), so a single call site hardcoding
+ * another band's cell fails here by name.
  *
- *   1. `app/gun-deck.tsx` drew a flat `['+', '−', '×', '÷']` operator row, so a kindergartner saw
- *      multiplication and division on their own deck — dulled, as things not yet earned, three years
- *      before the curriculum introduces them.
- *   2. `chartNodes` measured `cleared` against EVERY skill an island teaches. Port Sumwich teaches
- *      four and one of them, `two_step_add_sub`, is `minGrade: 2`. A K-1 captain is never served it,
- *      so `every` could never be satisfied and their first island could never earn its green check
- *      however completely they finished it.
- *
- * The second is the more interesting failure: the tick was unreachable, not merely wrong, and no
- * existing test caught it because none of them picked a band and then mastered everything reachable.
+ * A-051's original two bugs stay pinned, one cause: a grade band gates what a child is ASKED in
+ * several places, and each of those places had to remember to apply it. Two forgot —
+ * `app/gun-deck.tsx`'s flat operator row, and `chartNodes` measuring `cleared` against skills a
+ * band is never served. Under the atlas `cleared` is measured against the band's own cell, so
+ * the tick and the offer can no longer disagree.
  */
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { getIsland, getSkill, islands, skills } from '../../src/content/index';
+import { getCannon, getSkill, islandCurriculumFor, islands, skills } from '../../src/content/index';
 import type { GradeBand, IslandId, SkillId } from '../../src/content/schemas';
+import { advanceOnWin } from '../../src/engine/mastery';
 import { maxGradeForBand } from '../../src/engine/placement';
 import { chartNodes } from '../../src/services/chart';
+import { encounterSkillFor } from '../../src/services/encounter';
+import { rangeSkills } from '../../src/services/range';
+import { deriveRivalLoadout } from '../../src/services/rivalLoadout';
+import { trainingCatalog } from '../../src/services/trainingCatalog';
 import { TEMPLATE_POOLS } from '../../src/services/templatePools';
 import { emptyCaptain } from '../../src/stores/player';
 import type { Captain } from '../../src/stores/player';
 import { MASTERY_THRESHOLD_CORRECT } from '../../src/engine/tuning';
 
 const BANDS: readonly GradeBand[] = ['k_1', 'g2_3', 'g4_5'];
+
+/** The chain, in `requiresIsland` order — used to drive entry-cannon grants per arrival. */
+const CHAIN: readonly IslandId[] = [
+  'port_sumwich',
+  'isla_products',
+  'quotient_cove',
+  'fraction_reef',
+  'grandline',
+];
 
 /** The two ways multiplication or division can reach a child: the glyph, and the word. */
 const OPERATOR_GLYPHS = /[×÷]/;
@@ -59,10 +74,10 @@ function captainWith(band: GradeBand, mastered: readonly SkillId[]): Captain {
   };
 }
 
-/** The skills an island teaches that this band will actually be asked. */
+/** The skills an island teaches THIS band (its cell), filtered by the ceiling tripwire. */
 function inBandSkills(islandId: IslandId, band: GradeBand): readonly SkillId[] {
   const maxGrade = maxGradeForBand(band);
-  return getIsland(islandId).rangeSkills.filter((s) => getSkill(s).minGrade <= maxGrade);
+  return islandCurriculumFor(islandId, band).skills.filter((s) => getSkill(s).minGrade <= maxGrade);
 }
 
 describe('A-051 grade-band ceiling', () => {
@@ -78,8 +93,8 @@ describe('A-051 grade-band ceiling', () => {
         expect(
           node?.cleared,
           `${island.id} is unclearable at ${band}: mastered all ${reachable.length} in-band ` +
-            `skill(s) [${reachable.join(', ')}] and it still did not tick. The island teaches ` +
-            `[${island.rangeSkills.join(', ')}].`,
+            `skill(s) [${reachable.join(', ')}] and it still did not tick. The island's ${band} ` +
+            `cell teaches [${islandCurriculumFor(island.id, band).skills.join(', ')}].`,
         ).toBe(true);
       }
     }
@@ -95,12 +110,19 @@ describe('A-051 grade-band ceiling', () => {
     expect(node?.cleared).toBe(true);
   });
 
-  it('spec(A-051:AC-1) an island with nothing in band is NOT ticked by vacuous truth', () => {
-    // `[].every(...)` is `true`. Without a length guard this would tick every island above the band,
-    // which is worse than the bug it replaced.
-    const node = chartNodes(captainWith('k_1', [])).find((n) => n.island.id === 'quotient_cove');
-    expect(inBandSkills('quotient_cove', 'k_1')).toEqual([]);
-    expect(node?.cleared).toBe(false);
+  it('spec(A-070:AC-2) no cell is empty at any band — the vacuous-truth guard has nothing left to bite on', () => {
+    // Pre-D-14 this test drove `[].every(...) === true` through quotient_cove@k_1, an island with
+    // nothing in band. Under the atlas that STATE no longer exists — every island teaches every
+    // band at least one in-ceiling skill (A-069's validator law) — so the successor pins the law
+    // at the consumer: 15 cells, none empty, and none ticked without mastery. The guard survives
+    // in `chartNodes` for the corrupt-catalog case the validator cannot see at runtime.
+    for (const band of BANDS) {
+      for (const island of islands) {
+        expect(inBandSkills(island.id, band).length, `${island.id}@${band} cell is empty`).toBeGreaterThan(0);
+      }
+      const node = chartNodes(captainWith(band, [])).find((n) => n.island.id === 'quotient_cove');
+      expect(node?.cleared, `${band} ticked quotient_cove with no mastery`).toBe(false);
+    }
   });
 
   it('spec(A-051:AC-2) mastering nothing clears nothing, at every band', () => {
@@ -216,9 +238,9 @@ describe('A-051 grade-band ceiling', () => {
     const node = chartNodes(captainWith('k_1', reachable)).find((n) => n.island.id === 'isla_products');
     expect(node?.cleared).toBe(true);
 
-    // The scope of this cut: the island AFTER it still teaches nothing in band, and the vacuous-
-    // truth guard above must keep it unticked.
-    expect(inBandSkills('quotient_cove', 'k_1')).toEqual([]);
+    // D-14 finished what A-060 started: the island AFTER it now teaches K-1 its own cell too —
+    // the old `[]` here was the scoped first cut, and the atlas closed the gap.
+    expect(inBandSkills('quotient_cove', 'k_1').length).toBeGreaterThan(0);
   });
 });
 
@@ -238,30 +260,25 @@ describe('A-051 the chart labels an island with what THIS captain will be asked'
 
     const nodes = chartNodes({ ...captain, unlockedIslands: [...captain.unlockedIslands] });
 
-    // ENTERABLE islands only, and the distinction is the ruling rather than a convenience.
-    //
-    // A fogged node keeps the board's own glyph on purpose: board 9a says "a silhouette, a name and
-    // a skill glyph survive the fog on every locked node, because anticipation is the whole point of
-    // a map". A `÷` a child cannot reach is a promise about later, not instruction now — the same
-    // reason A-051's original scope was the gun deck's operator row, a thing a child USES.
-    //
-    // An island they can sail to is instruction. That one has to speak their band.
-    const enterable = nodes.filter((node) => !node.fogged);
-    expect(enterable.length, 'nothing enterable — the sweep would pass vacuously').toBeGreaterThan(1);
-    for (const node of enterable) {
-      expect(node.glyph, `${node.island.id} is enterable and shows ${node.glyph} at K-1`).not.toMatch(
-        /[×÷]/,
-      );
+    // EVERY node, fogged included — RE-BASELINED under D-14. The pre-atlas rule kept the board's
+    // own glyph on fogged nodes ("anticipation is the whole point of a map"), which left `÷` on a
+    // K-1 captain's Quotient Cove. Under the atlas the anticipation IS band-true: the fogged node
+    // promises the island's OWN K-1 cell (Port Twenty, `+`), so no node on a five-year-old's map —
+    // reachable or promised — ever shows the symbol A-051 exists to keep away from them.
+    expect(nodes.filter((node) => !node.fogged).length, 'nothing enterable — the sweep would pass vacuously').toBeGreaterThan(1);
+    for (const node of nodes) {
+      expect(node.glyph, `${node.island.id} shows ${node.glyph} on a K-1 map`).not.toMatch(/[×÷]/);
     }
 
-    // And the fogged ones DO still carry the board's label, which is what makes the line above a
-    // scope decision rather than an accident of there being no glyphs anywhere.
-    expect(nodes.find((n) => n.island.id === 'quotient_cove')?.glyph).toBe('÷');
+    // The fogged successor now carries ITS band-true promise — the `+` of add_within_20, never
+    // the board's `÷`.
+    expect(nodes.find((n) => n.island.id === 'quotient_cove')?.glyph).toBe('+');
 
-    // Non-vacuous: the same island really does say `×` to a band that will be asked multiplication,
-    // so this is measuring the band and not simply an absence of glyphs everywhere.
-    expect(islandGlyphForCaptain('isla_products', 'k_1')).toBe('+');
-    expect(islandGlyphForCaptain('isla_products', 'g2_3')).toBe('×');
+    // Non-vacuous: the same chart position really does show ×/÷ to a band that will be asked it —
+    // the glyph is the cell's FIRST skill (D-14: the headline, the glyph source, the entry-cannon
+    // skill) — so this is measuring the band, not an absence of glyphs everywhere.
+    expect(islandGlyphForCaptain('isla_products', 'k_1')).toBe('−');
+    expect(islandGlyphForCaptain('isla_products', 'g4_5')).toBe('×');
     expect(islandGlyphForCaptain('quotient_cove', 'g4_5')).toBe('÷');
   });
 });
@@ -271,7 +288,6 @@ describe('A-051 the game loop hands you a gun for the island it opens', () => {
     const { applyCaptainTally, createCaptainStore } = await import('../../src/stores/player');
     const { commitGradeBand } = await import('../../src/services/onboarding');
     const { asksInBand } = await import('../../src/services/loadout');
-    const { getCannon, getIsland } = await import('../../src/content/index');
 
     // Driven through `applyCaptainTally`, which is what a real win goes through — it applies the
     // unlock delta itself, so this measures the captain the game actually produces rather than a
@@ -291,17 +307,144 @@ describe('A-051 the game loop hands you a gun for the island it opens', () => {
     expect(captain.unlockedIslands, 'the second island never opened').toContain('isla_products');
     expect(wins, 'a five-year-old should not grind for this').toBeLessThanOrEqual(4);
 
-    // `island.unlocksCannons` was declared on every island and read by NOTHING, so a cannon could
-    // only be earned by mastering its own skill — circular at a new island, and the reason a
-    // captain reached Isla Products holding nothing that could ask its questions.
+    // D-14: the entry list read is the BAND'S OWN CELL (`islandCurriculumFor`) — the shared
+    // `island.unlocksCannons` no longer exists, and the gun that lands is the one the island
+    // pays THIS band, whose skill the island teaches THIS band.
+    const cell = islandCurriculumFor('isla_products', 'k_1');
     const gained = captain.ownedCannons.filter((id) => !before.has(id));
-    const entry = gained.filter((id) => getIsland('isla_products').unlocksCannons.includes(id));
+    const entry = gained.filter((id) => cell.unlocksCannons.includes(id));
     expect(entry, 'earning the island granted no cannon of its own, or granted several').toHaveLength(1);
 
     // It must be a gun the duel will actually arm. An out-of-band grant is a reward the tray
     // refuses (A-058) — celebrated on one screen and denied on the next.
     const gun = getCannon(entry[0]!);
     expect(asksInBand(gun, 'k_1'), `${gun.id} cannot be fired at k_1`).toBe(true);
-    expect(getIsland('isla_products').rangeSkills).toContain(gun.skill);
+    expect(cell.skills).toContain(gun.skill);
+  });
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// A-070 AC-2 — the ceiling holds everywhere it used to, restated: the living 15-cell sweep
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+//
+// D-14 moved the ceiling from the map into the curriculum; this sweep is the A-060 tripwire
+// reborn. For every band × island (15 cells), every migrated door is opened with the CAPTAIN'S
+// band and everything that comes through it is measured against the band's ceiling. One call
+// site hardcoding another band's cell — the exact mutation A-070's verification demands go red —
+// fails below with the cell named.
+
+describe('A-070 AC-2 — the 15-cell ceiling sweep', () => {
+  /** A placed captain shaped like the app produces, holding the whole map open. */
+  function placedCaptain(band: GradeBand): Captain {
+    return {
+      ...emptyCaptain(),
+      gradeBand: band,
+      unlockedIslands: islands.map((i) => i.id),
+      currentIsland: 'port_sumwich',
+    };
+  }
+
+  it('spec(A-070:AC-2) every drill skill, rival gun, entry-cannon grant, and encounter skill sits at or under the band ceiling — all 15 cells', () => {
+    for (const band of BANDS) {
+      const ceiling = maxGradeForBand(band);
+      const captain = placedCaptain(band);
+
+      for (const island of islands) {
+        const at = `${island.id}@${band}`;
+
+        // Drills: the range offers the band's cell, whole and in-ceiling.
+        const drills = rangeSkills(island.id, band);
+        expect(drills.length, `${at}: no drills`).toBeGreaterThan(0);
+        expect(drills, at).toEqual([...islandCurriculumFor(island.id, band).skills]);
+        for (const skill of drills) {
+          expect(getSkill(skill).minGrade, `${at} drill ${skill}`).toBeLessThanOrEqual(ceiling);
+        }
+
+        // The rival's tray: guns whose skills the island teaches THIS band, all in band.
+        const rival = deriveRivalLoadout(captain, island.id);
+        expect(rival.length, `${at}: rival has no gun`).toBeGreaterThan(0);
+        for (const id of rival) {
+          const gun = getCannon(id);
+          expect(gun.minGrade, `${at} rival gun ${id}`).toBeLessThanOrEqual(ceiling);
+          expect(islandCurriculumFor(island.id, band).skills, `${at} rival gun ${id} skill`).toContain(
+            gun.skill,
+          );
+        }
+
+        // The encounter's greeting: the band's own cell, never above the ceiling.
+        const greeting = encounterSkillFor(island.id, band);
+        expect(greeting, `${at}: the host has no riddle`).not.toBeNull();
+        expect(getSkill(greeting!).minGrade, `${at} encounter ${greeting}`).toBeLessThanOrEqual(ceiling);
+        expect(islandCurriculumFor(island.id, band).skills, at).toContain(greeting);
+      }
+
+      // Entry-cannon grants: each of the four arrivals, one in-band gun from the band's cell.
+      for (let step = 0; step < CHAIN.length - 1; step += 1) {
+        const at = CHAIN[step]!;
+        const opens = CHAIN[step + 1]!;
+        const delta = advanceOnWin(at, band, CHAIN.slice(0, step + 1), []);
+        expect(delta.islands, `${band} win at ${at}`).toEqual([opens]);
+        expect(delta.cannons, `${band} arrival ${opens}`).toHaveLength(1);
+        const gun = getCannon(delta.cannons[0]!);
+        expect(gun.minGrade, `${band} entry gun ${gun.id} at ${opens}`).toBeLessThanOrEqual(ceiling);
+        expect(islandCurriculumFor(opens, band).unlocksCannons).toContain(gun.id);
+      }
+
+      // The training menu unions exactly the band's cells across unlocked islands — nothing more.
+      const offered = trainingCatalog({
+        unlockedIslands: captain.unlockedIslands,
+        currentIsland: captain.currentIsland,
+        gradeBand: band,
+      }).flatMap((group) => group.entries.map((entry) => entry.skillId));
+      for (const skill of offered) {
+        expect(getSkill(skill).minGrade, `${band} menu offers ${skill}`).toBeLessThanOrEqual(ceiling);
+      }
+    }
+  });
+
+  it("spec(A-070:AC-2) a K-1 captain's rendered questions never contain × or ÷ — proven on ALL FIVE islands", () => {
+    // The symbol ban, measured on what the glass would show: every template of every skill any
+    // K-1 door can serve (drill, rival gun, encounter), across the whole map.
+    const askable = new Set<SkillId>();
+    const captain = placedCaptain('k_1');
+    for (const island of islands) {
+      for (const skill of rangeSkills(island.id, 'k_1')) askable.add(skill);
+      for (const id of deriveRivalLoadout(captain, island.id)) askable.add(getCannon(id).skill);
+      const greeting = encounterSkillFor(island.id, 'k_1');
+      if (greeting !== null) askable.add(greeting);
+    }
+    expect(askable.size, 'no K-1 skill is askable anywhere — vacuous').toBeGreaterThan(2);
+
+    for (const skill of askable) {
+      for (const template of TEMPLATE_POOLS[skill]) {
+        expect(template.text, `${skill}/${template.id} on a K-1 island`).not.toMatch(OPERATOR_GLYPHS);
+        expect(template.text, `${skill}/${template.id} on a K-1 island`).not.toMatch(OPERATOR_WORDS);
+      }
+    }
+  });
+
+  it('spec(A-070:AC-5) null and corrupt bands fail closed at every migrated door — no drill, no menu, no encounter skill, no rival gun, no unlock', () => {
+    const nullish: readonly (null | undefined)[] = [null, undefined];
+    for (const band of nullish) {
+      expect(rangeSkills('port_sumwich', band)).toEqual([]);
+      expect(encounterSkillFor('port_sumwich', band)).toBeNull();
+      expect(
+        trainingCatalog({ unlockedIslands: ['port_sumwich'], currentIsland: 'port_sumwich', gradeBand: band }),
+      ).toEqual([]);
+    }
+    // Corrupt band strings a save can carry: same closed answers, never a throw on the offer path.
+    const corrupt = 'grade_9' as unknown as GradeBand;
+    expect(rangeSkills('port_sumwich', corrupt)).toEqual([]);
+    expect(encounterSkillFor('port_sumwich', corrupt)).toBeNull();
+    expect(
+      trainingCatalog({ unlockedIslands: ['port_sumwich'], currentIsland: 'port_sumwich', gradeBand: corrupt }),
+    ).toEqual([]);
+
+    // The rival gun and the win-advance fail closed too — loudly and emptily respectively, both
+    // the postures their modules document.
+    expect(() =>
+      deriveRivalLoadout({ ...emptyCaptain(), gradeBand: null }, 'port_sumwich'),
+    ).toThrowError(RangeError);
+    expect(advanceOnWin('port_sumwich', null, ['port_sumwich'], [])).toEqual({ islands: [], cannons: [] });
   });
 });

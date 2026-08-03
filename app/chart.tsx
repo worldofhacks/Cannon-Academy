@@ -591,7 +591,7 @@ export default function Chart() {
           <ArrivalCeremonyOverlay
             beat={ceremony.beat}
             islandId={ceremonyNode.island.id}
-            islandName={ceremonyNode.island.displayName}
+            islandName={ceremonyNode.displayName}
             glyph={ceremonyNode.glyph}
             typeScale={L.type}
             width={screen.w || FRAME.width}

@@ -35,7 +35,7 @@
  * as a precondition that the predecessor island itself is unlocked. Do not add that precondition
  * — a frozen test pins the literal reading.
  */
-import { cannons, getCannon, getIsland, getSkill, islands } from '@content/index';
+import { cannons, getCannon, getSkill, islandCurriculumFor, islands } from '@content/index';
 import type { CannonId, GradeBand, Island, IslandId, SkillId } from '@content/schemas';
 import { maxGradeForBand } from '@engine/placement';
 import {
@@ -121,48 +121,55 @@ function masteredSkillIds(mastery: Readonly<Partial<Record<SkillId, SkillMastery
 
 /**
  * The band-eligibility rule, shared by `resolveUnlocks` and `advanceOnWin` so the two unlock
- * paths can never disagree about it: an island is eligible only when it teaches something at or
- * under the captain's grade ceiling. This is the only thing standing between a K-1 captain and
- * Quotient Cove's division, whichever mechanism lifts the fog.
+ * paths can never disagree about it: an island is eligible only when its cell for THE CAPTAIN'S
+ * BAND (D-14 — `islandCurriculumFor`, the one door to island content) teaches something at or
+ * under the captain's grade ceiling.
+ *
+ * Under the atlas every island is band-eligible BY CONSTRUCTION — A-069's `assertCurriculumLawful`
+ * refuses a catalog whose cells violate the ceiling — but the gate STAYS (A-070 ticket): it is the
+ * runtime tripwire that catches a future bad catalog after import-time validation is somehow
+ * bypassed, not a check the happy path needs.
  */
-function teachesInBand(island: Island, maxGrade: number): boolean {
-  return island.rangeSkills.some((skillId) => getSkill(skillId).minGrade <= maxGrade);
+function teachesInBand(island: Island, band: GradeBand, maxGrade: number): boolean {
+  return islandCurriculumFor(island.id, band).skills.some(
+    (skillId) => getSkill(skillId).minGrade <= maxGrade,
+  );
 }
 
 /**
  * One entry cannon per island earned, and it is what closes the loop.
  *
- * `island.unlocksCannons` has been declared on all five islands since the catalog was written and
- * was consumed by NOTHING — `content/index.ts` only validated that the ids exist. So a cannon
- * could only ever be earned by mastering its own skill, which is circular at a new island: the
- * gun that teaches grouping arrived only once you had already mastered grouping. A captain
- * therefore reached Isla Products holding nothing that could ask its questions, and duelling
- * there taught them nothing new.
+ * The list read is THE BAND'S OWN (D-14): `islandCurriculumFor(islandId, band).unlocksCannons`,
+ * the cell the arrival is actually teaching this captain — never a shared island-wide list, which
+ * no longer exists. A-069's validator guarantees every cell cannon fires a skill on that cell's
+ * own skill list, so the gun that lands is a gun whose questions the island asks THIS band.
  *
- * Arriving now hands you the island's entry gun, so the loop reads: earn the next island → its
+ * Arriving hands you the island's entry gun, so the loop reads: earn the next island → its
  * cannon arrives → its questions are new → mastery grows → the arsenal grows. Shared by
  * `resolveUnlocks` and `advanceOnWin` (D-11) so both paths pay the arrival gun identically.
  *
- * **One, not all.** Port Sumwich alone lists four; granting every one would hand a fresh captain
- * five guns for three tray slots and leave nothing to earn on the island they are standing on.
- * The rest stay on the mastery path, which is the within-island progression.
+ * **One, not all.** A cell may list several guns; granting every one would overfill a three-slot
+ * tray and leave nothing to earn on the island itself. The rest stay on the mastery path, which
+ * is the within-island progression.
  *
  * **The lowest in-band grade**, because that is the gun the island is teaching you WITH. An
  * out-of-band one would be a reward the duel then refuses to arm (A-058), which the gun deck
- * would have to explain away as "NOT YET" on the very screen celebrating it.
+ * would have to explain away as "NOT YET" on the very screen celebrating it. The `minGrade`
+ * filter is the same runtime tripwire as `teachesInBand`: satisfied by construction under a
+ * lawful catalog, kept so a future bad authoring edit fails closed here too.
  *
  * Only for islands earned in this delta — placement has its own grant rule (starters plus the
- * D-9 exceptions) and pre-unlocks up to three islands at the top band, so folding these in there
- * would overfill the tray on the first launch.
+ * D-9 exceptions), so folding these in there would overfill the tray on the first launch.
  */
 function entryCannonGrants(
   earnedIslands: readonly IslandId[],
+  band: GradeBand,
   maxGrade: number,
   alreadyCannons: ReadonlySet<CannonId>,
   grantedInSameDelta: readonly CannonId[],
 ): readonly CannonId[] {
   const entries = earnedIslands.flatMap((islandId) => {
-    const granted = getIsland(islandId)
+    const granted = islandCurriculumFor(islandId, band)
       .unlocksCannons.map((id) => getCannon(id))
       .filter(
         (c) =>
@@ -183,8 +190,16 @@ function entryCannonGrants(
  * - Cannons: every catalog cannon whose `unlock.kind === 'range'` and whose `skill` is mastered,
  *   PLUS one entry cannon for each island unlocked in this same delta (see below).
  * - Islands: every catalog island `I` with `requiresIsland === J` where at least one skill in
- *   `J.rangeSkills` is mastered. This reads `unlockedIslands` only to exclude `I` itself from the
- *   delta — never as a precondition that `J` is unlocked (see module docs above).
+ *   `J`'s cell for the captain's band (D-14 — `islandCurriculumFor`) is mastered. This reads
+ *   `unlockedIslands` only to exclude `I` itself from the delta — never as a precondition that
+ *   `J` is unlocked (see module docs above).
+ *
+ * **No band, no island** (D-14 / A-070 AC-5): with `gradeBand` omitted there is no cell to read,
+ * so the island delta and its entry cannons are empty — fail closed, never "no ceiling". The old
+ * `POSITIVE_INFINITY` reading opened a band-less save onto whichever curriculum happened to be
+ * shared; under the atlas there is no shared curriculum to fall back to. Mastery-earned cannons
+ * are unaffected: they hang off the captain's own mastered skills, not off island content, and
+ * A-058's `asksInBand` still refuses to arm anything above a real band at the point of fire.
  */
 export function resolveUnlocks(input: {
   readonly gradeBand?: GradeBand;
@@ -195,27 +210,30 @@ export function resolveUnlocks(input: {
   const mastered = masteredSkillIds(input.mastery);
   const alreadyCannons = new Set(input.unlockedCannons);
   const alreadyIslands = new Set(input.unlockedIslands);
-  const maxGrade =
-    input.gradeBand === undefined ? Number.POSITIVE_INFINITY : maxGradeForBand(input.gradeBand);
 
   const newCannons = cannons
     .filter((c) => c.unlock.kind === 'range' && mastered.has(c.skill) && !alreadyCannons.has(c.id))
     .map((c) => c.id);
 
+  const band = input.gradeBand;
+  if (band === undefined) {
+    return { cannons: newCannons, islands: [] };
+  }
+  const maxGrade = maxGradeForBand(band);
+
   const newIslands = islands
     .filter((i) => {
       if (alreadyIslands.has(i.id)) return false;
       if (i.requiresIsland === undefined) return false;
-      if (!teachesInBand(i, maxGrade)) return false;
-      const predecessor = getIsland(i.requiresIsland);
-      return predecessor.rangeSkills.some((s) => mastered.has(s));
+      if (!teachesInBand(i, band, maxGrade)) return false;
+      return islandCurriculumFor(i.requiresIsland, band).skills.some((s) => mastered.has(s));
     })
     .map((i) => i.id);
 
   // See `entryCannonGrants` — the arrival gun, shared with `advanceOnWin` so both paths pay it
   // identically. Mastery-granted cannons from this same delta are excluded so a gun is never
   // reported twice in one resolution.
-  const entryCannons = entryCannonGrants(newIslands, maxGrade, alreadyCannons, newCannons);
+  const entryCannons = entryCannonGrants(newIslands, band, maxGrade, alreadyCannons, newCannons);
 
   return { cannons: [...newCannons, ...entryCannons], islands: newIslands };
 }
@@ -238,8 +256,11 @@ export function resolveUnlocks(input: {
  * keeps paying cannons (and still lifts fog on mastery, which is now the slower of the two
  * roads); the band gate is not negotiable in either.
  *
- * `band` is `null` for a captain who was never placed — no ceiling, matching `resolveUnlocks`
- * with `gradeBand` omitted and `services/chart.ts`'s reading of the same state.
+ * `band` is `null` for a captain who was never placed — and under D-14 that FAILS CLOSED: no
+ * cell to read means no island opens and no gun lands, matching `resolveUnlocks` with
+ * `gradeBand` omitted (A-070 AC-5). The old reading — `null` as "no ceiling" — opened the shared
+ * chain that no longer exists; a captain the app never placed has no curriculum to advance
+ * through, and a win from that state must not invent one.
  */
 export function advanceOnWin(
   islandId: IslandId,
@@ -247,16 +268,23 @@ export function advanceOnWin(
   unlockedIslands: readonly IslandId[],
   unlockedCannons: readonly CannonId[],
 ): { readonly islands: readonly IslandId[]; readonly cannons: readonly CannonId[] } {
+  if (band === null) {
+    return { islands: [], cannons: [] };
+  }
+
   const alreadyIslands = new Set(unlockedIslands);
   const alreadyCannons = new Set(unlockedCannons);
-  const maxGrade = band === null ? Number.POSITIVE_INFINITY : maxGradeForBand(band);
+  const maxGrade = maxGradeForBand(band);
 
   const newIslands = islands
-    .filter((i) => i.requiresIsland === islandId && !alreadyIslands.has(i.id) && teachesInBand(i, maxGrade))
+    .filter(
+      (i) =>
+        i.requiresIsland === islandId && !alreadyIslands.has(i.id) && teachesInBand(i, band, maxGrade),
+    )
     .map((i) => i.id);
 
   return {
     islands: newIslands,
-    cannons: entryCannonGrants(newIslands, maxGrade, alreadyCannons, []),
+    cannons: entryCannonGrants(newIslands, band, maxGrade, alreadyCannons, []),
   };
 }
