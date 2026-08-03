@@ -26,10 +26,10 @@ README, HANDOFF, or STATE — those documents link here.
 | A-009 | app | Gunnery range — the drill that makes mastery real | review-passed | A4 | A-001, A-007 | ticket/a-009 | [A-009](app/A-009.md) |
 | A-010 | app | Chest ceremony — the real rarity roll, not a hardcoded reward | review-passed | G4 | A-008, A-032 | ticket/a-010 | [A-010](app/A-010.md) |
 | A-011 | app | Gun deck — which three cannons sail with you | review-passed | A7 | A-001 | ticket/a-011 | [A-011](app/A-011.md) |
-| A-012 | app | Rank ladder and progress — what the meta actually shows | backlog | G1 | A-008 | ticket/a-012 | [A-012](app/A-012.md) |
-| A-013 | app | Design fidelity — the shipped sprites, and a diff that proves it | backlog | A6 | A-007 | ticket/a-013 | [A-013](app/A-013.md) |
+| A-012 | app | Rank ladder and progress — what the meta actually shows | review-passed | G1 | A-008 | ticket/a-012 | [A-012](app/A-012.md) |
+| A-013 | app | Design fidelity — the shipped sprites, and a diff that proves it | review-passed | A6 | A-007 | ticket/a-013 | [A-013](app/A-013.md) |
 | A-014 | app | Retire the placeholder question generator | review-passed | A7 | A-001, A-016, A-017 | ticket/a-014 | [A-014](app/A-014.md) |
-| A-015 | app | The guided first duel — where a five-year-old learns to play | backlog | G4 | A-001, A-003, A-008, A-014, A-016, A-017, A-029, A-030, A-032, A-039 | ticket/a-015 | [A-015](app/A-015.md) |
+| A-015 | app | The guided first duel — where a five-year-old learns to play | review-passed | G4 | A-001, A-003, A-008, A-014, A-016, A-017, A-029, A-030, A-032, A-039 | ticket/a-015 | [A-015](app/A-015.md) |
 | A-016 | app | The duel itself — four choices, a speed-aimed volley, and a machine that cannot lock | review-passed | A5 | A-001, A-008 | ticket/a-016 | [A-016](app/A-016.md) |
 | A-017 | app | Timeout and misfire — what a burned fuse costs, said out loud | review-passed | A6 | A-001, A-016 | ticket/a-017 | [A-017](app/A-017.md) |
 | A-018 | app | Release verification — rebuilt chart is safe and visible | review-passed | R1 | A-007, A-017 | ticket/a-018-release-chart | [A-018](app/A-018.md) |
@@ -45,20 +45,35 @@ README, HANDOFF, or STATE — those documents link here.
 | A-028 | app | Training choice — easier practice remains available and difficulty is legible | review-passed | G2 | A-027 | ticket/a-028-training-choice | [A-028](app/A-028.md) |
 | A-029 | app | Island-aware duel context — five levels no longer fight like Port Sumwich | review-passed | G2 | A-016, A-039 | ticket/a-029-duel-context | [A-029](app/A-029.md) |
 | A-030 | app | Real rival bridge — use the seeded bot and mercy system already built | review-passed | G3 | A-027, A-029, A-039, A-041 | ticket/a-030-opponent-bridge | [A-030](app/A-030.md) |
-| A-031 | app | Enemy encounters — pirate, skeleton, ghost, shark, and kraken | backlog | G4 | A-030 | ticket/a-031-enemy-variety | [A-031](app/A-031.md) |
+| A-031 | app | Enemy encounters — pirate, skeleton, ghost, shark, and kraken | review-passed | G4 | A-030 | ticket/a-031-enemy-variety | [A-031](app/A-031.md) |
 | A-032 | app | Real chest settlement — every catalog cannon has an attainable path | review-passed | G3 | A-008, A-039, A-041 | ticket/a-032-chest-acquisition | [A-032](app/A-032.md) |
-| A-033 | app | Harbor store — spend coins without buying past learning | backlog | G4 | A-032 | ticket/a-033-harbor-store | [A-033](app/A-033.md) |
-| A-034 | app | Cannon identity — visible difficulty, distinct weapons, and grade-aware starting play | backlog | G4 | A-027, A-032, A-041 | ticket/a-034-cannon-identity | [A-034](app/A-034.md) |
+| A-033 | app | Harbor store — spend coins without buying past learning | review-passed | G4 | A-032 | ticket/a-033-harbor-store | [A-033](app/A-033.md) |
+| A-034 | app | Cannon identity — visible difficulty, distinct weapons, and grade-aware starting play | review-passed | G4 | A-027, A-032, A-041 | ticket/a-034-cannon-identity | [A-034](app/A-034.md) |
 | A-035 | app | Canonical ticket index — one generated source of delivery truth | review-passed | D1 | none | ticket/a-035-canonical-ticket-index | [A-035](app/A-035.md) |
 | A-036 | app | Documentation reconciliation — current behavior, backend, and limits agree | backlog | D6 | A-010, A-012, A-015, A-026, A-028, A-031, A-033, A-034, A-035, A-038, A-039, A-040, A-041 | ticket/a-036-doc-reconciliation | [A-036](app/A-036.md) |
 | A-037 | app | Release proof — native demo flow and production redeploy | backlog | D7 | A-036, A-038 | ticket/a-037-demo-release | [A-037](app/A-037.md) |
-| A-038 | app | Demo navigation — every built screen is reachable from the chart | backlog | G5 | A-010, A-012, A-015, A-028, A-031, A-033, A-034 | ticket/a-038-demo-navigation | [A-038](app/A-038.md) |
+| A-038 | app | Demo navigation — every built screen is reachable from the chart | review-passed | G5 | A-010, A-012, A-015, A-028, A-031, A-033, A-034 | ticket/a-038-demo-navigation | [A-038](app/A-038.md) |
 | A-039 | app | Canonical duel core — one rules machine with a presentation adapter | review-passed | G1 | A-016, T-020, T-021, T-036 | ticket/a-039-canonical-duel-core | [A-039](app/A-039.md) |
 | A-040 | app | Cloud-safe profile sync — one local-first dispatcher and owner-only schema | backlog | D4 | A-026, A-030, A-032, A-041 | ticket/a-040-profile-sync | [A-040](app/A-040.md) |
 | A-041 | app | Durable captain contract — mercy and reward receipts survive relaunch | review-passed | G2 | A-027 | ticket/a-041-durable-captain | [A-041](app/A-041.md) |
 | A-042 | app | Demo launch gate and unclipped ship picker | review-passed | RELEASE-HOTFIX | A-005, A-025 | ticket/a-042-launch-picker | [A-042](app/A-042.md) |
 | A-043 | app | Responsive tablet and desktop surfaces | review-passed | RELEASE-RESPONSIVE | A-042 | ticket/a-043-responsive-surfaces | [A-043](app/A-043.md) |
 | A-044 | app | Reviewer-ready repository baseline — current landing docs without erasing history | review-passed | DOC-BASELINE | A-035 | ticket/a-044-reviewer-ready-docs | [A-044](app/A-044.md) |
+| A-045 | app | Restore the boards' composed ships and make the artifacts the only source of art | review-passed | G6 | A-013, A-031, A-034 | app/shell | [A-045](app/A-045.md) |
+| A-046 | app | Purge invented colours — every hex in the app traces to a design artifact | review-passed | G6 | A-045 | app/shell | [A-046](app/A-046.md) |
+| A-047 | app | Fix the hook-order crash on both duel routes, and the dead cannon in the guided duel | review-passed | G6 | A-015, A-016, A-038 | app/shell | [A-047](app/A-047.md) |
+| A-048 | app | Stop the chart dock overflowing — five labelled controls that fit and read | review-passed | G6 | A-038 | app/shell | [A-048](app/A-048.md) |
+| A-049 | app | Waterline, crossbones and dock padding — three overflow fixes | review-passed | G6 | A-045, A-048 | app/shell | [A-049](app/A-049.md) |
+| A-050 | app | Centre the chart dock controls so tablet and desktop stop left-huddling | review-passed | G6 | A-049 | app/shell | [A-050](app/A-050.md) |
+| A-051 | app | The grade-band ceiling holds everywhere, including where it only shows | review-passed | G6 | A-007, A-011 | app/shell | [A-051](app/A-051.md) |
+| A-052 | app | Ship skins — the model layer the Harbor and Rank boards both assume | review-passed | G7 | A-006, A-045 | app/shell | [A-052](app/A-052.md) |
+| A-054 | app | Text colours certified against their ground — five real contrast failures | review-passed | G7 | none | app/shell | [A-054](app/A-054.md) |
+| A-055 | app | The Harbor sells paint — ship skins, and the chest off the shelf | review-passed | G7 | A-052 | app/shell | [A-055](app/A-055.md) |
+| A-058 | app | A duel never asks above the band the child picked at onboarding | in-progress | G6 | A-011, A-016, A-051 | app/shell | [A-058](app/A-058.md) |
+| A-061 | app | The range never re-throws a target that is already dead or already flying | review-passed | G8 | A-009 | main | [A-061](app/A-061.md) |
+| A-062 | app | A win advances the voyage — no island is replayed to open the next | review-passed | G8 | A-027 | main | [A-062](app/A-062.md) |
+| A-063 | app | The ship sails to the island it just earned, and the next battle begins | review-passed | G8 | A-018 | main | [A-063](app/A-063.md) |
+| A-064 | app | A generated fleet — twenty golden ships from board-sanctioned primitives | review-passed | G8 | A-045, A-052 | main | [A-064](app/A-064.md) |
 | T-001 | engine | Seeded mulberry32 PRNG with pure, state-threaded draw helpers | review-passed | 1 | none | ticket/T-001-seeded-prng | [T-001](T-001.md) |
 | T-002 | engine | Safe arithmetic expression and constraint predicate evaluator (no eval) | review-passed | 1 | none | ticket/T-002-safe-expr-eval | [T-002](T-002.md) |
 | T-003 | engine | Content zod schemas, id unions, and engine question types | review-passed | 1 | none | ticket/T-003-schemas-and-types | [T-003](T-003.md) |

@@ -214,3 +214,71 @@ by the schema and read by no engine code, so tiers alone cannot stage this.
 `src/content/cannons.json` and `src/content/islands.json` are engine-track scope per
 `COORDINATION.md`. The owner authorised these two edits directly for this fix; no engine module
 changed.
+
+## D-11 — A win advances the voyage (2026-08-02, ruled in session)
+
+> "we should remove the need to play the same island multiple times to move to the next ones so
+> it does not feel repetitive."
+
+### What was true
+
+Forward progression was mastery-gated: an island's fog lifted only when a predecessor
+`rangeSkill` crossed `MASTERY_THRESHOLD_CORRECT`/`MASTERY_MIN_ACCURACY` — in practice 2–3 wins on
+the same island (`src/engine/mastery.ts` `resolveUnlocks`, pinned at ≤3 wins by
+`k1-island-progression`). That rationing existed because content was finite: five islands, and a
+child who sprinted through them was done. With adaptive generated content planned, the rationing
+loses its reason, and the owner judged repetition the bigger retention risk than pacing.
+
+### The ruling
+
+**Winning a duel on an island immediately opens the next band-eligible island in the chain.** One
+win, one new island, and the voyage moves.
+
+Narrow supersession: this replaces mastery as the gate for **island fog only**. Everything else
+D-6/D-7 built stands untouched —
+
+- **The band gate is not negotiable.** A win never opens an island that teaches nothing inside
+  the captain's band. K-1's reachable set remains exactly `[port_sumwich, isla_products]` until
+  that band gains lower rungs. The A-060 fixpoint holds; only the *speed* of reaching it changed.
+- **Mastery still pays cannons.** `resolveUnlocks` keeps granting range cannons on mastery; the
+  practice lane still accelerates the arsenal, it just no longer holds the map hostage.
+- **The entry cannon still lands with its island** — an island must arrive holding the gun that
+  asks its questions, or we recreate the circular-acquisition bug.
+
+### Consequences
+
+The dock meter's `NEXT: 2 DUELS` arithmetic becomes vestigial — it now reads `NEXT: 1 DUEL`
+whenever a next island exists, and the caption plumbing stays so the copy keeps telling the
+truth. The frozen specs that pinned mastery-gated fog (`k1-island-progression`,
+`engine/mastery` island cases) are re-baselined citing this ruling. Implemented by **A-062**.
+
+## D-12 — Generated fleet art ships only as recombination of artifact material (2026-08-02, ruled in session)
+
+> "We can generate new ships within a specific zod schema since they are svgs … use the existing
+> upgrade options we have as golden examples, and then generate 20 more so we have solid golden
+> set to generate off of."
+
+### The tension
+
+A-045 ruled — twice — that art appearing in neither design artifact does not ship, and pins the
+raster inventory to nine MD5s. Generated ships are, by definition, not on the boards.
+
+### The ruling
+
+A generated ship may ship **as data** when every field of its document is an enum or count over
+board-sanctioned primitives: the board's own hull/sail outlines, named palette tokens from
+`src/theme/tokens.ts`, and emblem parts that already exist in the composed geometry. Such a
+document is a *rearrangement of artifact material*, not outside art. The strict zod schema is the
+provenance boundary:
+
+- **No raw coordinates.** Shape variety is counts and enum shapes over fixed anchors; a document
+  that could describe a degenerate polygon is unrepresentable.
+- **No free hex.** Color fields are enums over named token swatches, so the contrast audits keep
+  their meaning.
+- **No rasters.** Output renders through the same `Poly`/View stack as everything else; a
+  generated PNG on disk stays a test failure.
+- **Player identity stays the player's** — the red vertical sail stripe is unrepresentable on a
+  rival-role document, mirroring `enemyPresentation`'s rule.
+
+Every shipped document passes the schema **and** a committed human-reviewed golden set (the
+eyeball grid). Implemented by **A-064**; the standing A-045 regime is otherwise unchanged.
