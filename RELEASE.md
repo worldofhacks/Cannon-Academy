@@ -11,7 +11,8 @@ backend boundary (Auth/Firestore/Storage client + rules), not a web host. Railwa
 
 | URL                                           | Role                                                                         | Evidence                   |
 | --------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------- |
-| <https://cannon-academy.expo.app>             | Production alias — currently lags `main` (no `/fleet` or `/uncharted` route) | HTTP 200 probed 2026-08-03 |
+| <https://cannon-academy.expo.app>             | Production alias — serves immutable deployment `24prch14ju` built from `main` @ `bf9df3d` | All 12 routes HTTP 200 probed 2026-08-03 |
+| <https://cannon-academy--24prch14ju.expo.app> | Immutable current-production deployment (promoted 2026-08-03 after all-route verification) | HTTP 200 probed 2026-08-03 |
 | <https://cannon-academy--wejre1bucz.expo.app> | Immutable A-042 release deployment — code `28f4ccc` (committed A-044 record) | HTTP 200 probed 2026-08-03 |
 | <https://cannon-academy--2f4tf1erk3.expo.app> | Immutable rollback target preceding A-042 (committed A-044 record)           | HTTP 200 probed 2026-08-03 |
 | <https://cannon-academy--waa9davmr9.expo.app> | Later immutable deployment recorded 2026-07-29 as carrying `5147e38`         | HTTP 200 probed 2026-08-03 |

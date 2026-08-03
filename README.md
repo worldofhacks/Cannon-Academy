@@ -29,9 +29,10 @@ merge-request state intentionally differ — and GitHub
 [PR #2](https://github.com/worldofhacks/Cannon-Academy/pull/2) (`app/shell` → `main`) stays
 **owner review only** — do not merge it from an agent session.
 
-The hosted web bundle lags the repository. The A-042 release commit **`28f4ccc`** shipped as
-immutable deployment `wejre1bucz` (committed A-044 record); the alias today serves a build newer
-than that but older than the rival fleet shelf and the Uncharted Sea — see the hosting section
+The hosted web bundle now matches the repository: the production alias serves immutable
+deployment `24prch14ju`, built from `main` @ `bf9df3d` and promoted 2026-08-03 after all-route
+verification. The A-042 release commit **`28f4ccc`** remains available as immutable deployment
+`wejre1bucz` (committed A-044 record) — see the hosting section
 below for the 2026-08-03 probes.
 
 ---
@@ -87,7 +88,7 @@ remains:
 | Guided-duel teaching depth                | Step 1 of 3 is scripted; steps 2–3 wait on the design brief (`design/GUIDED-DUEL-BRIEF.md`)                                                                                                   | A-015 follow-up |
 | Ranks ladder                              | Cut by owner ruling — the Rank screen shows private progress only                                                                                                                             | A-012 ruling    |
 | Tablet / desktop polish                   | Responsive surfaces shipped (A-043); one known-red fixture remains in the accepted test baseline                                                                                              | A-043           |
-| Hosted web build                          | The production alias lags `main` — no `/fleet` or `/uncharted` route on the deployed bundle (probed 2026-08-03)                                                                               | `RELEASE.md`    |
+| Hosted web build                          | Current as of 2026-08-03: the alias serves `main` @ `bf9df3d` (deployment `24prch14ju`, all 12 routes probed live). Redeploy is a manual owner-gated step — see `RELEASE.md`                  | `RELEASE.md`    |
 
 Final cross-doc reconciliation after those features land is **A-036** (still backlog). This README
 is the A-044 reviewer baseline, not an evergreen claim.
@@ -100,7 +101,8 @@ is the A-044 reviewer baseline, not an evergreen claim.
 
 | URL                                           | Role                                                                                                                                              |
 | --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
-| <https://cannon-academy.expo.app>             | Production alias — HTTP 200 probed 2026-08-03; serves `/harbor` and `/rank` but not `/fleet` or `/uncharted`, so the hosted build **lags `main`** |
+| <https://cannon-academy.expo.app>             | Production alias — serves immutable deployment `24prch14ju`, built from `main` @ `bf9df3d` (all 12 routes incl. `/fleet` and `/uncharted` HTTP 200, probed 2026-08-03 post-promotion) |
+| <https://cannon-academy--24prch14ju.expo.app> | Immutable current-production deployment — built from `bf9df3d`, promoted to the alias 2026-08-03 after all-route verification                     |
 | <https://cannon-academy--wejre1bucz.expo.app> | Immutable A-042 release deployment — code `28f4ccc` per the committed A-044 record; HTTP 200 probed 2026-08-03                                    |
 | <https://cannon-academy--2f4tf1erk3.expo.app> | Immutable rollback target preceding A-042 (committed A-044 record); HTTP 200 probed 2026-08-03                                                    |
 | <https://cannon-academy--waa9davmr9.expo.app> | Later immutable deployment recorded 2026-07-29 as carrying `5147e38`; HTTP 200 probed 2026-08-03                                                  |
