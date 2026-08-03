@@ -78,6 +78,9 @@ README, HANDOFF, or STATE — those documents link here.
 | A-066 | app | The island encounter — one riddle, no wrong outcome, adjusted to the band | review-passed | G9 | A-062 | main | [A-066](app/A-066.md) |
 | A-067 | app | The rival fleet shelf — twenty ships, met the honest way | review-passed | G9 | A-064 | main | [A-067](app/A-067.md) |
 | A-068 | app | Deck crew — a sailor on every rival deck, built from nine shapes | review-passed | G9 | A-067 | main | [A-068](app/A-068.md) |
+| A-069 | app | The curriculum atlas — per-band islands, four new skills, the catalog speaks Common Core | in-progress | G10 | A-062 | main | [A-069](app/A-069.md) |
+| A-070 | app | Every consumer sails the band's own sea — the atlas migration | in-progress | G10 | A-069 | main | [A-070](app/A-070.md) |
+| A-071 | app | The atlas speaks — band names on the chart, riddles for the new rungs | in-progress | G10 | A-069, A-066 | main | [A-071](app/A-071.md) |
 | T-001 | engine | Seeded mulberry32 PRNG with pure, state-threaded draw helpers | review-passed | 1 | none | ticket/T-001-seeded-prng | [T-001](T-001.md) |
 | T-002 | engine | Safe arithmetic expression and constraint predicate evaluator (no eval) | review-passed | 1 | none | ticket/T-002-safe-expr-eval | [T-002](T-002.md) |
 | T-003 | engine | Content zod schemas, id unions, and engine question types | review-passed | 1 | none | ticket/T-003-schemas-and-types | [T-003](T-003.md) |
