@@ -16,21 +16,29 @@
  *   * Every entry validated through `templateSchema` — the parse is what produces the type as
  *     well as the guarantee, and a malformed riddle must fail a test, never reach a child.
  *
- * ── Which skills carry riddles ────────────────────────────────────────────────────────────────
+ * ── Which skills carry riddles (re-baselined under D-14 by A-071) ─────────────────────────────
  *
  * One file per skill rung an arrival can ask (`encounterSkillFor` — see `services/encounter.ts`
  * for the band rule), each holding at least two host-voiced word problems in the board's register
- * ("I have 3 shells. I find 2 more. How many?"), all `isWordProblem`/`readAloud`. The voice per
- * file follows the island that asks it: Port Sumwich's three rungs are Nipper's shells and sand,
- * Isla Products' two are Pip's hellos and seeds, Quotient Cove shares Tumble's berries, Fraction
- * Reef counts Ollie's arms, and the Grandline follows Gale's fish.
+ * ("I have 3 shells. I find 2 more. How many?"), all `isWordProblem`/`readAloud`. Since owner
+ * ruling D-14 every island teaches per-band curriculum, but the HOSTS stay keyed by island id —
+ * so a riddle file's voice follows the ISLAND that asks its skill under the atlas, whatever a
+ * band calls that island: Nipper the crab keeps Port Sumwich's rungs, Pip the parrot voices Isla
+ * Products' (`sub_within_10` at K-1's Take-Away Bay, `multi_digit_mult` at G4-5's Product Peaks,
+ * with the older hellos and seeds), Tumble the turtle voices Quotient Cove's (`long_division` at
+ * Long-Divide Deep joins the berries), Ollie the octopus counts at Fraction Reef, and Gale the
+ * gull follows fish at the Grandline (`place_value_teens` at K-1's Teen-Ten Harbor). Every
+ * closing question restates the action in full — D-13, enforced by spec(A-066:AC-7).
  *
  * `__tests__/app/encounter.test.ts` writes the arrival enumeration out as data and asserts every
  * asked skill has an AUTHORED pool — so a new island rung fails that test loudly instead of
- * silently having no riddles. The fallback below exists for the runtime beyond that test: a skill
- * with no riddle file falls back to its plain duel templates via a LOCAL parse of the same JSON
- * files — fresh arrays, never the shared pool object — because a plain question in front of a
- * child beats a thrown error in front of one.
+ * silently having no riddles. Two rungs ride the pinned fallback instead: `place_value_compare`
+ * (Compare Cove, g2_3) and `sub_within_20` (Minus Lagoon, k_1) became arrival skills under D-14
+ * with no authored file yet — the enumeration names them EXACTLY, so a third can never join them
+ * silently. The fallback below exists for the runtime beyond that test: a skill with no riddle
+ * file falls back to its plain duel templates via a LOCAL parse of the same JSON files — fresh
+ * arrays, never the shared pool object — because a plain question in front of a child beats a
+ * thrown error in front of one.
  */
 import type { SkillId, Template } from '@content/schemas';
 import { templateSchema } from '@content/schemas';
@@ -39,9 +47,13 @@ import riddleAddWithin10Raw from './riddles/add_within_10.json';
 import riddleAddWithin20Raw from './riddles/add_within_20.json';
 import riddleDivFactsRaw from './riddles/div_facts.json';
 import riddleFractionsIntRaw from './riddles/fractions_int.json';
+import riddleLongDivisionRaw from './riddles/long_division.json';
 import riddleMultFactsRaw from './riddles/mult_facts.json';
+import riddleMultiDigitMultRaw from './riddles/multi_digit_mult.json';
 import riddleMultiDigitOrderOpsRaw from './riddles/multi_digit_order_ops.json';
+import riddlePlaceValueTeensRaw from './riddles/place_value_teens.json';
 import riddleRepeatedAdditionRaw from './riddles/repeated_addition.json';
+import riddleSubWithin10Raw from './riddles/sub_within_10.json';
 import riddleTwoStepAddSubRaw from './riddles/two_step_add_sub.json';
 
 // The fallback's own reading of the duel files. Same JSON on disk, DIFFERENT arrays in memory —
@@ -50,10 +62,14 @@ import addWithin10DuelRaw from './templates/add_within_10.json';
 import addWithin20DuelRaw from './templates/add_within_20.json';
 import divFactsDuelRaw from './templates/div_facts.json';
 import fractionsIntDuelRaw from './templates/fractions_int.json';
+import longDivisionDuelRaw from './templates/long_division.json';
 import multFactsDuelRaw from './templates/mult_facts.json';
+import multiDigitMultDuelRaw from './templates/multi_digit_mult.json';
 import multiDigitOrderOpsDuelRaw from './templates/multi_digit_order_ops.json';
 import placeValueCompareDuelRaw from './templates/place_value_compare.json';
+import placeValueTeensDuelRaw from './templates/place_value_teens.json';
 import repeatedAdditionDuelRaw from './templates/repeated_addition.json';
+import subWithin10DuelRaw from './templates/sub_within_10.json';
 import subWithin20DuelRaw from './templates/sub_within_20.json';
 import twoStepAddSubDuelRaw from './templates/two_step_add_sub.json';
 
@@ -102,6 +118,11 @@ export const RIDDLE_POOLS: Partial<Record<SkillId, readonly Template[]>> = {
   div_facts: riddlePool('div_facts', riddleDivFactsRaw),
   fractions_int: riddlePool('fractions_int', riddleFractionsIntRaw),
   multi_digit_order_ops: riddlePool('multi_digit_order_ops', riddleMultiDigitOrderOpsRaw),
+  // D-14's four new rungs (A-071), voiced by the island that asks each under the atlas.
+  sub_within_10: riddlePool('sub_within_10', riddleSubWithin10Raw),
+  place_value_teens: riddlePool('place_value_teens', riddlePlaceValueTeensRaw),
+  multi_digit_mult: riddlePool('multi_digit_mult', riddleMultiDigitMultRaw),
+  long_division: riddlePool('long_division', riddleLongDivisionRaw),
 };
 
 /** The fallback table — every skill, so `riddleTemplatesFor` is total over `SkillId`. */
@@ -132,6 +153,18 @@ const FALLBACK_POOLS: Record<SkillId, readonly Template[]> = {
     'repeated_addition',
     repeatedAdditionDuelRaw,
   ),
+  sub_within_10: pool('content/templates/sub_within_10.json', 'sub_within_10', subWithin10DuelRaw),
+  place_value_teens: pool(
+    'content/templates/place_value_teens.json',
+    'place_value_teens',
+    placeValueTeensDuelRaw,
+  ),
+  multi_digit_mult: pool(
+    'content/templates/multi_digit_mult.json',
+    'multi_digit_mult',
+    multiDigitMultDuelRaw,
+  ),
+  long_division: pool('content/templates/long_division.json', 'long_division', longDivisionDuelRaw),
 };
 
 /**

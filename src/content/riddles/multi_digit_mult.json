@@ -1,0 +1,41 @@
+[
+  {
+    "id": "riddle_multi_digit_mult_limes",
+    "skill": "multi_digit_mult",
+    "text": "I pack {a} crates of {b} limes. How many limes do I pack?",
+    "params": {
+      "a": [12, 48],
+      "b": [3, 9]
+    },
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_multi_digit_mult_hellos",
+    "skill": "multi_digit_mult",
+    "text": "I squawk {a} hellos a day for {b}0 days. How many hellos do I squawk in all?",
+    "params": {
+      "a": [12, 30],
+      "b": [2, 9]
+    },
+    "answerExpr": "a * b * 10",
+    "distractors": ["(a * b * 10) + 10", "(a * b * 10) - 10", "(a * b * 10) + 20"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_multi_digit_mult_seeds",
+    "skill": "multi_digit_mult",
+    "text": "I collect {a} seeds every day for {b} days. How many seeds do I collect in all?",
+    "params": {
+      "a": [102, 320],
+      "b": [2, 4]
+    },
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  }
+]

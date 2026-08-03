@@ -105,7 +105,10 @@ export function StationMarker({
   onSail,
 }: MarkerProps) {
   const presentation = stationPresentation(node, state, requirement);
-  const label = node.island.displayName;
+  // The BAND-TRUE name, carried on the node exactly like `glyph` (D-14 / A-071): `chartNodes`
+  // resolves the captain's band cell (`islandCurriculumFor`), so this marker cannot label a K-1
+  // captain's map with another band's island name any more than it can with their operator.
+  const label = node.displayName;
   const glyph = node.glyph;
 
   const head =

@@ -31,7 +31,7 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import type { GradeBand, Island, SkillId } from '@content/schemas';
-import { getSkill } from '@content/index';
+import { getSkill, islandCurriculumFor } from '@content/index';
 import { emptyMastery, meterPercent, type SkillMastery } from '@engine/mastery';
 import { maxGradeForBand } from '@engine/placement';
 
@@ -163,6 +163,12 @@ export function ChartDock({
           {nextIslandCount === null ? (
             <Text
               numberOfLines={1}
+              // The D-14 name table's longest cells — `Long-Divide Deep`, `Teen-Ten Harbor` — run
+              // three characters past the old longest name, and this row also holds the glyph tile
+              // and the non-negotiable ten-cell meter at a phone width. The title shrinks a step
+              // rather than ellipsizing (the dock buttons' own posture): a name a child navigates
+              // by has to read in full, at SE width too.
+              adjustsFontSizeToFit
               style={{
                 flex: 1,
                 minWidth: 0,
@@ -172,7 +178,8 @@ export function ChartDock({
                 color: chart.ink,
               }}
             >
-              {island.displayName}
+              {/* The BAND'S OWN name for this island (D-14): the accessor is the only door. */}
+              {islandCurriculumFor(island.id, gradeBand).displayName}
             </Text>
           ) : (
             <View style={{ flex: 1, minWidth: 0 }} />
@@ -428,16 +435,16 @@ function filledCells(
   mastery: Partial<Record<SkillId, SkillMastery>>,
   band: GradeBand | null,
 ): number {
-  // Averaged over the skills this captain will actually be ASKED, not everything the island
-  // teaches at every age — the same filter `services/chart.ts` applies to `cleared`, and the same
-  // bug A-051 fixed there and nobody swept for here.
-  //
-  // Isla Products teaches `repeated_addition` (grade 1) and `mult_facts` (grade 3). Averaging both
-  // for a K-1 captain divides by a skill they can never be served, so a five-year-old who has
-  // mastered everything available to them sees 5 of 10 cells and no way to move the rest. The meter
-  // stops being a measure of progress and becomes a measure of their age.
+  // Averaged over the BAND'S OWN curriculum for this island (D-14): `islandCurriculumFor` is the
+  // only door to what an island teaches, and the cell it returns is already the set this captain
+  // can be asked. The ceiling clamp STAYS even though A-069's validator guarantees every shipped
+  // cell is in-band — it is the same runtime tripwire `encounterSkillFor` keeps, so a bad future
+  // catalog fills no meter instead of measuring a child against maths above their band (the A-051
+  // posture, restated for the atlas). A null band reads the accessor's documented g4_5 fallback.
   const ceiling = band === null ? Number.POSITIVE_INFINITY : maxGradeForBand(band);
-  const inBand = island.rangeSkills.filter((id) => getSkill(id).minGrade <= ceiling);
+  const inBand = islandCurriculumFor(island.id, band).skills.filter(
+    (id) => getSkill(id).minGrade <= ceiling,
+  );
   // Empty means nothing here is age-appropriate at all: no bar rather than a full one. `every` on an
   // empty list is `true`, which is exactly how the sibling bug ticked islands above the band.
   if (inBand.length === 0) return 0;

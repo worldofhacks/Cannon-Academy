@@ -1,0 +1,44 @@
+[
+  {
+    "id": "riddle_long_division_berries",
+    "skill": "long_division",
+    "text": "I share {t} berries fairly among {b} turtle friends. How many berries does each friend get?",
+    "params": {
+      "t": [24, 96],
+      "b": [3, 8]
+    },
+    "constraints": ["t % b == 0", "t / b >= 4"],
+    "answerExpr": "t / b",
+    "distractors": ["(t / b) + 1", "(t / b) - 1", "(t / b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_long_division_piles",
+    "skill": "long_division",
+    "text": "I sort {t} sea grapes into piles of {b}. How many piles do I fill?",
+    "params": {
+      "t": [30, 90],
+      "b": [3, 6]
+    },
+    "constraints": ["t % b == 0", "t / b >= 5"],
+    "answerExpr": "t / b",
+    "distractors": ["(t / b) + 1", "(t / b) - 1", "(t / b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_long_division_voyage",
+    "skill": "long_division",
+    "text": "My {t} berries last a voyage of {b} equal days. How many berries do I eat each day?",
+    "params": {
+      "t": [104, 400],
+      "b": [4, 8]
+    },
+    "constraints": ["t % b == 0", "t / b >= 20"],
+    "answerExpr": "t / b",
+    "distractors": ["(t / b) + 1", "(t / b) - 1", "(t / b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  }
+]

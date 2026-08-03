@@ -1,0 +1,44 @@
+[
+  {
+    "id": "riddle_sub_within_10_seeds",
+    "skill": "sub_within_10",
+    "text": "I have {a} seeds. I eat {b} of them. How many seeds do I have left?",
+    "params": {
+      "a": [5, 9],
+      "b": [2, 4]
+    },
+    "constraints": ["a - b >= 2"],
+    "answerExpr": "a - b",
+    "distractors": ["(a - b) + 1", "(a - b) - 1", "(a - b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_sub_within_10_crackers",
+    "skill": "sub_within_10",
+    "text": "{a} crackers sit on my perch. I peck {b} away. How many crackers sit on my perch now?",
+    "params": {
+      "a": [6, 10],
+      "b": [2, 5]
+    },
+    "constraints": ["a - b >= 2"],
+    "answerExpr": "a - b",
+    "distractors": ["(a - b) + 1", "(a - b) - 1", "(a - b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_sub_within_10_buttons",
+    "skill": "sub_within_10",
+    "text": "My nest holds {a} shiny buttons. {b} buttons roll away. How many buttons are in my nest now?",
+    "params": {
+      "a": [5, 10],
+      "b": [2, 4]
+    },
+    "constraints": ["a - b >= 2"],
+    "answerExpr": "a - b",
+    "distractors": ["(a - b) + 1", "(a - b) - 1", "(a - b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  }
+]

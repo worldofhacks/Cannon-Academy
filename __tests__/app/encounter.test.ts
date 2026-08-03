@@ -12,14 +12,20 @@
  *     both set the latch, and nothing in the encounter may name a red;
  *   * entry/exit grow from the island's own position (origin 76%/34%, board keyframe verbatim).
  *
- * Traceability: every behavioural test cites `spec(A-066:AC-n)`.
+ * Traceability: every behavioural test cites `spec(A-066:AC-n)`, with A-071's atlas additions
+ * cited `spec(A-071:AC-n)`.
+ *
+ * RE-BASELINED under owner ruling D-14 (tickets/app/OWNER-RULINGS.md, 2026-08-02) by A-071: the
+ * arrival enumeration and the authored-riddle coverage specs now transcribe the per-band
+ * curriculum atlas (five islands for every band, `islandCurriculumFor` the only door). The
+ * amber-card rules, payout latch and host roster are unchanged.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { getSkill } from '@content/index';
+import { getSkill, islandCurriculumFor } from '@content/index';
 import { GRADE_BANDS, ISLAND_IDS } from '@content/schemas';
 import type { GradeBand, IslandId, SkillId } from '@content/schemas';
 import { maxGradeForBand } from '@engine/placement';
@@ -84,18 +90,22 @@ function bandedStore(band: GradeBand | null, coins = 40) {
 
 /**
  * THE ENUMERATION — the ticket's own demand, written out as data so a new island rung fails
- * loudly instead of silently having no riddles. Derived from the band rule (ceiling shared with
- * the entry cannon, floor from the band's own first grade — see `services/encounter.ts`) over
- * the catalog's `rangeSkills`, and pinned against the ticket's stated examples: K-1 at Isla
- * Products is asked repeated addition; g4_5 at the same island gets multiplication; a band whose
- * ceiling clears NOTHING an island teaches is asked nothing at all.
+ * loudly instead of silently having no riddles.
+ *
+ * RE-BASELINED under owner ruling D-14 (tickets/app/OWNER-RULINGS.md, 2026-08-02) by A-071: the
+ * catalog now carries per-band curriculum (`islandCurriculumFor` is the only door), every band
+ * reaches all five islands, and every cell teaches in-band by A-069's import-time validator — so
+ * no cell asks nothing any more. The table below is D-14's atlas transcribed: each cell's
+ * headline (first) skill, which is what an arrival asks. K-1 at Isla Products is now asked
+ * subtraction at their own Take-Away Bay; g4_5 at the same island gets multi-digit
+ * multiplication at Product Peaks.
  */
 const EXPECTED_SKILL: Record<IslandId, Record<GradeBand, SkillId | null>> = {
-  port_sumwich: { k_1: 'add_within_10', g2_3: 'add_within_20', g4_5: 'two_step_add_sub' },
-  isla_products: { k_1: 'repeated_addition', g2_3: 'repeated_addition', g4_5: 'mult_facts' },
-  quotient_cove: { k_1: null, g2_3: 'div_facts', g4_5: 'div_facts' },
-  fraction_reef: { k_1: null, g2_3: null, g4_5: 'fractions_int' },
-  grandline: { k_1: null, g2_3: null, g4_5: 'multi_digit_order_ops' },
+  port_sumwich: { k_1: 'add_within_10', g2_3: 'place_value_compare', g4_5: 'div_facts' },
+  isla_products: { k_1: 'sub_within_10', g2_3: 'two_step_add_sub', g4_5: 'multi_digit_mult' },
+  quotient_cove: { k_1: 'add_within_20', g2_3: 'repeated_addition', g4_5: 'long_division' },
+  fraction_reef: { k_1: 'sub_within_20', g2_3: 'mult_facts', g4_5: 'fractions_int' },
+  grandline: { k_1: 'place_value_teens', g2_3: 'div_facts', g4_5: 'multi_digit_order_ops' },
 };
 
 const ENUMERATED: readonly { island: IslandId; band: GradeBand; skill: SkillId | null }[] =
@@ -107,6 +117,21 @@ const ENUMERATED: readonly { island: IslandId; band: GradeBand; skill: SkillId |
 const ASKED_SKILLS: readonly SkillId[] = [
   ...new Set(ENUMERATED.flatMap(({ skill }) => (skill === null ? [] : [skill]))),
 ];
+
+/**
+ * The EXACT rungs that ride the duel-template fallback instead of an authored pool (D-14 /
+ * A-071). Both became arrival skills when the atlas gave them their own cells — Compare Cove
+ * (port_sumwich, g2_3) and Minus Lagoon (fraction_reef, k_1) — but authoring their riddle files
+ * sat outside A-071's sanctioned scope, so the child hears a plain (host-safe, engine-generated)
+ * duel question there. Pinned as a closed list so a THIRD rung can never join silently: a future
+ * atlas edit whose skill has no riddle file reddens the coverage spec below by name.
+ */
+const FALLBACK_ONLY: readonly SkillId[] = ['place_value_compare', 'sub_within_20'];
+
+/** The asked skills that must carry an AUTHORED, host-voiced pool. */
+const AUTHORED_ASKED: readonly SkillId[] = ASKED_SKILLS.filter(
+  (skill) => !FALLBACK_ONLY.includes(skill),
+);
 
 // ── AC-3: band adjustment — the point of the ticket ────────────────────────────────────────────
 
@@ -160,13 +185,18 @@ describe('AC-3 — the asked skill is the island’s band-adjusted rangeSkill, f
     }
   });
 
-  it('spec(A-066:AC-3) every skill an arrival can ask has an AUTHORED riddle pool of at least 2', () => {
-    // A new island rung must fail HERE, not fall silently onto the duel fallback.
-    expect(ASKED_SKILLS.length).toBeGreaterThan(0);
-    for (const skill of ASKED_SKILLS) {
+  it('spec(A-066:AC-3) every skill an arrival can ask has an AUTHORED riddle pool of at least 2, except the two rungs pinned FALLBACK_ONLY', () => {
+    // Re-baselined under D-14 (A-071): the atlas made every skill in the catalog askable
+    // somewhere, and exactly two of them — named in FALLBACK_ONLY, out of A-071's file scope —
+    // ride the duel-template fallback. Any OTHER rung must fail HERE, not fall silently onto it.
+    expect(AUTHORED_ASKED.length).toBeGreaterThan(0);
+    for (const skill of AUTHORED_ASKED) {
       const pool = RIDDLE_POOLS[skill];
       expect(pool, `src/content/riddles/${skill}.json is missing`).toBeDefined();
       expect(pool?.length ?? 0, `riddle pool for '${skill}' needs >= 2 riddles`).toBeGreaterThanOrEqual(2);
+    }
+    for (const skill of FALLBACK_ONLY) {
+      expect(ASKED_SKILLS.includes(skill), `FALLBACK_ONLY '${skill}' is no longer asked — retire it`).toBe(true);
     }
   });
 });
@@ -175,7 +205,9 @@ describe('AC-3 — the asked skill is the island’s band-adjusted rangeSkill, f
 
 describe('riddle pools — real generator, separate source, duel pools untouched', () => {
   it('spec(A-066:AC-3) riddleFor serves the authored pool: riddle_-prefixed, word-problem, read-aloud', () => {
-    for (const skill of ASKED_SKILLS) {
+    // Re-baselined under D-14 (A-071): swept over the authored arrivals; the two FALLBACK_ONLY
+    // rungs are served plain duel templates by design and are pinned in their own spec below.
+    for (const skill of AUTHORED_ASKED) {
       for (let seed = 1; seed <= 10; seed += 1) {
         const [question] = riddleFor(skill, createRng(seed));
         expect(question.skill).toBe(skill);
@@ -187,6 +219,8 @@ describe('riddle pools — real generator, separate source, duel pools untouched
   });
 
   it('spec(A-066:AC-3) a skill with no riddle file falls back to its plain duel templates — a LOCAL copy, never the shared pool object', () => {
+    // Since D-14 these two ARE arrival skills (Compare Cove g2_3, Minus Lagoon k_1) — the
+    // FALLBACK_ONLY pair — so this spec is now also the pin on what a child hears there.
     for (const skill of ['sub_within_20', 'place_value_compare'] as const) {
       expect(RIDDLE_POOLS[skill]).toBeUndefined();
       const fallback = riddleTemplatesFor(skill);
@@ -263,6 +297,59 @@ describe('riddle pools — real generator, separate source, duel pools untouched
     }
 
     expect(failures, failures.slice(0, 20).join('\n')).toEqual([]);
+  });
+});
+
+// ── A-071: the atlas asks, the riddles answer (D-14) ───────────────────────────────────────────
+
+describe('A-071 — every atlas-askable rung has riddles; the fallback set is closed', () => {
+  it('spec(A-071:AC-1) the enumeration IS the atlas: each cell’s first in-ceiling skill, read off A-069’s accessor', () => {
+    // Data-level on purpose: `islandCurriculumFor` is the catalog's own door (A-069), so this pin
+    // holds whatever state `services/encounter.ts` is in mid-migration (A-070) — and an atlas
+    // cell swap in islands.json reddens it by island, band and skill.
+    for (const { island, band, skill } of ENUMERATED) {
+      const ceiling = maxGradeForBand(band);
+      const asked =
+        islandCurriculumFor(island, band).skills.find(
+          (skillId) => getSkill(skillId).minGrade <= ceiling,
+        ) ?? null;
+      expect(asked, `${island}/${band}`).toBe(skill);
+    }
+  });
+
+  it('spec(A-071:AC-1) the four new rungs ship exactly 3 authored riddles each', () => {
+    for (const skill of ['sub_within_10', 'place_value_teens', 'multi_digit_mult', 'long_division'] as const) {
+      expect(ASKED_SKILLS.includes(skill), `${skill} is not asked by any arrival`).toBe(true);
+      expect(RIDDLE_POOLS[skill]?.length, `riddle pool for '${skill}'`).toBe(3);
+    }
+  });
+
+  it('spec(A-071:AC-1) authored coverage is EXACTLY the asked set minus FALLBACK_ONLY — no gap, no orphan', () => {
+    // Both directions at once: an atlas edit that asks a rung with no riddle file appears as a
+    // missing member; a riddle pool no arrival can reach appears as an extra one. The fallback
+    // path stays pinned for exactly the two named non-authored arrivals.
+    expect([...Object.keys(RIDDLE_POOLS)].sort()).toEqual([...AUTHORED_ASKED].sort());
+    for (const skill of FALLBACK_ONLY) {
+      expect(RIDDLE_POOLS[skill]).toBeUndefined();
+      const served = riddleTemplatesFor(skill);
+      expect(served.length).toBeGreaterThan(0);
+      expect(served.every((template) => !template.id.startsWith('riddle_'))).toBe(true);
+    }
+  });
+
+  it('spec(A-071:AC-4) hosts stay keyed by island id — no band swap can orphan an encounter', () => {
+    // The same creature greets every band at a given position, and every enumerated cell has a
+    // servable pool behind its host — so re-authoring a band's cells can never strand an arrival
+    // in front of nobody, or in front of a host with nothing to ask.
+    expect(Object.keys(HOSTS).sort()).toEqual([...ISLAND_IDS].sort());
+    for (const { island, band, skill } of ENUMERATED) {
+      expect(HOSTS[island], `${island} lost its host`).toBeDefined();
+      if (skill === null) continue;
+      expect(
+        riddleTemplatesFor(skill).length,
+        `${island}/${band} asks '${skill}' with an empty pool`,
+      ).toBeGreaterThan(0);
+    }
   });
 });
 
