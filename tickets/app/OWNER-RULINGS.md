@@ -343,3 +343,104 @@ Consequences, all deliberate:
   arrives the full way — templates, entry cannon, riddles, glyph.
 - Placement still opens island one only; D-11 still advances by wins; D-13's whole-question
   rule binds the new riddles.
+
+## D-15 — Replay is not a product promise; the record of a duel is its Firestore result (2026-08-03, ruled in session)
+
+> "why do we need to replay duels? we should just be writing the results to firestore, im not
+> sure why we would need to ever replay anything at all"
+
+### What was asked
+
+The adaptive-islands plan (§7, decision 1) asked the owner to ratify a new *replay key* —
+{seed, action log, pack set} — because adaptive packs change what a duel's question pool
+contains, and a frozen source scan pins a comment calling the whole-pool handover "the replay
+contract."
+
+### The ruling
+
+**There is no product requirement to reconstruct historical duels.** The durable record of a
+duel is the telemetry document written to Firestore at settlement. Replay-from-seed survives
+only as what it always actually was: engineering infrastructure — the determinism that lets the
+frozen suites prove the no-op path is byte-identical and that a given seed yields a given
+question sequence.
+
+Consequences:
+
+- The pinned "replay contract" comment in `src/stores/duel.ts` is re-worded to name what the
+  determinism guarantee is *for* (test reproducibility), and the frozen source scan is
+  re-baselined citing this ruling. Determinism itself is not weakened: same seed + same pack
+  set → same questions, and the no-op path returns the same object reference.
+- Pack ids are still recorded alongside the telemetry doc — cheap, and it keeps generated
+  content auditable — but as bookkeeping, not as a replay promise.
+- This unblocks the `armAdaptivePacks` injection seam (wave G12).
+
+## D-16 — The Firestore rules open exactly two owner-scoped doors (2026-08-03, ruled in session)
+
+The owner approved the recommended shape: the rules stay **default-deny**, with two narrow
+enumerated exceptions — **create-only** owner-scoped telemetry writes
+(`telemetry/{uid}/duels/{duelId}`, shape-checked, ≤64 shots, no read/update/delete) and
+**get-only** owner-scoped plan reads (`/plans/{uid}`). Nothing else opens.
+
+`firebase.test.ts` spec(A-025:AC-5/AC-8) — the frozen pin on the deny-all rules file — is
+re-baselined in the same commit as the rules change, citing this ruling, and its successor must
+still verify default-deny plus inspect every enumerated clause.
+
+## D-17 — The Uncharted Sea: endless is a sixth island, LLM-curated and LLM-crewed (2026-08-03, ruled in session)
+
+> "we should have an uncharted sea, but we should use zod for validation and openrouter llm to
+> analyze where the student struggled and then create custom curated question sets based on
+> that so that when they fire the cannons the questions are still within their bounds but its
+> focused on the questions they struggled with. also it should use the llm to generate the
+> enemy ships and enemys as well so that we have a endless, adaptive, and llm driven game"
+
+### The ruling
+
+This supersedes the plan's voyage-loop recommendation (§5 shape (a)). The endless surface is
+**the Uncharted Sea — a repeatable sixth island beyond the Grandline**, and it is the LLM's
+island:
+
+- **Questions**: the telemetry → OpenRouter analysis → curated pack loop (Layers 1–3 of the
+  plan, confirmed as designed) aims its packs here. Packs target the skills the student
+  struggled with, zod-validated through the full gauntlet, always inside the band's ceiling —
+  "still within their bounds but focused on the questions they struggled with."
+- **Enemies**: the LLM generates the enemy ships **and** the enemy identities (names, text
+  channels) for Uncharted Sea duels — inside D-12's provenance boundary. The generated-fleet
+  zod schema is the hard wall: enums and counts over board primitives, no raw coordinates, no
+  free hex, no rasters. D-12 is not weakened; the LLM becomes one more author writing inside
+  the same schema the golden set already polices.
+- **Repeatable**: arriving, dueling, and winning at the Uncharted Sea never exhausts it; each
+  visit draws the current pack set and a fresh generated rival.
+
+### What it costs, deliberately
+
+The sixth island reopens the closed `IslandId` enum and needs the full arrival: a curriculum
+cell per band (each cell within its band's ceiling), a hull entry, a glyph, a sixth host
+species, an enemy row — and **a republished sea-chart board**, because A-045's regime holds:
+chart art ships only from design artifacts. G13 is board-gated; the owner commissions the
+board via Claude Design. Enemy ship art needs no new board material — that is the point of
+routing it through D-12's schema.
+
+## D-18 — Every band gets the rewrite; golden sets are the reference; Langfuse watches (2026-08-03, ruled in session)
+
+> "we should have many different ways to present the questions and reword them regardless of
+> the grade. we should have some golden sets that the llm can use as reference but it should
+> still be the adaptive llm rewrite based on the telemetry performance of the student. we can
+> also use langfuse to track everything"
+
+### The ruling
+
+This supersedes the plan's "K-1 sails authored content only in v1" recommendation (§7,
+decision 4). **No band is excluded from adaptive presentation.**
+
+- **Golden sets close the K-1 gap.** Rewrite-mode needs a prose surface, and K-1's skills are
+  mostly symbolic — so the gap is filled by *authoring*, not by loosening validation: every
+  skill × band cell that lacks a word-problem archetype gains a small human-written golden set
+  (D-13-compliant whole questions, FITTED-bounded, seed-swept like any authored template).
+  These goldens are both shippable content and the LLM's reference material.
+- **The rewrite discipline is unchanged.** The LLM still writes prose only; every pack still
+  names a real archetype and deep-equals its math (params, constraints, answerExpr,
+  distractors). More surfaces to rewrite, zero new trust.
+- **Langfuse traces every generation** — server-side only, inside the relay Function: prompt,
+  completion, model, latency, cost, validation verdict per stage. Keys live in Secret Manager
+  beside the OpenRouter key; traces carry a hashed uid and never the child's free-typed name,
+  which continues to never leave the device.

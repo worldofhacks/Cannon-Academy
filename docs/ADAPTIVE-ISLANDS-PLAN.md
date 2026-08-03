@@ -5,6 +5,9 @@ D-13 whole-question rule, D-14 curriculum atlas). Four read-only investigations,
 file:line-verified. Nothing here is implemented; waves G11–G13 build against this document
 after the owner rules the open decisions in §7.*
 
+*Update, later 2026-08-03: the owner has ruled — see §9 and rulings D-15…D-18. §9's revised
+wave table supersedes §8 where they differ.*
+
 ---
 
 ## 1. What this is
@@ -147,6 +150,11 @@ still-green regex.
 
 ## 5. Layer 4 — "Endless": the VOYAGE LOOP (recommended shape)
 
+> **SUPERSEDED 2026-08-03 by D-17.** The owner chose shape (b), the Uncharted Sea, and expanded
+> it: the sixth island is repeatable, its packs target the student's struggled skills, and its
+> enemies are LLM-generated inside D-12's fleet schema. See §9 for the ruled shape and the
+> revised waves. The voyage-loop analysis below stands as the record of what was costed.
+
 Three candidate shapes were costed honestly:
 
 | Shape | Verdict |
@@ -180,6 +188,11 @@ different is Layer 3; the loop is the cheapest surface that makes packs matter.
 
 ## 7. Decisions only the owner can make (blocking, in order of bite)
 
+> **RESOLVED 2026-08-03** — the owner ruled in session; see `tickets/app/OWNER-RULINGS.md`
+> D-15 (replay: decision 1), D-16 (rules: decision 5), D-17 (endless shape: decision 2),
+> D-18 (all-band rewrite + Langfuse: decision 4). Decisions 3, 6, 7, 8, 9, 10 adopt the
+> recommendations below as defaults. §9 carries the resulting revisions.
+
 1. **D-15 — the replay contract**: ratify *replay key = {seed, action log, pack set}* and the
    companion `armAdaptivePacks` pin, keeping the frozen source scan green. Gates the duel seam.
 2. **The endless shape**: confirm VOYAGE LOOP for MVP; Uncharted Sea deferred until a
@@ -208,3 +221,47 @@ different is Layer 3; the loop is the cheapest surface that makes packs matter.
 
 Each wave: full-suite gate against the 9-red baseline, tsc clean, on-device verification,
 per-ticket commits, no push without owner confirmation — the standing discipline.
+
+---
+
+## 9. Rulings addendum (2026-08-03) — what the owner changed, and the revised waves
+
+The owner ruled the §7 decisions in session (recorded as **D-15…D-18** in
+`tickets/app/OWNER-RULINGS.md`; quotes live there). The deltas against §1–§8:
+
+1. **Replay (D-15)**: no product promise to reconstruct duels — the Firestore telemetry doc is
+   the record. Determinism survives as test infrastructure; the pinned "replay contract"
+   comment is re-worded and its source scan re-baselined citing D-15. Pack ids ride the
+   telemetry doc as bookkeeping. The G12 injection seam is unblocked.
+2. **Rules (D-16)**: default-deny + the two enumerated owner-scoped clauses approved;
+   `firebase.test.ts` AC-5/AC-8 re-baselines in the same commit as the rules change.
+3. **Endless (D-17)**: **the Uncharted Sea replaces the voyage loop.** A repeatable sixth
+   island beyond the Grandline where the adaptive loop concentrates: packs target the
+   student's struggled skills (gauntlet-validated, ceiling-clamped), and **enemy ships and
+   identities are LLM-generated inside D-12's fleet schema** — enums/counts over board
+   primitives only, so no new trust and no new enemy art. Costs accepted deliberately: the
+   `IslandId` enum reopens; the island needs 3 band curriculum cells (each under its ceiling),
+   hull entry, glyph, a sixth host, an enemy row, and **a republished sea-chart board**
+   (A-045 holds — G13+ is board-gated; the owner commissions the board).
+4. **All bands adapt (D-18)**: K-1 is *not* authored-only. Every skill × band cell lacking a
+   word-problem archetype gains a human-written **golden set** (D-13 whole questions,
+   FITTED-bounded, seed-swept) — shippable content and the LLM's reference material at once.
+   Rewrite-mode enforcement is unchanged: prose only, deep-equal math to a named archetype.
+   **Langfuse** traces every generation inside the relay (Secret Manager keys, hashed uid,
+   no PII).
+5. **Defaults adopted** (unruled, recommendations stand): separate quarantinable pack key;
+   duel-only packs at v1 (drills later, one line); internal-ops privacy stance with
+   env-absence as kill switch; hosts greet once (latch survives revisits); caps
+   5 packs / ≤12 templates / 20h-or-5-duel debounce; flash-class relay model.
+
+### Revised waves
+
+| Wave | Tickets | Ships | Gate |
+|---|---|---|---|
+| **G11** | A-072 telemetry write · A-073 relay + plan reader (Langfuse tracing in the relay) | Plans exist; console demo via tools/ script; zero gameplay change | D-16 re-baseline; no board needed |
+| **G12** | A-074 gauntlet module · A-075 golden sets (every skill × band cell gets a word-problem archetype; K-1 coverage born here) · A-076 generation leg (rewrite vs goldens) · A-077 injection seam + D-15 re-word | Duels adapt for pack-carrying captains on the existing five islands; everyone else byte-identical by reference | The D-15 seam |
+| **G13** | A-078 Uncharted Sea foundation (enum, 3 curriculum cells, hull, glyph, chart + arrival wiring) · A-079 generated rivals (LLM → D-12 fleet schema → enemy row + identity) · A-080 sixth host + encounter | The sea becomes endless, adaptive, LLM-driven | **Board-gated**: republished sea-chart board + sixth-host art |
+
+G12 no longer waits on any board; G13 starts when the republished sea-chart artifact lands.
+The standing discipline is unchanged: full-suite gate against the accepted baseline, tsc
+clean, on-device verification, per-ticket commits, **no push without owner confirmation**.
