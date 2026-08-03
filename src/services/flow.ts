@@ -33,7 +33,8 @@ export type DemoRoute =
   | 'gun-deck'
   | 'harbor'
   | 'rank'
-  | 'fleet';
+  | 'fleet'
+  | 'uncharted';
 
 export type RouteOrigin = DemoRoute | 'boot';
 
@@ -150,6 +151,16 @@ export const DEMO_ROUTE_EDGES: readonly DemoRouteEdge[] = [
   edge('chart-range', 'chart', 'range', 1, push('range')),
   edge('chart-gun-deck', 'chart', 'gun-deck', 1, push('gun-deck')),
   edge('chart-duel', 'chart', 'duel', 1, push('duel')),
+  // A-082 (amended D-17): the Uncharted Sea. In from the dock's chain-complete doorway chip
+  // (`Dock.tsx` — NOT a hub control, so it binds through the chip's own `onDemoRouteEdge`
+  // dispatch rather than `chartHubControlLayout`); out via the same pop discipline as every
+  // chart child; SET SAIL pushes the duel after arming A-080's boot flag — no route params
+  // anywhere on this leg. `demo-navigation.test.ts`'s route inventory and chart-binding
+  // clauses predate this route and need the A-067-style amendment (integrator's re-baseline,
+  // reported by A-082).
+  edge('chart-uncharted', 'chart', 'uncharted', 1, push('uncharted')),
+  edge('uncharted-chart-back', 'uncharted', 'chart', 1, popBack()),
+  edge('uncharted-duel', 'uncharted', 'duel', 1, push('duel')),
 ];
 
 /**

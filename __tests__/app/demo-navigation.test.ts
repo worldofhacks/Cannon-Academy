@@ -34,6 +34,9 @@ const DEMO_ROUTES = [
   'harbor',
   'rank',
   'fleet',
+  // D-17 (amended, 2026-08-03) / A-082: the Uncharted Sea frontier screen. Entered only through
+  // the dock's completion doorway chip; pops back to the chart; pushes /duel via the armed flag.
+  'uncharted',
 ] as const;
 
 /** `index` is the intentional boot redirect, not a child-facing destination. */
@@ -538,6 +541,17 @@ describe('A-038 demo navigation', () => {
     ).chartHubControlLayout;
     const chartControls = layout?.({ width: 360, height: 640 }).controls ?? [];
     for (const edge of edges ?? []) {
+      // D-17 (amended) / A-082: `chart-uncharted` binds through the dock's completion doorway
+      // chip, NOT a hub control — the hub model stays pinned at exactly five (AC-5). Its
+      // executable evidence is the chip's dispatch in Dock.tsx, asserted here directly (and
+      // state-gated by spec(A-082:AC-3) in chart-progress-presentation.test.ts).
+      if (edge.from === 'chart' && edge.to === 'uncharted') {
+        expect(
+          source('src/components/chart/Dock.tsx').includes("onDemoRouteEdge('chart-uncharted')"),
+          'the dock doorway chip must dispatch the chart-uncharted edge',
+        ).toBe(true);
+        continue;
+      }
       const sourceBindings = transitions.filter(
         (transition) =>
           transition.from === edge.from && transition.to === edge.to && transition.kind === edge.action.kind,

@@ -985,3 +985,48 @@ describe('A-071 — glyph sanity across the atlas (D-14)', () => {
     }
   });
 });
+
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+// A-082 — the Uncharted Sea doorway chip, in the dock's chain-complete null-branch ONLY (D-17)
+// ═══════════════════════════════════════════════════════════════════════════════════════════════
+
+describe('A-082 — the dock doorway chip (amended D-17)', () => {
+  const dock = readFileSync(join(REPO_ROOT, 'src/components/chart/Dock.tsx'), 'utf8');
+
+  it('spec(A-082:AC-3) the chip mounts exactly once, gated by the chain-complete null-branch', () => {
+    // The one JSX mount sits directly inside `nextIslandCount === null ? (…)`. Rendering it
+    // anywhere else — or un-gating it — breaks this shape (the ticket's second mutation check).
+    expect(dock).toMatch(/\{nextIslandCount === null \? \(\s*<UnchartedDoorway/);
+    expect(dock.split('<UnchartedDoorway').length - 1).toBe(1);
+    // And the chip never joins the pre-completion dock: the NEXT chip branch is untouched, so
+    // while a next island exists the dock renders exactly yesterday's dock.
+    expect(dock).toMatch(/nextIslandCount === 1 \? 'NEXT: 1 DUEL'/);
+  });
+
+  it('spec(A-082:AC-3) the A-071 containment slice is undisturbed — the chip lives outside it', () => {
+    // The frozen slice above (`:946-959`) anchors on the FIRST `nextIslandCount === null ? (`;
+    // this guard proves the chip did not move that anchor: the slice still holds the dock
+    // title's no-clip contract and knows nothing of the doorway.
+    const slice = dock.slice(dock.indexOf('nextIslandCount === null ? ('), dock.indexOf(') : ('));
+    expect(slice).toContain('numberOfLines={1}');
+    expect(slice).toContain('adjustsFontSizeToFit');
+    expect(slice).not.toContain('Uncharted');
+  });
+
+  it('spec(A-082:AC-3) two states: OPEN rings gold on first completion, RETURNING keeps the pennant tally instead', () => {
+    const chip = dock.slice(dock.indexOf('function UnchartedDoorway'));
+    expect(chip.length).toBeGreaterThan(0);
+    // The state split is the cleared count, read from the captain store (chart.tsx is
+    // byte-untouched by AC-4, so the dock cannot be handed a new prop).
+    expect(chip).toContain("useCaptain((s) => s.captain.uncharted?.clearedCount ?? 0)");
+    expect(chip).toContain('const returning = clearedCount > 0;');
+    // OPEN: the gold ring is the null-arm of the returning branch — dropped once returning.
+    expect(chip).toMatch(/\{returning \? null : \(\s*<View\s+pointerEvents="none"/);
+    // RETURNING: the tally chip renders only in the returning arm, and counts the cleared row.
+    expect(chip).toMatch(/\{returning \? \(\s*<View/);
+    expect(chip).toContain('×{clearedCount}');
+    // Copy comes from the board's own Doorway column data, and the tap rides the declared edge.
+    expect(chip).toContain('returning ? DOORWAY.returningSub : DOORWAY.openSub');
+    expect(dock).toContain("onDemoRouteEdge('chart-uncharted')");
+  });
+});

@@ -39,8 +39,10 @@ import type { HubControl } from '../../services/flow';
 import { DOCK, RING, WAYPOINT_PARTS } from './board';
 import { chart } from './palette';
 import { Poly } from '../Poly';
+import { DOORWAY } from '../uncharted/unchartedBoard';
 import { sprite } from '../../theme/sprites';
-import { font } from '../../theme/tokens';
+import { useCaptain } from '../../stores/useCaptain';
+import { color, font } from '../../theme/tokens';
 
 interface DockProps {
   readonly island: Island;
@@ -303,8 +305,210 @@ export function ChartDock({
           })}
         </View>
       </View>
+      {/*
+        The Uncharted Sea doorway (A-082, amended D-17) — the board's Doorway column, in the
+        dock's chain-complete null-branch and nowhere else. It REPLACES the chain-complete full
+        stop rather than joining it: while a next island exists the dock is exactly yesterday's
+        dock, and the LOCKED pre-completion chip is DEFERRED with the chart-rebuild decision.
+        Below the verbs so the three-button row never reflows; full dock width at 64pt, and the
+        only gold-ringed thing on this screen once the fifth island falls (OPEN) — the ring is
+        dropped once the frontier has been sailed (RETURNING keeps the pennant tally instead).
+      */}
+      {nextIslandCount === null ? (
+        <UnchartedDoorway typeScale={typeScale} onOpen={() => onDemoRouteEdge('chart-uncharted')} />
+      ) : null}
       {/* The dock is the last thing on the screen, so it is what has to hold the home indicator. */}
       <View style={{ height: insetBottom, backgroundColor: chart.parchment }} />
+    </View>
+  );
+}
+
+/**
+ * The doorway chip, board-exact (`unchartedBoard.DOORWAY`): compass-and-question disc, the
+ * line, and either the gold ring (OPEN — first completion, `clearedCount === 0`) or the
+ * pennant-tally chip (RETURNING — `uncharted.clearedCount > 0`). The cleared count is read
+ * from the captain store directly because `app/chart.tsx` is byte-untouched by ruling (AC-4);
+ * the dock is already re-rendered by the chart's own captain subscription.
+ */
+function UnchartedDoorway({
+  typeScale: t,
+  onOpen,
+}: {
+  readonly typeScale: number;
+  readonly onOpen: () => void;
+}) {
+  const clearedCount = useCaptain((s) => s.captain.uncharted?.clearedCount ?? 0);
+  const returning = clearedCount > 0;
+  const rose = DOORWAY.disc.needle;
+
+  return (
+    <View
+      style={{
+        backgroundColor: chart.parchment,
+        paddingHorizontal: DOORWAY.plate.pad * t,
+        paddingBottom: DOORWAY.plate.pad * t,
+      }}
+    >
+      <Pressable
+        onPress={onOpen}
+        accessibilityRole="button"
+        accessibilityLabel={DOORWAY.line}
+        style={({ pressed }) => [
+          {
+            height: DOORWAY.chip.height * t,
+            borderRadius: DOORWAY.chip.radius * t,
+            backgroundColor: color.amber,
+            borderBottomWidth: DOORWAY.chip.shadowDy * t,
+            borderBottomColor: color.goldDeep,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: DOORWAY.chip.gap * t,
+            paddingHorizontal: DOORWAY.chip.padX * t,
+          },
+          pressed ? { transform: [{ translateY: 2 }], borderBottomWidth: 1 } : null,
+        ]}
+      >
+        {returning ? null : (
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: -DOORWAY.ring.inset * t,
+              top: -DOORWAY.ring.inset * t,
+              right: -DOORWAY.ring.inset * t,
+              bottom: -DOORWAY.ring.inset * t,
+              borderRadius: DOORWAY.ring.radius * t,
+              borderWidth: DOORWAY.ring.width * t,
+              borderColor: color.gold,
+            }}
+          />
+        )}
+
+        <View
+          style={{
+            width: DOORWAY.disc.size * t,
+            height: DOORWAY.disc.size * t,
+            borderRadius: 999,
+            backgroundColor: chart.parchment,
+            borderWidth: DOORWAY.disc.rim * t,
+            borderColor: color.goldDeep,
+          }}
+        >
+          <Poly
+            points="50,0 100,100 0,100"
+            width={rose.w * t}
+            height={rose.h * t}
+            fill={chart.ink}
+            style={{ position: 'absolute', left: rose.mid * t, top: rose.edge * t }}
+          />
+          <Poly
+            points="50,100 100,0 0,0"
+            width={rose.w * t}
+            height={rose.h * t}
+            fill={chart.ink}
+            style={{ position: 'absolute', left: rose.mid * t, bottom: rose.edge * t, opacity: rose.sideOpacity }}
+          />
+          <Poly
+            points="0,50 100,0 100,100"
+            width={rose.sideW * t}
+            height={rose.sideH * t}
+            fill={chart.ink}
+            style={{ position: 'absolute', left: rose.edge * t, top: rose.mid * t, opacity: rose.sideOpacity }}
+          />
+          <Poly
+            points="100,50 0,0 0,100"
+            width={rose.sideW * t}
+            height={rose.sideH * t}
+            fill={chart.ink}
+            style={{ position: 'absolute', right: rose.edge * t, top: rose.mid * t, opacity: rose.sideOpacity }}
+          />
+          <View
+            style={{
+              position: 'absolute',
+              left: DOORWAY.disc.oval.left * t,
+              top: DOORWAY.disc.oval.top * t,
+              width: DOORWAY.disc.oval.w * t,
+              height: DOORWAY.disc.oval.h * t,
+              borderRadius: 999,
+              backgroundColor: chart.parchment,
+              borderWidth: DOORWAY.disc.oval.ring * t,
+              borderColor: chart.ink,
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text
+              style={{
+                fontFamily: font.displayBold,
+                fontSize: DOORWAY.disc.oval.glyphSize * t,
+                lineHeight: DOORWAY.disc.oval.glyphSize * t * 1.2,
+                color: chart.ink,
+              }}
+            >
+              ?
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text
+            numberOfLines={1}
+            style={{
+              fontFamily: font.displayBold,
+              fontSize: DOORWAY.lineSize * t,
+              lineHeight: DOORWAY.lineSize * t * 1.15,
+              color: chart.ink,
+            }}
+          >
+            {DOORWAY.line}
+          </Text>
+          <Text
+            numberOfLines={1}
+            style={{
+              fontFamily: font.bodyBold,
+              fontSize: DOORWAY.subSize * t,
+              lineHeight: DOORWAY.subSize * t * 1.3,
+              letterSpacing: DOORWAY.subSize * t * DOORWAY.subTracking,
+              color: color.goldDeepest,
+            }}
+          >
+            {returning ? DOORWAY.returningSub : DOORWAY.openSub}
+          </Text>
+        </View>
+
+        {returning ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 5 * t,
+              paddingHorizontal: DOORWAY.tallyChip.padX * t,
+              paddingVertical: DOORWAY.tallyChip.padY * t,
+              borderRadius: 999,
+              backgroundColor: chart.parchment,
+              borderBottomWidth: DOORWAY.tallyChip.shadowDy * t,
+              borderBottomColor: color.parchmentPlank,
+            }}
+          >
+            <Poly
+              points="0,0 100,0 100,68 50,100 0,68"
+              width={DOORWAY.tallyChip.iconW * t}
+              height={DOORWAY.tallyChip.iconH * t}
+              fill={color.amber}
+            />
+            <Text
+              style={{
+                fontFamily: font.displayBold,
+                fontSize: DOORWAY.tallyChip.size * t,
+                lineHeight: DOORWAY.tallyChip.size * t * 1.3,
+                color: chart.ink,
+              }}
+            >
+              ×{clearedCount}
+            </Text>
+          </View>
+        ) : null}
+      </Pressable>
     </View>
   );
 }
