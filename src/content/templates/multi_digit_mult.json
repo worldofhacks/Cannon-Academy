@@ -1,0 +1,91 @@
+[
+  {
+    "id": "multi_digit_mult_two_by_one",
+    "skill": "multi_digit_mult",
+    "text": "{a} × {b} = ?",
+    "params": {
+      "a": [12, 99],
+      "b": [3, 9]
+    },
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"]
+  },
+  {
+    "id": "multi_digit_mult_three_by_one",
+    "skill": "multi_digit_mult",
+    "text": "{a} × {b} = ?",
+    "params": {
+      "a": [102, 999],
+      "b": [2, 9]
+    },
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"]
+  },
+  {
+    "id": "multi_digit_mult_tens_by_tens",
+    "skill": "multi_digit_mult",
+    "text": "{a}0 × {b}0 = ?",
+    "params": {
+      "a": [2, 9],
+      "b": [2, 9]
+    },
+    "answerExpr": "a * b * 100",
+    "distractors": ["(a * b * 100) + 100", "(a * b * 100) - 100", "(a * b * 100) + 200"]
+  },
+  {
+    "id": "multi_digit_mult_product_first",
+    "skill": "multi_digit_mult",
+    "text": "? = {a} × {b}",
+    "params": {
+      "a": [12, 99],
+      "b": [2, 9]
+    },
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"]
+  },
+  {
+    "id": "multi_digit_mult_missing_factor",
+    "skill": "multi_digit_mult",
+    "text": "{b} × ? = {c}",
+    "params": {
+      "b": [2, 9],
+      "c": [24, 891]
+    },
+    "constraints": ["c % b == 0", "c / b >= 12", "c / b <= 99"],
+    "answerExpr": "c / b",
+    "distractors": ["(c / b) + 1", "(c / b) - 1", "(c / b) + 2"]
+  },
+  {
+    "id": "multi_digit_mult_hundreds_by_one",
+    "skill": "multi_digit_mult",
+    "text": "{a}00 × {b} = ?",
+    "params": {
+      "a": [1, 9],
+      "b": [2, 9]
+    },
+    "answerExpr": "a * 100 * b",
+    "distractors": ["(a * 100 * b) + 100", "(a * 100 * b) - 100", "(a * 100 * b) + 200"]
+  },
+  {
+    "id": "multi_digit_mult_word_crates",
+    "skill": "multi_digit_mult",
+    "text": "A ship hauls {a} crates with {b} cannonballs in each crate. How many cannonballs are in the hold?",
+    "params": {
+      "a": [12, 60],
+      "b": [3, 9]
+    },
+    "answerExpr": "a * b",
+    "distractors": ["(a * b) + 1", "(a * b) - 1", "(a * b) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "multi_digit_mult_times_ten",
+    "skill": "multi_digit_mult",
+    "text": "{a} × 10 = ?",
+    "params": {
+      "a": [11, 99]
+    },
+    "answerExpr": "a * 10",
+    "distractors": ["(a * 10) + 10", "(a * 10) - 10", "(a * 10) + 1"]
+  }
+]

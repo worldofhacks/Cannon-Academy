@@ -1,0 +1,98 @@
+[
+  {
+    "id": "long_division_two_by_one",
+    "skill": "long_division",
+    "text": "{a} ÷ {b} = ?",
+    "params": {
+      "a": [12, 98],
+      "b": [2, 9]
+    },
+    "constraints": ["a % b == 0", "a / b >= 3"],
+    "answerExpr": "a / b",
+    "distractors": ["(a / b) + 1", "(a / b) - 1", "(a / b) + 2"]
+  },
+  {
+    "id": "long_division_three_by_one",
+    "skill": "long_division",
+    "text": "{a} ÷ {b} = ?",
+    "params": {
+      "a": [100, 999],
+      "b": [2, 9]
+    },
+    "constraints": ["a % b == 0"],
+    "answerExpr": "a / b",
+    "distractors": ["(a / b) + 1", "(a / b) - 1", "(a / b) + 2"]
+  },
+  {
+    "id": "long_division_quotient_first",
+    "skill": "long_division",
+    "text": "? = {a} ÷ {b}",
+    "params": {
+      "a": [100, 999],
+      "b": [2, 9]
+    },
+    "constraints": ["a % b == 0"],
+    "answerExpr": "a / b",
+    "distractors": ["(a / b) + 1", "(a / b) - 1", "(a / b) + 2"]
+  },
+  {
+    "id": "long_division_missing_dividend",
+    "skill": "long_division",
+    "text": "? ÷ {b} = {c}",
+    "params": {
+      "b": [2, 9],
+      "c": [11, 99]
+    },
+    "answerExpr": "b * c",
+    "distractors": ["(b * c) + 1", "(b * c) - 1", "(b * c) + 2"]
+  },
+  {
+    "id": "long_division_tens",
+    "skill": "long_division",
+    "text": "{a}0 ÷ {b} = ?",
+    "params": {
+      "a": [2, 9],
+      "b": [2, 9]
+    },
+    "constraints": ["(a * 10) % b == 0"],
+    "answerExpr": "a * 10 / b",
+    "distractors": ["(a * 10 / b) + 1", "(a * 10 / b) - 1", "(a * 10 / b) + 2"]
+  },
+  {
+    "id": "long_division_hundreds",
+    "skill": "long_division",
+    "text": "{a}00 ÷ {b} = ?",
+    "params": {
+      "a": [1, 9],
+      "b": [2, 9]
+    },
+    "constraints": ["(a * 100) % b == 0"],
+    "answerExpr": "a * 100 / b",
+    "distractors": ["(a * 100 / b) + 1", "(a * 100 / b) - 1", "(a * 100 / b) + 2"]
+  },
+  {
+    "id": "long_division_word_coins",
+    "skill": "long_division",
+    "text": "The crew shares {a} gold coins fairly among {b} pirates. How many coins does each pirate get?",
+    "params": {
+      "a": [100, 996],
+      "b": [2, 9]
+    },
+    "constraints": ["a % b == 0"],
+    "answerExpr": "a / b",
+    "distractors": ["(a / b) + 1", "(a / b) - 1", "(a / b) + 2"],
+    "isWordProblem": true
+  },
+  {
+    "id": "long_division_fact_family",
+    "skill": "long_division",
+    "text": "{b} × ? = {a}",
+    "params": {
+      "a": [100, 999],
+      "b": [2, 9]
+    },
+    "constraints": ["a % b == 0"],
+    "answerExpr": "a / b",
+    "distractors": ["(a / b) + 1", "(a / b) - 1", "(a / b) + 2"]
+  }
+]

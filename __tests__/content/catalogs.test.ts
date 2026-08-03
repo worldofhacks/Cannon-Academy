@@ -23,17 +23,39 @@ import { existsSync, readFileSync } from 'node:fs';
  *     determinism guard is the repo ESLint block, not this scan.
  *
  * Traceability: every test cites `spec(T-006:AC-n)` in its name.
+ *
+ * **Re-baselined for owner ruling D-14 (2026-08-02, `tickets/app/OWNER-RULINGS.md`) by A-069** —
+ * five islands for every band, each band its own Common-Core curriculum. What moved, and why:
+ *   - The armory gains the four D-14 entry cannons (dinghy_gun, teen_lantern, carronade,
+ *     stern_chaser) and the skill catalog the four D-14 skills; every pre-existing row is
+ *     byte-identical.
+ *   - `ISLAND_TABLE` becomes the D-14 curriculum atlas: per-band cells of
+ *     `{displayName, skills, unlocksCannons}` replacing the shared `rangeSkills` /
+ *     `unlocksCannons` / `displayName` fields, which no longer exist (schemas.test.ts pins them
+ *     unrepresentable).
+ *   - AC-9's "every range cannon is listed by exactly one island — the one it names" is VOID
+ *     under D-14: a cell pays whatever cannon teaches its skill, and a skill may sit on
+ *     different islands for different bands (div_facts pays `mortar` from Port Sumwich's g4_5
+ *     cell AND the Grandline's g2_3 cell), while a cannon's `unlock.island` row in the frozen
+ *     armory is untouched. What survives: every cell entry exists, is duplicate-free, and fires
+ *     a skill on its own cell's list (the D-14 validator's third clause).
+ *   - AC-14's "place_value_compare is deliberately on no island range" is VOID: D-14 puts it on
+ *     Port Sumwich's g2_3 cell (Compare Cove). Its successor invariant — per-band pairwise
+ *     disjoint island skills — is pinned in the A-069 block at the bottom.
+ * The A-069 acceptance criteria (atlas transcription, ceiling validator, entry-cannon paths)
+ * are also pinned at the bottom of this file.
  */
 import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { CANNON_IDS, ISLAND_IDS, RANK_IDS, SKILL_IDS } from '@content/schemas';
+import { CANNON_IDS, GRADE_BANDS, ISLAND_IDS, RANK_IDS, SKILL_IDS } from '@content/schemas';
 import { cannonSchema, crewSchema, islandSchema, rankSchema, skillSchema } from '@content/schemas';
 import type {
   Cannon,
   CannonId,
   Crew,
+  GradeBand,
   Island,
   IslandId,
   Rank,
@@ -52,6 +74,7 @@ import {
   getIsland,
   getRankByTier,
   getSkill,
+  islandCurriculumFor,
   islands,
   ranks,
   skills,
@@ -212,6 +235,53 @@ const CANNON_TABLE: Record<CannonId, CannonRow> = {
     maxGrade: 2,
     unlock: { kind: 'range', island: 'isla_products', tier: 1 },
   },
+  // D-14 / A-069 — the four new skills' entry cannons, each `{kind:'range', island:<its atlas
+  // island>, tier:1}` per the ticket. Stats sit inside their grade family and outclass no peer:
+  // dinghy_gun matches the K guns' 20s fuse between the Swivel Gun (8–12 reliable) and the Saker
+  // (9–13 standard); teen_lantern copies the grade-1 family profile (10–16 standard, 15s);
+  // carronade sits between the Mortar (14–24) and the Powder Keg (20–34, which keeps a higher
+  // ceiling plus its recoil-8 gamble); stern_chaser trades below the Long Nine (24–40) on the
+  // Long Nine's own 20s fuse, recoil-free but slower and softer than the volatile g4-5 guns.
+  dinghy_gun: {
+    skill: 'sub_within_10',
+    damageMin: 8,
+    damageMax: 12,
+    temperament: 'standard',
+    timerMs: 20_000,
+    minGrade: 0,
+    maxGrade: 1,
+    unlock: { kind: 'range', island: 'isla_products', tier: 1 },
+  },
+  teen_lantern: {
+    skill: 'place_value_teens',
+    damageMin: 10,
+    damageMax: 16,
+    temperament: 'standard',
+    timerMs: 15_000,
+    minGrade: 1,
+    maxGrade: 1,
+    unlock: { kind: 'range', island: 'grandline', tier: 1 },
+  },
+  carronade: {
+    skill: 'multi_digit_mult',
+    damageMin: 16,
+    damageMax: 26,
+    temperament: 'standard',
+    timerMs: 18_000,
+    minGrade: 4,
+    maxGrade: 4,
+    unlock: { kind: 'range', island: 'isla_products', tier: 1 },
+  },
+  stern_chaser: {
+    skill: 'long_division',
+    damageMin: 18,
+    damageMax: 30,
+    temperament: 'standard',
+    timerMs: 20_000,
+    minGrade: 4,
+    maxGrade: 5,
+    unlock: { kind: 'range', island: 'quotient_cove', tier: 1 },
+  },
 };
 
 /**
@@ -232,35 +302,66 @@ const RECOIL_TABLE: Record<CannonId, number> = {
   powder_keg: 8,
   long_nine: 10,
   grapeshot: 0, // A-060 invented — standard, zero recoil
+  dinghy_gun: 0, // D-14 / A-069 invented — standard, zero recoil
+  teen_lantern: 0, // D-14 / A-069 invented — standard, zero recoil
+  carronade: 0, // D-14 / A-069 invented — standard, zero recoil
+  stern_chaser: 0, // D-14 / A-069 invented — standard, zero recoil
 };
 
-/** AC-14: the exact island → range-skills / unlocked-cannons assignment T-010 and T-011 assume. */
-const ISLAND_TABLE: Record<
-  IslandId,
-  { readonly rangeSkills: readonly SkillId[]; readonly unlocksCannons: readonly CannonId[] }
-> = {
+/** One island×band curriculum cell, as `islands.json` now carries it (D-14). */
+interface AtlasCell {
+  readonly displayName: string;
+  readonly skills: readonly SkillId[];
+  readonly unlocksCannons: readonly CannonId[];
+}
+
+/**
+ * Re-baselined by A-069 under D-14 (was the shared rangeSkills/unlocksCannons assignment): the
+ * exact 15-cell curriculum atlas transcribed from `tickets/app/A-069.md` §The atlas. This table
+ * is LAW — AC-1 sweeps the shipped catalog against it byte for byte. The A-060 rationale the old
+ * table carried ("Isla Products is a PLACE, not a difficulty tier") survives generalised: under
+ * D-14 EVERY island teaches whatever its captain's band can be asked, so every band reaches all
+ * five islands.
+ */
+const ISLAND_TABLE: Record<IslandId, Record<GradeBand, AtlasCell>> = {
   port_sumwich: {
-    // T-029 / D-7 — add_within_10 joins the lane; saker is its paying range unlock
-    // D-10 — culverin joins the list because AC-9 below requires every RANGE cannon to be listed
-    // by the one island it names, and the Culverin now names this one. It is inert for unlocking:
-    // `unlocksCannons` is read only to hand a NEWLY-earned island its entry gun, and Port Sumwich
-    // is the chain root (`requiresIsland === undefined`), so it is never in an unlock delta.
-    rangeSkills: ['add_within_10', 'add_within_20', 'sub_within_20', 'two_step_add_sub'],
-    unlocksCannons: ['culverin', 'saker', 'six_pounder', 'chain_shot', 'double_broadside'],
+    k_1: { displayName: 'Port Sumwich', skills: ['add_within_10'], unlocksCannons: ['culverin', 'saker'] },
+    g2_3: { displayName: 'Compare Cove', skills: ['place_value_compare'], unlocksCannons: ['nine_pounder'] },
+    g4_5: { displayName: 'Factor Shoals', skills: ['div_facts'], unlocksCannons: ['mortar'] },
   },
-  // A-060 — Isla Products is a PLACE, not a difficulty tier: it teaches GROUPING at whatever level
-  // the captain's band can be asked. `repeated_addition` is the K-1 rung of that concept and
-  // `grapeshot` is its range payoff; `mult_facts` / `twelve_pounder` remain the grade-3 rung.
-  // Without an in-band skill here a `k_1` captain could master Port Sumwich forever and
-  // `resolveUnlocks` would return `[]` — there was no content at all between grade 1 and grade 3.
   isla_products: {
-    rangeSkills: ['repeated_addition', 'mult_facts'],
-    unlocksCannons: ['grapeshot', 'twelve_pounder'],
+    k_1: { displayName: 'Take-Away Bay', skills: ['sub_within_10'], unlocksCannons: ['dinghy_gun'] },
+    g2_3: {
+      displayName: 'Two-Step Strait',
+      skills: ['two_step_add_sub'],
+      unlocksCannons: ['double_broadside'],
+    },
+    g4_5: { displayName: 'Product Peaks', skills: ['multi_digit_mult'], unlocksCannons: ['carronade'] },
   },
-  quotient_cove: { rangeSkills: ['div_facts'], unlocksCannons: ['mortar'] },
-  fraction_reef: { rangeSkills: ['fractions_int'], unlocksCannons: ['powder_keg'] },
-  grandline: { rangeSkills: ['multi_digit_order_ops'], unlocksCannons: ['long_nine'] },
+  quotient_cove: {
+    k_1: { displayName: 'Port Twenty', skills: ['add_within_20'], unlocksCannons: ['six_pounder'] },
+    g2_3: { displayName: 'Array Atoll', skills: ['repeated_addition'], unlocksCannons: ['grapeshot'] },
+    g4_5: { displayName: 'Long-Divide Deep', skills: ['long_division'], unlocksCannons: ['stern_chaser'] },
+  },
+  fraction_reef: {
+    k_1: { displayName: 'Minus Lagoon', skills: ['sub_within_20'], unlocksCannons: ['chain_shot'] },
+    g2_3: { displayName: 'Isla Products', skills: ['mult_facts'], unlocksCannons: ['twelve_pounder'] },
+    g4_5: { displayName: 'Fraction Reef', skills: ['fractions_int'], unlocksCannons: ['powder_keg'] },
+  },
+  grandline: {
+    k_1: { displayName: 'Teen-Ten Harbor', skills: ['place_value_teens'], unlocksCannons: ['teen_lantern'] },
+    g2_3: { displayName: 'Quotient Cove', skills: ['div_facts'], unlocksCannons: ['mortar'] },
+    g4_5: {
+      displayName: 'The Grandline',
+      skills: ['multi_digit_order_ops'],
+      unlocksCannons: ['long_nine'],
+    },
+  },
 };
+
+/** D-14's band bounds, restated from the ticket: ceiling on skill.minGrade, floor on skill.maxGrade. */
+const BAND_CEILING: Record<GradeBand, number> = { k_1: 1, g2_3: 3, g4_5: 5 };
+const BAND_FLOOR: Record<GradeBand, number> = { k_1: 0, g2_3: 2, g4_5: 4 };
 
 /** The three crew members named in tickets/T-006.md §Context (identity data only). */
 const CREW_KEYWORDS = ['gunner', 'carpenter', 'cook'] as const;
@@ -438,12 +539,20 @@ describe('AC-1 — the catalog module loads and every entry is schema-valid', ()
     for (const [name, entries] of [
       ['skills', skills],
       ['cannons', cannons],
-      ['islands', islands],
       ['ranks', ranks],
       ['crew', crew],
     ] as const) {
       for (const entry of entries) {
         expect(entry.displayName.trim(), `${name}/${String(entry.id)} displayName`).not.toBe('');
+      }
+    }
+    // D-14 / A-069: an island's display names live in its per-band curriculum cells now.
+    for (const island of islands) {
+      for (const band of GRADE_BANDS) {
+        expect(
+          island.curriculum[band].displayName.trim(),
+          `islands/${island.id} ${band} displayName`,
+        ).not.toBe('');
       }
     }
   });
@@ -452,17 +561,19 @@ describe('AC-1 — the catalog module loads and every entry is schema-valid', ()
 // --- AC-2: cardinality and id uniqueness, per catalog ------------------------------------------
 
 describe('AC-2 — every catalog has exactly its ids, once each', () => {
-  it('spec(T-006:AC-2) cannons has exactly the 12 CannonId values with no duplicates', () => {
-    expect(cannons).toHaveLength(12);
-    expect(CANNON_IDS).toHaveLength(12);
+  // Counts re-baselined 12 → 16 and 10 → 14 by A-069 under D-14 (four new skills, one entry
+  // cannon each). The structure of the assertion is untouched.
+  it('spec(T-006:AC-2) spec(A-069:AC-5) cannons has exactly the 16 CannonId values with no duplicates', () => {
+    expect(cannons).toHaveLength(16);
+    expect(CANNON_IDS).toHaveLength(16);
     const ids = cannons.map((c) => c.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(sorted(ids)).toEqual(sorted(CANNON_IDS));
   });
 
-  it('spec(T-006:AC-2) skills has exactly 10 entries covering every SkillId with no duplicates', () => {
-    expect(skills).toHaveLength(10);
-    expect(SKILL_IDS).toHaveLength(10);
+  it('spec(T-006:AC-2) spec(A-069:AC-5) skills has exactly 14 entries covering every SkillId with no duplicates', () => {
+    expect(skills).toHaveLength(14);
+    expect(SKILL_IDS).toHaveLength(14);
     const ids = skills.map((s) => s.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(sorted(ids)).toEqual(sorted(SKILL_IDS));
@@ -649,13 +760,24 @@ describe('AC-6 — skill grade bands are legal and symbolicOnly is derived from 
     expect(skill.maxGrade).toBeLessThanOrEqual(5);
   });
 
-  it('spec(T-006:AC-6) exactly the four K-1 skills are symbolic-only', () => {
+  it('spec(T-006:AC-6) exactly the six K-1 skills are symbolic-only', () => {
     // `repeated_addition` joined them in A-060: it is `minGrade: 1`, so the derived rule above
     // (`symbolicOnly === minGrade < 2`) already forces the flag, and its templates print nothing
     // but digits and `+`.
+    // Re-baselined four → six by A-069 under D-14: `sub_within_10` (minGrade 0) and
+    // `place_value_teens` (minGrade 1) sit under the same derived rule. `place_value_teens` may
+    // still print its place-value operator vocabulary ("1 ten and 4 ones") — its golden suite
+    // pins the closed word list — but never a glyph beyond `+` and never a word-problem flag.
     const symbolic = sorted(skills.filter((s) => s.symbolicOnly).map((s) => s.id));
     expect(symbolic).toEqual(
-      sorted(['add_within_10', 'add_within_20', 'sub_within_20', 'repeated_addition'] as SkillId[]),
+      sorted([
+        'add_within_10',
+        'add_within_20',
+        'sub_within_20',
+        'repeated_addition',
+        'sub_within_10',
+        'place_value_teens',
+      ] as SkillId[]),
     );
   });
 
@@ -773,67 +895,64 @@ describe('AC-8 — the island arc is a total ordering and an unbroken chain', ()
   });
 });
 
-// --- AC-9: referential integrity, both directions ----------------------------------------------
+// --- AC-9: referential integrity across the curriculum cells -----------------------------------
+//
+// Re-baselined by A-069 under D-14. Two of the old invariants are VOID by the ruling itself:
+//   - "every range cannon is listed by exactly one island — the one it names": a skill may sit
+//     on different islands for different bands, and a cell pays whatever cannon teaches its
+//     skill (mortar is paid by Port Sumwich g4_5 AND Grandline g2_3; six_pounder by Quotient
+//     Cove k_1 while its frozen armory row still unlocks at Port Sumwich).
+//   - "no island unlocks a starter or chest cannon": nine_pounder (chest) is Compare Cove's one
+//     place_value_compare payoff, so Port Sumwich's g2_3 cell lists it.
+// What replaces them is the D-14 validator's own law, asserted here from the shipped data: every
+// cell entry exists, is duplicate-free, and fires a skill on its OWN cell's skill list.
 
-describe('AC-9 — island ↔ cannon and island → skill references agree from both sides', () => {
-  it('spec(T-006:AC-9) every rangeSkills entry names a skill that exists, with no repeats', () => {
+describe('AC-9 — curriculum cell ↔ skill/cannon references agree (D-14 shape)', () => {
+  it('spec(T-006:AC-9) every cell skills entry names a skill that exists, with no repeats in the cell', () => {
     const known = new Set(skills.map((s) => s.id));
     for (const island of islands) {
-      for (const skill of island.rangeSkills) {
-        expect(known.has(skill), `${island.id}.rangeSkills names unknown skill '${skill}'`).toBe(true);
+      for (const band of GRADE_BANDS) {
+        const cell = island.curriculum[band];
+        for (const skill of cell.skills) {
+          expect(known.has(skill), `${island.id}.${band}.skills names unknown skill '${skill}'`).toBe(true);
+        }
+        expect(new Set(cell.skills).size, `${island.id}.${band}.skills has a duplicate`).toBe(
+          cell.skills.length,
+        );
       }
-      expect(new Set(island.rangeSkills).size, `${island.id}.rangeSkills has a duplicate`).toBe(
-        island.rangeSkills.length,
-      );
     }
   });
 
-  it('spec(T-006:AC-9) every unlocksCannons entry names a cannon that exists, with no repeats', () => {
+  it('spec(T-006:AC-9) every cell unlocksCannons entry names a cannon that exists, with no repeats in the cell', () => {
     const known = new Set(cannons.map((c) => c.id));
     for (const island of islands) {
-      for (const cannon of island.unlocksCannons) {
-        expect(known.has(cannon), `${island.id}.unlocksCannons names unknown cannon '${cannon}'`).toBe(true);
-      }
-      expect(new Set(island.unlocksCannons).size, `${island.id}.unlocksCannons has a duplicate`).toBe(
-        island.unlocksCannons.length,
-      );
-    }
-  });
-
-  it('spec(T-006:AC-9) every range cannon is listed by exactly one island — the one it names', () => {
-    for (const cannon of cannons) {
-      if (cannon.unlock.kind !== 'range') continue;
-      const listing = islands.filter((i) => i.unlocksCannons.includes(cannon.id));
-      expect(
-        listing.map((i) => i.id),
-        `${cannon.id} must be unlocked by exactly one island`,
-      ).toHaveLength(1);
-      const island = listing[0];
-      if (island === undefined) throw new Error(`no island unlocks '${cannon.id}'`);
-      expect(island.id, `${cannon.id}.unlock.island disagrees with the island's unlocksCannons`).toBe(
-        cannon.unlock.island,
-      );
-    }
-  });
-
-  it('spec(T-006:AC-9) every island that unlocks a cannon is named back by that cannon', () => {
-    for (const island of islands) {
-      for (const cannonId of island.unlocksCannons) {
-        const cannon = findCannon(cannonId);
-        expect(cannon.unlock.kind, `${island.id} unlocks '${cannonId}', which is not a range unlock`).toBe(
-          'range',
+      for (const band of GRADE_BANDS) {
+        const cell = island.curriculum[band];
+        for (const cannon of cell.unlocksCannons) {
+          expect(
+            known.has(cannon),
+            `${island.id}.${band}.unlocksCannons names unknown cannon '${cannon}'`,
+          ).toBe(true);
+        }
+        expect(new Set(cell.unlocksCannons).size, `${island.id}.${band}.unlocksCannons has a duplicate`).toBe(
+          cell.unlocksCannons.length,
         );
-        if (cannon.unlock.kind !== 'range') continue;
-        expect(cannon.unlock.island, `${cannonId}.unlock.island must be '${island.id}'`).toBe(island.id);
       }
     }
   });
 
-  it('spec(T-006:AC-9) no island unlocks a starter or chest cannon', () => {
-    const listedAnywhere = new Set(islands.flatMap((i) => i.unlocksCannons));
-    for (const cannon of cannons) {
-      if (cannon.unlock.kind === 'range') continue;
-      expect(listedAnywhere.has(cannon.id), `${cannon.id} is a ${cannon.unlock.kind} unlock`).toBe(false);
+  it('spec(T-006:AC-9) spec(A-069:AC-4) every cell cannon fires a skill on that cell own skill list', () => {
+    for (const island of islands) {
+      for (const band of GRADE_BANDS) {
+        const cell = island.curriculum[band];
+        for (const cannonId of cell.unlocksCannons) {
+          const cannon = findCannon(cannonId);
+          expect(
+            cell.skills.includes(cannon.skill),
+            `${island.id}.${band} pays '${cannonId}' whose skill '${cannon.skill}' is off the cell's list`,
+          ).toBe(true);
+        }
+      }
     }
   });
 
@@ -844,6 +963,24 @@ describe('AC-9 — island ↔ cannon and island → skill references agree from 
       expect(known.has(cannon.unlock.island), `${cannon.id}.unlock.island`).toBe(true);
       expect(Number.isInteger(cannon.unlock.tier), `${cannon.id}.unlock.tier`).toBe(true);
       expect(cannon.unlock.tier, `${cannon.id}.unlock.tier`).toBeGreaterThanOrEqual(1);
+    }
+  });
+
+  it('spec(T-006:AC-9) every cannon is paid by some island cell, except the lone starter', () => {
+    // The successor to the old both-directions walk: no gun may be orphaned from the map. The
+    // Swivel Gun alone is handed to the captain rather than earned (D-10).
+    const paid = new Set<CannonId>();
+    for (const island of islands) {
+      for (const band of GRADE_BANDS) {
+        for (const cannonId of island.curriculum[band].unlocksCannons) paid.add(cannonId);
+      }
+    }
+    for (const cannon of cannons) {
+      if (cannon.unlock.kind === 'starter') {
+        expect(paid.has(cannon.id), `${cannon.id} is the starter and must not also be a payoff`).toBe(false);
+        continue;
+      }
+      expect(paid.has(cannon.id), `${cannon.id} is paid by no island cell in any band`).toBe(true);
     }
   });
 });
@@ -1075,40 +1212,46 @@ describe('AC-13 — the content layer names no URL', () => {
 
 // --- AC-14: the exact island → skills/cannons assignment T-010 and T-011 build on ---------------
 
-describe('AC-14 — each island carries exactly its assigned range skills and cannon unlocks', () => {
-  it.each([...ISLAND_IDS])('spec(T-006:AC-14) %s lists exactly its assigned range skills', (id) => {
-    const island = findIsland(id);
-    expect(sorted(island.rangeSkills)).toEqual(sorted(ISLAND_TABLE[id].rangeSkills));
-    expect(island.rangeSkills).toHaveLength(ISLAND_TABLE[id].rangeSkills.length);
+// Re-baselined by A-069 under D-14: the assignment an island carries is now per band, and the
+// atlas table above is the byte-exact law. The old "place_value_compare is deliberately on no
+// island range" pin is VOID — D-14 makes it Compare Cove's (Port Sumwich g2_3) headline skill,
+// paid by the nine_pounder, whose frozen armory row stays a chest drop.
+describe('AC-14 — each island×band cell carries exactly its atlas skills, names, and payoffs', () => {
+  const CELLS: readonly [IslandId, GradeBand][] = ISLAND_IDS.flatMap((id) =>
+    GRADE_BANDS.map((band): [IslandId, GradeBand] => [id, band]),
+  );
+
+  it.each(CELLS)(
+    'spec(T-006:AC-14) spec(A-069:AC-1) %s %s matches its atlas cell byte for byte',
+    (id, band) => {
+      const cell = findIsland(id).curriculum[band];
+      const expected = ISLAND_TABLE[id][band];
+      // Exact transcription: display name byte-equal, skills in teaching order, payoffs in order.
+      expect(cell.displayName).toBe(expected.displayName);
+      expect(cell.skills).toEqual(expected.skills);
+      expect(cell.unlocksCannons).toEqual(expected.unlocksCannons);
+    },
+  );
+
+  it('spec(T-006:AC-14) spec(A-069:AC-1) the atlas is complete: 15 cells, and no island carries more', () => {
+    expect(CELLS).toHaveLength(15);
+    for (const island of islands) {
+      expect(Object.keys(island.curriculum).sort()).toEqual([...GRADE_BANDS].sort());
+    }
   });
 
-  it.each([...ISLAND_IDS])('spec(T-006:AC-14) %s unlocks exactly its assigned cannons', (id) => {
-    const island = findIsland(id);
-    expect(sorted(island.unlocksCannons)).toEqual(sorted(ISLAND_TABLE[id].unlocksCannons));
-    expect(island.unlocksCannons).toHaveLength(ISLAND_TABLE[id].unlocksCannons.length);
-  });
-
-  it('spec(T-006:AC-14) the islands between them unlock every range cannon, and only those', () => {
-    const listed = sorted(islands.flatMap((i) => i.unlocksCannons));
-    const expected = sorted(ISLAND_IDS.flatMap((id) => [...ISLAND_TABLE[id].unlocksCannons]));
-    expect(listed).toEqual(expected);
-    expect(new Set(listed).size, 'a cannon is unlocked by two islands').toBe(listed.length);
-  });
-
-  it('spec(T-006:AC-14) place_value_compare is deliberately on no island range (nine_pounder is a chest drop)', () => {
-    const ranged = new Set(islands.flatMap((i) => i.rangeSkills));
-    expect(ranged.has('place_value_compare')).toBe(false);
-    expect(findCannon('nine_pounder').unlock.kind).toBe('chest');
-  });
-
-  it('spec(T-006:AC-14) every island range skill is at or below the grade its island sits at in the arc', () => {
-    // The arc is a K-5 progression: a later island never trains a skill an earlier island already
-    // owns, so the range-skill sets are pairwise disjoint.
-    const seen = new Set<SkillId>();
-    for (const island of [...islands].sort((a, b) => a.order - b.order)) {
-      for (const skill of island.rangeSkills) {
-        expect(seen.has(skill), `skill '${skill}' is trained by two islands`).toBe(false);
-        seen.add(skill);
+  it('spec(T-006:AC-14) within each band, the five islands teach pairwise disjoint skills', () => {
+    // The successor to the old "a later island never trains a skill an earlier island owns":
+    // one BAND's arc is still a progression with no repeats. ACROSS bands a skill may recur
+    // (div_facts is Port Sumwich's g4_5 cell and the Grandline's g2_3 cell) — that is D-14's
+    // whole point, so it is deliberately not constrained here.
+    for (const band of GRADE_BANDS) {
+      const seen = new Set<SkillId>();
+      for (const island of [...islands].sort((a, b) => a.order - b.order)) {
+        for (const skill of island.curriculum[band].skills) {
+          expect(seen.has(skill), `band '${band}': skill '${skill}' is trained by two islands`).toBe(false);
+          seen.add(skill);
+        }
       }
     }
   });
@@ -1143,17 +1286,20 @@ describe('T-027 — validateCatalogs set-level corruption', () => {
   });
 
   // spec(T-027:AC-3)
-  it('spec(T-027:AC-3) island rangeSkills / unlocksCannons dangling sibling ids throw', () => {
+  // Re-baselined by A-069 under D-14: mult_facts / twelve_pounder are Fraction Reef's g2_3 cell
+  // now (the atlas's "Isla Products" display name moved with them), so the dangling reference is
+  // reported against fraction_reef.
+  it('spec(T-027:AC-3) island curriculum skills / unlocksCannons dangling sibling ids throw', () => {
     const rawSkills = rawCatalogs();
     rawSkills.skills = rawSkills.skills.filter((entry) => (entry as { id: string }).id !== 'mult_facts');
-    expect(() => validate(rawSkills)).toThrow(/isla_products/);
+    expect(() => validate(rawSkills)).toThrow(/fraction_reef/);
     expect(() => validate(rawSkills)).toThrow(/mult_facts/);
 
     const rawCannons = rawCatalogs();
     rawCannons.cannons = rawCannons.cannons.filter(
       (entry) => (entry as { id: string }).id !== 'twelve_pounder',
     );
-    expect(() => validate(rawCannons)).toThrow(/isla_products/);
+    expect(() => validate(rawCannons)).toThrow(/fraction_reef/);
     expect(() => validate(rawCannons)).toThrow(/twelve_pounder/);
   });
 
@@ -1259,5 +1405,192 @@ describe('A-031 — enemies catalog covers every island exactly once', () => {
   it('spec(A-031:AC-5) getEnemyForIsland throws for unknown ids instead of returning a generic rival', () => {
     expect(() => getEnemyForIsland('ghost_gun' as IslandId)).toThrow(Error);
     expect(() => getEnemyForIsland('ghost_gun' as IslandId)).toThrow(/ghost_gun/);
+  });
+});
+
+// --- A-069 / D-14: the curriculum atlas, the ceiling law, and the accessor ---------------------
+//
+// D-14 (`tickets/app/OWNER-RULINGS.md`): five islands for every band, each band its own
+// Common-Core curriculum. The atlas transcription itself is pinned in the AC-14 block above
+// (spec(A-069:AC-1) tags on the 15-cell sweep); this block pins the validator law (AC-2), the
+// entry-cannon paths (AC-4), the SKILL_IDS delta (AC-5), and `islandCurriculumFor`, the ONE
+// door through which A-070 migrates every consumer.
+
+describe('A-069 — the D-14 ceiling validator', () => {
+  it('spec(A-069:AC-2) a synthetic catalog putting mult_facts on a k_1 island throws naming island, band, and skill', () => {
+    const raw = rawCatalogs();
+    corruptEntry(raw.islands, 'quotient_cove', (entry) => {
+      (entry.curriculum as Record<string, Record<string, unknown>>).k_1 = {
+        displayName: 'Port Twenty',
+        skills: ['mult_facts'],
+        unlocksCannons: ['twelve_pounder'],
+      };
+    });
+    expect(() => validate(raw)).toThrow(Error);
+    expect(() => validate(raw)).toThrow(/quotient_cove/);
+    expect(() => validate(raw)).toThrow(/k_1/);
+    expect(() => validate(raw)).toThrow(/mult_facts/);
+    expect(() => validate(raw)).toThrow(/ceiling/i);
+  });
+
+  it('spec(A-069:AC-2) the not-outgrown dual throws on a g4_5 island of only g0-1 skills, naming island and band', () => {
+    const raw = rawCatalogs();
+    corruptEntry(raw.islands, 'grandline', (entry) => {
+      // add_within_10 (g0-1) is legal under every ceiling, so ONLY the dual can reject this
+      // cell: a grade-4-5 captain would be sent to an island of pure kindergarten review.
+      (entry.curriculum as Record<string, Record<string, unknown>>).g4_5 = {
+        displayName: 'The Grandline',
+        skills: ['add_within_10'],
+        unlocksCannons: ['culverin'],
+      };
+    });
+    expect(() => validate(raw)).toThrow(Error);
+    expect(() => validate(raw)).toThrow(/grandline/);
+    expect(() => validate(raw)).toThrow(/g4_5/);
+    expect(() => validate(raw)).toThrow(/outgrown/i);
+  });
+
+  it('spec(A-069:AC-2) a cell paying a cannon whose skill is off the cell list throws naming island, band, and cannon', () => {
+    const raw = rawCatalogs();
+    corruptEntry(raw.islands, 'isla_products', (entry) => {
+      (entry.curriculum as Record<string, Record<string, unknown>>).k_1 = {
+        displayName: 'Take-Away Bay',
+        skills: ['sub_within_10'],
+        unlocksCannons: ['teen_lantern'], // fires place_value_teens, not on this cell's list
+      };
+    });
+    expect(() => validate(raw)).toThrow(Error);
+    expect(() => validate(raw)).toThrow(/isla_products/);
+    expect(() => validate(raw)).toThrow(/k_1/);
+    expect(() => validate(raw)).toThrow(/teen_lantern/);
+  });
+
+  it('spec(A-069:AC-2) the shipped catalog passes both halves of the law for all 15 cells', () => {
+    expect(() => validate(rawCatalogs())).not.toThrow();
+
+    // Assert the law directly from the shipped data too, so this test cannot be satisfied by a
+    // validator that checks nothing.
+    for (const island of islands) {
+      for (const band of GRADE_BANDS) {
+        const cell = island.curriculum[band];
+        for (const skillId of cell.skills) {
+          expect(
+            findSkill(skillId).minGrade,
+            `${island.id}.${band}.${skillId} must sit at or under the band ceiling`,
+          ).toBeLessThanOrEqual(BAND_CEILING[band]);
+        }
+        expect(
+          cell.skills.some((skillId) => findSkill(skillId).maxGrade >= BAND_FLOOR[band]),
+          `${island.id}.${band} must teach at least one not-outgrown skill`,
+        ).toBe(true);
+      }
+    }
+  });
+
+  it('spec(A-069:AC-2) the ceiling law also fails the content module at import, not only validateCatalogs', () => {
+    // The import-time guard is the same function the validator calls; this pins that index.ts
+    // actually invokes it at module scope, so a bad authoring edit cannot load at all.
+    const src = readFileSync(join(CONTENT_DIR, 'index.ts'), 'utf8');
+    expect(src).toMatch(/^assertCurriculumLawful\(islands, skills, cannons\);/m);
+  });
+});
+
+describe('A-069 — every island×band has a valid entry-cannon path', () => {
+  const CELLS: readonly [IslandId, GradeBand][] = ISLAND_IDS.flatMap((id) =>
+    GRADE_BANDS.map((band): [IslandId, GradeBand] => [id, band]),
+  );
+
+  /** A cannon a band can actually be asked: its grade span overlaps the band's floor..ceiling. */
+  const inBand = (cannon: Cannon, band: GradeBand): boolean =>
+    cannon.minGrade <= BAND_CEILING[band] && cannon.maxGrade >= BAND_FLOOR[band];
+
+  it.each(CELLS)(
+    'spec(A-069:AC-4) %s %s: the first in-band cannon exists, fires a cell skill, and clears the band',
+    (id, band) => {
+      const cell = islandCurriculumFor(id, band);
+      const first = cell.unlocksCannons.map((cannonId) => findCannon(cannonId)).find((c) => inBand(c, band));
+
+      expect(first, `${id}.${band} has no in-band cannon in its unlocksCannons`).toBeDefined();
+      if (first === undefined) return;
+      expect(cell.skills.includes(first.skill), `${id}.${band} entry gun fires an off-cell skill`).toBe(true);
+      expect(first.minGrade, `${id}.${band} entry gun opens above the band ceiling`).toBeLessThanOrEqual(
+        BAND_CEILING[band],
+      );
+    },
+  );
+
+  it('spec(A-069:AC-4) each new skill’s entry cannon is the payoff of its own atlas cell', () => {
+    expect(islandCurriculumFor('isla_products', 'k_1').unlocksCannons).toContain('dinghy_gun');
+    expect(islandCurriculumFor('grandline', 'k_1').unlocksCannons).toContain('teen_lantern');
+    expect(islandCurriculumFor('isla_products', 'g4_5').unlocksCannons).toContain('carronade');
+    expect(islandCurriculumFor('quotient_cove', 'g4_5').unlocksCannons).toContain('stern_chaser');
+  });
+});
+
+describe('A-069 — islandCurriculumFor is the one door to taught content', () => {
+  it('spec(A-069:AC-1) returns the exact band cell for every island and band', () => {
+    for (const islandId of ISLAND_IDS) {
+      for (const band of GRADE_BANDS) {
+        expect(islandCurriculumFor(islandId, band)).toEqual(findIsland(islandId).curriculum[band]);
+      }
+    }
+  });
+
+  it('spec(A-069:AC-1) band null falls back to the g4_5 cell for legacy/fixture callers', () => {
+    for (const islandId of ISLAND_IDS) {
+      expect(islandCurriculumFor(islandId, null)).toEqual(findIsland(islandId).curriculum.g4_5);
+    }
+  });
+
+  it('spec(A-069:AC-1) throws for an unknown island id rather than returning undefined', () => {
+    expect(() => islandCurriculumFor('atlantis' as IslandId, 'k_1')).toThrow(Error);
+    expect(() => islandCurriculumFor('atlantis' as IslandId, 'k_1')).toThrow(/atlantis/);
+  });
+});
+
+describe('A-069 — the skill catalog grows by exactly the four D-14 skills', () => {
+  it('spec(A-069:AC-5) SKILL_IDS is the ten pre-D-14 ids plus exactly the four, appended', () => {
+    const preD14 = [
+      'add_within_10',
+      'add_within_20',
+      'sub_within_20',
+      'place_value_compare',
+      'mult_facts',
+      'two_step_add_sub',
+      'div_facts',
+      'fractions_int',
+      'multi_digit_order_ops',
+      'repeated_addition',
+    ];
+    expect(SKILL_IDS.slice(0, preD14.length)).toEqual(preD14);
+    expect(SKILL_IDS.slice(preD14.length)).toEqual([
+      'sub_within_10',
+      'place_value_teens',
+      'multi_digit_mult',
+      'long_division',
+    ]);
+  });
+
+  it('spec(A-069:AC-5) the four new skills carry their ticketed Common-Core grade bands', () => {
+    expect([findSkill('sub_within_10').minGrade, findSkill('sub_within_10').maxGrade]).toEqual([0, 1]);
+    expect([findSkill('place_value_teens').minGrade, findSkill('place_value_teens').maxGrade]).toEqual([
+      1, 1,
+    ]);
+    expect([findSkill('multi_digit_mult').minGrade, findSkill('multi_digit_mult').maxGrade]).toEqual([4, 4]);
+    expect([findSkill('long_division').minGrade, findSkill('long_division').maxGrade]).toEqual([4, 5]);
+  });
+
+  it('spec(A-069:AC-5) every new cannon fires its skill, opens at its skill minGrade, and unlocks at its atlas island at tier 1', () => {
+    for (const [cannonId, skillId, atlasIsland] of [
+      ['dinghy_gun', 'sub_within_10', 'isla_products'],
+      ['teen_lantern', 'place_value_teens', 'grandline'],
+      ['carronade', 'multi_digit_mult', 'isla_products'],
+      ['stern_chaser', 'long_division', 'quotient_cove'],
+    ] as const) {
+      const cannon = findCannon(cannonId);
+      expect(cannon.skill).toBe(skillId);
+      expect(cannon.minGrade).toBe(findSkill(skillId).minGrade);
+      expect(cannon.unlock).toEqual({ kind: 'range', island: atlasIsland, tier: 1 });
+    }
   });
 });

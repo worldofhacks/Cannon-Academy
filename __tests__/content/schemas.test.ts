@@ -10,6 +10,17 @@
  *
  * T-034 appends the param-key identifier-grammar narrowing below (same file per
  * `test_scopes`). Do not weaken the frozen T-003 / T-026 cases above the T-034 divider.
+ *
+ * **Re-baselined for owner ruling D-14 (2026-08-02, `tickets/app/OWNER-RULINGS.md`) by A-069**:
+ * five islands for every band, each band its own Common-Core curriculum. Exactly three frozen
+ * facts moved, each sanctioned by that ruling and nothing else was touched:
+ *   1. `SKILL_IDS` grows by exactly the four D-14 skills (sub_within_10, place_value_teens,
+ *      multi_digit_mult, long_division) — ten ids become fourteen.
+ *   2. `CANNON_IDS` grows by exactly their four entry cannons (dinghy_gun, teen_lantern,
+ *      carronade, stern_chaser) — twelve ids become sixteen.
+ *   3. `islandSchema` moves the taught content under per-band `curriculum` cells; the shared
+ *      `displayName` / `rangeSkills` / `unlocksCannons` fields are DELIBERATELY unrepresentable
+ *      so every consumer is forced through `islandCurriculumFor` (see A-069 cases below).
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -116,13 +127,25 @@ const VALID_CANNON: Record<string, unknown> = {
   unlock: { kind: 'range', island: 'port_sumwich', tier: 1 },
 };
 
+// D-14 shape: taught content lives in per-band curriculum cells; no shared fields remain.
 const VALID_ISLAND: Record<string, unknown> = {
   id: 'port_sumwich',
-  displayName: 'Port Sumwich',
   order: 0,
-  rangeSkills: ['add_within_10', 'add_within_20'],
-  unlocksCannons: ['six_pounder', 'chain_shot'],
+  curriculum: {
+    k_1: { displayName: 'Port Sumwich', skills: ['add_within_10'], unlocksCannons: ['culverin', 'saker'] },
+    g2_3: { displayName: 'Compare Cove', skills: ['place_value_compare'], unlocksCannons: ['nine_pounder'] },
+    g4_5: { displayName: 'Factor Shoals', skills: ['div_facts'], unlocksCannons: ['mortar'] },
+  },
 };
+
+/** A copy of VALID_ISLAND with one band cell's field overridden (deep, so the base stays clean). */
+function islandWithCellOverride(band: 'k_1' | 'g2_3' | 'g4_5', overrides: Record<string, unknown>): unknown {
+  const base = structuredClone(VALID_ISLAND) as {
+    curriculum: Record<string, Record<string, unknown>>;
+  };
+  base.curriculum[band] = { ...base.curriculum[band], ...overrides };
+  return base;
+}
 
 const VALID_RANK: Record<string, unknown> = {
   id: 'cadet',
@@ -149,7 +172,9 @@ const VALID_ENEMY: Record<string, unknown> = {
 // --- AC-1: the id sets ---------------------------------------------------------------------
 
 describe('id unions', () => {
-  it('spec(T-003:AC-1) SKILL_IDS lists the ten skill ids in ticket order with no duplicates', () => {
+  // Re-baselined by A-069 under D-14 (was "the ten skill ids"): the ruling adds exactly four
+  // skills, appended so every pre-existing position is untouched.
+  it('spec(T-003:AC-1) spec(A-069:AC-5) SKILL_IDS lists the fourteen skill ids in ticket order with no duplicates', () => {
     expect(SKILL_IDS).toEqual([
       'add_within_10',
       'add_within_20',
@@ -161,13 +186,19 @@ describe('id unions', () => {
       'fractions_int',
       'multi_digit_order_ops',
       'repeated_addition', // A-060 — the K-1 grouping rung of Isla Products
+      'sub_within_10', // D-14 / A-069 — K.OA.2 / 1.OA.6
+      'place_value_teens', // D-14 / A-069 — 1.NBT.2 / 1.NBT.3
+      'multi_digit_mult', // D-14 / A-069 — 4.NBT.5
+      'long_division', // D-14 / A-069 — 4.NBT.6 / 5.NBT.6
     ]);
     expect(new Set(SKILL_IDS).size).toBe(SKILL_IDS.length);
     const unionMatchesArray: Exact<SkillId, (typeof SKILL_IDS)[number]> = true;
     expect(unionMatchesArray).toBe(true);
   });
 
-  it('spec(T-003:AC-1) CANNON_IDS lists the twelve cannon ids in ticket order with no duplicates', () => {
+  // Re-baselined by A-069 under D-14 (was "the twelve cannon ids"): one entry cannon per new
+  // skill, appended so tray and loadout render order is unchanged for the existing guns.
+  it('spec(T-003:AC-1) spec(A-069:AC-5) CANNON_IDS lists the sixteen cannon ids in ticket order with no duplicates', () => {
     expect(CANNON_IDS).toEqual([
       'swivel_gun',
       'culverin',
@@ -181,6 +212,10 @@ describe('id unions', () => {
       'powder_keg',
       'long_nine',
       'grapeshot', // A-060 — invented range payoff for repeated_addition, at Isla Products
+      'dinghy_gun', // D-14 / A-069 — sub_within_10 entry gun
+      'teen_lantern', // D-14 / A-069 — place_value_teens entry gun
+      'carronade', // D-14 / A-069 — multi_digit_mult entry gun
+      'stern_chaser', // D-14 / A-069 — long_division entry gun
     ]);
     expect(new Set(CANNON_IDS).size).toBe(CANNON_IDS.length);
     const unionMatchesArray: Exact<CannonId, (typeof CANNON_IDS)[number]> = true;
@@ -277,15 +312,17 @@ describe('id unions in schema fields', () => {
     expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { id: 'atlantis' })).success).toBe(false);
   });
 
-  it('spec(T-003:AC-1) islandSchema rejects a rangeSkills entry outside SkillId', () => {
-    expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { rangeSkills: ['algebra_ii'] })).success).toBe(
+  // Re-baselined by A-069 under D-14: the skill / cannon lists moved into per-band curriculum
+  // cells, so the id-union rejection is asserted there.
+  it('spec(T-003:AC-1) islandSchema rejects a curriculum skills entry outside SkillId', () => {
+    expect(islandSchema.safeParse(islandWithCellOverride('k_1', { skills: ['algebra_ii'] })).success).toBe(
       false,
     );
   });
 
-  it('spec(T-003:AC-1) islandSchema rejects an unlocksCannons entry outside CannonId', () => {
+  it('spec(T-003:AC-1) islandSchema rejects a curriculum unlocksCannons entry outside CannonId', () => {
     expect(
-      islandSchema.safeParse(withOverrides(VALID_ISLAND, { unlocksCannons: ['trebuchet'] })).success,
+      islandSchema.safeParse(islandWithCellOverride('g4_5', { unlocksCannons: ['trebuchet'] })).success,
     ).toBe(false);
   });
 
@@ -317,8 +354,11 @@ describe('id unions in schema fields', () => {
     const cannonSkill: Exact<Cannon['skill'], SkillId> = true;
     const cannonTemperament: Exact<Cannon['temperament'], Temperament> = true;
     const islandId: Exact<Island['id'], IslandId> = true;
-    const rangeSkill: Exact<Island['rangeSkills'][number], SkillId> = true;
-    const unlocksCannon: Exact<Island['unlocksCannons'][number], CannonId> = true;
+    // D-14 / A-069: the taught lists live inside per-band curriculum cells now, and the cell
+    // keys are exactly the GradeBand union.
+    const curriculumBands: Exact<keyof Island['curriculum'], GradeBand> = true;
+    const curriculumSkill: Exact<Island['curriculum']['k_1']['skills'][number], SkillId> = true;
+    const curriculumCannon: Exact<Island['curriculum']['g4_5']['unlocksCannons'][number], CannonId> = true;
     const requiresIsland: Exact<Island['requiresIsland'], IslandId | undefined> = true;
     const rankId: Exact<Rank['id'], RankId> = true;
 
@@ -329,11 +369,12 @@ describe('id unions in schema fields', () => {
       cannonSkill,
       cannonTemperament,
       islandId,
-      rangeSkill,
-      unlocksCannon,
+      curriculumBands,
+      curriculumSkill,
+      curriculumCannon,
       requiresIsland,
       rankId,
-    ]).toEqual([true, true, true, true, true, true, true, true, true, true]);
+    ]).toEqual([true, true, true, true, true, true, true, true, true, true, true]);
   });
 });
 
@@ -809,6 +850,67 @@ describe('islandSchema', () => {
     const result = islandSchema.safeParse(withOverrides(VALID_ISLAND, { order: 1.5 }));
 
     expect(result.success).toBe(false);
+  });
+
+  // --- D-14 / A-069: the per-band curriculum shape ------------------------------------------
+  // The point of these cases: the OLD shared-field world must be UNREPRESENTABLE, so no call
+  // site can silently keep reading a band-blind curriculum instead of `islandCurriculumFor`.
+
+  it('spec(A-069:AC-1) rejects a shared top-level displayName — the old band-blind field', () => {
+    expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { displayName: 'Port Sumwich' })).success).toBe(
+      false,
+    );
+  });
+
+  it('spec(A-069:AC-1) rejects a shared top-level rangeSkills — the old band-blind field', () => {
+    expect(
+      islandSchema.safeParse(withOverrides(VALID_ISLAND, { rangeSkills: ['add_within_10'] })).success,
+    ).toBe(false);
+  });
+
+  it('spec(A-069:AC-1) rejects a shared top-level unlocksCannons — the old band-blind field', () => {
+    expect(
+      islandSchema.safeParse(withOverrides(VALID_ISLAND, { unlocksCannons: ['culverin'] })).success,
+    ).toBe(false);
+  });
+
+  it.each(['k_1', 'g2_3', 'g4_5'] as const)(
+    'spec(A-069:AC-1) rejects an island whose curriculum is missing the %s band cell',
+    (band) => {
+      const curriculum = { ...(VALID_ISLAND.curriculum as Record<string, unknown>) };
+      delete curriculum[band];
+      expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { curriculum })).success).toBe(false);
+    },
+  );
+
+  it('spec(A-069:AC-1) rejects a curriculum carrying an unknown band key', () => {
+    const curriculum = {
+      ...(VALID_ISLAND.curriculum as Record<string, unknown>),
+      g6_8: { displayName: 'Middle School Shoals', skills: ['div_facts'], unlocksCannons: ['mortar'] },
+    };
+    expect(islandSchema.safeParse(withOverrides(VALID_ISLAND, { curriculum })).success).toBe(false);
+  });
+
+  it('spec(A-069:AC-2) rejects a band cell with an empty skills list — a band with nothing to learn', () => {
+    expect(islandSchema.safeParse(islandWithCellOverride('g2_3', { skills: [] })).success).toBe(false);
+  });
+
+  it('spec(A-069:AC-4) rejects a band cell with an empty unlocksCannons list — a band with no entry-cannon path', () => {
+    expect(islandSchema.safeParse(islandWithCellOverride('g2_3', { unlocksCannons: [] })).success).toBe(
+      false,
+    );
+  });
+
+  it('spec(A-069:AC-1) rejects a band cell missing its displayName', () => {
+    const base = structuredClone(VALID_ISLAND) as { curriculum: Record<string, Record<string, unknown>> };
+    delete base.curriculum.k_1!.displayName;
+    expect(islandSchema.safeParse(base).success).toBe(false);
+  });
+
+  it('spec(A-069:AC-1) rejects an unknown key inside a band cell (strictness reaches the cells)', () => {
+    expect(
+      islandSchema.safeParse(islandWithCellOverride('k_1', { rangeSkills: ['add_within_10'] })).success,
+    ).toBe(false);
   });
 });
 

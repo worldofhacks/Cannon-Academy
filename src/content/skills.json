@@ -68,5 +68,33 @@
     "minGrade": 1,
     "maxGrade": 2,
     "symbolicOnly": true
+  },
+  {
+    "id": "sub_within_10",
+    "displayName": "Subtraction within 10",
+    "minGrade": 0,
+    "maxGrade": 1,
+    "symbolicOnly": true
+  },
+  {
+    "id": "place_value_teens",
+    "displayName": "Teens as ten and ones",
+    "minGrade": 1,
+    "maxGrade": 1,
+    "symbolicOnly": true
+  },
+  {
+    "id": "multi_digit_mult",
+    "displayName": "Multi-digit multiplication",
+    "minGrade": 4,
+    "maxGrade": 4,
+    "symbolicOnly": false
+  },
+  {
+    "id": "long_division",
+    "displayName": "Long division",
+    "minGrade": 4,
+    "maxGrade": 5,
+    "symbolicOnly": false
   }
 ]

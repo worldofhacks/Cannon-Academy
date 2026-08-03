@@ -28,6 +28,12 @@ export const SKILL_IDS = [
   // `__tests__/content/schemas.test.ts`, and because `skills.json` order decides Rank-screen row
   // order — a late entry joins the existing `+` group instead of opening a new row.
   'repeated_addition',
+  // D-14 / A-069 — the four skills that fill the honest gaps in the per-band curriculum atlas.
+  // Appended in ticket order for the same ordered-transcription reason as `repeated_addition`.
+  'sub_within_10', // K.OA.2 / 1.OA.6 — subtraction within 10, non-negative answers
+  'place_value_teens', // 1.NBT.2 / 1.NBT.3 — teens as ten-and-ones, no symbol beyond +
+  'multi_digit_mult', // 4.NBT.5 — 2–3-digit × 1-digit, and tens × tens
+  'long_division', // 4.NBT.6 / 5.NBT.6 — 2–3-digit ÷ 1-digit, exact quotients
 ] as const;
 export type SkillId = (typeof SKILL_IDS)[number];
 
@@ -46,6 +52,11 @@ export const CANNON_IDS = [
   // Isla Products' K-1 range payoff, on `repeated_addition`. Appended so the catalog order every
   // tray and rival loadout renders in is unchanged for the guns that were already there.
   'grapeshot',
+  // D-14 / A-069 — one entry cannon per new skill, each a range unlock at its atlas island.
+  'dinghy_gun', // sub_within_10, g0 — Isla Products' K-1 entry gun
+  'teen_lantern', // place_value_teens, g1 — the Grandline's K-1 entry gun
+  'carronade', // multi_digit_mult, g4 — Isla Products' G4-5 entry gun
+  'stern_chaser', // long_division, g4 — Quotient Cove's G4-5 entry gun
 ] as const;
 export type CannonId = (typeof CANNON_IDS)[number];
 
@@ -180,15 +191,43 @@ export const cannonSchema = z
 
 export type Cannon = z.infer<typeof cannonSchema>;
 
-// --- islandSchema (AC-11) ---------------------------------------------------------------------
+// --- islandSchema (AC-11, reshaped by D-14 / A-069) ---------------------------------------------
 
+/**
+ * D-14: one band's view of one island — its display name, the skills it teaches that band (in
+ * teaching order; the first is the island's headline, glyph source, and entry-cannon skill), and
+ * the cannons it pays that band. Both lists are non-empty: an island with nothing to teach or
+ * nothing to pay a band is an authoring error, not a valid cell.
+ */
+export const islandBandCurriculumSchema = z
+  .object({
+    displayName: z.string(),
+    skills: z.array(z.enum(SKILL_IDS)).min(1),
+    unlocksCannons: z.array(z.enum(CANNON_IDS)).min(1),
+  })
+  .strict();
+
+export type IslandBandCurriculum = z.infer<typeof islandBandCurriculumSchema>;
+
+/**
+ * D-14 — five islands for every band, each band its own curriculum. Geometry and chain fields
+ * (`id`, `order`, `requiresIsland`) stay band-neutral; everything TAUGHT lives under
+ * `curriculum`, one complete cell per grade band. Deliberately, no shared `displayName` /
+ * `rangeSkills` / `unlocksCannons` remain at the top level: a leftover shared field would let a
+ * call site silently keep the old one-curriculum world instead of going through
+ * `islandCurriculumFor` (content/index.ts), the single accessor A-070 migrates consumers onto.
+ */
 export const islandSchema = z
   .object({
     id: z.enum(ISLAND_IDS),
-    displayName: z.string(),
     order: z.number().int().min(0),
-    rangeSkills: z.array(z.enum(SKILL_IDS)),
-    unlocksCannons: z.array(z.enum(CANNON_IDS)),
+    curriculum: z
+      .object({
+        k_1: islandBandCurriculumSchema,
+        g2_3: islandBandCurriculumSchema,
+        g4_5: islandBandCurriculumSchema,
+      })
+      .strict(),
     requiresIsland: z.enum(ISLAND_IDS).optional(),
   })
   .strict();

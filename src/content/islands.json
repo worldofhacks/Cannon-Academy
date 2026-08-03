@@ -1,41 +1,111 @@
 [
   {
     "id": "port_sumwich",
-    "displayName": "Port Sumwich",
     "order": 0,
-    "rangeSkills": ["add_within_10", "add_within_20", "sub_within_20", "two_step_add_sub"],
-    "unlocksCannons": ["culverin", "saker", "six_pounder", "chain_shot", "double_broadside"]
+    "curriculum": {
+      "k_1": {
+        "displayName": "Port Sumwich",
+        "skills": ["add_within_10"],
+        "unlocksCannons": ["culverin", "saker"]
+      },
+      "g2_3": {
+        "displayName": "Compare Cove",
+        "skills": ["place_value_compare"],
+        "unlocksCannons": ["nine_pounder"]
+      },
+      "g4_5": {
+        "displayName": "Factor Shoals",
+        "skills": ["div_facts"],
+        "unlocksCannons": ["mortar"]
+      }
+    }
   },
   {
     "id": "isla_products",
-    "displayName": "Isla Products",
     "order": 1,
     "requiresIsland": "port_sumwich",
-    "rangeSkills": ["repeated_addition", "mult_facts"],
-    "unlocksCannons": ["grapeshot", "twelve_pounder"]
+    "curriculum": {
+      "k_1": {
+        "displayName": "Take-Away Bay",
+        "skills": ["sub_within_10"],
+        "unlocksCannons": ["dinghy_gun"]
+      },
+      "g2_3": {
+        "displayName": "Two-Step Strait",
+        "skills": ["two_step_add_sub"],
+        "unlocksCannons": ["double_broadside"]
+      },
+      "g4_5": {
+        "displayName": "Product Peaks",
+        "skills": ["multi_digit_mult"],
+        "unlocksCannons": ["carronade"]
+      }
+    }
   },
   {
     "id": "quotient_cove",
-    "displayName": "Quotient Cove",
     "order": 2,
     "requiresIsland": "isla_products",
-    "rangeSkills": ["div_facts"],
-    "unlocksCannons": ["mortar"]
+    "curriculum": {
+      "k_1": {
+        "displayName": "Port Twenty",
+        "skills": ["add_within_20"],
+        "unlocksCannons": ["six_pounder"]
+      },
+      "g2_3": {
+        "displayName": "Array Atoll",
+        "skills": ["repeated_addition"],
+        "unlocksCannons": ["grapeshot"]
+      },
+      "g4_5": {
+        "displayName": "Long-Divide Deep",
+        "skills": ["long_division"],
+        "unlocksCannons": ["stern_chaser"]
+      }
+    }
   },
   {
     "id": "fraction_reef",
-    "displayName": "Fraction Reef",
     "order": 3,
     "requiresIsland": "quotient_cove",
-    "rangeSkills": ["fractions_int"],
-    "unlocksCannons": ["powder_keg"]
+    "curriculum": {
+      "k_1": {
+        "displayName": "Minus Lagoon",
+        "skills": ["sub_within_20"],
+        "unlocksCannons": ["chain_shot"]
+      },
+      "g2_3": {
+        "displayName": "Isla Products",
+        "skills": ["mult_facts"],
+        "unlocksCannons": ["twelve_pounder"]
+      },
+      "g4_5": {
+        "displayName": "Fraction Reef",
+        "skills": ["fractions_int"],
+        "unlocksCannons": ["powder_keg"]
+      }
+    }
   },
   {
     "id": "grandline",
-    "displayName": "The Grandline",
     "order": 4,
     "requiresIsland": "fraction_reef",
-    "rangeSkills": ["multi_digit_order_ops"],
-    "unlocksCannons": ["long_nine"]
+    "curriculum": {
+      "k_1": {
+        "displayName": "Teen-Ten Harbor",
+        "skills": ["place_value_teens"],
+        "unlocksCannons": ["teen_lantern"]
+      },
+      "g2_3": {
+        "displayName": "Quotient Cove",
+        "skills": ["div_facts"],
+        "unlocksCannons": ["mortar"]
+      },
+      "g4_5": {
+        "displayName": "The Grandline",
+        "skills": ["multi_digit_order_ops"],
+        "unlocksCannons": ["long_nine"]
+      }
+    }
   }
 ]

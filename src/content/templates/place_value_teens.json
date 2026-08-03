@@ -1,0 +1,82 @@
+[
+  {
+    "id": "place_value_teens_ten_and_ones",
+    "skill": "place_value_teens",
+    "text": "1 ten and {a} ones = ?",
+    "params": {
+      "a": [2, 9]
+    },
+    "answerExpr": "10 + a",
+    "distractors": ["(10 + a) + 1", "(10 + a) - 1", "(10 + a) + 2"]
+  },
+  {
+    "id": "place_value_teens_ten_plus",
+    "skill": "place_value_teens",
+    "text": "10 + {a} = ?",
+    "params": {
+      "a": [0, 9]
+    },
+    "answerExpr": "10 + a",
+    "distractors": ["(10 + a) + 1", "(10 + a) - 1", "(10 + a) + 2"]
+  },
+  {
+    "id": "place_value_teens_ones_in_teen",
+    "skill": "place_value_teens",
+    "text": "How many ones are in 1{a}?",
+    "params": {
+      "a": [1, 9]
+    },
+    "answerExpr": "a",
+    "distractors": ["a + 1", "a - 1", "a + 2"]
+  },
+  {
+    "id": "place_value_teens_tens_in_teen",
+    "skill": "place_value_teens",
+    "text": "How many tens are in 1{a}?",
+    "params": {
+      "a": [1, 9]
+    },
+    "answerExpr": "1",
+    "distractors": ["0", "2", "3"]
+  },
+  {
+    "id": "place_value_teens_make_teen",
+    "skill": "place_value_teens",
+    "text": "1{a} = 10 + ?",
+    "params": {
+      "a": [1, 9]
+    },
+    "answerExpr": "a",
+    "distractors": ["a + 1", "a - 1", "a + 2"]
+  },
+  {
+    "id": "place_value_teens_ten_part",
+    "skill": "place_value_teens",
+    "text": "1{a} = ? + {a}",
+    "params": {
+      "a": [1, 9]
+    },
+    "answerExpr": "10",
+    "distractors": ["11", "9", "12"]
+  },
+  {
+    "id": "place_value_teens_ones_and_ten",
+    "skill": "place_value_teens",
+    "text": "{a} ones and 1 ten = ?",
+    "params": {
+      "a": [2, 9]
+    },
+    "answerExpr": "a + 10",
+    "distractors": ["(a + 10) + 1", "(a + 10) - 1", "(a + 10) + 2"]
+  },
+  {
+    "id": "place_value_teens_sum_first",
+    "skill": "place_value_teens",
+    "text": "? = 10 + {a}",
+    "params": {
+      "a": [1, 9]
+    },
+    "answerExpr": "10 + a",
+    "distractors": ["(10 + a) + 1", "(10 + a) - 1", "(10 + a) + 2"]
+  }
+]

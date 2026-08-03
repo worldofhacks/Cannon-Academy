@@ -13,8 +13,28 @@ import crewRaw from './crew.json';
 import enemiesRaw from './enemies.json';
 import islandsRaw from './islands.json';
 import ranksRaw from './ranks.json';
-import { cannonSchema, crewSchema, enemySchema, islandSchema, rankSchema, skillSchema } from './schemas';
-import type { Cannon, CannonId, Crew, Enemy, Island, IslandId, Rank, Skill, SkillId } from './schemas';
+import {
+  cannonSchema,
+  crewSchema,
+  enemySchema,
+  GRADE_BANDS,
+  islandSchema,
+  rankSchema,
+  skillSchema,
+} from './schemas';
+import type {
+  Cannon,
+  CannonId,
+  Crew,
+  Enemy,
+  GradeBand,
+  Island,
+  IslandBandCurriculum,
+  IslandId,
+  Rank,
+  Skill,
+  SkillId,
+} from './schemas';
 import skillsRaw from './skills.json';
 
 type CatalogName = 'skills' | 'cannons' | 'islands' | 'ranks' | 'crew' | 'enemies';
@@ -79,6 +99,84 @@ function assertNoRankTierClash(ranks: readonly Rank[]): void {
   }
 }
 
+/** D-14: the highest skill `minGrade` a band's islands may carry — the band's Common-Core ceiling. */
+const BAND_CEILING: Readonly<Record<GradeBand, number>> = { k_1: 1, g2_3: 3, g4_5: 5 };
+
+/**
+ * D-14's dual bound: every island must teach a band at least one skill NOT outgrown by that
+ * band, i.e. one skill whose `maxGrade` reaches the band's floor grade — so a grade-5 captain is
+ * never sent to an island of pure kindergarten review.
+ */
+const BAND_FLOOR: Readonly<Record<GradeBand, number>> = { k_1: 0, g2_3: 2, g4_5: 4 };
+
+/**
+ * The D-14 ceiling law over the per-band curriculum, enforced at import (below) and inside
+ * `validateCatalogs`, so a bad authoring edit fails before it can reach a child:
+ *
+ *   1. Every curriculum skill exists, and no island may carry, for any band, a skill whose
+ *      `minGrade` exceeds that band's ceiling (k_1→1, g2_3→3, g4_5→5).
+ *   2. The not-outgrown dual: every band's every island teaches at least one skill with
+ *      `maxGrade >=` the band's floor (0, 2, 4 respectively).
+ *   3. Every `unlocksCannons` entry exists and fires a skill on that island-band's skill list.
+ *
+ * Every throw names the island, the band, and the offending skill or cannon.
+ */
+function assertCurriculumLawful(
+  islands: readonly Island[],
+  skills: readonly Skill[],
+  cannons: readonly Cannon[],
+): void {
+  const skillById = new Map<SkillId, Skill>(skills.map((skill) => [skill.id, skill]));
+  const cannonById = new Map<CannonId, Cannon>(cannons.map((cannon) => [cannon.id, cannon]));
+
+  for (const island of islands) {
+    for (const band of GRADE_BANDS) {
+      const cell = island.curriculum[band];
+
+      for (const skillId of cell.skills) {
+        const skill = skillById.get(skillId);
+        if (skill === undefined) {
+          throw new Error(
+            `content/islands.json: island '${island.id}' band '${band}' skills entry '${skillId}' is absent from skills`,
+          );
+        }
+        if (skill.minGrade > BAND_CEILING[band]) {
+          throw new Error(
+            `content/islands.json: island '${island.id}' band '${band}' carries skill '${skillId}' ` +
+              `(minGrade ${skill.minGrade}) above the band ceiling of grade ${BAND_CEILING[band]} (D-14)`,
+          );
+        }
+      }
+
+      const notOutgrown = cell.skills.some((skillId) => {
+        const skill = skillById.get(skillId);
+        return skill !== undefined && skill.maxGrade >= BAND_FLOOR[band];
+      });
+      if (!notOutgrown) {
+        throw new Error(
+          `content/islands.json: island '${island.id}' band '${band}' teaches only outgrown skills ` +
+            `[${cell.skills.join(', ')}] — no skill reaches the band floor of grade ${BAND_FLOOR[band]} (D-14)`,
+        );
+      }
+
+      for (const cannonId of cell.unlocksCannons) {
+        const cannon = cannonById.get(cannonId);
+        if (cannon === undefined) {
+          throw new Error(
+            `content/islands.json: island '${island.id}' band '${band}' unlocksCannons entry '${cannonId}' is absent from cannons`,
+          );
+        }
+        if (!cell.skills.includes(cannon.skill)) {
+          throw new Error(
+            `content/islands.json: island '${island.id}' band '${band}' pays cannon '${cannonId}' ` +
+              `whose skill '${cannon.skill}' is not on that island-band's skill list (D-14)`,
+          );
+        }
+      }
+    }
+  }
+}
+
 function assertIslandGraphAcyclic(islands: readonly Island[]): void {
   const byId = new Map<string, Island>(islands.map((island) => [island.id, island]));
   for (const island of islands) {
@@ -136,8 +234,6 @@ export function validateCatalogs(input: RawCatalogs): void {
   assertUniqueIds('enemies', enemies);
   assertNoRankTierClash(ranks);
 
-  const skillIds = new Set(skills.map((s) => s.id));
-  const cannonIds = new Set(cannons.map((c) => c.id));
   const islandIds = new Set(islands.map((i) => i.id));
 
   for (const cannon of cannons) {
@@ -169,22 +265,9 @@ export function validateCatalogs(input: RawCatalogs): void {
     }
   }
 
-  for (const island of islands) {
-    for (const skillId of island.rangeSkills) {
-      if (!skillIds.has(skillId)) {
-        throw new Error(
-          `content/islands.json: island '${island.id}' rangeSkills entry '${skillId}' is absent from skills`,
-        );
-      }
-    }
-    for (const cannonId of island.unlocksCannons) {
-      if (!cannonIds.has(cannonId)) {
-        throw new Error(
-          `content/islands.json: island '${island.id}' unlocksCannons entry '${cannonId}' is absent from cannons`,
-        );
-      }
-    }
-  }
+  // D-14 — the per-band curriculum ceiling law replaces the old shared rangeSkills /
+  // unlocksCannons reference checks (its clauses subsume them: every entry must exist).
+  assertCurriculumLawful(islands, skills, cannons);
 
   assertIslandGraphAcyclic(islands);
 }
@@ -195,6 +278,11 @@ export const islands: readonly Island[] = parseCatalog('islands', islandSchema, 
 export const ranks: readonly Rank[] = parseCatalog('ranks', rankSchema, ranksRaw);
 export const crew: readonly Crew[] = parseCatalog('crew', crewSchema, crewRaw);
 export const enemies: readonly Enemy[] = parseCatalog('enemies', enemySchema, enemiesRaw);
+
+// D-14 — the ceiling law is enforced AT IMPORT, not only inside `validateCatalogs`: an island
+// carrying an over-ceiling skill for any band must fail a test the moment anything imports the
+// content layer, never reach a device.
+assertCurriculumLawful(islands, skills, cannons);
 
 // --- Total lookup helpers: an entry or a thrown Error, never `undefined` --------------------
 
@@ -226,4 +314,23 @@ export function getRankByTier(tier: number): Rank {
   const found = ranks.find((r) => r.tier === tier);
   if (found === undefined) throw new Error(`getRankByTier: no rank with tier ${tier}`);
   return found;
+}
+
+/**
+ * D-14 / A-069 — THE door to an island's taught content. Every consumer that used to read the
+ * shared `island.rangeSkills` / `island.displayName` / `island.unlocksCannons` goes through
+ * here instead (A-070 migrates them), so what an island teaches is always a function of the
+ * captain's band.
+ *
+ * **Null-band fallback**: `band === null` returns the `g4_5` cell. Legacy and fixture callers
+ * that predate banded profiles (or run before a band is chosen) get the full top-of-school
+ * curriculum view — the same "no ceiling" reading those call sites had under the shared-field
+ * world — rather than a throw or an empty cell. Callers with a real captain must pass the
+ * captain's band.
+ *
+ * Throws (via `getIsland`) for an unknown island id; total otherwise — every island document
+ * carries all three band cells by schema.
+ */
+export function islandCurriculumFor(islandId: IslandId, band: GradeBand | null): IslandBandCurriculum {
+  return getIsland(islandId).curriculum[band ?? 'g4_5'];
 }

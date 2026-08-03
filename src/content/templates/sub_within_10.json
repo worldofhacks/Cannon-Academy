@@ -1,0 +1,93 @@
+[
+  {
+    "id": "sub_within_10_basic",
+    "skill": "sub_within_10",
+    "text": "{a} - {b} = ?",
+    "params": {
+      "a": [1, 10],
+      "b": [0, 9]
+    },
+    "constraints": ["a > b", "a <= 10"],
+    "answerExpr": "a - b",
+    "distractors": ["(a - b) + 1", "(a - b) - 1", "(a - b) + 2"]
+  },
+  {
+    "id": "sub_within_10_missing_subtrahend",
+    "skill": "sub_within_10",
+    "text": "{a} - ? = {c}",
+    "params": {
+      "a": [1, 10],
+      "c": [0, 9]
+    },
+    "constraints": ["a > c"],
+    "answerExpr": "a - c",
+    "distractors": ["(a - c) + 1", "(a - c) - 1", "(a - c) + 2"]
+  },
+  {
+    "id": "sub_within_10_missing_minuend",
+    "skill": "sub_within_10",
+    "text": "? - {b} = {c}",
+    "params": {
+      "b": [0, 9],
+      "c": [0, 9]
+    },
+    "constraints": ["b + c <= 10", "b + c >= 1"],
+    "answerExpr": "b + c",
+    "distractors": ["(b + c) + 1", "(b + c) - 1", "(b + c) + 2"]
+  },
+  {
+    "id": "sub_within_10_from_ten",
+    "skill": "sub_within_10",
+    "text": "10 - {a} = ?",
+    "params": {
+      "a": [0, 9]
+    },
+    "answerExpr": "10 - a",
+    "distractors": ["(10 - a) + 1", "(10 - a) - 1", "(10 - a) + 2"]
+  },
+  {
+    "id": "sub_within_10_minus_zero",
+    "skill": "sub_within_10",
+    "text": "{a} - 0 = ?",
+    "params": {
+      "a": [1, 10]
+    },
+    "answerExpr": "a - 0",
+    "distractors": ["(a - 0) + 1", "(a - 0) - 1", "(a - 0) + 2"]
+  },
+  {
+    "id": "sub_within_10_doubles",
+    "skill": "sub_within_10",
+    "text": "{a} - {a} = ?",
+    "params": {
+      "a": [0, 10]
+    },
+    "answerExpr": "0",
+    "distractors": ["1", "2", "3"]
+  },
+  {
+    "id": "sub_within_10_two_step",
+    "skill": "sub_within_10",
+    "text": "{a} - {b} - {c} = ?",
+    "params": {
+      "a": [2, 10],
+      "b": [0, 5],
+      "c": [0, 5]
+    },
+    "constraints": ["a - b - c >= 1"],
+    "answerExpr": "a - b - c",
+    "distractors": ["(a - b - c) + 1", "(a - b - c) - 1", "(a - b - c) + 2"]
+  },
+  {
+    "id": "sub_within_10_diff_first",
+    "skill": "sub_within_10",
+    "text": "? = {a} - {b}",
+    "params": {
+      "a": [1, 10],
+      "b": [0, 9]
+    },
+    "constraints": ["a > b"],
+    "answerExpr": "a - b",
+    "distractors": ["(a - b) + 1", "(a - b) - 1", "(a - b) + 2"]
+  }
+]

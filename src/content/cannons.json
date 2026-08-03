@@ -198,5 +198,73 @@
       "island": "isla_products",
       "tier": 1
     }
+  },
+  {
+    "id": "dinghy_gun",
+    "displayName": "Dinghy Gun",
+    "skill": "sub_within_10",
+    "damageMin": 8,
+    "damageMax": 12,
+    "temperament": "standard",
+    "recoilDamage": 0,
+    "timerMs": 20000,
+    "minGrade": 0,
+    "maxGrade": 1,
+    "unlock": {
+      "kind": "range",
+      "island": "isla_products",
+      "tier": 1
+    }
+  },
+  {
+    "id": "teen_lantern",
+    "displayName": "Teen Lantern",
+    "skill": "place_value_teens",
+    "damageMin": 10,
+    "damageMax": 16,
+    "temperament": "standard",
+    "recoilDamage": 0,
+    "timerMs": 15000,
+    "minGrade": 1,
+    "maxGrade": 1,
+    "unlock": {
+      "kind": "range",
+      "island": "grandline",
+      "tier": 1
+    }
+  },
+  {
+    "id": "carronade",
+    "displayName": "Carronade",
+    "skill": "multi_digit_mult",
+    "damageMin": 16,
+    "damageMax": 26,
+    "temperament": "standard",
+    "recoilDamage": 0,
+    "timerMs": 18000,
+    "minGrade": 4,
+    "maxGrade": 4,
+    "unlock": {
+      "kind": "range",
+      "island": "isla_products",
+      "tier": 1
+    }
+  },
+  {
+    "id": "stern_chaser",
+    "displayName": "Stern Chaser",
+    "skill": "long_division",
+    "damageMin": 18,
+    "damageMax": 30,
+    "temperament": "standard",
+    "recoilDamage": 0,
+    "timerMs": 20000,
+    "minGrade": 4,
+    "maxGrade": 5,
+    "unlock": {
+      "kind": "range",
+      "island": "quotient_cove",
+      "tier": 1
+    }
   }
 ]
