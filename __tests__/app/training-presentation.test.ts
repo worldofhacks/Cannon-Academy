@@ -141,7 +141,11 @@ describe('A-028 range picker presentation guards', () => {
     const source = picker.body.getText(file);
 
     expect(source).toMatch(/getSkill\s*\(/);
-    expect(source).toMatch(/getIsland\s*\(/);
+    // Re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md; A-070): island content is per-band,
+    // so the picker names islands through `islandCurriculumFor(...)` — the one accessor to a
+    // band's cell — instead of `getIsland(...)`. Same protective intent: the island the card
+    // shows comes from the catalog, in the captain's own band's words.
+    expect(source).toMatch(/islandCurriculumFor\s*\(/);
     expect(source).toMatch(/difficultyPresentation\s*\(/);
     expect(source).toMatch(/accessibilityLabel/);
     expect(source).toMatch(/\.label/);
@@ -154,7 +158,11 @@ describe('A-028 range picker presentation guards', () => {
     const source = picker.body.getText(file);
 
     expect(source).toMatch(/isCurrentIsland/);
-    expect(source).toMatch(/getIsland\s*\([^)]*\)\.displayName/);
+    // Re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md; A-070): the group header's island
+    // name is the BAND's display name, read through the per-band accessor rather than the
+    // pre-atlas `getIsland(...)` — the guarded property (the header names the island from the
+    // catalog, and marks the current one) is unchanged.
+    expect(source).toMatch(/islandCurriculumFor\s*\([^)]*\)\.displayName/);
   });
 
   it('spec(A-028:AC-2) picker rows keep at least the 64pt tap target from the design system', () => {

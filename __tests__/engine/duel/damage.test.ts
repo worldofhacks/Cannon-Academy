@@ -331,8 +331,11 @@ describe(
       }
       expect(violations.slice(0, 5)).toEqual([]);
       // L-017: a passing assertion over an unswept domain is no evidence at all.
-      expect(samples).toBe(6_000); // 12 cannons × elapsed × shots (T-029 saker, A-060 grapeshot)
-      expect(ALL_CANNONS.length).toBe(12); // T-029 / D-7 added saker; A-060 added grapeshot
+      // Re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md; A-069): the atlas's four new
+      // skills each arrive with an entry cannon, so the REAL catalog the sweep insists on is
+      // now sixteen guns wide.
+      expect(samples).toBe(8_000); // 16 cannons × elapsed × shots (T-029 saker, A-060 grapeshot, D-14 four)
+      expect(ALL_CANNONS.length).toBe(16); // T-029/D-7 saker; A-060 grapeshot; D-14/A-069 dinghy_gun, teen_lantern, carronade, stern_chaser
     });
 
     // spec(T-008:AC-15)
@@ -356,7 +359,8 @@ describe(
         }
       }
       expect(violations.slice(0, 5)).toEqual([]);
-      expect(samples).toBe(6_000); // 12 cannons × elapsed × shots (T-029 saker, A-060 grapeshot)
+      // 16 cannons × elapsed × shots — re-baselined 2026-08-03 under D-14/A-069 (four new guns).
+      expect(samples).toBe(8_000);
     });
 
     // spec(T-008:AC-15)
@@ -526,8 +530,9 @@ describe('T-008 resolveShot — the Perfect Shot bonus', { timeout: 60000 }, () 
     const seven = await shotsWith(BASE_BALLS_PER_VOLLEY + 6);
     vi.resetModules();
 
-    expect(one.length).toBe(600); // 12 cannons × 10 elapsed × 5 seeds (T-029, A-060)
-    expect(seven.length).toBe(600);
+    // Re-baselined 2026-08-03 under D-14/A-069: sixteen catalog guns now.
+    expect(one.length).toBe(800); // 16 cannons × 10 elapsed × 5 seeds (T-029, A-060, D-14)
+    expect(seven.length).toBe(800);
 
     // L-014: prove the mutation is LIVE before trusting the verdict. `ballCount` must track
     // the mutated constant, or the mock never took effect and this test proves nothing.
@@ -901,7 +906,8 @@ describe(
           }
         }
       }
-      expect(samples).toBe(6_000); // 12 cannons × elapsed × shots (T-029 saker, A-060 grapeshot)
+      // 16 cannons × elapsed × shots — re-baselined 2026-08-03 under D-14/A-069 (four new guns).
+      expect(samples).toBe(8_000);
     });
 
     // spec(T-008:AC-14)
@@ -942,6 +948,10 @@ describe('T-008 resolveShot — answer speed moves damage by a MEASURABLE amount
     // (w > 7/12); a lazy `w = 0.001` passes every monotonicity check in this file and makes
     // "answer speed aims the shot" statistically undetectable in play. Scoped to spans >= 10,
     // where a single roll's integer rounding cannot dominate the measurement.
+    // Re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md; A-069): `carronade` (16–26, span 10)
+    // and `stern_chaser` (18–30, span 12) joined the catalog as g4 entry guns and clear the
+    // span >= 10 gate, so AC-16's effect-size law now measures them too — the loop below holds
+    // them to the same >= 0.10 * span lift as every other wide gun.
     expect(WIDE_CANNONS.map((c) => c.id)).toEqual([
       'culverin',
       'twelve_pounder',
@@ -949,6 +959,8 @@ describe('T-008 resolveShot — answer speed moves damage by a MEASURABLE amount
       'double_broadside',
       'powder_keg',
       'long_nine',
+      'carronade',
+      'stern_chaser',
     ]);
 
     for (const cannon of WIDE_CANNONS) {

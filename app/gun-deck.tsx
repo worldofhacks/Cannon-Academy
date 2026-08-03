@@ -110,7 +110,9 @@ const board = {
  */
 const OPERATION_MIN_GRADE: readonly { readonly glyph: string; readonly minGrade: number }[] = [
   { glyph: '+', minGrade: 0 },
-  { glyph: '−', minGrade: 1 },
+  // 0 since D-14 / A-069's `sub_within_10` (K.OA.2): subtraction now enters the catalog at
+  // kindergarten, so the − chip lights the moment the curriculum does (A-070).
+  { glyph: '−', minGrade: 0 },
   { glyph: '×', minGrade: 3 },
   { glyph: '÷', minGrade: 3 },
 ];

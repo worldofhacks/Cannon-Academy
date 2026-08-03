@@ -56,7 +56,14 @@ const SKILL: SkillId = 'add_within_10';
 function captain(over: Partial<Captain> = {}): Captain {
   return {
     ...emptyCaptain(),
-    gradeBand: 'g2_3' as GradeBand,
+    // Re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md; A-069's atlas): islands carry
+    // per-band curricula now, and `add_within_10` is Port Sumwich's K-1 cell — a g2_3 captain's
+    // Port Sumwich drills `place_value_compare`, so the old band is (rightly) refused at
+    // `openDrill`'s curriculum door. Only the captain's band moves; the frozen skill/island
+    // pair, every seed-hunted fixture, and the round machine under test are untouched — the
+    // target stream draws from `targetRng` alone and the drill stream from `add_within_10`'s
+    // frozen templates, neither of which reads the band.
+    gradeBand: 'k_1' as GradeBand,
     unlockedIslands: [ISLAND],
     currentIsland: ISLAND,
     ...over,
@@ -413,7 +420,8 @@ describe('A-059 the six targets', () => {
 describe('A-059 the round refuses what the band refuses', () => {
   it('spec(A-059:AC-12) opening a round on an out-of-band skill throws rather than drilling it', () => {
     // The ceiling is `openDrill`'s, and `openRound` inherits it rather than restating it — one
-    // rule, one place. Port Sumwich teaches `two_step_add_sub` at minGrade 2.
+    // rule, one place. `two_step_add_sub` is minGrade 2, above the k_1 ceiling (since D-14 it
+    // lives on g2_3's Isla Products cell, not on any k_1 island — either door refuses it here).
     expect(getSkill('two_step_add_sub').minGrade).toBe(2);
     expect(() =>
       openRound({

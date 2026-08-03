@@ -455,7 +455,10 @@ describe('A-012 the goal card', () => {
 
   it('spec(A-012:AC-1) after a win the goal is the fog, in the chart’s own words', () => {
     const c = captain({ gradeBand: 'g2_3', wins: 3, unlockedIslands: ['port_sumwich'], currentIsland: 'port_sumwich' });
-    expect(rankGoalText(c)).toBe('Train at Port Sumwich to lift the fog.');
+    // Re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md; A-069's atlas): island names are
+    // per-band, and a g2_3 captain's chart calls port_sumwich "Compare Cove" — so "the chart's
+    // own words", this spec's whole point, now means the band's own name for the place.
+    expect(rankGoalText(c)).toBe('Train at Compare Cove to lift the fog.');
   });
 
   it('spec(A-012:AC-1) with every island open the goal stops asking for anything', () => {

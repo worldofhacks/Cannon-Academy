@@ -354,8 +354,11 @@ describe('A-008 the duel pays the captain', () => {
     // happen still grants nothing. A short duel on a starter skill cannot reach the threshold, so
     // the range cannons on `add_within_10` (`culverin`, `saker`) must not appear — and everything
     // announced is exactly what the voyage advance made: Isla Products and its entry gun.
-    expect(store.getState().captain.ownedCannons).toEqual([...owned, 'grapeshot']);
-    expect(outcome.unlockedCannons).toEqual(['grapeshot']);
+    // Re-baselined again 2026-08-03 under D-14 (OWNER-RULINGS.md; A-069's atlas): this store's
+    // captain is k_1, and Isla Products' k_1 cell teaches `sub_within_10`, whose entry gun is
+    // `dinghy_gun` — `grapeshot` (repeated_addition) now belongs to g2_3's ladder.
+    expect(store.getState().captain.ownedCannons).toEqual([...owned, 'dinghy_gun']);
+    expect(outcome.unlockedCannons).toEqual(['dinghy_gun']);
     expect(outcome.unlockedIslands).toEqual(['isla_products']);
     expect(store.getState().captain.ownedCannons).not.toContain('culverin');
     expect(store.getState().captain.ownedCannons).not.toContain('saker');

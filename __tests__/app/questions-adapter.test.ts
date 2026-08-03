@@ -436,7 +436,14 @@ describe('A-014 the question adapter', () => {
   it('spec(A-014:AC-3) a real duel threads the window across its whole sequence of draws', () => {
     // The adapter can honour a window it is never given. This is the half that proves
     // `src/stores/duel.ts` actually carries the history from one question to the next.
-    const duelSeeds = SEEDS.slice(0, 20);
+    //
+    // Re-hunted 2026-08-03 under D-14 (OWNER-RULINGS.md; A-069/A-070): the harness's legacy
+    // captain is top-band, and Port Sumwich's g4_5 cell now teaches `div_facts` — so the rival
+    // fires the mortar instead of an add_within_10 gun and these wrong-answer duels run shorter.
+    // Seed 31689's duel fell to exactly RECENT_TEMPLATE_WINDOW draws, which the harness guard
+    // below rightly refuses; it is swapped for the next seed in the same sweep (158393, 8 draws).
+    // Still 20 duels, and the guard keeps its teeth — nothing here computes its way around it.
+    const duelSeeds = SEEDS.slice(0, 21).filter((seed) => seed !== 31689);
     let totalDraws = 0;
     let totalRepeats = 0;
     const short: string[] = [];

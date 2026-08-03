@@ -29,7 +29,12 @@ describe('A-007 sea chart', () => {
   });
 
   it('spec(A-007:AC-3) a fogged island states its requirement in words a child can read', () => {
-    const nodes = chartNodes(captain({ unlockedIslands: ['port_sumwich'] }));
+    // Re-baselined 2026-08-03 under D-14 (OWNER-RULINGS.md; A-069's atlas): island display names
+    // are per-band now, and a band-less captain's chart falls back to g4_5 names ("Factor
+    // Shoals"). The captain is given a real band — k_1, whose Port Sumwich is still named
+    // "Port Sumwich" — because the property under test is that the requirement names the place
+    // in THE CAPTAIN'S OWN chart words, not an id and not a skill code.
+    const nodes = chartNodes(captain({ gradeBand: 'k_1', unlockedIslands: ['port_sumwich'] }));
     const products = nodes.find((n) => n.island.id === 'isla_products');
     expect(products?.fogged).toBe(true);
     const text = requirementText(products!);

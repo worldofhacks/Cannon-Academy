@@ -412,7 +412,7 @@ describe('A-022 settlement reaches presentation and the existing gun deck', () =
       ...fresh,
       gradeBand: 'g2_3',
       mastery: {
-        sub_within_20: {
+        two_step_add_sub: {
           weightedCorrect: MASTERY_THRESHOLD_CORRECT - MASTERY_RATE_DUEL,
           correct: 20,
           attempts: 20,
@@ -423,7 +423,7 @@ describe('A-022 settlement reaches presentation and the existing gun deck', () =
       ...initialDuelState(22003),
       phase: 'victory',
       coins: 17,
-      skillTally: { sub_within_20: { correct: 1, asked: 1 } },
+      skillTally: { two_step_add_sub: { correct: 1, asked: 1 } },
     };
 
     const outcome = applyDuelOutcome(store, terminal);
@@ -431,11 +431,13 @@ describe('A-022 settlement reaches presentation and the existing gun deck', () =
     const slots = deckSlots(store.getState().captain);
 
     expect(outcome.applied).toBe(true);
-    // `chain_shot` from mastering `sub_within_20`, and Grapeshot because that same mastery opens
-    // Isla Products, which now grants its entry cannon (re-baselined 2026-07-30 — `unlocksCannons`
-    // was declared on every island and read by nothing, making acquisition circular at a new
-    // island). Asserted as a set: the panel's contract is which cannons it shows, not their order.
-    expect([...outcome.unlockedCannons].sort()).toEqual(['chain_shot', 'grapeshot']);
+    // `double_broadside` from mastering `two_step_add_sub`, and Grapeshot because that same
+    // mastery opens Quotient Cove for a g2_3 captain, which grants its cell's entry cannon
+    // (re-baselined 2026-07-30 for the entry-gun grant; re-baselined again 2026-08-03 under D-14,
+    // OWNER-RULINGS.md, applied by A-070 — the old `sub_within_20` fixture skill sits in another
+    // band's cell under the atlas, so its mastery opens no island for THIS captain). Asserted as
+    // a set: the panel's contract is which cannons it shows, not their order.
+    expect([...outcome.unlockedCannons].sort()).toEqual(['double_broadside', 'grapeshot']);
     expect(projected.cannons.map((cannon) => cannon.id)).toEqual(outcome.unlockedCannons);
     for (const cannon of projected.cannons) {
       expect(store.getState().captain.ownedCannons).toContain(cannon.id);
