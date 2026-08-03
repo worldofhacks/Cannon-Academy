@@ -1,16 +1,23 @@
 /**
- * A-064 — a generated fleet: twenty golden ships from board-sanctioned primitives.
+ * The rival fleet catalog — the board's twenty ships, D-12's walls intact.
  *
- * Ruling D-12: generated ship art ships ONLY as data — enums and counts over the duel board's own
- * geometry, painted with named token swatches. The strict zod schema in
- * `src/content/generatedFleet.ts` is the provenance boundary, and these specs are what make it
- * load-bearing: free hex, duplicate rigging, raw coordinates and the player's red vertical stripe
- * on a rival must all be UNREPRESENTABLE, not merely absent.
+ * **Re-baselined by A-067** (sanctioned in `tickets/app/A-067.md`, "the A-064 suite is
+ * re-baselined to the new catalog citing this ticket in its header"): the catalog is rebuilt to
+ * the exact 20-row `FLEET` table of `Cannon Academy Rival Fleet.dc.html` §3b, the schema's
+ * parameter set is now the board's own columns (kind, strakes, gunports, castle, sail count,
+ * emblem), and paint derives from kind through named tokens instead of per-document palette
+ * slots. Every D-12 check A-064 froze is PRESERVED in its new shape:
  *
- * The frozen A-045/A-052/A-031 surfaces must not move: the ticket's verification command runs
- * `sprites.test.ts`, `ship-skins.test.ts` and `enemy-presentation.test.ts` alongside this file,
- * and AC-2/AC-5 below additionally pin `Ship.tsx`'s exact bytes and the raster inventory so this
- * file fails on its own if the fleet work leaks outside its fence.
+ *   - **free hex** — a document has no colour field at all; hex anywhere in a document fails the
+ *     strict parse, and neither the JSON nor the module may contain a `#` colour literal;
+ *   - **slot/rig abuse** — the old duplicate-sail-slot rejection becomes: rigging is a bounded
+ *     COUNT, and a document carrying a `sails` array (or any stripe field) is rejected outright;
+ *   - **the player's stripe** — there is no stripe channel left to smuggle it through: the module
+ *     never touches `sailStripe`, and the emitted SVG never contains its red.
+ *
+ * The frozen A-045/A-052/A-031 surfaces still must not move: the ticket's verification command
+ * runs `sprites.test.ts`, `ship-skins.test.ts` and `enemy-presentation.test.ts` alongside this
+ * file, and the specs below additionally pin `Ship.tsx`'s exact bytes and the raster inventory.
  */
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -21,14 +28,18 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
-  GENERATED_SWATCHES,
+  FLEET_KIND_PAINT,
+  FLEET_KINDS,
+  MYSTERY_NAME,
   generatedFleet,
   generatedShipSchema,
   generatedShipSvg,
+  isMysteryShip,
   parseGeneratedFleet,
 } from '../../src/content/generatedFleet';
 import type { GeneratedShip } from '../../src/content/generatedFleet';
 import generatedFleetRaw from '../../src/content/generatedFleet.json';
+import { color } from '../../src/theme/tokens';
 
 const REPO_ROOT = join(import.meta.dirname, '../..');
 const SHIP_PATH = 'src/components/duel/Ship.tsx';
@@ -39,42 +50,67 @@ const PREVIEW_SCRIPT_PATH = 'scripts/fleet-preview.ts';
 const PREVIEW_HTML_PATH = 'design/generated-fleet/preview.html';
 
 /**
- * `Ship.tsx` exactly as it stood when A-064 started. The ticket's hard constraint: geometry is
- * lifted by COPYING, never by editing — so the file's bytes may not move at all. If this fails,
- * someone edited the frozen transcription, and the fix is to revert that edit, not this hash.
+ * `Ship.tsx` exactly as it stood when A-064 started, and A-067 after it. The hard constraint both
+ * tickets share: geometry is lifted by COPYING, never by editing — so the file's bytes may not
+ * move at all. If this fails, someone edited the frozen transcription; the fix is to revert that
+ * edit, not this hash.
  */
 const SHIP_TSX_MD5_BEFORE_A064 = 'ab4cd96a826db8a0d3fbba1b7f0f5f34';
+
+/**
+ * The board's `FLEET` table, `Cannon Academy Rival Fleet.dc.html` §3b, row for row:
+ * [name, kind, strakes, gunports, sailCount, sternCastle, emblem]. This is the design authority
+ * the shipped catalog must match byte-for-byte and column-for-column (A-067 AC-1) — a catalog row
+ * drifting from it fails here BY NAME.
+ */
+const BOARD_FLEET: readonly (readonly [
+  string,
+  GeneratedShip['kind'],
+  number,
+  number,
+  number,
+  boolean,
+  GeneratedShip['emblem'],
+])[] = [
+  ['Bone Biscuit', 'skeleton', 2, 2, 2, false, 'bones'],
+  ['Soggy Doom', 'pirate', 3, 3, 2, true, 'skull'],
+  ['The Grumbling Gull', 'pirate', 2, 1, 1, false, 'star'],
+  ['Puddle Menace', 'ghost', 1, 0, 1, false, 'star'],
+  ['Captain Crumb', 'pirate', 2, 2, 2, false, 'bones'],
+  ['Rusty Kettle', 'skeleton', 3, 2, 2, true, 'skull'],
+  ['Wet Sock', 'ghost', 1, 1, 1, false, 'fish'],
+  ['Toothy Nibbler', 'shark', 2, 2, 2, false, 'fish'],
+  ['The Damp Terror', 'ghost', 2, 1, 2, true, 'skull'],
+  ['Barnacle Betty', 'pirate', 3, 3, 3, true, 'bones'],
+  ['Sir Snaps', 'shark', 2, 3, 2, false, 'fish'],
+  ['Old Mopbucket', 'skeleton', 2, 1, 1, false, 'bones'],
+  ['Squid Pickle', 'kraken', 3, 2, 2, true, 'fish'],
+  ['The Cranky Crumpet', 'pirate', 2, 2, 2, false, 'star'],
+  ['Grim Gravy', 'skeleton', 3, 3, 3, true, 'skull'],
+  ['Foggy Fright', 'ghost', 2, 0, 2, false, 'star'],
+  ['Chomp Muffin', 'shark', 3, 2, 3, true, 'fish'],
+  ['Tentacle Trouble', 'kraken', 3, 3, 3, true, 'skull'],
+  ['The Last Grumble', 'kraken', 3, 3, 3, true, 'bones'],
+  ['???', 'pirate', 2, 2, 2, false, 'star'],
+];
 
 function readRepo(relativePath: string): string {
   return readFileSync(join(REPO_ROOT, relativePath), 'utf8');
 }
 
-/** A valid document to mutate from — mirrors the golden shape without depending on the catalog. */
+/** A valid document to mutate from — mirrors the roster shape without depending on the catalog. */
 function validDoc(): Record<string, unknown> {
   return {
     id: 'gen_ship_spec_probe',
     displayName: 'Spec Probe',
-    role: 'showcase',
-    palette: {
-      hull: 'woodLight',
-      hullDeep: 'woodDeep',
-      sail: 'parchment',
-      trim: 'amber',
-      pennant: 'gold',
-      mast: 'wood',
-      deck: 'deck',
-    },
+    kind: 'pirate',
     hull: { strakes: 2, gunports: 3, sternCastle: true },
-    sails: [
-      { slot: 'topsail', shape: 'clean', stripe: 'vertical' },
-      { slot: 'mainsail', shape: 'clean', stripe: 'band' },
-      { slot: 'jib', shape: 'tattered', stripe: 'none' },
-    ],
-    flag: { shape: 'pennant', emblem: 'star' },
+    sailCount: 2,
+    emblem: 'star',
   };
 }
 
-describe('A-064 AC-1 — the schema is closed', () => {
+describe('A-064 AC-1 — the schema is closed (re-baselined to the A-067 parameter set)', () => {
   it('spec(A-064:AC-1) a well-formed document strict-parses; unknown keys are rejected at every level', () => {
     expect(generatedShipSchema.safeParse(validDoc()).success).toBe(true);
 
@@ -82,63 +118,57 @@ describe('A-064 AC-1 — the schema is closed', () => {
     expect(generatedShipSchema.safeParse(withTopLevel).success).toBe(false);
 
     const doc = validDoc();
-    (doc['palette'] as Record<string, unknown>)['glow'] = 'gold';
+    (doc['hull'] as Record<string, unknown>)['height'] = 40;
     expect(generatedShipSchema.safeParse(doc).success).toBe(false);
 
     const doc2 = validDoc();
-    (doc2['hull'] as Record<string, unknown>)['height'] = 40;
+    doc2['palette'] = { hull: 'gold' };
     expect(generatedShipSchema.safeParse(doc2).success).toBe(false);
 
     const doc3 = validDoc();
-    ((doc3['sails'] as Record<string, unknown>[])[0] as Record<string, unknown>)['width'] = 34;
+    doc3['flag'] = { shape: 'pennant', emblem: 'star' };
     expect(generatedShipSchema.safeParse(doc3).success).toBe(false);
-
-    const doc4 = validDoc();
-    (doc4['flag'] as Record<string, unknown>)['color'] = 'gold';
-    expect(generatedShipSchema.safeParse(doc4).success).toBe(false);
   });
 
-  it('spec(A-064:AC-1) free hex is unrepresentable — every palette value is a named token swatch', () => {
-    for (const slot of ['hull', 'hullDeep', 'sail', 'trim', 'pennant', 'mast', 'deck']) {
+  it('spec(A-064:AC-1) free hex is unrepresentable — no document field carries colour, and kind paint is named tokens only', () => {
+    // A hex literal fails wherever it is attached: the schema has no colour-shaped field at all.
+    for (const key of ['hull', 'sail', 'trim', 'paint', 'colour', 'color']) {
       const doc = validDoc();
-      (doc['palette'] as Record<string, unknown>)[slot] = '#FF0000';
-      expect(generatedShipSchema.safeParse(doc).success, `palette.${slot} accepted a hex literal`).toBe(
-        false,
-      );
+      doc[key] = '#FF0000';
+      expect(generatedShipSchema.safeParse(doc).success, `'${key}' accepted a hex literal`).toBe(false);
     }
+    const kindHex = validDoc();
+    kindHex['kind'] = '#FF0000';
+    expect(generatedShipSchema.safeParse(kindHex).success).toBe(false);
 
-    // The curated list itself: names only, drawn from the token file, and the player's red
-    // vertical stripe colour is NOT on the shelf (D-12 — player identity stays the player's).
-    for (const swatch of GENERATED_SWATCHES) {
-      expect(swatch).not.toMatch(/#/);
+    // The kind→paint table is token NAMES resolving through tokens.ts — and the player's red
+    // vertical stripe colour is not on the shelf (D-12: player identity stays the player's).
+    for (const kind of FLEET_KINDS) {
+      const names = FLEET_KIND_PAINT[kind];
+      for (const name of [names.hull, names.hullDeep, names.sail]) {
+        expect(name).not.toMatch(/#/);
+        expect(name).not.toBe('sailStripe');
+        expect(color[name], `paint name '${name}' is not a token`).toMatch(/^#[0-9A-F]{6}$/i);
+      }
     }
-    expect(GENERATED_SWATCHES).not.toContain('sailStripe');
   });
 
-  it('spec(A-064:AC-1) duplicate sail slots are rejected', () => {
-    const doc = validDoc();
-    (doc['sails'] as { slot: string }[])[1]!.slot = 'topsail';
-    const result = generatedShipSchema.safeParse(doc);
-    expect(result.success).toBe(false);
-  });
+  it('spec(A-064:AC-1) rig abuse is rejected — sails are a bounded count, and the old slot/stripe channels are unrepresentable', () => {
+    // The stripe rejection, in its A-067 shape: there is no sail-object channel left at all. A
+    // document trying to carry one — striped, duplicated, or otherwise — fails the strict parse.
+    const withSails = validDoc();
+    withSails['sails'] = [{ slot: 'topsail', shape: 'clean', stripe: 'vertical' }];
+    expect(generatedShipSchema.safeParse(withSails).success).toBe(false);
 
-  it("spec(A-064:AC-1) a vertical stripe on a rival-role document is rejected; a showcase's parses", () => {
-    const rival = validDoc();
-    rival['role'] = 'rival';
-    expect(
-      generatedShipSchema.safeParse(rival).success,
-      'a rival-role document carried the vertical stripe',
-    ).toBe(false);
+    const withStripe = validDoc();
+    withStripe['stripe'] = 'vertical';
+    expect(generatedShipSchema.safeParse(withStripe).success).toBe(false);
 
-    // Same rigging, showcase role: representable. The stripe is role-fenced, not banned.
-    expect(validDoc()['role']).toBe('showcase');
-    expect(generatedShipSchema.safeParse(validDoc()).success).toBe(true);
-
-    // A rival without vertical stripes parses fine — the fence is the stripe, not the role.
-    const plainRival = validDoc();
-    plainRival['role'] = 'rival';
-    (plainRival['sails'] as { stripe: string }[])[0]!.stripe = 'band';
-    expect(generatedShipSchema.safeParse(plainRival).success).toBe(true);
+    for (const bad of [0, 4, 1.5, -1]) {
+      const doc = validDoc();
+      doc['sailCount'] = bad;
+      expect(generatedShipSchema.safeParse(doc).success, `sailCount=${bad} accepted`).toBe(false);
+    }
   });
 
   it("spec(A-064:AC-1) ids are constrained to 'gen_ship_*'", () => {
@@ -152,15 +182,15 @@ describe('A-064 AC-1 — the schema is closed', () => {
     expect(generatedShipSchema.safeParse(doc).success).toBe(true);
   });
 
-  it('spec(A-064:AC-1) no field can carry raw coordinates — counts are the only numbers, both bounded ints', () => {
+  it('spec(A-064:AC-1) no field can carry raw coordinates — counts are the only numbers, all bounded ints', () => {
     // Strict schemas reject coordinate-shaped fields wherever they are attached.
     for (const key of ['points', 'x', 'y', 'left', 'bottom', 'anchor']) {
       const doc = validDoc();
       doc[key] = '0,0 100,100';
       expect(generatedShipSchema.safeParse(doc).success, `top-level '${key}' accepted`).toBe(false);
       const doc2 = validDoc();
-      ((doc2['sails'] as Record<string, unknown>[])[0] as Record<string, unknown>)[key] = 12;
-      expect(generatedShipSchema.safeParse(doc2).success, `sail '${key}' accepted`).toBe(false);
+      (doc2['hull'] as Record<string, unknown>)[key] = 12;
+      expect(generatedShipSchema.safeParse(doc2).success, `hull '${key}' accepted`).toBe(false);
     }
 
     // Counts stay counts: out-of-range and non-integer values fail.
@@ -176,34 +206,63 @@ describe('A-064 AC-1 — the schema is closed', () => {
       expect(generatedShipSchema.safeParse(doc).success, `hull.${field}=${value} accepted`).toBe(false);
     }
 
-    // And the schema source has exactly two numeric fields, both bounded integers — a future
-    // `z.number()` coordinate channel cannot arrive without deleting this spec.
+    // And the schema source has exactly three numeric fields (strakes, gunports, sailCount), all
+    // bounded integers — a future `z.number()` coordinate channel cannot arrive without deleting
+    // this spec. (Was two under A-064; the third is the board's SAIL column. A-067.)
     const source = readRepo(FLEET_MODULE_PATH);
     const numberSites = source.match(/z\.number\(\)/g) ?? [];
-    expect(numberSites).toHaveLength(2);
+    expect(numberSites).toHaveLength(3);
     const boundedIntSites = source.match(/z\.number\(\)\.int\(\)\.min\(\d+\)\.max\(\d+\)/g) ?? [];
-    expect(boundedIntSites).toHaveLength(2);
+    expect(boundedIntSites).toHaveLength(3);
   });
 
-  it('spec(A-064:AC-1) every shipped golden respects the closed schema — no hex, no duplicate slots, no rival vertical stripe', () => {
-    // Re-parse the RAW file entry by entry, so a hand-edited golden fails here by name even if
-    // some future refactor made the module's import-time validation lazier.
+  it('spec(A-064:AC-1) every shipped row respects the closed schema, and hex cannot even be written in the file', () => {
+    // Re-parse the RAW file entry by entry, so a hand-edited row fails here by name even if some
+    // future refactor made the module's import-time validation lazier.
     const raw = generatedFleetRaw as readonly unknown[];
     for (const entry of raw) {
       const result = generatedShipSchema.safeParse(entry);
       expect(
         result.success,
-        `golden failed strict parse: ${JSON.stringify(entry).slice(0, 120)}…`,
+        `roster row failed strict parse: ${JSON.stringify(entry).slice(0, 120)}…`,
       ).toBe(true);
     }
 
-    // No '#' anywhere in the committed catalog: hex cannot even be WRITTEN there, parsed or not.
-    expect(readRepo(FLEET_JSON_PATH)).not.toMatch(/#/);
+    // No '#' colour anywhere in the committed catalog… except the one board-authored name that IS
+    // three question marks, which is why this is a hex check and not a character ban.
+    expect(readRepo(FLEET_JSON_PATH)).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/);
+    expect(readRepo(FLEET_JSON_PATH)).not.toMatch(/"#/);
+  });
+});
+
+describe('A-067 AC-1 — the catalog IS the board roster', () => {
+  it('spec(A-067:AC-1) twenty documents, names byte-equal, every parameter column matching board 3b', () => {
+    expect(generatedFleet).toHaveLength(BOARD_FLEET.length);
+    for (let index = 0; index < BOARD_FLEET.length; index += 1) {
+      const [name, kind, strakes, gunports, sailCount, sternCastle, emblem] = BOARD_FLEET[
+        index
+      ] as (typeof BOARD_FLEET)[number];
+      const doc = generatedFleet[index] as GeneratedShip;
+      expect(doc.displayName, `row ${index} name`).toBe(name);
+      expect(doc.kind, `${name} kind`).toBe(kind);
+      expect(doc.hull.strakes, `${name} strakes`).toBe(strakes);
+      expect(doc.hull.gunports, `${name} gunports`).toBe(gunports);
+      expect(doc.sailCount, `${name} sailCount`).toBe(sailCount);
+      expect(doc.hull.sternCastle, `${name} castle`).toBe(sternCastle);
+      expect(doc.emblem, `${name} emblem`).toBe(emblem);
+    }
+  });
+
+  it('spec(A-067:AC-1) the ??? row is real data — one mystery ship, last on the shelf, never two', () => {
+    const mysteries = generatedFleet.filter(isMysteryShip);
+    expect(mysteries).toHaveLength(1);
+    expect(mysteries[0]?.displayName).toBe(MYSTERY_NAME);
+    expect(generatedFleet[generatedFleet.length - 1]?.displayName).toBe(MYSTERY_NAME);
   });
 });
 
 describe('A-064 AC-2 — any valid document renders, and Ship.tsx never moved', () => {
-  it('spec(A-064:AC-2) every golden renders to plain SVG without throwing', () => {
+  it('spec(A-064:AC-2) every roster row renders to plain SVG without throwing, and never in the player stripe red', () => {
     for (const doc of generatedFleet) {
       const svg = generatedShipSvg(doc);
       expect(svg.startsWith('<svg ')).toBe(true);
@@ -211,6 +270,8 @@ describe('A-064 AC-2 — any valid document renders, and Ship.tsx never moved', 
       expect(svg).toContain('<polygon'); // the hull is always a polygon
       expect(svg).not.toMatch(/NaN|undefined|null/);
       expect(svg).toContain(`aria-label="${doc.displayName}"`);
+      // D-12's stripe wall, verified on the OUTPUT: the player's red never paints a rival.
+      expect(svg.toUpperCase()).not.toContain(color.sailStripe.toUpperCase());
     }
   });
 
@@ -221,7 +282,7 @@ describe('A-064 AC-2 — any valid document renders, and Ship.tsx never moved', 
     expect(bytes.toString('utf8')).not.toMatch(/GeneratedShip|generatedFleet/);
   });
 
-  it('spec(A-064:AC-2) GeneratedShip renders through Poly/View/Svg only — no raster, no hex, no reach into Ship.tsx', () => {
+  it('spec(A-064:AC-2) GeneratedShip renders through Poly/View only — no raster, no hex, no stripe, no reach into Ship.tsx', () => {
     // Same harness pattern as A-045's composition specs: React Native's Flow-typed entry point
     // cannot load duel components in the node runner, so the renderer half is enforced on source
     // text while the shared layer plan is executed for real above.
@@ -229,18 +290,24 @@ describe('A-064 AC-2 — any valid document renders, and Ship.tsx never moved', 
     expect(source).toMatch(/from '\.\.\/Poly'/);
     expect(source).toMatch(/buildGeneratedShipLayers/);
     expect(source).not.toMatch(/<Image|sprite\./);
-    expect(source).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/); // paint arrives via named swatches only
+    expect(source).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/); // paint arrives via named tokens only
     expect(source).not.toMatch(/from '\.\/Ship'/); // lifted by copying, never re-exported
+    expect(source).not.toMatch(/sailStripe|stripedPoly/); // A-067: no stripe path exists at all
 
     // The schema module resolves colour exclusively from the token file — no literals of its own.
+    // Its ONE legal mention of the player's stripe is the type-level ban: the paint-name type
+    // excludes `sailStripe`, so writing it into the kind table is a compile error, and the module
+    // never actually reads it.
     const fleetModule = readRepo(FLEET_MODULE_PATH);
     expect(fleetModule).toMatch(/from '\.\.\/theme\/tokens\.ts'/);
     expect(fleetModule).not.toMatch(/#[0-9A-Fa-f]{3,8}\b/);
+    expect(fleetModule).toMatch(/Exclude<keyof typeof color, 'sailStripe'>/);
+    expect(fleetModule).not.toMatch(/color\.sailStripe|sailStripe:/);
   });
 });
 
-describe('A-064 AC-3 — exactly twenty goldens ship', () => {
-  it('spec(A-064:AC-3) the catalog holds exactly 20 strict-parsed goldens with unique ids and no two identical', () => {
+describe('A-064 AC-3 — exactly twenty ships ship', () => {
+  it('spec(A-064:AC-3) the catalog holds exactly 20 strict-parsed rows with unique ids and names, no two identical', () => {
     expect(generatedFleet).toHaveLength(20);
     expect((generatedFleetRaw as readonly unknown[]).length).toBe(20);
 
@@ -253,18 +320,21 @@ describe('A-064 AC-3 — exactly twenty goldens ship', () => {
     const shapes = generatedFleet.map((doc) => JSON.stringify(doc));
     expect(new Set(shapes).size).toBe(20);
 
-    // The set exercises the schema's whole vocabulary, so the goldens stay a usable few-shot
-    // base for future generation rather than twenty near-copies.
-    expect(new Set(generatedFleet.map((doc) => doc.role)).size).toBe(2);
-    expect(new Set(generatedFleet.map((doc) => doc.flag.emblem)).size).toBe(5);
-    expect(new Set(generatedFleet.map((doc) => doc.sails.length)).size).toBe(3);
+    // The set exercises the schema's whole vocabulary — every kind, every emblem, every count.
+    // (Re-baselined from A-064's spread: roles are gone, emblems are the board's four. A-067.)
+    expect(new Set(generatedFleet.map((doc) => doc.kind)).size).toBe(5);
+    expect(new Set(generatedFleet.map((doc) => doc.emblem)).size).toBe(4);
+    expect(new Set(generatedFleet.map((doc) => doc.sailCount)).size).toBe(3);
     expect(new Set(generatedFleet.map((doc) => doc.hull.strakes)).size).toBe(3);
     expect(new Set(generatedFleet.map((doc) => doc.hull.gunports)).size).toBe(4);
   });
 
-  it('spec(A-064:AC-3) every displayName reads for a five-year-old — short, playful, no realistic menace', () => {
-    // The real review is the committed eyeball grid; this is the mechanical floor under it.
-    const menace = /(blood|death|dead|kill|murder|hell|demon|corpse|knife|slaughter|terror)/i;
+  it('spec(A-064:AC-3) every displayName reads for a five-year-old — short, playful, menace collapsed by pairing', () => {
+    // The real review is the committed eyeball grid plus the board's own naming note: "a menacing
+    // word next to a domestic one, so the pairing collapses the threat". The board authors 'Soggy
+    // Doom' and 'The Damp Terror' under that rule, so this floor bans REALISTIC menace only.
+    // (Re-baselined by A-067: 'terror' left the ban list because the board shipped it, damp.)
+    const menace = /(blood|death|dead|kill|murder|hell|demon|corpse|knife|slaughter)/i;
     const names = new Set<string>();
     for (const doc of generatedFleet) {
       expect(doc.displayName.length).toBeGreaterThan(0);
@@ -284,12 +354,12 @@ describe('A-064 AC-3 — exactly twenty goldens ship', () => {
 
     const bad = validDoc();
     bad['id'] = 'gen_ship_bad_probe';
-    (bad['palette'] as Record<string, unknown>)['hull'] = '#123456';
+    bad['kind'] = 'dragon';
     expect(() => parseGeneratedFleet([bad])).toThrow(/content\/generatedFleet\.json/);
     expect(() => parseGeneratedFleet([bad])).toThrow(/gen_ship_bad_probe/);
 
     // Duplicate ids across the set collide even when each entry parses alone.
-    expect(() => parseGeneratedFleet([validDoc(), validDoc()])).toThrow(/duplicate id/);
+    expect(() => parseGeneratedFleet([validDoc(), validDoc()])).toThrow(/duplicate/);
   });
 });
 
@@ -297,7 +367,7 @@ describe('A-064 AC-4 — the preview grid regenerates byte-for-byte', () => {
   it('spec(A-064:AC-4) running fleet-preview.ts reproduces the committed page and shows all 20 with ids and names', () => {
     const committed = readRepo(PREVIEW_HTML_PATH);
 
-    const scratch = mkdtempSync(join(tmpdir(), 'a064-fleet-preview-'));
+    const scratch = mkdtempSync(join(tmpdir(), 'a067-fleet-preview-'));
     try {
       execFileSync(process.execPath, [join(REPO_ROOT, PREVIEW_SCRIPT_PATH), join(scratch, 'preview.html')], {
         cwd: REPO_ROOT,
@@ -354,8 +424,11 @@ describe('A-064 AC-5 — no frozen surface moved', () => {
     }
   });
 
-  it('spec(A-064:AC-5) generated ships are not ownable: no captain field, no persistence, no skin-catalog reach', () => {
-    // Mirrors the A-052 shape lock: paint and silhouette only, no engine meaning, nothing saved.
+  it('spec(A-064:AC-5) fleet ships are not ownable: no captain field, no persistence import, no skin-catalog reach', () => {
+    // Mirrors the A-052 shape lock: paint and silhouette only, no engine meaning, nothing OWNED.
+    // `captain.metRivals` (A-067) is a met LEDGER, not ownership — the ids reach it as opaque
+    // strings through settlement, so the store, persistence and skin layers still never import
+    // the catalog or name its types.
     for (const path of ['src/stores/player.ts', 'src/services/persistence.ts', 'src/theme/shipSkins.ts']) {
       const source = readRepo(path);
       expect(source, `${path} mentions the generated fleet`).not.toMatch(
@@ -371,6 +444,6 @@ describe('A-064 AC-5 — no frozen surface moved', () => {
   });
 });
 
-/** The type-level contract stays honest: a golden is assignable to the inferred document type. */
+/** The type-level contract stays honest: a roster row is assignable to the inferred document type. */
 const _typeProbe: GeneratedShip | undefined = generatedFleet[0];
 void _typeProbe;

@@ -2,746 +2,161 @@
   {
     "id": "gen_ship_bone_biscuit",
     "displayName": "Bone Biscuit",
-    "role": "rival",
-    "palette": {
-      "hull": "parchment",
-      "hullDeep": "parchmentEdge",
-      "sail": "white",
-      "trim": "parchmentEdge",
-      "pennant": "parchment",
-      "mast": "parchmentEdge",
-      "deck": "iceCard"
-    },
-    "hull": {
-      "strakes": 2,
-      "gunports": 2,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "tattered",
-        "stripe": "none"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "tattered",
-        "stripe": "band"
-      }
-    ],
-    "flag": {
-      "shape": "jagged",
-      "emblem": "skull"
-    }
+    "kind": "skeleton",
+    "hull": { "strakes": 2, "gunports": 2, "sternCastle": false },
+    "sailCount": 2,
+    "emblem": "bones"
   },
   {
-    "id": "gen_ship_giggle_galleon",
-    "displayName": "Giggle Galleon",
-    "role": "showcase",
-    "palette": {
-      "hull": "woodLight",
-      "hullDeep": "woodDeep",
-      "sail": "parchment",
-      "trim": "amber",
-      "pennant": "amber",
-      "mast": "wood",
-      "deck": "deck"
-    },
-    "hull": {
-      "strakes": 3,
-      "gunports": 3,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "vertical"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "vertical"
-      },
-      {
-        "slot": "jib",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "star"
-    }
+    "id": "gen_ship_soggy_doom",
+    "displayName": "Soggy Doom",
+    "kind": "pirate",
+    "hull": { "strakes": 3, "gunports": 3, "sternCastle": true },
+    "sailCount": 2,
+    "emblem": "skull"
   },
   {
-    "id": "gen_ship_soggy_sock",
-    "displayName": "Soggy Sock",
-    "role": "rival",
-    "palette": {
-      "hull": "iron",
-      "hullDeep": "ironDeep",
-      "sail": "iceCard",
-      "trim": "seaFoam",
-      "pennant": "flame",
-      "mast": "ironDeep",
-      "deck": "parchmentEdge"
-    },
-    "hull": {
-      "strakes": 1,
-      "gunports": 1,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "mainsail",
-        "shape": "tattered",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "jagged",
-      "emblem": "none"
-    }
+    "id": "gen_ship_the_grumbling_gull",
+    "displayName": "The Grumbling Gull",
+    "kind": "pirate",
+    "hull": { "strakes": 2, "gunports": 1, "sternCastle": false },
+    "sailCount": 1,
+    "emblem": "star"
   },
   {
-    "id": "gen_ship_sir_splashalot",
-    "displayName": "Sir Splashalot",
-    "role": "showcase",
-    "palette": {
-      "hull": "sea",
-      "hullDeep": "seaDeep",
-      "sail": "white",
-      "trim": "foam",
-      "pennant": "seaFoam",
-      "mast": "iron",
-      "deck": "iceCard"
-    },
-    "hull": {
-      "strakes": 2,
-      "gunports": 3,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "band"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "vertical"
-      },
-      {
-        "slot": "jib",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "fish"
-    }
+    "id": "gen_ship_puddle_menace",
+    "displayName": "Puddle Menace",
+    "kind": "ghost",
+    "hull": { "strakes": 1, "gunports": 0, "sternCastle": false },
+    "sailCount": 1,
+    "emblem": "star"
   },
   {
-    "id": "gen_ship_captain_custard",
-    "displayName": "Captain Custard",
-    "role": "showcase",
-    "palette": {
-      "hull": "gold",
-      "hullDeep": "goldDeep",
-      "sail": "white",
-      "trim": "amber",
-      "pennant": "goldLight",
-      "mast": "wood",
-      "deck": "deck"
-    },
-    "hull": {
-      "strakes": 1,
-      "gunports": 2,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "none"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "band"
-      },
-      {
-        "slot": "jib",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "star"
-    }
+    "id": "gen_ship_captain_crumb",
+    "displayName": "Captain Crumb",
+    "kind": "pirate",
+    "hull": { "strakes": 2, "gunports": 2, "sternCastle": false },
+    "sailCount": 2,
+    "emblem": "bones"
   },
   {
-    "id": "gen_ship_tickled_kraken",
-    "displayName": "Tickled Kraken",
-    "role": "rival",
-    "palette": {
-      "hull": "krakenDeep",
-      "hullDeep": "purple",
-      "sail": "krakenPink",
-      "trim": "krakenPink",
-      "pennant": "krakenPink",
-      "mast": "iron",
-      "deck": "iceCard"
-    },
-    "hull": {
-      "strakes": 2,
-      "gunports": 3,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "tattered",
-        "stripe": "band"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "tattered",
-        "stripe": "none"
-      },
-      {
-        "slot": "jib",
-        "shape": "tattered",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "jagged",
-      "emblem": "crossbones"
-    }
+    "id": "gen_ship_rusty_kettle",
+    "displayName": "Rusty Kettle",
+    "kind": "skeleton",
+    "hull": { "strakes": 3, "gunports": 2, "sternCastle": true },
+    "sailCount": 2,
+    "emblem": "skull"
   },
   {
-    "id": "gen_ship_noodle_navy",
-    "displayName": "Noodle Navy",
-    "role": "showcase",
-    "palette": {
-      "hull": "seaDeep",
-      "hullDeep": "ironDeep",
-      "sail": "foam",
-      "trim": "seaFoam",
-      "pennant": "seaFoam",
-      "mast": "iron",
-      "deck": "iceCard"
-    },
-    "hull": {
-      "strakes": 2,
-      "gunports": 2,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "vertical"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "none"
-      },
-      {
-        "slot": "jib",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "none"
-    }
+    "id": "gen_ship_wet_sock",
+    "displayName": "Wet Sock",
+    "kind": "ghost",
+    "hull": { "strakes": 1, "gunports": 1, "sternCastle": false },
+    "sailCount": 1,
+    "emblem": "fish"
   },
   {
-    "id": "gen_ship_pickle_pirate",
-    "displayName": "Pickle Pirate",
-    "role": "rival",
-    "palette": {
-      "hull": "successDeep",
-      "hullDeep": "ironDeep",
-      "sail": "ghostGlow",
-      "trim": "success",
-      "pennant": "success",
-      "mast": "wood",
-      "deck": "deck"
-    },
-    "hull": {
-      "strakes": 1,
-      "gunports": 3,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "tattered",
-        "stripe": "none"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "tattered",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "jagged",
-      "emblem": "crossbones"
-    }
+    "id": "gen_ship_toothy_nibbler",
+    "displayName": "Toothy Nibbler",
+    "kind": "shark",
+    "hull": { "strakes": 2, "gunports": 2, "sternCastle": false },
+    "sailCount": 2,
+    "emblem": "fish"
   },
   {
-    "id": "gen_ship_squid_squad",
-    "displayName": "Squid Squad",
-    "role": "rival",
-    "palette": {
-      "hull": "purple",
-      "hullDeep": "ironDeep",
-      "sail": "ghostGlow",
-      "trim": "ghostGlow",
-      "pennant": "ghostGlow",
-      "mast": "iron",
-      "deck": "parchmentEdge"
-    },
-    "hull": {
-      "strakes": 2,
-      "gunports": 2,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "tattered",
-        "stripe": "none"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "tattered",
-        "stripe": "band"
-      },
-      {
-        "slot": "jib",
-        "shape": "tattered",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "jagged",
-      "emblem": "skull"
-    }
+    "id": "gen_ship_the_damp_terror",
+    "displayName": "The Damp Terror",
+    "kind": "ghost",
+    "hull": { "strakes": 2, "gunports": 1, "sternCastle": true },
+    "sailCount": 2,
+    "emblem": "skull"
   },
   {
-    "id": "gen_ship_jolly_jellyfish",
-    "displayName": "Jolly Jellyfish",
-    "role": "showcase",
-    "palette": {
-      "hull": "krakenDeep",
-      "hullDeep": "purple",
-      "sail": "krakenPink",
-      "trim": "krakenPink",
-      "pennant": "krakenPink",
-      "mast": "iron",
-      "deck": "iceCard"
-    },
-    "hull": {
-      "strakes": 1,
-      "gunports": 1,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "none"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "vertical"
-      },
-      {
-        "slot": "jib",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "star"
-    }
+    "id": "gen_ship_barnacle_betty",
+    "displayName": "Barnacle Betty",
+    "kind": "pirate",
+    "hull": { "strakes": 3, "gunports": 3, "sternCastle": true },
+    "sailCount": 3,
+    "emblem": "bones"
   },
   {
-    "id": "gen_ship_sneaky_sardine",
-    "displayName": "Sneaky Sardine",
-    "role": "rival",
-    "palette": {
-      "hull": "seaDeep",
-      "hullDeep": "ironDeep",
-      "sail": "foam",
-      "trim": "seaFoam",
-      "pennant": "seaFoam",
-      "mast": "iron",
-      "deck": "iceCard"
-    },
-    "hull": {
-      "strakes": 1,
-      "gunports": 0,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "jib",
-        "shape": "tattered",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "jagged",
-      "emblem": "fish"
-    }
+    "id": "gen_ship_sir_snaps",
+    "displayName": "Sir Snaps",
+    "kind": "shark",
+    "hull": { "strakes": 2, "gunports": 3, "sternCastle": false },
+    "sailCount": 2,
+    "emblem": "fish"
   },
   {
-    "id": "gen_ship_cannonball_carl",
-    "displayName": "Cannonball Carl",
-    "role": "rival",
-    "palette": {
-      "hull": "iron",
-      "hullDeep": "ironDeep",
-      "sail": "iceCard",
-      "trim": "seaFoam",
-      "pennant": "flame",
-      "mast": "ironDeep",
-      "deck": "parchmentEdge"
-    },
-    "hull": {
-      "strakes": 3,
-      "gunports": 3,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "tattered",
-        "stripe": "band"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "tattered",
-        "stripe": "band"
-      },
-      {
-        "slot": "jib",
-        "shape": "tattered",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "jagged",
-      "emblem": "crossbones"
-    }
+    "id": "gen_ship_old_mopbucket",
+    "displayName": "Old Mopbucket",
+    "kind": "skeleton",
+    "hull": { "strakes": 2, "gunports": 1, "sternCastle": false },
+    "sailCount": 1,
+    "emblem": "bones"
   },
   {
-    "id": "gen_ship_marsh_mallow",
-    "displayName": "Marsh Mallow",
-    "role": "showcase",
-    "palette": {
-      "hull": "parchment",
-      "hullDeep": "parchmentEdge",
-      "sail": "white",
-      "trim": "parchmentEdge",
-      "pennant": "parchment",
-      "mast": "parchmentEdge",
-      "deck": "iceCard"
-    },
-    "hull": {
-      "strakes": 1,
-      "gunports": 0,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "none"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "none"
-    }
+    "id": "gen_ship_squid_pickle",
+    "displayName": "Squid Pickle",
+    "kind": "kraken",
+    "hull": { "strakes": 3, "gunports": 2, "sternCastle": true },
+    "sailCount": 2,
+    "emblem": "fish"
   },
   {
-    "id": "gen_ship_starfish_scout",
-    "displayName": "Starfish Scout",
-    "role": "showcase",
-    "palette": {
-      "hull": "captainCoat",
-      "hullDeep": "ironDeep",
-      "sail": "parchment",
-      "trim": "gold",
-      "pennant": "goldLight",
-      "mast": "wood",
-      "deck": "deck"
-    },
-    "hull": {
-      "strakes": 2,
-      "gunports": 1,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "none"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "band"
-      },
-      {
-        "slot": "jib",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "star"
-    }
+    "id": "gen_ship_the_cranky_crumpet",
+    "displayName": "The Cranky Crumpet",
+    "kind": "pirate",
+    "hull": { "strakes": 2, "gunports": 2, "sternCastle": false },
+    "sailCount": 2,
+    "emblem": "star"
   },
   {
-    "id": "gen_ship_bouncy_buccaneer",
-    "displayName": "Bouncy Buccaneer",
-    "role": "showcase",
-    "palette": {
-      "hull": "woodDeep",
-      "hullDeep": "gunport",
-      "sail": "parchment",
-      "trim": "flame",
-      "pennant": "flame",
-      "mast": "wood",
-      "deck": "deck"
-    },
-    "hull": {
-      "strakes": 3,
-      "gunports": 3,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "band"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "vertical"
-      },
-      {
-        "slot": "jib",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "crossbones"
-    }
+    "id": "gen_ship_grim_gravy",
+    "displayName": "Grim Gravy",
+    "kind": "skeleton",
+    "hull": { "strakes": 3, "gunports": 3, "sternCastle": true },
+    "sailCount": 3,
+    "emblem": "skull"
   },
   {
-    "id": "gen_ship_pepper_plank",
-    "displayName": "Pepper Plank",
-    "role": "rival",
-    "palette": {
-      "hull": "woodDeep",
-      "hullDeep": "gunport",
-      "sail": "parchment",
-      "trim": "flame",
-      "pennant": "flame",
-      "mast": "wood",
-      "deck": "deck"
-    },
-    "hull": {
-      "strakes": 3,
-      "gunports": 1,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "mainsail",
-        "shape": "tattered",
-        "stripe": "band"
-      },
-      {
-        "slot": "jib",
-        "shape": "tattered",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "jagged",
-      "emblem": "skull"
-    }
+    "id": "gen_ship_foggy_fright",
+    "displayName": "Foggy Fright",
+    "kind": "ghost",
+    "hull": { "strakes": 2, "gunports": 0, "sternCastle": false },
+    "sailCount": 2,
+    "emblem": "star"
   },
   {
-    "id": "gen_ship_toothy_tug",
-    "displayName": "Toothy Tug",
-    "role": "rival",
-    "palette": {
-      "hull": "gold",
-      "hullDeep": "goldDeep",
-      "sail": "white",
-      "trim": "amber",
-      "pennant": "goldLight",
-      "mast": "wood",
-      "deck": "deck"
-    },
-    "hull": {
-      "strakes": 2,
-      "gunports": 0,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "mainsail",
-        "shape": "tattered",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "jagged",
-      "emblem": "none"
-    }
+    "id": "gen_ship_chomp_muffin",
+    "displayName": "Chomp Muffin",
+    "kind": "shark",
+    "hull": { "strakes": 3, "gunports": 2, "sternCastle": true },
+    "sailCount": 3,
+    "emblem": "fish"
   },
   {
-    "id": "gen_ship_dizzy_dolphin",
-    "displayName": "Dizzy Dolphin",
-    "role": "showcase",
-    "palette": {
-      "hull": "seaDeep",
-      "hullDeep": "ironDeep",
-      "sail": "foam",
-      "trim": "seaFoam",
-      "pennant": "seaFoam",
-      "mast": "iron",
-      "deck": "iceCard"
-    },
-    "hull": {
-      "strakes": 3,
-      "gunports": 0,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "band"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "none"
-      },
-      {
-        "slot": "jib",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "fish"
-    }
+    "id": "gen_ship_tentacle_trouble",
+    "displayName": "Tentacle Trouble",
+    "kind": "kraken",
+    "hull": { "strakes": 3, "gunports": 3, "sternCastle": true },
+    "sailCount": 3,
+    "emblem": "skull"
   },
   {
-    "id": "gen_ship_snappy_turtle",
-    "displayName": "Snappy Turtle",
-    "role": "showcase",
-    "palette": {
-      "hull": "successDeep",
-      "hullDeep": "ironDeep",
-      "sail": "ghostGlow",
-      "trim": "success",
-      "pennant": "success",
-      "mast": "wood",
-      "deck": "deck"
-    },
-    "hull": {
-      "strakes": 2,
-      "gunports": 2,
-      "sternCastle": false
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "none"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "vertical"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "none"
-    }
+    "id": "gen_ship_the_last_grumble",
+    "displayName": "The Last Grumble",
+    "kind": "kraken",
+    "hull": { "strakes": 3, "gunports": 3, "sternCastle": true },
+    "sailCount": 3,
+    "emblem": "bones"
   },
   {
-    "id": "gen_ship_muffin_marauder",
-    "displayName": "Muffin Marauder",
-    "role": "showcase",
-    "palette": {
-      "hull": "goldDeep",
-      "hullDeep": "goldDeepest",
-      "sail": "parchment",
-      "trim": "gold",
-      "pennant": "gold",
-      "mast": "wood",
-      "deck": "deck"
-    },
-    "hull": {
-      "strakes": 2,
-      "gunports": 3,
-      "sternCastle": true
-    },
-    "sails": [
-      {
-        "slot": "topsail",
-        "shape": "clean",
-        "stripe": "vertical"
-      },
-      {
-        "slot": "mainsail",
-        "shape": "clean",
-        "stripe": "vertical"
-      },
-      {
-        "slot": "jib",
-        "shape": "clean",
-        "stripe": "none"
-      }
-    ],
-    "flag": {
-      "shape": "pennant",
-      "emblem": "crossbones"
-    }
+    "id": "gen_ship_mystery",
+    "displayName": "???",
+    "kind": "pirate",
+    "hull": { "strakes": 2, "gunports": 2, "sternCastle": false },
+    "sailCount": 2,
+    "emblem": "star"
   }
 ]

@@ -65,12 +65,8 @@ export default function RankScreen() {
   );
 }
 
-/**
- * TODO(tokens): `surfaceSunk` (#F0E2C8) and `parchmentPlank` (#C9AE7E). Both are board hexes with
- * no name in `tokens.ts`; see the same note in `app/harbor.tsx`.
- */
-const SURFACE_SUNK = '#F0E2C8';
-const PARCHMENT_PLANK = '#C9AE7E';
+// `surfaceSunk` and `parchmentPlank` were inlined here until A-067 named them in `tokens.ts`
+// (the rival-fleet board reuses both). `app/harbor.tsx` still carries its own copies.
 
 function RankBody() {
   const insets = useSafeAreaInsets();
@@ -231,6 +227,48 @@ function RankBody() {
             </View>
           </>
         )}
+
+        {/* ── The rival fleet ────────────────────────────────────────────────────────────────
+            A-067: the shelf's front door, sitting above the Captain's papers. Built exactly like
+            a Papers row — same card, tile, chevron, 64pt floor — because it is the same gesture:
+            a tap that re-enters a screen. Unlike the papers it IS a demo-graph edge (`rank-fleet`),
+            bound here through plain executable route syntax, the way every non-chart edge binds. */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Rival Fleet. The captains you've met."
+          onPress={() => router.push('/fleet')}
+          style={({ pressed }) => [
+            s.paper,
+            {
+              minHeight: B.papers.height,
+              paddingHorizontal: tx(B.papers.padX),
+              paddingVertical: tx(B.papers.padY),
+              borderRadius: tx(B.papers.radius),
+              gap: tx(B.papers.gap),
+              borderBottomWidth: tx(B.papers.shadow),
+              marginTop: tx(2),
+            },
+            pressed ? s.pressed : null,
+          ]}
+        >
+          <View
+            style={[
+              s.paperTile,
+              { width: tx(B.papers.tile), height: tx(B.papers.tile), borderRadius: tx(B.papers.tileRadius) },
+            ]}
+          >
+            <Text style={[s.paperGlyph, { fontSize: tx(B.papers.glyphSize) }]}>{'⚑︎'}</Text>
+          </View>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text numberOfLines={1} style={[s.paperTitle, { fontSize: tx(B.papers.titleSize) }]}>
+              {'Rival Fleet'}
+            </Text>
+            <Text numberOfLines={1} style={[s.paperDetail, { fontSize: tx(B.papers.detailSize) }]}>
+              {"The captains you've met."}
+            </Text>
+          </View>
+          <Text style={[s.paperChevron, { fontSize: tx(B.papers.chevronSize) }]}>{'›'}</Text>
+        </Pressable>
 
         {/* ── Captain's papers ───────────────────────────────────────────────────────────── */}
         <Text style={[s.eyebrow, eyebrow(tx), { marginTop: tx(2) }]}>{rankPapersLabel}</Text>
@@ -425,7 +463,7 @@ function SkillMeter({ row, tx }: { readonly row: SkillRow; readonly tx: (n: numb
             width: tx(K.badge.size),
             height: tx(K.badge.size),
             borderRadius: tx(K.badge.radius),
-            backgroundColor: row.mastered ? color.success : SURFACE_SUNK,
+            backgroundColor: row.mastered ? color.success : color.surfaceSunk,
           },
         ]}
       >
@@ -597,7 +635,7 @@ const s = StyleSheet.create({
     alignItems: 'center',
     borderRadius: radius.pill,
     backgroundColor: color.parchment,
-    borderBottomColor: PARCHMENT_PLANK,
+    borderBottomColor: color.parchmentPlank,
   },
   purseText: { fontFamily: font.displayBold, color: color.inkDark },
   coin: { borderRadius: 999, backgroundColor: color.amber, overflow: 'hidden', justifyContent: 'flex-end' },
@@ -624,7 +662,7 @@ const s = StyleSheet.create({
 
   trophy: { flex: 1, minWidth: 0, alignItems: 'center', justifyContent: 'center' },
   trophyFilled: { backgroundColor: color.white, borderBottomColor: color.parchmentEdge },
-  trophyEmpty: { backgroundColor: SURFACE_SUNK },
+  trophyEmpty: { backgroundColor: color.surfaceSunk },
   trophyTile: { alignItems: 'center', justifyContent: 'center' },
   trophyGlyph: { fontFamily: font.displayBold, color: color.inkDark },
   trophyCount: { fontFamily: font.displayBold },
@@ -636,7 +674,7 @@ const s = StyleSheet.create({
     backgroundColor: color.white,
     borderBottomColor: color.parchmentEdge,
   },
-  skillTile: { backgroundColor: SURFACE_SUNK, alignItems: 'center', justifyContent: 'center' },
+  skillTile: { backgroundColor: color.surfaceSunk, alignItems: 'center', justifyContent: 'center' },
   skillGlyph: { fontFamily: font.displayBold, color: color.inkDark },
   skillBadge: { alignItems: 'center', justifyContent: 'center' },
   skillBadgeGlyph: { fontFamily: font.bodyBold },
@@ -647,7 +685,7 @@ const s = StyleSheet.create({
     backgroundColor: color.white,
     borderBottomColor: color.parchmentEdge,
   },
-  paperTile: { backgroundColor: SURFACE_SUNK, alignItems: 'center', justifyContent: 'center' },
+  paperTile: { backgroundColor: color.surfaceSunk, alignItems: 'center', justifyContent: 'center' },
   paperGlyph: { fontFamily: font.bodyBold, color: color.inkDark },
   paperTitle: { fontFamily: font.displayBold, color: color.inkDark },
   paperDetail: { fontFamily: font.bodySemi, color: color.inkDarkMuted },

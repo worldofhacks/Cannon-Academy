@@ -1,10 +1,10 @@
 /**
- * A-064 — the generated fleet's eyeball grid.
+ * A-067 (was A-064) — the rival fleet's eyeball grid.
  *
- * Renders every committed golden in `src/content/generatedFleet.json` as plain `<svg>` into one
- * static HTML page at `design/generated-fleet/preview.html`, so the fleet is reviewable in a
+ * Renders every committed roster row in `src/content/generatedFleet.json` as plain `<svg>` into
+ * one static HTML page at `design/generated-fleet/preview.html`, so the fleet is reviewable in a
  * browser with no Expo running. The page is COMMITTED, and this script is deterministic — same
- * goldens in, same bytes out (no timestamps, no environment) — which is what lets
+ * roster in, same bytes out (no timestamps, no environment) — which is what lets
  * `__tests__/app/generated-fleet.test.ts` assert the committed page byte-for-byte.
  *
  * Run with plain node (Node 25 strips types natively):
@@ -26,17 +26,17 @@ const CARD_BG = '#0E2233';
 const INK = '#E5EFF7';
 const INK_SOFT = '#8AA0B4';
 
-function card(svg: string, id: string, displayName: string, role: string): string {
+function card(svg: string, id: string, displayName: string, kind: string): string {
   return [
     '    <figure>',
     `      ${svg}`,
-    `      <figcaption><strong>${displayName}</strong><br /><code>${id}</code> · ${role}</figcaption>`,
+    `      <figcaption><strong>${displayName}</strong><br /><code>${id}</code> · ${kind}</figcaption>`,
     '    </figure>',
   ].join('\n');
 }
 
 const cards = generatedFleet
-  .map((doc) => card(generatedShipSvg(doc), doc.id, doc.displayName, doc.role))
+  .map((doc) => card(generatedShipSvg(doc), doc.id, doc.displayName, doc.kind))
   .join('\n');
 
 const html = `<!doctype html>
@@ -44,7 +44,7 @@ const html = `<!doctype html>
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Generated fleet — ${generatedFleet.length} goldens (A-064)</title>
+  <title>The rival fleet — ${generatedFleet.length} ships (A-067)</title>
   <style>
     body { margin: 0; padding: 20px; background: ${PAGE_BG}; font-family: -apple-system, 'Segoe UI', sans-serif; }
     h1 { color: ${INK}; font-size: 18px; }
@@ -57,12 +57,13 @@ const html = `<!doctype html>
   </style>
 </head>
 <body>
-  <h1>The generated fleet — ${generatedFleet.length} golden ships</h1>
+  <h1>The rival fleet — ${generatedFleet.length} ships from six parts</h1>
   <p>
-    Every hull below is a D-12 recombination: enums and counts over the duel board's own geometry,
-    painted only with named token swatches. Regenerate this page with
+    Every hull below is a D-12 recombination: the rival-fleet board's own twenty parameter rows
+    (strakes, gunports, sails, castle, emblem) over the duel board's geometry, painted only with
+    the named per-kind tokens. Regenerate this page with
     <code>node scripts/fleet-preview.ts</code>; it must reproduce byte-for-byte from the committed
-    goldens in <code>src/content/generatedFleet.json</code>.
+    roster in <code>src/content/generatedFleet.json</code>.
   </p>
   <main>
 ${cards}
@@ -74,4 +75,4 @@ ${cards}
 const out = process.argv[2] ?? DEFAULT_OUT;
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, html);
-console.log(`fleet-preview: wrote ${generatedFleet.length} goldens to ${out}`);
+console.log(`fleet-preview: wrote ${generatedFleet.length} ships to ${out}`);

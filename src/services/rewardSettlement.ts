@@ -24,6 +24,7 @@ import type { DuelResult, DuelState } from '@engine/duel/types';
 
 import { hashReceiptKey, rollChestSettlement, type RollChestFn } from './chestSettlement';
 import type { DuelRewardOutcome } from './duelRewards';
+import { rivalVariantFor } from './rivalVariant';
 
 /** In-session idempotency for defeats, which commit no chest receipt (AC-6). */
 const settledDefeatDuels = new WeakMap<CaptainStore, Set<string>>();
@@ -259,6 +260,23 @@ export function settleDuelRewards(
   let next = applySkillTallies(before, resolved.skillTally);
   next = { ...next, coins: next.coins + resolved.purseCoins };
   next = recordWin(next, resolved.won);
+
+  /*
+   * A-067: fought is met. The duel's rival variant lands on the fleet shelf inside this same
+   * receipted commit — win or lose — so the shelf's MET count can never disagree with the coins
+   * that paid out beside it. Replay is a no-op through the same guards that protect the chest:
+   * the `duel:<id>` receipt returns above for a won duel, the defeat ledger returns above for a
+   * lost one, and the union itself refuses a duplicate id, so one duel marks exactly one ship
+   * met exactly once. `currentIsland` is the island the duel was fought at (`resolveDuelContext`
+   * reads nothing else), and `rivalVariantFor` is duelId-seeded, so the ship marked met here is
+   * the ship the duel dealt.
+   */
+  if (next.currentIsland !== null) {
+    const variant = rivalVariantFor(next.currentIsland, resolved.duelId);
+    if (!next.metRivals.includes(variant.shipId)) {
+      next = { ...next, metRivals: [...next.metRivals, variant.shipId] };
+    }
+  }
 
   if (voyage === 'advance' && resolved.won && next.currentIsland !== null) {
     /*

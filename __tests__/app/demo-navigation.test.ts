@@ -5,6 +5,11 @@
  * contract is consequently exported from `services/flow`, while the two small source guards below
  * make sure the chart actually consumes it rather than leaving a truthful but disconnected map.
  * Screenshot/device evidence remains the authority for composition, clipping, and hit testing.
+ *
+ * **Amended by A-067** (sanctioned in `tickets/app/A-067.md`, its own amendment protocol): the
+ * `fleet` route joins the inventory with edges `rank→fleet` (push) and `fleet→rank` (back). That
+ * back edge is the one change to the derivation rules below — `fleet` is the first child route
+ * pushed from somewhere other than the chart, so its `router.back()` pops to Rank, not the chart.
  */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -28,6 +33,7 @@ const DEMO_ROUTES = [
   'gun-deck',
   'harbor',
   'rank',
+  'fleet',
 ] as const;
 
 /** `index` is the intentional boot redirect, not a child-facing destination. */
@@ -128,7 +134,8 @@ function literalHref(node: ts.Node): DemoRoute | null {
 /**
  * Derives transitions from executable syntax only. TypeScript's AST drops comments, so route names
  * in prose cannot satisfy this evidence. Resolver calls expand to their finite declared outputs;
- * `back()` is chart-safe because these child routes are entered only from the chart contract.
+ * `back()` is chart-safe because these child routes are entered only from the chart contract —
+ * except `fleet` (A-067), which is pushed only from Rank and therefore pops to Rank.
  */
 function executableTransitions(): readonly ExecutableTransition[] {
   const found = new Map<string, ExecutableTransition>();
@@ -156,7 +163,9 @@ function executableTransitions(): readonly ExecutableTransition[] {
       ) {
         const method = node.expression.name.text;
         if (method === 'back') {
-          if (origin !== 'boot') record('chart', 'back');
+          // A-067: `fleet` is pushed only from Rank, so its pop lands on Rank. Every other child
+          // route is entered from the chart contract and pops to the chart.
+          if (origin !== 'boot') record(origin === 'fleet' ? 'rank' : 'chart', 'back');
         } else if (method === 'push' || method === 'replace') {
           const argument = node.arguments[0];
           const exact = argument === undefined ? null : literalHref(argument);
@@ -658,5 +667,42 @@ describe('A-038 demo navigation', () => {
     // child. That child must map the complete model to Pressables and bind each iteration's own
     // edge id to the executor callback; one unrelated executor call cannot satisfy this chain.
     expect(chartRendersAndBindsEveryControl()).toBe(true);
+  });
+
+  it('spec(A-067:AC-5) the fleet shelf is reachable from Rank, leavable back to Rank, and never a dead end', () => {
+    const edges = (flow as { DEMO_ROUTE_EDGES?: readonly Edge[] }).DEMO_ROUTE_EDGES ?? [];
+
+    // One push in from Rank — the Rival Fleet entry row — declared and one-tap.
+    const inbound = edges.filter((edge) => edge.from === 'rank' && edge.to === 'fleet');
+    expect(inbound).toHaveLength(1);
+    expect(inbound[0]?.action).toEqual({ kind: 'push', href: '/fleet' });
+    expect(inbound[0]?.taps).toBeLessThanOrEqual(2);
+
+    // One pop back out, landing on Rank (not the chart): the screen is leavable wherever it is
+    // reachable, so no viewport — SE or Pro Max — can strand a child on the shelf.
+    const outbound = edges.filter((edge) => edge.from === 'fleet');
+    expect(outbound).toHaveLength(1);
+    expect(outbound[0]?.to).toBe('rank');
+    expect(outbound[0]?.action.kind).toBe('back');
+
+    // Both edges execute their declared transitions through the shared executor.
+    for (const edge of [...inbound, ...outbound]) {
+      const calls: string[] = [];
+      const navigator: NavigationPort = {
+        push: (href) => calls.push(`push:${href}`),
+        replace: (href) => calls.push(`replace:${href}`),
+        back: () => calls.push('back'),
+        redirect: (href) => calls.push(`redirect:${href}`),
+      };
+      flow.executeDemoRouteEdge(edge?.id ?? '', navigator);
+      const expected = edge?.action.kind === 'back' ? 'back' : `${edge?.action.kind}:${edge?.action.href ?? ''}`;
+      expect(calls).toEqual([expected]);
+    }
+
+    // And the executable-syntax evidence exists on both sides: the Rank row pushes the literal
+    // route, and the fleet screen's back chevron pops. (AC-1 above binds each exactly once.)
+    const transitions = executableTransitions();
+    expect(transitions).toContainEqual({ from: 'rank', to: 'fleet', kind: 'push' });
+    expect(transitions).toContainEqual({ from: 'fleet', to: 'rank', kind: 'back' });
   });
 });

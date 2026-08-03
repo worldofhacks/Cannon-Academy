@@ -32,7 +32,8 @@ export type DemoRoute =
   | 'range'
   | 'gun-deck'
   | 'harbor'
-  | 'rank';
+  | 'rank'
+  | 'fleet';
 
 export type RouteOrigin = DemoRoute | 'boot';
 
@@ -105,7 +106,7 @@ const edge = (
 const push = (to: DemoRoute): DemoRouteAction => ({ kind: 'push', href: `/${to}` });
 const replace = (to: DemoRoute): DemoRouteAction => ({ kind: 'replace', href: `/${to}` });
 const redirect = (to: DemoRoute): DemoRouteAction => ({ kind: 'redirect', href: `/${to}` });
-const backToChart = (): DemoRouteAction => ({ kind: 'back' });
+const popBack = (): DemoRouteAction => ({ kind: 'back' });
 
 /** Resolver destinations expanded into boot/name-flag/gun-deck replace edges. */
 const resolverReplaceEdges = (from: RouteOrigin, idPrefix: string): readonly DemoRouteEdge[] =>
@@ -131,14 +132,19 @@ export const DEMO_ROUTE_EDGES: readonly DemoRouteEdge[] = [
   edge('duel-name-flag-redirect', 'duel', 'name-flag', 0, redirect('name-flag')),
   edge('duel-guided-duel-redirect', 'duel', 'guided-duel', 0, redirect('guided-duel')),
   edge('duel-gun-deck-redirect', 'duel', 'gun-deck', 0, redirect('gun-deck')),
-  edge('duel-chart-back', 'duel', 'chart', 1, backToChart()),
-  edge('harbor-chart-back', 'harbor', 'chart', 1, backToChart()),
+  edge('duel-chart-back', 'duel', 'chart', 1, popBack()),
+  edge('harbor-chart-back', 'harbor', 'chart', 1, popBack()),
   // The empty purse is a place to visit, not an error (Harbor board 8c) — so it offers the two ways
   // to fill it rather than a dead end. "Go and earn" on the not-yet sheet lands on the same edge.
   edge('harbor-duel', 'harbor', 'duel', 1, push('duel')),
   edge('harbor-range', 'harbor', 'range', 1, push('range')),
-  edge('rank-chart-back', 'rank', 'chart', 1, backToChart()),
-  edge('range-chart-back', 'range', 'chart', 1, backToChart()),
+  edge('rank-chart-back', 'rank', 'chart', 1, popBack()),
+  // A-067: the fleet shelf hangs off the Rank screen — push in from the Rival Fleet row, pop
+  // back out. The back edge lands on Rank, not the chart, because `fleet` is only ever pushed
+  // from Rank; `back` is a stack pop, and Rank is what is under it by construction.
+  edge('rank-fleet', 'rank', 'fleet', 1, push('fleet')),
+  edge('fleet-rank-back', 'fleet', 'rank', 1, popBack()),
+  edge('range-chart-back', 'range', 'chart', 1, popBack()),
   edge('chart-harbor', 'chart', 'harbor', 1, push('harbor')),
   edge('chart-rank', 'chart', 'rank', 1, push('rank')),
   edge('chart-range', 'chart', 'range', 1, push('range')),

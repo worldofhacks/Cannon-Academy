@@ -1,19 +1,20 @@
 /**
- * A generated-fleet ship, drawn from a validated document — never from coordinates of its own.
+ * A rival-fleet ship, drawn from a validated document — never from coordinates of its own.
  *
- * `Ship.tsx` is the board's transcription and is pinned by frozen tests; this renderer is A-064's
- * NEW surface beside it. It consumes one `GeneratedShip` document (already validated by
- * `generatedFleet.ts`, the D-12 provenance boundary) and paints the exact layer plan
- * `buildGeneratedShipLayers` produces — the same plan `generatedShipSvg` emits for the committed
- * preview grid, so what the eyeball review approved is what the device draws.
+ * `Ship.tsx` is the board's transcription and is pinned by frozen tests; this renderer is the
+ * fleet's surface beside it (A-064, rebuilt to the rival-fleet board by A-067). It consumes one
+ * `GeneratedShip` document (already validated by `generatedFleet.ts`, the D-12 provenance
+ * boundary) and paints the exact layer plan `buildGeneratedShipLayers` produces — the same plan
+ * `generatedShipSvg` emits for the committed preview grid, so what the eyeball review approved is
+ * what the device draws.
  *
- * Everything here goes through `Poly`, `View` and `react-native-svg` primitives. No image
- * element and no raster exists anywhere on this path (A-045 still holds), and nothing
- * engine-shaped: a generated ship is paint and silhouette only, mirroring the A-052 shape lock.
+ * Everything here goes through `Poly` and `View`. No image element and no raster exists anywhere
+ * on this path (A-045 still holds), and nothing engine-shaped: a fleet ship is paint and
+ * silhouette only, mirroring the A-052 shape lock. Since A-067 there is no stripe layer either —
+ * the document schema has no paint or stripe channel at all, so the player's red-striped sail
+ * cannot be represented here even by mistake.
  */
-import { useId } from 'react';
 import { View } from 'react-native';
-import Svg, { ClipPath, Defs, G, Polygon, Rect } from 'react-native-svg';
 
 import { buildGeneratedShipLayers, GENERATED_GRID } from '../../content/generatedFleet';
 import type { GeneratedShip as GeneratedShipDoc, ShipLayer } from '../../content/generatedFleet';
@@ -74,8 +75,6 @@ function Layer({ layer, s }: { readonly layer: ShipLayer; readonly s: number }) 
           style={{ position: 'absolute', left: layer.x * s, top: layer.y * s }}
         />
       );
-    case 'stripedPoly':
-      return <StripedPoly layer={layer} s={s} />;
     case 'port':
       return (
         <View
@@ -93,47 +92,4 @@ function Layer({ layer, s }: { readonly layer: ShipLayer; readonly s: number }) 
         />
       );
   }
-}
-
-/**
- * A sail with stripe rects clipped to its own outline — `Ship.tsx`'s `Sail` pattern: RN clips
- * `overflow: 'hidden'` to the BOX, and a sail is a polygon, so the stripes are `Rect`s inside an
- * SVG `ClipPath` of the same polygon. `useId` keeps two ships on one screen from sharing a clip.
- */
-function StripedPoly({
-  layer,
-  s,
-}: {
-  readonly layer: Extract<ShipLayer, { kind: 'stripedPoly' }>;
-  readonly s: number;
-}) {
-  const clipId = `gen-${layer.clipId}-${useId().replace(/:/g, '')}`;
-  return (
-    <Svg
-      width={layer.w * s}
-      height={layer.h * s}
-      viewBox="0 0 100 100"
-      preserveAspectRatio="none"
-      style={{ position: 'absolute', left: layer.x * s, top: layer.y * s }}
-    >
-      <Defs>
-        <ClipPath id={clipId}>
-          <Polygon points={layer.points} />
-        </ClipPath>
-      </Defs>
-      <G clipPath={`url(#${clipId})`}>
-        <Rect x={0} y={0} width={100} height={100} fill={layer.fill} />
-        {layer.stripes.map((stripe) => (
-          <Rect
-            key={`${stripe.x}-${stripe.y}`}
-            x={stripe.x}
-            y={stripe.y}
-            width={stripe.w}
-            height={stripe.h}
-            fill={layer.stripeFill}
-          />
-        ))}
-      </G>
-    </Svg>
-  );
 }
