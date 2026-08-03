@@ -9,11 +9,12 @@ backend boundary (Auth/Firestore/Storage client + rules), not a web host. Railwa
 
 ## A. EAS Hosting (web)
 
-| URL                                           | Role                                            | Evidence                   |
-| --------------------------------------------- | ----------------------------------------------- | -------------------------- |
-| <https://cannon-academy.expo.app>             | Production alias                                | HTTP 200 probed 2026-07-29 |
-| <https://cannon-academy--waa9davmr9.expo.app> | Immutable deployment for code `5147e38` (A-042) | HTTP 200 probed 2026-07-29 |
-| <https://cannon-academy--wejre1bucz.expo.app> | Preceding immutable rollback target             | HTTP 200 probed 2026-07-29 |
+| URL                                           | Role                                                                         | Evidence                   |
+| --------------------------------------------- | ---------------------------------------------------------------------------- | -------------------------- |
+| <https://cannon-academy.expo.app>             | Production alias — currently lags `main` (no `/fleet` or `/uncharted` route) | HTTP 200 probed 2026-08-03 |
+| <https://cannon-academy--wejre1bucz.expo.app> | Immutable A-042 release deployment — code `28f4ccc` (committed A-044 record) | HTTP 200 probed 2026-08-03 |
+| <https://cannon-academy--2f4tf1erk3.expo.app> | Immutable rollback target preceding A-042 (committed A-044 record)           | HTTP 200 probed 2026-08-03 |
+| <https://cannon-academy--waa9davmr9.expo.app> | Later immutable deployment recorded 2026-07-29 as carrying `5147e38`         | HTTP 200 probed 2026-08-03 |
 
 Deployments are immutable. Promote or roll back by reassigning the production alias.
 
@@ -27,7 +28,7 @@ eas deploy --prod
 # or:
 eas deploy:alias --prod --id=<deploymentId>
 
-# roll production back to the previous immutable deployment
+# roll production back to a known immutable deployment (e.g. the A-042 release)
 eas deploy:alias --prod --id=wejre1bucz
 ```
 

@@ -23,26 +23,41 @@ harder. Master a skill at an island's gunnery range to unlock its cannon and sai
 | GitHub mirror                          | <https://github.com/worldofhacks/Cannon-Academy>              |
 | GitLab mirror                          | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy> |
 
-Integration branch: **`app/shell`**. Engine track: **`swarm/engine-core`**. Neither repository is a
-full mirror of the other: GitHub `main` and GitLab `main` intentionally differ, and GitHub
-[PR #2](https://github.com/worldofhacks/Cannon-Academy/pull/2) (`app/shell` → `main`) stays open for
+Development lands on **`main`** (waves G6–G13). `app/shell` and `swarm/engine-core` remain as
+historical track branches. Neither repository is a full mirror of the other — branch sets and
+merge-request state intentionally differ — and GitHub
+[PR #2](https://github.com/worldofhacks/Cannon-Academy/pull/2) (`app/shell` → `main`) stays
 **owner review only** — do not merge it from an agent session.
 
-The production web bundle currently served at the alias was built from commit **`5147e38`**. Local
-`app/shell` may be ahead with documentation and later tickets; that does not mean `app/shell` is on
-`main`.
+The hosted web bundle lags the repository. The A-042 release commit **`28f4ccc`** shipped as
+immutable deployment `wejre1bucz` (committed A-044 record); the alias today serves a build newer
+than that but older than the rival fleet shelf and the Uncharted Sea — see the hosting section
+below for the 2026-08-03 probes.
 
 ---
 
 ## What ships today
 
-Verified against routes and engine content on `app/shell` (2026-07-29):
+Verified against `app/` routes and the `src/content/` catalog on `main` (2026-08-03):
 
 - **Playable loop:** splash → grade picker → captain name/flag → sea chart → duel → coins →
-  gunnery range → mastery unlock → gun deck (equip) → duel again.
+  gunnery range → mastery unlock → gun deck (equip) → duel again. A win now **advances the
+  voyage** (A-062): the ship sails to the island it just earned (A-063), the arrival ceremony
+  plays (A-065), and the island's host offers a riddle encounter (A-066).
 - **Routes:** `/`, `/onboarding`, `/name-flag`, `/chart`, `/duel`, `/guided-duel`, `/gun-deck`,
-  `/range`.
-- **Catalog:** 9 skills, 72 question templates, 11 cannons, 5 islands.
+  `/range`, `/harbor`, `/rank`, `/fleet`, `/uncharted`.
+- **Catalog:** 14 skills, 112 question templates, 16 cannons, and 5 charted islands, each carrying
+  a per-band curriculum (ruling D-14: the K–1, 2–3 and 4–5 bands each sail five islands of their
+  own, Common-Core-aligned) — plus a 20-ship generated rival fleet.
+- **Island hosts:** six — Nipper the crab, Pip the parrot, Tumble the turtle, Ollie the octopus,
+  Gale the gull, and Lumen the lanternfish, who greets the **Uncharted Sea**: the endless frontier
+  of locally generated islands, gen duels and receipted rewards (no LLM involved — see
+  limitations).
+- **Harbor and Rank:** the Harbor sells ship skins (A-033 / A-055 — chest removed by owner
+  ruling); the Rank screen shows trophies and a tier badge, private progress only (A-012 — ladder
+  cut).
+- **Duel rival:** the seeded bot with the Mercy system is wired as the live opponent (A-030), with
+  band-safe Training choice on the range (A-027 / A-028).
 - **Engine:** pure TypeScript duel reducer, damage, mastery, drill, placement, economy; Vitest in a
   `node` environment (headless logic — not component rendering).
 - **Timeouts (D-8):** free in both lanes — duel store and `answerDrill(..., null)` / T-036. A
@@ -59,20 +74,20 @@ npx vitest run
 
 ## Current limitations (not shipped)
 
-Do not treat design text, service seams, or green unit tests as product completion.
+Do not treat design text, service seams, or green unit tests as product completion. Earlier rows
+here — the Guided first duel, the Harbor, the Ranks screen, the Mercy rival, Training choice, and
+island variety — shipped across waves G1–G13 and moved up to "What ships today". What genuinely
+remains:
 
-| Area                                      | State                                                       | Owning work  |
-| ----------------------------------------- | ----------------------------------------------------------- | ------------ |
-| Guided first duel                         | Reachable stub; teaching hold/depth incomplete              | A-015        |
-| Mercy / adaptive bot                      | Engine opponents exist; not wired as the live duel rival UX | A-030        |
-| Harbor / spend coins                      | Not built                                                   | A-010, A-033 |
-| Ranks / meta screen                       | Not built                                                   | A-012, A-038 |
-| Island & rival variety                    | Thin vs PLAN encounters                                     | A-029, A-031 |
-| Training choice / difficulty labels       | Partial; band-safety and UX still open                      | A-027, A-028 |
-| Firebase anonymous boot session           | Client exports exist; **not** mounted in `app/_layout.tsx`  | A-026        |
-| Firestore profile sync / Storage gameplay | Not used; local AsyncStorage remains authoritative          | A-040        |
-| Tablet / desktop responsiveness           | Open                                                        | A-043        |
-| Harbor chest / acquisition polish         | Open                                                        | A-032, A-041 |
+| Area                                      | State                                                                                                                                                                                         | Owning work     |
+| ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------- |
+| Adaptive / LLM island generation          | **Designed, not implemented** — `docs/ADAPTIVE-ISLANDS-PLAN.md` and `docs/ENDLESS-ARCHIPELAGO-DESIGN.md` are target design; Uncharted Sea generation is local and deterministic, no LLM wired | plan docs       |
+| Firebase anonymous boot session           | Client exports exist; **not** mounted in `app/_layout.tsx` — the game is fully offline/local                                                                                                  | A-026           |
+| Firestore profile sync / Storage gameplay | Not used; local AsyncStorage remains authoritative                                                                                                                                            | A-040           |
+| Guided-duel teaching depth                | Step 1 of 3 is scripted; steps 2–3 wait on the design brief (`design/GUIDED-DUEL-BRIEF.md`)                                                                                                   | A-015 follow-up |
+| Ranks ladder                              | Cut by owner ruling — the Rank screen shows private progress only                                                                                                                             | A-012 ruling    |
+| Tablet / desktop polish                   | Responsive surfaces shipped (A-043); one known-red fixture remains in the accepted test baseline                                                                                              | A-043           |
+| Hosted web build                          | The production alias lags `main` — no `/fleet` or `/uncharted` route on the deployed bundle (probed 2026-08-03)                                                                               | `RELEASE.md`    |
 
 Final cross-doc reconciliation after those features land is **A-036** (still backlog). This README
 is the A-044 reviewer baseline, not an evergreen claim.
@@ -83,11 +98,12 @@ is the A-044 reviewer baseline, not an evergreen claim.
 
 **Web production = EAS Hosting only**
 
-| URL                                           | Role                                                                   |
-| --------------------------------------------- | ---------------------------------------------------------------------- |
-| <https://cannon-academy.expo.app>             | Production alias                                                       |
-| <https://cannon-academy--waa9davmr9.expo.app> | Immutable A-042 deployment (`5147e38`) — probed HTTP 200 on 2026-07-29 |
-| <https://cannon-academy--wejre1bucz.expo.app> | Preceding immutable rollback target — probed HTTP 200 on 2026-07-29    |
+| URL                                           | Role                                                                                                                                              |
+| --------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| <https://cannon-academy.expo.app>             | Production alias — HTTP 200 probed 2026-08-03; serves `/harbor` and `/rank` but not `/fleet` or `/uncharted`, so the hosted build **lags `main`** |
+| <https://cannon-academy--wejre1bucz.expo.app> | Immutable A-042 release deployment — code `28f4ccc` per the committed A-044 record; HTTP 200 probed 2026-08-03                                    |
+| <https://cannon-academy--2f4tf1erk3.expo.app> | Immutable rollback target preceding A-042 (committed A-044 record); HTTP 200 probed 2026-08-03                                                    |
+| <https://cannon-academy--waa9davmr9.expo.app> | Later immutable deployment recorded 2026-07-29 as carrying `5147e38`; HTTP 200 probed 2026-08-03                                                  |
 
 Firebase is **not** a second web host (`firebase.json` has rules only, no `hosting` block).
 Railway is not part of this architecture. Promote/rollback commands live in [`RELEASE.md`](RELEASE.md).
@@ -123,15 +139,18 @@ Development builds are required (App Store Expo Go is an older SDK).
 
 ---
 
-## Repository mirrors (inspected 2026-07-29)
+## Repository mirrors
 
-| Remote          | URL                                                           | `app/shell`           | `swarm/engine-core` | `main`    |
-| --------------- | ------------------------------------------------------------- | --------------------- | ------------------- | --------- |
-| GitHub `origin` | <https://github.com/worldofhacks/Cannon-Academy>              | `5147e38` (inspected) | `7ffeb6e`           | `aea6fe2` |
-| GitLab `gitlab` | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy> | `5147e38` (inspected) | `7ffeb6e`           | `aea6fe2` |
+| Remote          | URL                                                           |
+| --------------- | ------------------------------------------------------------- |
+| GitHub `origin` | <https://github.com/worldofhacks/Cannon-Academy>              |
+| GitLab `gitlab` | <https://labs.gauntletai.com/alexander.miller/Cannon-Academy> |
 
-The deployed web bundle remains `5147e38` until a new EAS promote. Re-run `git ls-remote` after
-later pushes.
+As of 2026-08-03 both remotes carry `main` in sync (waves G8–G13 pushed). The repositories are
+still **not a full mirror** of each other — historical track branches (`app/shell`,
+`swarm/engine-core`) and merge-request state differ, and GitHub
+[PR #2](https://github.com/worldofhacks/Cannon-Academy/pull/2) stays owner-review only. Re-run
+`git ls-remote` before quoting a tip commit.
 
 ---
 

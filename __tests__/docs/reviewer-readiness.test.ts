@@ -123,7 +123,13 @@ describe('A-044 reviewer-ready documentation baseline', () => {
     expect(architecture).toMatch(/Not current architecture|target design/i);
     expect(architecture).toMatch(/\/harbor|harbor/i);
     const routes = readdirSync(join(ROOT, 'app')).filter((name) => name.endsWith('.tsx'));
-    expect(routes).not.toContain('harbor.tsx');
+    // Amended 2026-08-03 (integrator): at A-044 time Harbor was target-design, so its route's
+    // ABSENCE was the honesty check. Harbor then shipped as review-passed work (A-033 wave G4,
+    // A-055 wave G7) and the frozen demo-navigation route inventory now REQUIRES harbor.tsx —
+    // two frozen contracts contradicted each other, and shipped reality picks the winner. The
+    // probe is amended (the D-8/HANDOFF §3 precedent: amended, not deleted): Harbor must exist,
+    // and `ranks.tsx` — which never shipped (the screen is rank.tsx) — stays banned.
+    expect(routes).toContain('harbor.tsx');
     expect(routes).not.toContain('ranks.tsx');
     expect(read('package.json')).not.toMatch(/lottie/i);
   });

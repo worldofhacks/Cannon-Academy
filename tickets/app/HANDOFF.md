@@ -2,12 +2,35 @@
 
 Verification date: 2026-07-29 (the A-044 reviewer-readiness snapshot, section 1 onward).
 
-**Section 0 below is a later addendum, verified 2026-07-30**, and supersedes anything it contradicts.
-Everything from section 1 down is the A-044 snapshot, kept intact because its assertions are frozen.
+**Section 0a is the newest addendum, verified 2026-08-03**, and supersedes anything below it that
+it contradicts. **Section 0 is the 2026-07-30 addendum.** Everything from section 1 down is the
+A-044 snapshot, kept intact because its assertions are frozen.
 
 ---
 
-## 0. Read this first — state as of 2026-07-30
+## 0a. Read this first — state as of 2026-08-03
+
+Work lands on **`main`** now: waves G6–G13 are committed and both mirrors (GitHub and GitLab)
+carry `main` in sync. `app/shell` and `swarm/engine-core` are historical track branches; GitHub
+PR #2 stays owner-review only.
+
+Shipped since section 0: the win-advance voyage (A-062 / A-063), the arrival ceremony (A-065),
+island encounters with six hosts (A-066 — Lumen the lanternfish greets the Uncharted Sea), the
+rival fleet shelf and deck crew (A-064 / A-067 / A-068), the per-band Common-Core curriculum atlas
+(ruling D-14 — five islands per band), and the **Uncharted Sea** endless frontier: locally
+generated islands, gen duels, receipted rewards. **No LLM is wired** — the adaptive/LLM plan
+(`docs/ADAPTIVE-ISLANDS-PLAN.md`, `docs/ENDLESS-ARCHIPELAGO-DESIGN.md`) is designed, not
+implemented. The game remains fully offline/local; the Firebase project is provisioned and
+dormant (no client keys committed, nothing deployed, nothing mounted in `app/_layout.tsx`).
+
+Hosting: the production alias answers HTTP 200 (probed 2026-08-03) and serves a bundle that has
+`/harbor` and `/rank` but **not** `/fleet` or `/uncharted` — the hosted build lags `main`.
+Redeploy before demoing the newest waves. Ruling D-14 re-baselined 29 fixtures across seven
+suites; run the suite single-fork (section 0's note stands) before believing a regression.
+
+---
+
+## 0. The 2026-07-30 addendum — state as of 2026-07-30
 
 **Branch `app/shell`, clean, pushed. Tip: `7b65598`.** Never merge to `main` — owner PR only.
 
@@ -46,7 +69,8 @@ re-running at the starting commit, which produced the identical 16:
 ### Verified on device
 
 Harbor driven on an iPhone 17 (simulator udid `87AB99AA-EA03-47D5-8C1D-928C694B8BE5`). Guided duel
-played to victory end-to-end with zero console errors. Responsive measured in CSS pixels at
+played to victory end-to-end; no errors were logged during that dated run — one session's
+observation, not a standing guarantee. Responsive measured in CSS pixels at
 320 / 375 / 768 / 1280 — no overflow, column centred, padding symmetric at all four.
 
 ### Immediate next task
