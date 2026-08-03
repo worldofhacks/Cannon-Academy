@@ -235,14 +235,16 @@ The owner ruled the §7 decisions in session (recorded as **D-15…D-18** in
    telemetry doc as bookkeeping. The G12 injection seam is unblocked.
 2. **Rules (D-16)**: default-deny + the two enumerated owner-scoped clauses approved;
    `firebase.test.ts` AC-5/AC-8 re-baselines in the same commit as the rules change.
-3. **Endless (D-17)**: **the Uncharted Sea replaces the voyage loop.** A repeatable sixth
-   island beyond the Grandline where the adaptive loop concentrates: packs target the
-   student's struggled skills (gauntlet-validated, ceiling-clamped), and **enemy ships and
-   identities are LLM-generated inside D-12's fleet schema** — enums/counts over board
-   primitives only, so no new trust and no new enemy art. Costs accepted deliberately: the
-   `IslandId` enum reopens; the island needs 3 band curriculum cells (each under its ceiling),
-   hull entry, glyph, a sixth host, an enemy row, and **a republished sea-chart board**
-   (A-045 holds — G13+ is board-gated; the owner commissions the board).
+3. **Endless (D-17, amended same day)**: **the Uncharted Sea is a REGION of never-ending
+   generated islands** — 6, 7, 8, … created as the player progresses, not one repeatable
+   sixth island. The adaptive loop concentrates there: packs target the student's struggled
+   skills (gauntlet-validated, ceiling-clamped), and enemy ships and identities are
+   LLM-generated inside D-12's fleet schema. The code-verified design lives in
+   `docs/ENDLESS-ARCHIPELAGO-DESIGN.md` — its two-tier law keeps the `IslandId` enum CLOSED
+   (the earlier enum-reopening cost is withdrawn; the endless shape moves zero authored
+   pins), parks generated islands in a `gen_*` namespace behind a strict schema, and puts the
+   frontier on its own screen rather than the authored chart. Only the Uncharted Sea screen
+   artifact is board-gated.
 4. **All bands adapt (D-18)**: K-1 is *not* authored-only. Every skill × band cell lacking a
    word-problem archetype gains a human-written **golden set** (D-13 whole questions,
    FITTED-bounded, seed-swept) — shippable content and the LLM's reference material at once.
@@ -260,8 +262,9 @@ The owner ruled the §7 decisions in session (recorded as **D-15…D-18** in
 |---|---|---|---|
 | **G11** | A-072 telemetry write · A-073 relay + plan reader (Langfuse tracing in the relay) | Plans exist; console demo via tools/ script; zero gameplay change | D-16 re-baseline; no board needed |
 | **G12** | A-074 gauntlet module · A-075 golden sets (every skill × band cell gets a word-problem archetype; K-1 coverage born here) · A-076 generation leg (rewrite vs goldens) · A-077 injection seam + D-15 re-word | Duels adapt for pack-carrying captains on the existing five islands; everyone else byte-identical by reference | The D-15 seam |
-| **G13** | A-078 Uncharted Sea foundation (enum, 3 curriculum cells, hull, glyph, chart + arrival wiring) · A-079 generated rivals (LLM → D-12 fleet schema → enemy row + identity) · A-080 sixth host + encounter | The sea becomes endless, adaptive, LLM-driven | **Board-gated**: republished sea-chart board + sixth-host art |
+| **G13–G15** | A-078..A-087 per `docs/ENDLESS-ARCHIPELAGO-DESIGN.md` §5 — the gen-island namespace + local generator, uncharted captain state, anchor-mapped gen duels, gen settlement + explicit advance, dock affordance, Uncharted Sea screen, LLM enrichment, generated rivals, gen encounters, captain's log | The sea becomes endless, adaptive, LLM-driven — zero authored pins move | **Board-gated: A-083 only** (the Uncharted Sea screen artifact); everything else buildable once G12 lands |
 
-G12 no longer waits on any board; G13 starts when the republished sea-chart artifact lands.
-The standing discipline is unchanged: full-suite gate against the accepted baseline, tsc
-clean, on-device verification, per-ticket commits, **no push without owner confirmation**.
+G12 waits on no board. Of the endless waves, only A-083 (the Uncharted Sea screen proper)
+waits on the commissioned artifact; A-078..A-082 ship a functional pre-board frontier. The
+standing discipline is unchanged: full-suite gate against the accepted baseline, tsc clean,
+on-device verification, per-ticket commits, **no push without owner confirmation**.

@@ -411,6 +411,27 @@ island:
 - **Repeatable**: arriving, dueling, and winning at the Uncharted Sea never exhausts it; each
   visit draws the current pack set and a fresh generated rival.
 
+### Amended 2026-08-03, same session — not one island; islands without end
+
+> "its not just going to be a repeated 6th island. it will be never ending islands. island 7,
+> 8, 9, and so on. all being generated as the player progresses"
+
+The Uncharted Sea is a **region**, not a single island. Beyond the authored Grandline the
+chain keeps extending — island six, then seven, then eight, without end — each island
+generated as the player approaches it. Every generated island is a validated document over
+closed primitives: its skills come from the existing catalog (ceiling-clamped to the
+captain's band), its questions arrive as packs through the full gauntlet, its rival through
+D-12's fleet schema, its chart presence recombined from board-published material (A-045
+holds — the republished board must carry the repeatable uncharted-segment primitives that
+generation recombines).
+
+**The implementation law under this ruling**: the five authored islands keep the closed
+`IslandId` enum and every total Record built on it; generated islands live in their own
+namespace behind their own strict schema and never enter that enum. The authored game must
+remain provably untouched — same reference, same bytes — for any captain who has not sailed
+past the Grandline. The design that satisfies this law is being audited against the codebase
+and lands in the plan doc before wave G13 is cut.
+
 ### What it costs, deliberately
 
 The sixth island reopens the closed `IslandId` enum and needs the full arrival: a curriculum
