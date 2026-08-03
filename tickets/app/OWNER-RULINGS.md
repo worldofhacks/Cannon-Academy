@@ -479,3 +479,36 @@ decision 4). **No band is excluded from adaptive presentation.**
   completion, model, latency, cost, validation verdict per stage. Keys live in Secret Manager
   beside the OpenRouter key; traces carry a hashed uid and never the child's free-typed name,
   which continues to never leave the device.
+
+## D-19 — The sea chart rebuilt: sixteen places, and the door you can see from day one (2026-08-03, ruled in session)
+
+> "can you in parralel fix the 1 and 2 items that you identified that you thought i should
+> know without breaking or interupting the other subagents"
+
+The integrator had flagged the republished Sea Chart board ("TURN 9 — the sea chart,
+rebuilt") as un-ruled scope and deferred it. The owner's instruction to fix that item rules
+the rebuild IN, as its own wave, at the board's own MVP definitions:
+
+- **The sixth station** joins the chart with three states: *fogged* — visible from the
+  game's very first minute, slate marker, "BEAT THE GRANDLINE FIRST" (the locked door a
+  child can see is the cheapest motivation in the design); *beckoning* — gold, ringed,
+  "SAIL PAST THE EDGE"; *returned* — pennant tally. The dock chip (A-082) remains the
+  completion-time doorway; the station carries the day-one anticipation.
+- **Eleven waypoints** make the sea a place rather than a menu, per the board: **practice
+  buoy** — a door to the existing gunnery range, nothing new behind it; **treasure chest** —
+  a small one-time coin pickup, receipted and idempotent like every other grant; **wreck** —
+  a repeatable one-off duel against a fleet ship paying one chest tier above the local
+  island's, with **no rank and no voyage consequence** (the map's side quest); **rival at
+  sea** — a repeatable duel against a fleet ship, honest met-marking, no voyage consequence;
+  **rocks and the kraken** — scenery, never tappable ("a map needs places that are not
+  tasks"). The "N OF 16 FOUND" counter counts discoveries honestly.
+- **Economy numbers are integrator-tunable** within the existing reward scales; the
+  mechanics above are the ruled shape.
+- **Frozen consequences, named**: the chart transcription and design-fidelity pins
+  re-baseline to the new board's geometry citing this ruling; `chartNodes`' island count
+  stays five; the bus law stands; generated islands still never render on the authored
+  chart — the station is the REGION's fixed doorway, not a generated island.
+- **Sequencing law**: this wave must not start until wave G13 is integrated — it moves the
+  exact pins (`chart-progress-presentation` dock slice, design-fidelity extents) that
+  G13's A-082 is contractually holding green. Tickets A-088..A-090, wave G14, held in
+  backlog until the G13 gate passes.

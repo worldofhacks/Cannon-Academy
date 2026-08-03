@@ -87,6 +87,9 @@ README, HANDOFF, or STATE — those documents link here.
 | A-081 | app | Gen settlement pays honestly, and the frontier advances by explicit action | in-progress | G13 | A-079, A-080 | main | [A-081](app/A-081.md) |
 | A-082 | app | The Uncharted Sea screen and the dock doorway — pixel-true to the board | in-progress | G13 | A-078, A-079, A-080, A-081 | main | [A-082](app/A-082.md) |
 | A-086 | app | Lumen the lanternfish — the frontier's host, with a riddle that grows | in-progress | G13 | A-082 | main | [A-086](app/A-086.md) |
+| A-088 | app | The chart rebuilt — sixteen places, the sixth station, one screen one scale | backlog | G14 | A-082 | main | [A-088](app/A-088.md) |
+| A-089 | app | The peaceful waypoints — buoys drill, chests pay once, discovery counts honestly | backlog | G14 | A-088 | main | [A-089](app/A-089.md) |
+| A-090 | app | The fighting waypoints — wrecks and rivals-at-sea, duels with no strings | backlog | G14 | A-089 | main | [A-090](app/A-090.md) |
 | T-001 | engine | Seeded mulberry32 PRNG with pure, state-threaded draw helpers | review-passed | 1 | none | ticket/T-001-seeded-prng | [T-001](T-001.md) |
 | T-002 | engine | Safe arithmetic expression and constraint predicate evaluator (no eval) | review-passed | 1 | none | ticket/T-002-safe-expr-eval | [T-002](T-002.md) |
 | T-003 | engine | Content zod schemas, id unions, and engine question types | review-passed | 1 | none | ticket/T-003-schemas-and-types | [T-003](T-003.md) |
