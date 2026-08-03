@@ -48,9 +48,10 @@ interface DockProps {
    *
    * It rides in the header row's own line, beside the meter, because the two say different things
    * and a child needs both: the meter is the COMPLETIONIST mark (every in-band skill of this island
-   * mastered, which is what earns the green tick), while this is the GATE (one skill mastered, which
-   * is what lifts the fog). Ten cells that fill at a fifth of the speed of the thing they appear to
-   * be measuring is how "I won and nothing happened" happens.
+   * mastered, which is what earns the green tick), while this is the GATE — and since D-11 (A-062)
+   * the gate is ONE WIN, so `chartProgress` hands this a `1` whenever a next band-eligible island
+   * exists and the chip below always reads `NEXT: 1 DUEL`. Ten cells that fill at a fifth of the
+   * speed of the thing they appear to be measuring is how "I won and nothing happened" happens.
    */
   readonly nextIslandCount: number | null;
   readonly insetBottom: number;
@@ -192,6 +193,10 @@ export function ChartDock({
                   at a phone width, and the longer form truncated to "NEXT ISLE: 2 D…". A chip that
                   degrades to an ellipsis is a chip a child cannot read, and the meter beside it is
                   not negotiable — so the copy gets shorter rather than the count getting clipped.
+
+                  Since D-11 the count is always 1 while a next island exists (`NEXT: 1 DUEL`); the
+                  plural branch stays because the prop's contract is a number, not a boolean, and a
+                  chip that printed a wrong plural would be worse than one that can.
                 */}
                 {nextIslandCount === 1 ? 'NEXT: 1 DUEL' : `NEXT: ${nextIslandCount} DUELS`}
               </Text>

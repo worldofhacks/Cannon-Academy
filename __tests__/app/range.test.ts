@@ -224,19 +224,21 @@ describe('A-009 gunnery range — what is drillable', () => {
 });
 
 // =============================================================================================
-// AC-2 — the full rate, and the fact that it is TWICE the duel rate
+// AC-2 — the full rate, and its declared relationship to the duel rate
 //
-// The whole reason the range exists is that it fills faster than a duel. An assertion that merely
-// says "mastery went up" passes an implementation that calls `recordDuelAnswers`, which is the
-// single most likely wrong implementation of this ticket. Every test here pins the RELATIONSHIP.
+// Re-baselined 2026-08-02: the owner's 2026-07-30 ruling (recorded on MASTERY_RATE_DUEL,
+// src/engine/tuning.ts:189-191) set duel answers to the FULL rate — range:duel is now 1:1.
+// The range's edge is focus, not arithmetic: ten reps on ONE chosen skill. What these specs
+// protect is unchanged — the range may not invent its own rate, and the meter must agree with
+// the store. An assertion that merely says "mastery went up" would still pass the single most
+// likely wrong implementation, so every test here still pins the RELATIONSHIP.
 // =============================================================================================
 
 describe('A-009 gunnery range — the full fill rate', () => {
-  it('spec(A-009:AC-2) the range rate is exactly twice the duel rate, in tuning', () => {
-    // PLAN.md §Sea chart: range drills fill at full rate; duels fill "the matching skill at half
-    // rate". Pinned here so a tuning edit that breaks the 2:1 relationship fails at its source
-    // rather than as a mysterious pacing regression three screens away.
-    expect(MASTERY_RATE_RANGE).toBeCloseTo(2 * MASTERY_RATE_DUEL, 10);
+  it('spec(A-009:AC-2) the range rate equals the duel rate, exactly as tuning declares', () => {
+    // Pinned so a tuning retune that silently reintroduces a rate split reopens this ruling
+    // deliberately rather than as a mysterious pacing regression three screens away.
+    expect(MASTERY_RATE_RANGE).toBeCloseTo(MASTERY_RATE_DUEL, 10);
     expect(MASTERY_RATE_DUEL).toBeGreaterThan(0);
   });
 
@@ -245,15 +247,15 @@ describe('A-009 gunnery range — the full fill rate', () => {
     for (let k = 1; k <= SHORT; k += 1) {
       session = answerDrill(session, session.current!.correctIndex, ELAPSED_MS);
       expect(session.mastery.weightedCorrect, `after ${k} correct`).toBeCloseTo(k * MASTERY_RATE_RANGE, 10);
-      // Same k answers taken in a duel would be worth half this. State it as the comparison, not
-      // as a literal, so the test says what the acceptance criterion says.
-      expect(session.mastery.weightedCorrect).toBeCloseTo(2 * duelFold(k).weightedCorrect, 10);
+      // Same k answers taken in a duel are worth exactly the same since the 2026-07-30 ruling.
+      // Stated as the comparison, not a literal, so the test says what the rates say.
+      expect(session.mastery.weightedCorrect).toBeCloseTo(duelFold(k).weightedCorrect, 10);
       expect(session.mastery.correct).toBe(k);
       expect(session.mastery.attempts).toBe(k);
     }
   });
 
-  it('spec(A-009:AC-2) a committed range drill is worth exactly twice the same answers duelled', () => {
+  it('spec(A-009:AC-2) a committed range drill is worth exactly the same answers duelled', () => {
     const rangeStore = createCaptainStore(atIsland());
     const duelStore = createCaptainStore(atIsland());
 
@@ -267,7 +269,8 @@ describe('A-009 gunnery range — the full fill rate', () => {
     expect(ranged).toBeDefined();
     expect(duelled).toBeDefined();
 
-    expect(ranged!.weightedCorrect).toBeCloseTo(2 * duelled!.weightedCorrect, 10);
+    // 1:1 with the duel since the 2026-07-30 ruling (tuning.ts:189-191).
+    expect(ranged!.weightedCorrect).toBeCloseTo(duelled!.weightedCorrect, 10);
     expect(ranged!.weightedCorrect).toBeCloseTo(SHORT * MASTERY_RATE_RANGE, 10);
     // The raw counters are the SAME answers — only the weighting differs. If these drift, the
     // range is inflating accuracy rather than fill rate, which hollows out the mastery gate.
@@ -275,7 +278,7 @@ describe('A-009 gunnery range — the full fill rate', () => {
     expect(ranged!.attempts).toBe(duelled!.attempts);
   });
 
-  it('spec(A-009:AC-2) the rendered 0-100 meter moves twice as far as the duelled one', () => {
+  it('spec(A-009:AC-2) the rendered 0-100 meter moves exactly as far as the duelled one', () => {
     const rangeStore = createCaptainStore(atIsland());
     const duelStore = createCaptainStore(atIsland());
 
@@ -288,7 +291,8 @@ describe('A-009 gunnery range — the full fill rate', () => {
     // Guard the comparison: at the clamp both would read 100 and the 2:1 test would pass on a
     // duel-rate implementation. `SHORT` is half the threshold, so neither reaches the ceiling.
     expect(rangedPercent).toBeLessThan(MASTERY_METER_MAX);
-    expect(rangedPercent).toBe(2 * duelledPercent);
+    // 1:1 with the duel since the 2026-07-30 ruling (tuning.ts:189-191).
+    expect(rangedPercent).toBe(duelledPercent);
     // The screen draws the meter from the outcome; it must agree with the store it just wrote.
     expect(outcome.meterPercent).toBe(rangedPercent);
   });

@@ -5,6 +5,11 @@
  * (`MASTERY_THRESHOLD_CORRECT` weighted corrects at `>= MASTERY_MIN_ACCURACY` accuracy) unlocks
  * that skill's next cannon and lifts the fog on the next island.
  *
+ * **D-11 (2026-08-02, A-062):** mastery is no longer the only road to the next island — winning a
+ * duel advances the voyage directly (`advanceOnWin` below), through the SAME band-eligibility and
+ * entry-cannon rules `resolveUnlocks` applies. Mastery keeps paying cannons; the band gate is not
+ * negotiable on either path.
+ *
  * **The dual rate is retained as a mechanism and is currently 1:1** — PLAN.md's "duels fill at half
  * rate" was overruled by the owner on 2026-07-30 because it hid progress: at half rate, opening the
  * next island took ~20 correct duel answers and nothing on the chart moved in between. See
@@ -31,7 +36,7 @@
  * — a frozen test pins the literal reading.
  */
 import { cannons, getCannon, getIsland, getSkill, islands } from '@content/index';
-import type { CannonId, GradeBand, IslandId, SkillId } from '@content/schemas';
+import type { CannonId, GradeBand, Island, IslandId, SkillId } from '@content/schemas';
 import { maxGradeForBand } from '@engine/placement';
 import {
   MASTERY_METER_MAX,
@@ -115,6 +120,62 @@ function masteredSkillIds(mastery: Readonly<Partial<Record<SkillId, SkillMastery
 }
 
 /**
+ * The band-eligibility rule, shared by `resolveUnlocks` and `advanceOnWin` so the two unlock
+ * paths can never disagree about it: an island is eligible only when it teaches something at or
+ * under the captain's grade ceiling. This is the only thing standing between a K-1 captain and
+ * Quotient Cove's division, whichever mechanism lifts the fog.
+ */
+function teachesInBand(island: Island, maxGrade: number): boolean {
+  return island.rangeSkills.some((skillId) => getSkill(skillId).minGrade <= maxGrade);
+}
+
+/**
+ * One entry cannon per island earned, and it is what closes the loop.
+ *
+ * `island.unlocksCannons` has been declared on all five islands since the catalog was written and
+ * was consumed by NOTHING — `content/index.ts` only validated that the ids exist. So a cannon
+ * could only ever be earned by mastering its own skill, which is circular at a new island: the
+ * gun that teaches grouping arrived only once you had already mastered grouping. A captain
+ * therefore reached Isla Products holding nothing that could ask its questions, and duelling
+ * there taught them nothing new.
+ *
+ * Arriving now hands you the island's entry gun, so the loop reads: earn the next island → its
+ * cannon arrives → its questions are new → mastery grows → the arsenal grows. Shared by
+ * `resolveUnlocks` and `advanceOnWin` (D-11) so both paths pay the arrival gun identically.
+ *
+ * **One, not all.** Port Sumwich alone lists four; granting every one would hand a fresh captain
+ * five guns for three tray slots and leave nothing to earn on the island they are standing on.
+ * The rest stay on the mastery path, which is the within-island progression.
+ *
+ * **The lowest in-band grade**, because that is the gun the island is teaching you WITH. An
+ * out-of-band one would be a reward the duel then refuses to arm (A-058), which the gun deck
+ * would have to explain away as "NOT YET" on the very screen celebrating it.
+ *
+ * Only for islands earned in this delta — placement has its own grant rule (starters plus the
+ * D-9 exceptions) and pre-unlocks up to three islands at the top band, so folding these in there
+ * would overfill the tray on the first launch.
+ */
+function entryCannonGrants(
+  earnedIslands: readonly IslandId[],
+  maxGrade: number,
+  alreadyCannons: ReadonlySet<CannonId>,
+  grantedInSameDelta: readonly CannonId[],
+): readonly CannonId[] {
+  const entries = earnedIslands.flatMap((islandId) => {
+    const granted = getIsland(islandId)
+      .unlocksCannons.map((id) => getCannon(id))
+      .filter(
+        (c) =>
+          c.minGrade <= maxGrade && !alreadyCannons.has(c.id) && !grantedInSameDelta.includes(c.id),
+      )
+      .sort((a, b) => a.minGrade - b.minGrade || a.id.localeCompare(b.id));
+    const entry = granted[0];
+    return entry === undefined ? [] : [entry.id];
+  });
+  return [...new Set(entries)];
+}
+
+/**
  * Resolves newly-unlocked cannons and islands from a mastery map, returning only ids not already
  * present in the corresponding input list (idempotent delta semantics — safe to apply after
  * every answer without duplicating unlocks).
@@ -145,49 +206,57 @@ export function resolveUnlocks(input: {
     .filter((i) => {
       if (alreadyIslands.has(i.id)) return false;
       if (i.requiresIsland === undefined) return false;
-      if (!i.rangeSkills.some((skillId) => getSkill(skillId).minGrade <= maxGrade)) return false;
+      if (!teachesInBand(i, maxGrade)) return false;
       const predecessor = getIsland(i.requiresIsland);
       return predecessor.rangeSkills.some((s) => mastered.has(s));
     })
     .map((i) => i.id);
 
-  /**
-   * One cannon per island earned, and it is what closes the loop.
-   *
-   * `island.unlocksCannons` has been declared on all five islands since the catalog was written and
-   * was consumed by NOTHING — `content/index.ts` only validated that the ids exist. So a cannon
-   * could only ever be earned by mastering its own skill, which is circular at a new island: the
-   * gun that teaches grouping arrived only once you had already mastered grouping. A captain
-   * therefore reached Isla Products holding nothing that could ask its questions, and duelling
-   * there taught them nothing new.
-   *
-   * Arriving now hands you the island's entry gun, so the loop reads: master a skill → the next
-   * island opens AND its cannon arrives → its questions are new → mastery grows → the next island
-   * opens. The range stops being a mandatory gate and goes back to being the accelerator it was
-   * built as (full rate against the duel rate).
-   *
-   * **One, not all.** Port Sumwich alone lists four; granting every one would hand a fresh captain
-   * five guns for three tray slots and leave nothing to earn on the island they are standing on.
-   * The rest stay on the mastery path, which is the within-island progression.
-   *
-   * **The lowest in-band grade**, because that is the gun the island is teaching you WITH. An
-   * out-of-band one would be a reward the duel then refuses to arm (A-058), which the gun deck
-   * would have to explain away as "NOT YET" on the very screen celebrating it.
-   *
-   * Only for islands earned in this delta — placement has its own grant rule (starters plus the
-   * D-9 exceptions) and pre-unlocks up to three islands at the top band, so folding these in there
-   * would overfill the tray on the first launch.
-   */
-  const entryCannons = newIslands.flatMap((islandId) => {
-    const granted = getIsland(islandId)
-      .unlocksCannons.map((id) => getCannon(id))
-      .filter(
-        (c) => c.minGrade <= maxGrade && !alreadyCannons.has(c.id) && !newCannons.includes(c.id),
-      )
-      .sort((a, b) => a.minGrade - b.minGrade || a.id.localeCompare(b.id));
-    const entry = granted[0];
-    return entry === undefined ? [] : [entry.id];
-  });
+  // See `entryCannonGrants` — the arrival gun, shared with `advanceOnWin` so both paths pay it
+  // identically. Mastery-granted cannons from this same delta are excluded so a gun is never
+  // reported twice in one resolution.
+  const entryCannons = entryCannonGrants(newIslands, maxGrade, alreadyCannons, newCannons);
 
-  return { cannons: [...newCannons, ...new Set(entryCannons)], islands: newIslands };
+  return { cannons: [...newCannons, ...entryCannons], islands: newIslands };
+}
+
+/**
+ * D-11 (implemented by A-062): winning a duel on an island immediately opens the next
+ * band-eligible island in the chain — one win, one new island, and the voyage moves.
+ *
+ * Pure delta, same shape and same semantics as `resolveUnlocks`: it returns only ids not already
+ * present in the inputs, so applying it after every win never duplicates an unlock. The two
+ * load-bearing safety properties are REUSED from the mastery path rather than re-implemented:
+ *
+ * - **Band eligibility** (`teachesInBand`): a win never opens an island that teaches nothing
+ *   inside the captain's band. This is never a bare next-in-chain unlock — a naive one would
+ *   sail a K-1 captain into Quotient Cove's division, the exact failure A-060 exists to prevent.
+ * - **Entry-cannon grant** (`entryCannonGrants`): a newly opened island grants exactly one
+ *   in-band entry cannon, or the captain arrives with no gun that asks the island's questions.
+ *
+ * Narrow supersession: this replaces mastery as the gate for island FOG only. `resolveUnlocks`
+ * keeps paying cannons (and still lifts fog on mastery, which is now the slower of the two
+ * roads); the band gate is not negotiable in either.
+ *
+ * `band` is `null` for a captain who was never placed — no ceiling, matching `resolveUnlocks`
+ * with `gradeBand` omitted and `services/chart.ts`'s reading of the same state.
+ */
+export function advanceOnWin(
+  islandId: IslandId,
+  band: GradeBand | null,
+  unlockedIslands: readonly IslandId[],
+  unlockedCannons: readonly CannonId[],
+): { readonly islands: readonly IslandId[]; readonly cannons: readonly CannonId[] } {
+  const alreadyIslands = new Set(unlockedIslands);
+  const alreadyCannons = new Set(unlockedCannons);
+  const maxGrade = band === null ? Number.POSITIVE_INFINITY : maxGradeForBand(band);
+
+  const newIslands = islands
+    .filter((i) => i.requiresIsland === islandId && !alreadyIslands.has(i.id) && teachesInBand(i, maxGrade))
+    .map((i) => i.id);
+
+  return {
+    islands: newIslands,
+    cannons: entryCannonGrants(newIslands, maxGrade, alreadyCannons, []),
+  };
 }

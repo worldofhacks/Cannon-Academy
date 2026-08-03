@@ -153,6 +153,20 @@ function payoutFor(d: DuelState, won: boolean, perfectShots = d.perfects): numbe
   });
 }
 
+/**
+ * Re-baselined 2026-08-02 under A-032: since the chest ceremony became a real settlement
+ * (`rollChestSettlement` commits inside the same `replaceCaptain` as the purse), a won duel's
+ * coin delta is purse + chest — deliberately, so a child who never taps the ceremony still owns
+ * its coins; the panel prints them as two lines ("+N from the duel" / chest card). These specs
+ * pinned the pre-chest world and had been red since 2026-07-29. The chest half is read off the
+ * DURABLE receipt, never re-derived, so exactness ("pays what the engine says, nothing invented")
+ * still holds line by line.
+ */
+function chestCoinsFor(s: CaptainStore, duelId: string): number {
+  const receipt = s.getState().captain.rewardReceipts[`duel:${duelId}`];
+  return receipt !== undefined && receipt.grant.kind === 'coins' ? receipt.grant.amount : 0;
+}
+
 /** A captain one duel answer short of mastering `skill`, at an accuracy well clear of the floor. */
 function captainOneAnswerShortOf(skill: SkillId): Captain {
   const seedStore = createCaptainStore();
@@ -201,13 +215,14 @@ describe('A-008 the duel pays the captain', () => {
     const outcome = applyDuelOutcome(store, state);
     const gained = store.getState().captain.coins - before;
 
-    // Priced by `computeCoinPayout`, not by this layer. If the reward module ever grows its own
-    // arithmetic, this is the assertion that catches it.
-    expect(gained).toBe(payoutFor(state, true));
+    // Priced by `computeCoinPayout` plus the receipted chest (A-032 re-baseline, see
+    // `chestCoinsFor`) — never by this layer's own arithmetic.
+    expect(gained).toBe(payoutFor(state, true) + chestCoinsFor(store, state.duelId));
     expect(gained).toBeGreaterThan(0);
     expect(outcome.applied).toBe(true);
     expect(outcome.won).toBe(true);
-    expect(outcome.coins).toBe(gained);
+    // `outcome.coins` is the PURSE channel alone — documented "Chest coins are separate".
+    expect(outcome.coins).toBe(payoutFor(state, true));
   });
 
   it('spec(A-008:AC-1) the purse the victory panel shows is the purse the captain receives', () => {
@@ -215,9 +230,12 @@ describe('A-008 the duel pays the captain', () => {
     const before = store.getState().captain.coins;
     applyDuelOutcome(store, state);
 
-    // `VictoryPanel` renders `state.coins`. A captain credited a different number than the one a
-    // child just read off the screen is the worst possible version of this bug.
-    expect(store.getState().captain.coins - before).toBe(state.coins);
+    // `VictoryPanel` renders `state.coins` as "+N from the duel" and the chest as its own card.
+    // A captain credited a number that isn't the sum of the two lines a child just read off the
+    // screen is the worst possible version of this bug. (A-032 re-baseline.)
+    expect(store.getState().captain.coins - before).toBe(
+      state.coins + chestCoinsFor(store, state.duelId),
+    );
   });
 
   it('spec(A-008:AC-1) perfect shots are paid for, not merely celebrated', () => {
@@ -227,10 +245,13 @@ describe('A-008 the duel pays the captain', () => {
 
     const before = store.getState().captain.coins;
     applyDuelOutcome(store, state);
-    const gained = store.getState().captain.coins - before;
+    // The purse channel isolated from the receipted chest (A-032 re-baseline), so the
+    // perfect-shot premium stays a pure `computeCoinPayout` comparison.
+    const purseGained =
+      store.getState().captain.coins - before - chestCoinsFor(store, state.duelId);
 
-    expect(gained).toBe(payoutFor(state, true));
-    expect(gained).toBeGreaterThan(payoutFor(state, true, 0));
+    expect(purseGained).toBe(payoutFor(state, true));
+    expect(purseGained).toBeGreaterThan(payoutFor(state, true, 0));
   });
 
   it('spec(A-008:AC-1) the coins survive a relaunch', async () => {
@@ -249,7 +270,7 @@ describe('A-008 the duel pays the captain', () => {
 
   // ── AC-2 — mastery rises, at the duel rate ─────────────────────────────────────────────────
 
-  it('spec(A-008:AC-2) correct duel answers fill the fired skill at the DUEL rate, not the range rate', () => {
+  it('spec(A-008:AC-2) correct duel answers fill the fired skill at exactly the DUEL rate', () => {
     const { state, tally } = playDuel(8005, win(SWIVEL));
     const expected = tally.add_within_10;
     if (expected === undefined) throw new Error('harness recorded no add_within_10 answers');
@@ -261,10 +282,15 @@ describe('A-008 the duel pays the captain', () => {
     expect(m).toBeDefined();
     expect(m?.correct).toBe(expected.correct);
     expect(m?.attempts).toBe(expected.asked);
-    // Half the range rate — PLAN.md: "correct answers in real duels fill the matching skill at
-    // half rate". A duel crediting the full rate deletes the reason the gunnery range exists.
+    // re-baselined 2026-08-02: MASTERY_RATE_DUEL=1 per the 2026-07-30 owner ruling
+    // (tuning.ts:189-191). PLAN.md's "half rate" clause is void — the range's edge is its own
+    // economics now, not a discount on the duel — so the old "not the range rate" pin is retired.
+    // What this spec still owns is EXACTNESS: mastery moves by precisely MASTERY_RATE_DUEL per
+    // correct duel answer, so a reward layer that grows its own rate arithmetic still fails here.
+    // The parity itself is pinned too, so a silent retune reopens the ruling on purpose, not by
+    // drift.
     expect(m?.weightedCorrect).toBeCloseTo(expected.correct * MASTERY_RATE_DUEL, 5);
-    expect(m?.weightedCorrect).not.toBeCloseTo(expected.correct * MASTERY_RATE_RANGE, 5);
+    expect(MASTERY_RATE_DUEL).toBe(MASTERY_RATE_RANGE);
   });
 
   it('spec(A-008:AC-2) the reducer tallies answers per skill, so the reward layer knows which meter to fill', () => {
@@ -316,15 +342,23 @@ describe('A-008 the duel pays the captain', () => {
     expect(outcome.unlockedCannons).toContain('chain_shot');
   });
 
-  it('spec(A-008:AC-3) a duel that crosses nothing grants nothing and announces nothing', () => {
+  it('spec(A-008:AC-3) a duel that crosses nothing pays no mastery cannon — the win itself advances the voyage', () => {
     const owned = [...store.getState().captain.ownedCannons];
     const { state } = playDuel(8009, win(SWIVEL));
     const outcome = applyDuelOutcome(store, state);
 
-    // A short duel on a starter skill cannot reach the threshold; anything reported here is the
-    // reward layer announcing an unlock it did not make.
-    expect(store.getState().captain.ownedCannons).toEqual(owned);
-    expect(outcome.unlockedCannons).toEqual([]);
+    // re-baselined 2026-08-02 under D-11 (OWNER-RULINGS.md): a frontier win advances the voyage —
+    // a WON duel at the frontier island now opens the next band-eligible island and lands its
+    // entry cannon inside the same settlement commit, so "a win grants nothing" is void at the
+    // frontier. What survives is this spec's real property: a mastery crossing that did not
+    // happen still grants nothing. A short duel on a starter skill cannot reach the threshold, so
+    // the range cannons on `add_within_10` (`culverin`, `saker`) must not appear — and everything
+    // announced is exactly what the voyage advance made: Isla Products and its entry gun.
+    expect(store.getState().captain.ownedCannons).toEqual([...owned, 'grapeshot']);
+    expect(outcome.unlockedCannons).toEqual(['grapeshot']);
+    expect(outcome.unlockedIslands).toEqual(['isla_products']);
+    expect(store.getState().captain.ownedCannons).not.toContain('culverin');
+    expect(store.getState().captain.ownedCannons).not.toContain('saker');
   });
 
   // ── AC-4 — wins and rank ───────────────────────────────────────────────────────────────────
@@ -478,7 +512,10 @@ describe('A-008 the duel pays the captain', () => {
     expect(first.applied).toBe(true);
     expect(second.applied).toBe(true);
     expect(store.getState().captain.wins).toBe(2);
-    expect(store.getState().captain.coins).toBe(first.coins + second.coins);
+    // Each win commits its own receipted chest alongside its purse (A-032 re-baseline).
+    expect(store.getState().captain.coins).toBe(
+      first.coins + second.coins + chestCoinsFor(store, a.duelId) + chestCoinsFor(store, b.duelId),
+    );
   });
 
   it('spec(A-008:AC-6) a duel still in progress pays nothing, and still pays when it finishes', () => {
@@ -497,7 +534,10 @@ describe('A-008 the duel pays the captain', () => {
     expect(state.duelId).toBe(midDuel.duelId);
     const settled = applyDuelOutcome(store, state);
     expect(settled.applied).toBe(true);
-    expect(store.getState().captain.coins).toBe(settled.coins);
+    // Purse plus the receipted chest, in the one late settlement (A-032 re-baseline).
+    expect(store.getState().captain.coins).toBe(
+      settled.coins + chestCoinsFor(store, state.duelId),
+    );
     expect(store.getState().captain.wins).toBe(1);
   });
 
@@ -534,7 +574,11 @@ describe('A-008 the duel pays the captain', () => {
     const outcome = applyDuelOutcome(other, state);
 
     expect(outcome.applied).toBe(true);
-    expect(other.getState().captain.coins).toBe(paid.coins);
+    // The same duel on a fresh captain rolls the same seeded chest — deterministic by duelId —
+    // so the second captain's total matches purse + chest exactly (A-032 re-baseline).
+    expect(other.getState().captain.coins).toBe(
+      paid.coins + chestCoinsFor(other, state.duelId),
+    );
     expect(other.getState().captain.wins).toBe(1);
   });
 });

@@ -514,6 +514,13 @@ describe('A-058 residue — an owned gun the band cannot fire yet', () => {
 
     // Which duel id rolls a cannon is a property of the seeded chest table, so it is SEARCHED for
     // rather than written down — a retune of `rollChest` moves the id, not the guarantee.
+    //
+    // re-baselined 2026-08-02 under D-11 (OWNER-RULINGS.md): a frontier win advances the voyage —
+    // EVERY won settle on a fresh K-1 captain now also grants the next island's entry cannon
+    // (`grapeshot`, which IS in band), so "the first cannon a won settle granted" no longer
+    // identifies the chest prize. The chest names its own grant on the durable receipt, so the
+    // probe reads it there; the reported path being pinned — the deck reports the number the
+    // duel will arm, chest gun excluded — is unchanged.
     let winner: string | null = null;
     let prize: CannonId | null = null;
     for (let n = 0; n < 512 && winner === null; n += 1) {
@@ -525,9 +532,10 @@ describe('A-058 residue — an owned gun the band cannot fire yet', () => {
         purseCoins: 0,
         skillTally: {},
       });
-      if (outcome.unlockedCannons.length > 0) {
+      const grant = outcome.chestReceipt?.grant;
+      if (grant !== undefined && grant.kind === 'cannon') {
         winner = duelId;
-        prize = outcome.unlockedCannons[0]!;
+        prize = grant.cannonId;
       }
     }
     expect(winner, 'no chest in 512 duels granted a cannon — the fixture found nothing to test').not.toBeNull();

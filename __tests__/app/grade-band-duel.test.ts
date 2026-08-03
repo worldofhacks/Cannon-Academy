@@ -399,6 +399,13 @@ describe('A-058 the duel obeys the band picked at onboarding', () => {
 
     // Which duel id rolls a cannon is a property of the seeded chest table, so it is SEARCHED for
     // rather than written down — a retune of `rollChest` moves the id, not the guarantee.
+    //
+    // re-baselined 2026-08-02 under D-11 (OWNER-RULINGS.md): a frontier win advances the voyage —
+    // EVERY won settle on a fresh K-1 captain now also grants the next island's entry cannon
+    // (`grapeshot`, which IS in band), so "the first cannon a won settle granted" no longer
+    // identifies the chest prize. The chest names its own grant on the durable receipt, so the
+    // probe reads it there; the guarantee under test — the chest cannon a K-1 captain can really
+    // win never reaches their questions — is unchanged.
     let winner: string | null = null;
     let prize: CannonId | null = null;
     for (let n = 0; n < 512 && winner === null; n += 1) {
@@ -411,9 +418,10 @@ describe('A-058 the duel obeys the band picked at onboarding', () => {
         purseCoins: 0,
         skillTally: {},
       });
-      if (outcome.unlockedCannons.length > 0) {
+      const grant = outcome.chestReceipt?.grant;
+      if (grant !== undefined && grant.kind === 'cannon') {
         winner = duelId;
-        prize = outcome.unlockedCannons[0]!;
+        prize = grant.cannonId;
       }
     }
 
@@ -694,9 +702,41 @@ describe('A-058 the duel obeys the band picked at onboarding', () => {
   it('dod(A-058:1) every island in the catalog is reachable by at least one band, and playable', () => {
     // Guards the shape of the sweep itself: if a band could unlock an island it may not be asked
     // anything at, AC-1 would be looping over a duel that cannot start.
+    //
+    // re-baselined 2026-08-02 under D-11 (OWNER-RULINGS.md): a frontier win advances the voyage.
+    // Placement opens only a band-sized PREFIX of the chain (owner rule 2026-07-30, recorded on
+    // `PLACEMENT_ISLANDS_BY_BAND` in `src/engine/tuning.ts`), so onboarding alone no longer
+    // covers the catalog — the rest of the map is reached by WINNING, through the same
+    // settlement seam every finished duel passes. Each band therefore wins its way down the
+    // chain here, and every island reached is then actually played, in band: the property is
+    // still "reachable by at least one band, and playable", with the reaching done the way the
+    // game now does it.
     const covered = new Set<IslandId>();
     for (const band of BANDS) {
-      for (const islandId of onboarded(band).getState().captain.unlockedIslands) covered.add(islandId);
+      const store = onboarded(band);
+      // Win at the frontier until the band ceiling stops the voyage. `islands.length` legs is
+      // enough to exhaust any chain; settles past the ceiling open nothing, harmlessly.
+      for (let leg = 0; leg < islands.length; leg += 1) {
+        const captain = store.getState().captain;
+        const frontier = captain.unlockedIslands[captain.unlockedIslands.length - 1]!;
+        store.getState().setCurrentIsland(frontier);
+        settleDuelRewards(store, {
+          duelId: `duel-d0d${BANDS.indexOf(band)}${leg}`,
+          seed: leg,
+          won: true,
+          purseCoins: 0,
+          skillTally: {},
+        });
+      }
+      for (const islandId of store.getState().captain.unlockedIslands) {
+        const played = playDuel(store.getState().captain, islandId, SEEDS[0]!);
+        expect(
+          played.asked.length,
+          `${band}@${islandId} was reachable but not playable — the duel asked nothing`,
+        ).toBeGreaterThan(0);
+        for (const question of played.asked) expectInBand(question, band, `${band}@${islandId}`);
+        covered.add(islandId);
+      }
     }
     expect([...covered].sort()).toEqual(islands.map((i) => i.id).sort());
   });

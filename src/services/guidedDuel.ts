@@ -262,7 +262,10 @@ export function settleGuidedDuel(store: CaptainStore, session: GuidedSession): G
     };
   }
 
-  const outcome = settleDuelRewards(store, core);
+  // `voyage: 'hold'` — a tutorial victory is choreographed, not earned (D-11 applies to real
+  // wins). Advancing here would consume a K-1 captain's only arrival before their first free
+  // duel, and the win→sail→next-battle beat would never fire for that band.
+  const outcome = settleDuelRewards(store, core, { voyage: 'hold' });
   if (outcome.applied && outcome.won) {
     store.getState().markGuidedDuelFought();
   }

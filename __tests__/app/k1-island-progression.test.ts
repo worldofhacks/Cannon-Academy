@@ -192,7 +192,13 @@ function everReachableIslands(band: GradeBand): readonly IslandId[] {
 describe('A-060 K-1 progression — the first island is not the last one', () => {
   // ── AC-1 — the owner's complaint, as an executable sentence ──────────────────────────────────
 
-  it('spec(A-060:AC-1) a fresh K-1 captain opens Isla Products by duelling, in a handful of wins', () => {
+  it('spec(A-060:AC-1) a fresh K-1 captain opens Isla Products by duelling — the FIRST win does it', () => {
+    // RE-BASELINED 2026-08-02 under owner ruling D-11 (`tickets/app/OWNER-RULINGS.md`, implemented
+    // by A-062): winning a duel on an island immediately opens the next band-eligible island —
+    // "we should remove the need to play the same island multiple times". This spec used to
+    // tolerate up to 3 wins and asserted the fog lifted BECAUSE a skill was mastered; both of
+    // those pinned mastery-gated fog, which D-11 retires for island fog only. The gate that
+    // survives is the band ceiling, and the sibling spec below still holds it to the fixpoint.
     const store = onboarded('k_1');
     expect(store.getState().captain.unlockedIslands).toEqual(['port_sumwich']);
     expect(store.getState().captain.currentIsland).toBe('port_sumwich');
@@ -211,15 +217,9 @@ describe('A-060 K-1 progression — the first island is not the last one', () =>
       opened,
       `a k_1 captain won ${wins} duel(s) in ${PATIENCE_DUELS} and Isla Products never opened`,
     ).toBeGreaterThan(0);
-    expect(opened, 'opening the second island took more duels than a five-year-old will give it')
-      .toBeLessThanOrEqual(3);
-
-    // ...and it opened because a skill was MASTERED, not because the gate was removed.
-    const captain = store.getState().captain;
-    const masteredSomething = Object.values(captain.mastery).some(
-      (m) => m !== undefined && m.weightedCorrect >= MASTERY_THRESHOLD_CORRECT,
-    );
-    expect(masteredSomething).toBe(true);
+    // D-11's whole point, pinned exactly: ONE win, and the island is not replayed to open the
+    // next. A `2` here means the win-advance path silently regressed to pacing by repetition.
+    expect(opened, 'a win must open the next island immediately (D-11)').toBe(1);
   });
 
   it('spec(A-060:AC-1) the ceiling is why it opened, and the ceiling still shuts Quotient Cove', () => {

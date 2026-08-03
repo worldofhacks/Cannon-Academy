@@ -307,25 +307,29 @@ describe('T-004 tuning — documented constants', () => {
     expect(MASTERY_THRESHOLD_CORRECT).toBe(10);
     expect(MASTERY_MIN_ACCURACY).toBe(0.7);
     expect(MASTERY_RATE_RANGE).toBe(1);
-    expect(MASTERY_RATE_DUEL).toBe(0.5);
+    // RE-BASELINED 2026-08-02 (A-062): 0.5 → 1 by the owner's 2026-07-30 ruling, recorded on
+    // MASTERY_RATE_DUEL in `src/engine/tuning.ts` — PLAN.md's half-rate clause is void. The
+    // tripwire's job is unchanged: this pins the RULED value against a drive-by retune.
+    expect(MASTERY_RATE_DUEL).toBe(1);
     expect(MASTERY_METER_MAX).toBe(100);
     expect(MERCY_LOSS_STREAK_TRIGGER).toBe(2);
     expect(MERCY_FORCED_MISFIRES).toBe(2);
   });
 
   // spec(T-004:AC-1)
-  it('keeps the range drill worth twice a duel answer, and the meter reachable', () => {
-    // The four mastery constants are only meaningful in relation to each other: T-010
-    // computes `meterPercent = min(MASTERY_METER_MAX, round(100 * weightedCorrect /
-    // MASTERY_THRESHOLD_CORRECT))`, crediting MASTERY_RATE_RANGE or MASTERY_RATE_DUEL per
-    // correct answer. Pinning the four numbers without their relationships would let a future
-    // edit keep every value "documented" while making the meter unreachable or the drill
-    // pointless (PLAN.md §Sea chart: "range full rate, duel half rate").
-    expect(MASTERY_RATE_RANGE).toBeGreaterThan(MASTERY_RATE_DUEL);
+  it('keeps duel and range answers worth exactly the same, and the meter reachable', () => {
+    // RE-BASELINED 2026-08-02 (A-062) against the owner's 2026-07-30 MASTERY_RATE_DUEL 0.5 → 1
+    // change, recorded on the constant in `src/engine/tuning.ts`: the original intent ("range
+    // worth twice a duel answer", PLAN.md §Sea chart) is VOID rather than nudged — the range's
+    // edge is now its own economics (~10 questions back to back), not a discount on the duel.
+    // What this test still owns is the RELATIONSHIP arithmetic: the four mastery constants are
+    // only meaningful together, and pinning the numbers without their relationships would let a
+    // future edit keep every value "documented" while making the meter unreachable.
+    expect(MASTERY_RATE_RANGE).toBe(MASTERY_RATE_DUEL);
     expect(MASTERY_RATE_DUEL).toBeGreaterThan(0);
     const rangeAnswersToMastery = MASTERY_THRESHOLD_CORRECT / MASTERY_RATE_RANGE;
     const duelAnswersToMastery = MASTERY_THRESHOLD_CORRECT / MASTERY_RATE_DUEL;
-    expect(duelAnswersToMastery).toBe(2 * rangeAnswersToMastery);
+    expect(duelAnswersToMastery).toBe(rangeAnswersToMastery);
     expect(rangeAnswersToMastery).toBe(10);
     // A full meter must land exactly on MASTERY_METER_MAX, not overshoot or undershoot it.
     expect(

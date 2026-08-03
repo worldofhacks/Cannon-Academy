@@ -1,10 +1,15 @@
 /**
  * Durable duel and store chest settlement — one replaceCaptain per commit (A-032).
+ *
+ * Since D-11 (A-062) a WON duel also advances the voyage here: `advanceOnWin` opens the next
+ * band-eligible island and lands its entry cannon inside the same receipted commit, so the
+ * advance is exactly as replay-safe as the coins and the chest.
  */
 import { cannons } from '@content/index';
 import type { CannonId, GradeBand } from '@content/schemas';
 import { GRADE_BANDS } from '@content/schemas';
 import { rollChest } from '@engine/economy';
+import { advanceOnWin } from '@engine/mastery';
 import { maxGradeForBand } from '@engine/placement';
 import { rankTierForWins } from '@engine/ranks';
 
@@ -226,7 +231,18 @@ export function canonicalDuelSeed(duelId: string): number {
 export function settleDuelRewards(
   store: CaptainStore,
   input: DuelSettlementInput | TerminalCore,
+  options?: {
+    /**
+     * D-11 applies to EARNED wins. The guided tutorial duel is scripted play — its victory is
+     * choreographed, not won — so it passes `'hold'` and the voyage advances on the first real
+     * duel instead. Without this, the tutorial silently consumes a K-1 captain's only possible
+     * arrival (their band's whole reach is two islands), and the win→sail→next-battle beat can
+     * never fire for the youngest band.
+     */
+    readonly voyage?: 'advance' | 'hold';
+  },
 ): DuelSettlementOutcome {
+  const voyage = options?.voyage ?? 'advance';
   const resolved = resolveSettlementInput(input);
   const before = store.getState().captain;
   const key = duelReceiptKey(resolved.duelId);
@@ -243,6 +259,30 @@ export function settleDuelRewards(
   let next = applySkillTallies(before, resolved.skillTally);
   next = { ...next, coins: next.coins + resolved.purseCoins };
   next = recordWin(next, resolved.won);
+
+  if (voyage === 'advance' && resolved.won && next.currentIsland !== null) {
+    /*
+     * D-11 (A-062): the win itself advances the voyage — the next band-eligible island opens and
+     * its entry cannon lands, inside this same receipted commit. `currentIsland` is the island
+     * the duel was fought at (`resolveDuelContext` reads nothing else), and the tallies above may
+     * already have paid mastery unlocks into `next`, so the delta here can never double-grant.
+     * Replay safety costs nothing extra: the `duel:<id>` receipt guard at the top returns before
+     * any of this runs a second time.
+     */
+    const advance = advanceOnWin(
+      next.currentIsland,
+      next.gradeBand,
+      next.unlockedIslands,
+      next.ownedCannons,
+    );
+    if (advance.islands.length > 0 || advance.cannons.length > 0) {
+      next = {
+        ...next,
+        unlockedIslands: [...next.unlockedIslands, ...advance.islands],
+        ownedCannons: [...next.ownedCannons, ...advance.cannons],
+      };
+    }
+  }
 
   let chestReceipt: ChestReceipt | null = null;
   let chestCoins = 0;

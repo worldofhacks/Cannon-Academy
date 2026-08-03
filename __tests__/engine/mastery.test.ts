@@ -22,10 +22,14 @@
  * where the ticket text itself pins a concrete worked example (AC-10, AC-12); each such use is
  * commented at the call site.
  *
- * L-006 drove the dual-rate tests: "drill fills faster than duel" is trivially satisfied by
- * near-identical rates, which would kill the "ranges are the fast lane" design while looking
- * green. Every rate assertion below checks the exact `2x` relationship and lands exactly on
- * `MASTERY_METER_MAX`, never just an inequality.
+ * L-006 drove the original dual-rate tests: "drill fills faster than duel" is trivially satisfied
+ * by near-identical rates, so every rate assertion pinned the exact `2x` relationship. **RE-BASELINED
+ * 2026-08-02 (by A-062) against the owner's 2026-07-30 `MASTERY_RATE_DUEL` 0.5 → 1 change** — see
+ * the ruling recorded on `MASTERY_RATE_DUEL` in `src/engine/tuning.ts`: at half rate the owner won
+ * a duel and nothing on the chart moved, so PLAN.md's half-rate clause is void, not nudged. The
+ * rate specs below now pin the 1:1 relationship with the same exactness (exact equality at exactly
+ * 1), so a drive-by retune in either direction still fails loudly. The dual-rate MECHANISM remains
+ * — `applyAnswer` still reads a source and two constants — and is still exercised by both sources.
  *
  * The accuracy gate (AC-6/AC-7) is tested at the exact boundary, just below, and just above —
  * plus a "guesser" scenario (count reached at ~25% accuracy, the four-choice guess rate) proven
@@ -179,10 +183,13 @@ describe('applyAnswer', () => {
     expect(result.attempts).toBe(1);
   });
 
-  it('spec(T-010:AC-2) a correct duel answer fills the meter at half rate', () => {
+  it('spec(T-010:AC-2) a correct duel answer fills the meter at the full duel rate (1 since 2026-07-30)', () => {
+    // RE-BASELINED 2026-08-02 (A-062) against the owner's 2026-07-30 MASTERY_RATE_DUEL 0.5 → 1
+    // ruling, recorded on the constant in `src/engine/tuning.ts`. The literal `1` stays beside the
+    // constant on purpose: the constant proves the wiring, the literal pins the ruled value.
     const result = applyAnswer(emptyMastery, 'duel', true);
     expect(result.weightedCorrect).toBe(MASTERY_RATE_DUEL);
-    expect(result.weightedCorrect).toBe(0.5);
+    expect(result.weightedCorrect).toBe(1);
     expect(result.correct).toBe(1);
     expect(result.attempts).toBe(1);
   });
@@ -226,18 +233,23 @@ describe('applyAnswer', () => {
     },
   );
 
-  it('spec(T-010:AC-5) MASTERY_RATE_RANGE is exactly twice MASTERY_RATE_DUEL (not merely >=)', () => {
-    // L-006: the whole "ranges are the fast lane" design collapses if this is only an
-    // inequality — rates of 0.500001 and 0.5 would pass a "range > duel" check.
-    expect(MASTERY_RATE_RANGE).toBe(2 * MASTERY_RATE_DUEL);
+  it('spec(T-010:AC-5) MASTERY_RATE_RANGE equals MASTERY_RATE_DUEL exactly (1:1 since 2026-07-30)', () => {
+    // RE-BASELINED 2026-08-02 (A-062) against the owner's 2026-07-30 MASTERY_RATE_DUEL 0.5 → 1
+    // ruling (`src/engine/tuning.ts`, on the constant): the "2x" here was PLAN.md's half-rate
+    // clause, now void. Pinned as exact equality at exactly 1 — the L-006 concern survives in the
+    // other direction too, since a "helpful" re-widening of the gap would fail both lines.
+    expect(MASTERY_RATE_RANGE).toBe(MASTERY_RATE_DUEL);
+    expect(MASTERY_RATE_DUEL).toBe(1);
   });
 
-  it('spec(T-010:AC-5) N duel corrects and N/2 range corrects both land exactly on the threshold', () => {
-    // Derived counts, not hardcoded "20"/"10": however the rates are tuned, exactly
-    // threshold/rate corrects of one source must land exactly on the threshold.
+  it('spec(T-010:AC-5) threshold/rate corrects from either source land exactly on the threshold', () => {
+    // RE-BASELINED 2026-08-02 (A-062), 2026-07-30 ruling (`src/engine/tuning.ts`): both rates are
+    // 1, so both sources reach the threshold in the same count. Still derived from the constants,
+    // not hardcoded — however the rates are retuned, threshold/rate corrects of one source must
+    // land exactly on the threshold, and the equal-corrects assertion pins today's 1:1 exactly.
     const duelAnswers = MASTERY_THRESHOLD_CORRECT / MASTERY_RATE_DUEL;
     const rangeAnswers = MASTERY_THRESHOLD_CORRECT / MASTERY_RATE_RANGE;
-    expect(duelAnswers).toBe(20);
+    expect(duelAnswers).toBe(10);
     expect(rangeAnswers).toBe(10);
 
     let viaDuel: SkillMastery = emptyMastery;
@@ -249,21 +261,23 @@ describe('applyAnswer', () => {
     expect(viaDuel.weightedCorrect).toBe(MASTERY_THRESHOLD_CORRECT);
     expect(viaRange.weightedCorrect).toBe(MASTERY_THRESHOLD_CORRECT);
     expect(viaDuel.weightedCorrect).toBe(viaRange.weightedCorrect);
-    // A duel answer is worth exactly half a range answer, not "roughly" — same weighted total
-    // from double the correct answers, and exactly double, nothing else, satisfies that.
-    expect(viaDuel.correct).toBe(2 * viaRange.correct);
+    // A duel answer is worth exactly a range answer under the ruling — same weighted total from
+    // the same number of corrects, and exact equality, nothing else, satisfies that.
+    expect(viaDuel.correct).toBe(viaRange.correct);
   });
 
   it('spec(T-010:AC-5) mixing sources still sums weightedCorrect exactly (no cross-source rounding)', () => {
     // Interaction dimension (L-017): drill and duel corrects in the same meter.
+    // RE-BASELINED 2026-08-02 (A-062), 2026-07-30 ruling: duel corrects now add 1, so the mixed
+    // total is 4, not 3. The shape of the sweep — both sources plus a miss — is unchanged.
     let m: SkillMastery = emptyMastery;
     m = applyAnswer(m, 'range', true); // +1
-    m = applyAnswer(m, 'duel', true); // +0.5
+    m = applyAnswer(m, 'duel', true); // +1 (full duel rate since 2026-07-30)
     m = applyAnswer(m, 'duel', false); // +0, attempts+1
     m = applyAnswer(m, 'range', true); // +1
-    m = applyAnswer(m, 'duel', true); // +0.5
+    m = applyAnswer(m, 'duel', true); // +1
     expect(m.weightedCorrect).toBe(2 * MASTERY_RATE_RANGE + 2 * MASTERY_RATE_DUEL);
-    expect(m.weightedCorrect).toBe(3);
+    expect(m.weightedCorrect).toBe(4);
     expect(m.correct).toBe(4);
     expect(m.attempts).toBe(5);
   });

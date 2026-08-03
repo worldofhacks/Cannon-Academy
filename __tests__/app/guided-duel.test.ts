@@ -641,7 +641,10 @@ describe('A-015 guided first duel', () => {
     const store = readyStore();
     expect(api.settleGuidedDuel(store, opened.session)).toBe(reward);
     expect(settlement).toHaveBeenCalledOnce();
-    expect(settlement).toHaveBeenCalledWith(store, terminal.core);
+    // Re-baselined 2026-08-02 under D-11 / spec(A-062:AC-7): the tutorial delegates with the
+    // voyage HELD — a choreographed victory pays coins and receipts but never spends the
+    // captain's arrival. Still exactly one observation, still the A-032 seam.
+    expect(settlement).toHaveBeenCalledWith(store, terminal.core, { voyage: 'hold' });
   });
 
   it('spec(A-015:AC-5) the A-032 receipt survives relaunch and makes the same duel a durable no-op', async () => {
