@@ -512,3 +512,15 @@ the rebuild IN, as its own wave, at the board's own MVP definitions:
   exact pins (`chart-progress-presentation` dock slice, design-fidelity extents) that
   G13's A-082 is contractually holding green. Tickets A-088..A-090, wave G14, held in
   backlog until the G13 gate passes.
+
+### Premise correction (2026-08-03, integrator, verified on device)
+
+The sixteen-place chart — waypoint silhouettes, kraken, compass, gated `N OF 16 OPEN`
+counter — **already shipped** with the original Sea Chart implementation; the board's fresh
+etag was a re-save, not a redesign, and the on-device chart confirms it. What this ruling
+actually grants is therefore: (a) **the sixth Uncharted station** with its three states and
+the dashed trail leg — the genuinely new board material; and (b) **the waypoint MECHANICS**
+the original implementation deliberately deferred (its own source notes record "chest →
+absent — no reward entry point outside a duel result"; this ruling supersedes that
+deferral). A-088's scope shrinks to the station; A-089/A-090 stand as written. The ruling's
+mechanics definitions and sequencing law are unchanged.
