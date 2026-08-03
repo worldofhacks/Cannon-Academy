@@ -2,7 +2,7 @@
   {
     "id": "riddle_fractions_int_arms",
     "skill": "fractions_int",
-    "text": "Half of my {a} arms are up. How many is that?",
+    "text": "Half of my {a} arms are up. How many of my arms are up?",
     "params": {
       "a": [4, 8]
     },
@@ -15,7 +15,7 @@
   {
     "id": "riddle_fractions_int_stones",
     "skill": "fractions_int",
-    "text": "I keep {t} shiny stones. A quarter of them are pink. How many pink stones?",
+    "text": "I keep {t} shiny stones. A quarter of them are pink. How many of my stones are pink?",
     "params": {
       "t": [8, 24]
     },
@@ -28,7 +28,7 @@
   {
     "id": "riddle_fractions_int_bubbles",
     "skill": "fractions_int",
-    "text": "A third of my {t} bubbles pop. How many pop?",
+    "text": "A third of my {t} bubbles pop. How many of my bubbles pop?",
     "params": {
       "t": [6, 21]
     },

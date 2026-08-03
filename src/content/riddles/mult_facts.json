@@ -2,7 +2,7 @@
   {
     "id": "riddle_mult_facts_hellos",
     "skill": "mult_facts",
-    "text": "I say hello {a} times a day, for {b} days. How many hellos?",
+    "text": "I say hello {a} times a day, for {b} days. How many hellos do I say in all?",
     "params": {
       "a": [2, 5],
       "b": [2, 5]
@@ -15,7 +15,7 @@
   {
     "id": "riddle_mult_facts_berries",
     "skill": "mult_facts",
-    "text": "{a} branches each hold {b} berries. How many berries?",
+    "text": "{a} branches each hold {b} berries. How many berries do the branches hold in all?",
     "params": {
       "a": [2, 6],
       "b": [2, 6]
@@ -28,7 +28,7 @@
   {
     "id": "riddle_mult_facts_bags",
     "skill": "mult_facts",
-    "text": "I hide {a} bags with {b} seeds inside each. How many seeds?",
+    "text": "I hide {a} bags with {b} seeds inside each. How many seeds do I hide in all?",
     "params": {
       "a": [3, 6],
       "b": [2, 5]

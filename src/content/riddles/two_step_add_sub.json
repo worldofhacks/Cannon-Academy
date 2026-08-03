@@ -2,7 +2,7 @@
   {
     "id": "riddle_two_step_add_sub_tide",
     "skill": "two_step_add_sub",
-    "text": "I gather {a} shells, find {b} more, then {c} wash away. How many left?",
+    "text": "I gather {a} shells, find {b} more, then {c} wash away. How many shells do I have left?",
     "params": {
       "a": [5, 10],
       "b": [3, 8],
@@ -17,7 +17,7 @@
   {
     "id": "riddle_two_step_add_sub_boats",
     "skill": "two_step_add_sub",
-    "text": "{a} boats float in my bay. {b} sail in. {c} sail out. How many boats now?",
+    "text": "{a} boats float in my bay. {b} sail in. {c} sail out. How many boats float in my bay now?",
     "params": {
       "a": [6, 12],
       "b": [2, 6],

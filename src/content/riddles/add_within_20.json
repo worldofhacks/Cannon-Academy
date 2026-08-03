@@ -2,7 +2,7 @@
   {
     "id": "riddle_add_within_20_shell_pile",
     "skill": "add_within_20",
-    "text": "My pile has {a} shells. I add {b} more. How many shells?",
+    "text": "My pile has {a} shells. I add {b} more. How many shells are in my pile now?",
     "params": {
       "a": [6, 12],
       "b": [3, 8]
@@ -16,7 +16,7 @@
   {
     "id": "riddle_add_within_20_gulls",
     "skill": "add_within_20",
-    "text": "{a} gulls rest on my beach. {b} more land. How many gulls?",
+    "text": "{a} gulls rest on my beach. {b} more land. How many gulls are on my beach now?",
     "params": {
       "a": [5, 11],
       "b": [4, 9]

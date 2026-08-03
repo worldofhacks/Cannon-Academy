@@ -18,8 +18,6 @@
  * `closeChartColumns` already clamps every node column against the live map box, so a genuinely
  * shorter box lifts the labels on its own. There is no second clamp here, and there must not be.
  */
-import { MIN_TAP_TARGET } from '../../theme/tokens';
-
 /** A rectangle in screen points, origin top-left. */
 export interface Rect {
   readonly x: number;
@@ -91,41 +89,18 @@ export function coachBandHeight({ art, type, hasSub, build }: CoachBandInput): n
 }
 
 /**
- * The grown-up skip row above the chart tour's coach bar, in design points.
- *
- * It is the tap floor, not the ink. The pill drawn inside it is 24pt of quiet 11pt text; the row is
- * `MIN_TAP_TARGET` because that is what the target has to be, and because every point of that
- * target has to live INSIDE the reserved band. Slop spent upward would steal advancing taps from
- * the dock band, and slop spent downward is dead on arrival — the coach bar is painted after the
- * skip and its speaker button owns those points.
- *
- * Reserved rather than floated for exactly the reason the coach bar is. The chart's only two spare
- * surfaces are the header band and the dock, and beats 18 and 19 ring controls in both: a floated
- * skip would sit on top of the Fight button or the purse, which is the defect `coachBandHeight`
- * exists to prevent, reintroduced one row higher. It also keeps the tour's chrome out of the map
- * entirely, which matters while the chart itself is being reworked beside this.
- *
- * The guided duel does NOT get a reserved row. Its sheet has 5.2pt of slack at 360×640 before the
- * answer grid loses its 64pt targets (see `coachBandFits`), so its skip is drawn over the sea
- * band's own chrome instead and costs the layout nothing.
- */
-export const TOUR_SKIP_ROW = 64;
-
-/**
- * The band the chart must set aside for the tour: the coach bar, the grown-up skip row above it
- * when there is one, and the home indicator underneath both.
+ * The band the chart must set aside for the tour: the coach bar, and the home indicator
+ * underneath it. (The grown-up skip row this band once carried was removed by owner ruling D-13 —
+ * every voyage plays in full, so the tour reserves nothing but its own bar.)
  *
  * One function so the screen and its viewport sweep cannot disagree about the number — the whole
  * no-overlap argument in `onboarding-wiring.test.ts` is only as true as the reservation the chart
  * actually makes.
  */
 export function chartTourBandHeight(
-  input: CoachBandInput & { readonly insetBottom: number; readonly hasSkip: boolean },
+  input: CoachBandInput & { readonly insetBottom: number },
 ): number {
-  // `max`, not the scaled value: the row IS the tap target, and a target that shrank with the art
-  // scale on a small phone would drop under the floor on exactly the devices that need it most.
-  const skip = input.hasSkip ? Math.max(MIN_TAP_TARGET, input.art(TOUR_SKIP_ROW)) : 0;
-  return coachBandHeight(input) + skip + input.insetBottom;
+  return coachBandHeight(input) + input.insetBottom;
 }
 
 /**

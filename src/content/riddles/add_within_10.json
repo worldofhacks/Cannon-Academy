@@ -2,7 +2,7 @@
   {
     "id": "riddle_add_within_10_shells",
     "skill": "add_within_10",
-    "text": "I have {a} shells. I find {b} more. How many shells?",
+    "text": "I have {a} shells. I find {b} more. How many shells do I have now?",
     "params": {
       "a": [2, 6],
       "b": [1, 4]
@@ -16,7 +16,7 @@
   {
     "id": "riddle_add_within_10_crabs",
     "skill": "add_within_10",
-    "text": "{a} crabs sit on the sand. {b} more scuttle over. How many crabs?",
+    "text": "{a} crabs sit on the sand. {b} more scuttle over. How many crabs are on the sand now?",
     "params": {
       "a": [2, 5],
       "b": [2, 5]
@@ -30,7 +30,7 @@
   {
     "id": "riddle_add_within_10_fish",
     "skill": "add_within_10",
-    "text": "I spy {a} little fish. {b} more swim past. How many fish?",
+    "text": "I spy {a} little fish. {b} more swim past. How many fish do I see in all?",
     "params": {
       "a": [1, 4],
       "b": [2, 5]

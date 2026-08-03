@@ -38,34 +38,6 @@ export function commitGradeBand(store: CaptainStore, band: GradeBand): Destinati
   return resolveDestination(store.getState().captain);
 }
 
-// ── The grown-up's skip ───────────────────────────────────────────────────────────────────────
-
-/**
- * "We have played this before" — the tour skipped, the setup untouched.
- *
- * Three properties, and each is a way to hurt a real captain if it is missed:
- *
- *  1. **It skips the TOUR, never the SETUP.** It writes the two tour latches and nothing else, then
- *     asks the resolver where the captain now belongs. A skip that tried to jump the band, the name
- *     or the flag would not even work: `resolveDestination` refuses a captain without them and
- *     would hand back the very screen the skip was pressed on, forever.
- *  2. **It returns the destination rather than navigating**, exactly like `commitGradeBand` — so
- *     the flow resolver stays the single place that decides, and the screen navigates to what it is
- *     handed. On the grade picker with no band chosen that answer is `onboarding`: the resolver
- *     declining to let a skip outrun the setup, which is the behaviour rather than a failure of it.
- *  3. **It is monotonic.** `skipTour` assigns both latches `true`; nothing here can write either
- *     one `false`.
- *
- * The cost it does not hide: a captain who skips the guided duel never fights it, so the tutorial's
- * coins and its chest are never banked. Settling a duel that was not played would be worse — it
- * would fabricate a reward — so the skip forfeits it, and the copy is pitched at the grown-up who
- * is making that trade knowingly.
- */
-export function commitTourSkip(store: CaptainStore): Destination {
-  store.getState().skipTour();
-  return resolveDestination(store.getState().captain);
-}
-
 /**
  * Whether the chart walkthrough is on screen for this captain.
  *

@@ -184,21 +184,6 @@ export const REWARD_STRIP = {
   coinSize: 28,
 } as const;
 
-/**
- * The grown-up escape hatch. Quiet on purpose: 11px, muted ink, underlined, no button chrome —
- * *adult-quiet* is the spec, because a big friendly button here would invite the child to skip
- * their own encounter. The ink is 28pt tall; the component pads it to the 64pt floor with
- * `hitSlop`, the same split the chart's header pills use.
- */
-export const SKIP_LINK = {
-  copy: 'Grown-ups: skip the island chats',
-  size: 11,
-  padX: 12,
-  padY: 8,
-  /** `.03em` at 11px. */
-  letterSpacing: 0.33,
-} as const;
-
 // ═══════════════════════════════════════════════════════════════════════════════════════════════
 // Tile treatments — the board's own `tiles()` helper, as data plus one pure function
 // ═══════════════════════════════════════════════════════════════════════════════════════════════

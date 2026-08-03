@@ -282,3 +282,64 @@ provenance boundary:
 
 Every shipped document passes the schema **and** a committed human-reviewed golden set (the
 eyeball grid). Implemented by **A-064**; the standing A-045 regime is otherwise unchanged.
+
+## D-13 — No grown-up skips, and a riddle asks its whole question (2026-08-02, ruled in session)
+
+> "lets remove all 'grown ups skip' prompts anywhere in the app. also … it says how many seeds?
+> instead of saying how many seeds did I eat? it must be clear and descriptive so the child
+> actually understands what is going on."
+
+### The ruling, part one — every voyage plays in full
+
+All three "Grown-ups: skip" affordances are removed: the tour skip on the grade picker, the tour
+skip over the guided duel, and "skip the island chats" on the encounter card. This supersedes
+the board's ADULTS rule ("a 10px 'skip the tour' affordance on that one screen"), the earlier
+in-session request that added the adult skip, and the encounter board's skip link.
+
+What it does NOT change: **"Watch the tour again" stays** — that is replay, not escape — and
+setup (band, name, flag) was never skippable to begin with. The dead paths (`commitTourSkip`,
+`skipTour`, `TOUR_SKIP`, `SKIP_LINK`) leave the codebase rather than lingering unreferenced;
+the specs that pinned them are re-baselined citing this ruling.
+
+### The ruling, part two — the question names what is being asked
+
+A riddle may never end on an elliptical tail ("How many shells?"). The closing question restates
+the action in full — "How many seeds did I eat?", "How many boats float in my bay now?" — so a
+pre-reader being read to hears WHAT is being counted and WHY. Every authored riddle is reworded,
+and the encounter suite gains a clarity lint so a future riddle cannot ship truncated.
+
+## D-14 — Five islands for every band, each band its own curriculum (2026-08-02, ruled in session)
+
+> "all of the islands that are available when a kindergartner selects their level should still
+> have all of the islands but all of the islands should follow the common core standards for
+> their respective band. there should still be 5 islands visable but those islands should be
+> completely different based on each band."
+
+### What was true
+
+One shared island chain carried one shared curriculum ladder, and the band was a fence across
+it: a K-1 captain saw five islands and could ever open two, because islands three through five
+taught nothing under their ceiling. The fence was the A-060 safety property doing its job — but
+the sea it protected was mostly someone else's.
+
+### The ruling
+
+The five islands stay — same chart geometry, same enemy kinds, same fleet — but their CONTENT
+becomes a function of the band. `islands.json` carries per-band curriculum: display name, the
+skills the island teaches, and the cannons it pays, one set per band, each aligned to that
+band's Common Core standards. A kindergartner's island three is not a locked Quotient Cove; it
+is their own island, teaching their own mathematics, under their own name.
+
+Consequences, all deliberate:
+
+- **Every band reaches all five islands.** The old fixpoints ("K-1 reach is exactly two") are
+  re-baselined to the new law: every band's reach is exactly five, and every arrival plays the
+  full ceremony and encounter.
+- **The ceiling moves from the map to the curriculum.** A-060's guarantee is restated, not
+  weakened: no island may carry, for any band, a skill above that band's ceiling — enforced in
+  the catalog validator, so a bad authoring edit fails at import, before it can reach a child.
+- **Four new skills** enter the catalog to fill the honest gaps: subtraction within 10 and
+  teens-as-ten-and-ones for K-1; multi-digit multiplication and long division for G4-5. Each
+  arrives the full way — templates, entry cannon, riddles, glyph.
+- Placement still opens island one only; D-11 still advances by wins; D-13's whole-question
+  rule binds the new riddles.

@@ -2,7 +2,7 @@
   {
     "id": "riddle_repeated_addition_hellos",
     "skill": "repeated_addition",
-    "text": "I squawk {a} hellos, then {a} hellos more. How many hellos?",
+    "text": "I squawk {a} hellos, then {a} hellos more. How many hellos do I squawk in all?",
     "params": {
       "a": [2, 8]
     },
@@ -15,7 +15,7 @@
   {
     "id": "riddle_repeated_addition_seeds",
     "skill": "repeated_addition",
-    "text": "I eat {a} seeds, then {a} seeds, then {a} more. How many seeds?",
+    "text": "I eat {a} seeds, then {a} seeds, then {a} more. How many seeds did I eat?",
     "params": {
       "a": [2, 6]
     },
@@ -28,7 +28,7 @@
   {
     "id": "riddle_repeated_addition_branches",
     "skill": "repeated_addition",
-    "text": "Two branches hold {a} parrots each. How many parrots?",
+    "text": "Two branches hold {a} parrots each. How many parrots sit on my branches?",
     "params": {
       "a": [2, 9]
     },

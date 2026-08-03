@@ -19,14 +19,8 @@ import { QuestionPanel } from '../src/components/duel/QuestionPanel';
 import { SeaStage } from '../src/components/duel/SeaStage';
 import { CoachBar } from '../src/components/onboarding/CoachBar';
 import { Spotlight } from '../src/components/onboarding/Spotlight';
-import {
-  CAST_BEATS,
-  guidedCoach,
-  TOUR_SKIP,
-  type GuidedPhase,
-} from '../src/components/onboarding/script';
+import { CAST_BEATS, guidedCoach, type GuidedPhase } from '../src/components/onboarding/script';
 import { coachBandFits, coachBandHeight } from '../src/components/onboarding/coachBand';
-import { commitTourSkip } from '../src/services/onboarding';
 import { ResponsiveFrame, useResponsiveSurface } from '../src/components/ResponsiveFrame';
 import { duelReceiptKey } from '../src/contracts/rewards';
 import { type DuelRewardOutcome } from '../src/services/duelRewards';
@@ -110,15 +104,6 @@ export default function GuidedDuelScreen() {
  * duel. `victoryRewards` of this projects zero coins and no cannons, so nothing can claim a grant
  * that did not happen.
  */
-/**
- * The skip chip's ink, inside a `MIN_TAP_TARGET` box.
- *
- * The board asks for a "10px affordance" and gets small INK rather than a small TARGET — the same
- * split `CoachBar`'s speaker and the chart's header pills document, and the only one that honours
- * the board's intent without breaking the floor a five-year-old's thumb is the reason for.
- */
-const SKIP_CHIP_HEIGHT = 22;
-
 const NO_REWARD: DuelRewardOutcome = {
   applied: false,
   won: true,
@@ -336,15 +321,6 @@ function GuidedDuelBody() {
     captainStore.getState().beginTourReplay();
     router.replace('/chart');
   };
-  /**
-   * The grown-up's way out of the twenty beats.
-   *
-   * It goes through the resolver rather than to a route of its own, and it must: skipping the tour
-   * writes `hasFoughtGuidedDuel`, but it writes nothing at all about the band, the name or the flag
-   * — so a captain who somehow reached this screen without them is sent back to finish, instead of
-   * being dropped onto a chart that would bounce them. Setup is never skippable.
-   */
-  const skipTour = () => router.replace(`/${commitTourSkip(captainStore)}`);
   const coach = cast
     ? cast.coach
     : guidedCoach({
@@ -442,30 +418,6 @@ function GuidedDuelBody() {
               </View>
               <Spotlight rect={castRect(cast.id, boardWidth, stageHeight)} hand />
             </>
-          )}
-
-          {/*
-            The grown-up's skip, mirrored across the stage from the cast badge.
-
-            It is drawn OVER the sea rather than into the sheet, and that is arithmetic rather than
-            taste: `coachBandFits` leaves the answer grid 5.2pt of slack above its 64pt rows on a
-            360×640 phone, so a row added below the panels would take the tap targets a child
-            actually needs. Absolutely positioned chrome over the sky costs the layout nothing.
-
-            Hidden once the duel is over, because both endings already carry their own way out and a
-            second exit beside them is one more thing to read.
-          */}
-          {view.phase === 'victory' || view.phase === 'defeat' ? null : (
-            <Pressable
-              onPress={skipTour}
-              accessibilityRole="button"
-              accessibilityLabel={TOUR_SKIP.accessibilityLabel}
-              style={({ pressed }) => [s.skipTarget, pressed && { opacity: 0.7 }]}
-            >
-              <View style={s.skipChip}>
-                <Text style={s.skipChipText}>{TOUR_SKIP.label}</Text>
-              </View>
-            </Pressable>
           )}
         </View>
       </View>
@@ -757,36 +709,6 @@ const s = StyleSheet.create({
   stageBadgeRival: { backgroundColor: '#6C4BD6' },
   stageBadgeText: { ...type.chip, fontSize: 11, letterSpacing: 0.6, color: color.inkDark },
   stageBadgeTextRival: { color: color.white },
-
-  /**
-   * The grown-up skip, mirrored across the stage from the cast badge — same 10pt top, opposite
-   * edge — with the target and the ink separated.
-   *
-   * The TARGET is a 64pt box over the sky, which costs the layout nothing and collides with
-   * nothing: the stage below it is art, and its spotlight ring is `pointerEvents="none"`. `hitSlop`
-   * would NOT have worked here — slop above the sea band is dead, because the point never enters
-   * this view's parent, and the whole 64 has to be somewhere real.
-   *
-   * The INK is a 22pt pill: `parchment` on `inkDark`, the coach slab's own pair, so the chip
-   * carries its own contrast rather than borrowing the sky's.
-   */
-  skipTarget: {
-    position: 'absolute',
-    right: 0,
-    top: 0,
-    height: MIN_TAP_TARGET,
-    paddingTop: 10,
-    paddingHorizontal: space[3],
-  },
-  skipChip: {
-    height: SKIP_CHIP_HEIGHT,
-    paddingHorizontal: 10,
-    borderRadius: radius.pill,
-    backgroundColor: color.inkDark,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  skipChipText: { ...type.body, fontSize: 11, lineHeight: 15, color: color.parchment },
   castCard: {
     flex: 1,
     margin: space[4],

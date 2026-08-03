@@ -37,7 +37,7 @@ import { createRng } from '@engine/rng';
 
 import { completeEncounter, ENCOUNTER_COINS, encounterSkillFor, riddleFor } from '../../services/encounter';
 import { captainStore, useCaptain } from '../../stores/useCaptain';
-import { color, font, MIN_TAP_TARGET } from '../../theme/tokens';
+import { color, font } from '../../theme/tokens';
 import { Poly } from '../Poly';
 import {
   ACTION_BUTTON,
@@ -59,7 +59,6 @@ import {
   SCENE,
   SCRIM,
   SHRUG,
-  SKIP_LINK,
   STAR_CHEERS,
   STAR_POINTS,
   tileLooks,
@@ -165,12 +164,6 @@ export function EncounterCard({ islandId, onDone }: EncounterCardProps) {
   const onOnward = () => {
     if (phase !== 'reward') return;
     goExit();
-  };
-
-  const onSkip = () => {
-    // One tap, no confirmation: latch the island (paying nothing) and hand straight back.
-    completeEncounter(captainStore, islandId, false);
-    fireDone();
   };
 
   const bubbleText =
@@ -324,24 +317,6 @@ export function EncounterCard({ islandId, onDone }: EncounterCardProps) {
           />
         ) : null}
         {showReward ? <ActionButton label={COPY.onward} onPress={onOnward} /> : null}
-
-        {/* The grown-up escape hatch: quiet, underlined, one tap, padded to the 64pt floor. */}
-        <View style={s.skipRow}>
-          <Pressable
-            onPress={onSkip}
-            accessibilityRole="link"
-            accessibilityLabel={SKIP_LINK.copy}
-            hitSlop={{
-              top: (MIN_TAP_TARGET - 28) / 2,
-              bottom: (MIN_TAP_TARGET - 28) / 2,
-              left: 12,
-              right: 12,
-            }}
-            style={s.skip}
-          >
-            <Text style={s.skipText}>{SKIP_LINK.copy}</Text>
-          </Pressable>
-        </View>
       </Animated.View>
     </View>
   );
@@ -643,16 +618,5 @@ const s = StyleSheet.create({
     borderRadius: 999,
     borderBottomWidth: 4,
     borderBottomColor: color.goldDeep,
-  },
-
-  skipRow: { marginTop: 12, alignItems: 'center' },
-  skip: { paddingHorizontal: SKIP_LINK.padX, paddingVertical: SKIP_LINK.padY },
-  skipText: {
-    fontFamily: font.bodyBold,
-    fontSize: SKIP_LINK.size,
-    lineHeight: 16,
-    letterSpacing: SKIP_LINK.letterSpacing,
-    color: color.inkDarkMuted,
-    textDecorationLine: 'underline',
   },
 });

@@ -59,7 +59,6 @@ import {
   RING_BURST,
   SCRIM,
   SHRUG,
-  SKIP_LINK,
   TILE,
   TILE_CORRECT,
   TILE_IDLE,
@@ -505,23 +504,55 @@ describe('AC-2 — five hosts, keyed by island, to the board recipes', () => {
   });
 });
 
-// ── AC-5: the grown-up skip ─────────────────────────────────────────────────────────────────────
+// ── AC-5: no skip affordance — re-baselined under owner ruling D-13 ─────────────────────────────
 
-describe('AC-5 — Grown-ups: skip the island chats', () => {
-  it('spec(A-066:AC-5) the copy is the board’s, exactly, at the board’s quiet size', () => {
-    expect(SKIP_LINK.copy).toBe('Grown-ups: skip the island chats');
-    expect(SKIP_LINK.size).toBe(11);
+describe('AC-5 — no skip affordance exists (re-baselined under D-13)', () => {
+  it('spec(A-066:AC-5) re-baselined under D-13: no skip affordance exists', () => {
+    // Owner ruling D-13 (tickets/app/OWNER-RULINGS.md, 2026-08-02): every voyage plays in full.
+    // This spec used to pin the "Grown-ups: skip the island chats" link; it now pins its ABSENCE —
+    // the encounter card and its board carry no skip row, no SKIP_LINK, and no grown-ups copy.
+    for (const file of [CARD_SOURCE, BOARD_SOURCE]) {
+      const source = src(file);
+      expect(source.includes('SKIP_LINK'), `${file} still names SKIP_LINK`).toBe(false);
+      expect(source.includes('onSkip'), `${file} still wires a skip handler`).toBe(false);
+      expect(source, `${file} still styles a skip row`).not.toMatch(/skipRow|skipText/);
+      expect(source.toLowerCase().includes('grown-ups'), `${file} still carries grown-ups copy`).toBe(
+        false,
+      );
+    }
   });
+});
 
-  it('spec(A-066:AC-5) one underlined tap: latch + onDone, no confirmation, padded to the tap floor', () => {
-    const source = src(CARD_SOURCE);
-    expect(source.includes('SKIP_LINK.copy')).toBe(true);
-    expect(source.includes("textDecorationLine: 'underline'")).toBe(true);
-    expect(source.includes('hitSlop')).toBe(true);
-    expect(source.includes('MIN_TAP_TARGET')).toBe(true);
-    // The handler latches through the service and hands back — and asks nothing first.
-    expect(source).toMatch(/onSkip[\s\S]{0,200}completeEncounter\(captainStore, islandId, false\)/);
-    expect(source.includes('Alert')).toBe(false);
+// ── AC-7: the clarity lint — a riddle asks its whole question (D-13, part two) ──────────────────
+
+describe('AC-7 — D-13 clarity lint: the closing question restates the action in full', () => {
+  it('spec(A-066:AC-7) every loaded riddle ends on a full question that names what is asked (D-13)', () => {
+    // Owner ruling D-13 (tickets/app/OWNER-RULINGS.md, 2026-08-02), part two: a riddle may never
+    // end on an elliptical tail ("How many shells?"). Run against the REAL riddle loader so a
+    // future truncated riddle fails here, not in front of a child.
+    const templates = Object.entries(RIDDLE_POOLS).flatMap(([skill, pool]) =>
+      (pool ?? []).map((template) => ({ skill, template })),
+    );
+    expect(templates.length).toBeGreaterThan(0);
+
+    for (const { skill, template } of templates) {
+      const text = template.text.trim();
+      expect(text.endsWith('?'), `${skill}/${template.id} does not end with a question`).toBe(true);
+
+      const sentences = text.split(/(?<=[.!?])\s+/);
+      const closing = sentences[sentences.length - 1] ?? '';
+      const words = closing.split(/\s+/).filter((word) => word.length > 0);
+      expect(
+        words.length,
+        `${skill}/${template.id} closing question "${closing}" is under 5 words — an elliptical tail`,
+      ).toBeGreaterThanOrEqual(5);
+      expect(
+        closing,
+        `${skill}/${template.id} closing question "${closing}" does not restate the action`,
+      ).toMatch(
+        /\b(do|did|does|am|is|are|have|has|get|go|fit|fly|pop|sit|float|say|see|eat|squawk|fill|left|now|in all|each)\b/i,
+      );
+    }
   });
 });
 

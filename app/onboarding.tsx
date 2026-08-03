@@ -6,10 +6,10 @@ import type { GradeBand } from '@content/schemas';
 
 import { CoachBar } from '../src/components/onboarding/CoachBar';
 import { SetupProgress } from '../src/components/onboarding/SetupProgress';
-import { CAREGIVER_NOTE, GRADE_COACH, TOUR_SKIP } from '../src/components/onboarding/script';
+import { CAREGIVER_NOTE, GRADE_COACH } from '../src/components/onboarding/script';
 import { Poly } from '../src/components/Poly';
 import { ResponsiveFrame } from '../src/components/ResponsiveFrame';
-import { commitGradeBand, commitTourSkip } from '../src/services/onboarding';
+import { commitGradeBand } from '../src/services/onboarding';
 import { captainStore, useCaptain } from '../src/stores/useCaptain';
 import { useLayout } from '../src/theme/useLayout';
 import { color, radius, type, MIN_TAP_TARGET } from '../src/theme/tokens';
@@ -28,17 +28,6 @@ import { color, radius, type, MIN_TAP_TARGET } from '../src/theme/tokens';
  *   #6C4BD6  rival              — the rival's purple, already inlined in `Panels`/`guided-duel`
  */
 const PENDING_PIP = '#E8DCC4';
-
-/**
- * The grown-up skip's ink box, and the slop that carries it to the 64pt floor.
- *
- * `40 + 12 + 12 = 64`. The ink is deliberately small — two quiet lines inside the caregiver block —
- * and unscaled, because this is chrome addressed to an adult rather than composition that has to
- * stay in proportion with the ships. Every point of the slop lands inside the caregiver card, where
- * nothing else is listening, so the whole target is real.
- */
-const SKIP_INK_HEIGHT = 40;
-const SKIP_SLOP = Math.round((MIN_TAP_TARGET - SKIP_INK_HEIGHT) / 2);
 
 /**
  * Beat 2 of the onboarding board — "Which ship is yours?", the ship-size ladder.
@@ -104,9 +93,6 @@ export default function Onboarding() {
   // Read from the store, not held here. A band in component state dies with the component, so
   // nothing is ever placed and nothing is ever persisted — that was the defect this ticket closes.
   const chosen = useCaptain((s) => s.captain.gradeBand);
-  // Also from the store, for the same reason: the skip's acknowledgement has to survive the
-  // resolver replacing this screen with itself (see the skip row below).
-  const tourSkipped = useCaptain((s) => s.captain.hasFoughtGuidedDuel);
 
   return (
     <ResponsiveFrame surface="reading">
@@ -203,47 +189,6 @@ export default function Onboarding() {
             ]}
           >
             <Text style={[s.grownups, { fontSize: tx(12), lineHeight: tx(18) }]}>{CAREGIVER_NOTE}</Text>
-
-            {/*
-              The board's ADULTS rule: *"from the grade picker only — a 10px 'skip the tour'
-              affordance on that one screen."* The intent is adopted; the 10px is not, because a
-              10pt target is a sixth of the floor this app is built on. The ink stays quiet inside
-              the caregiver block — the one place on this screen already addressed to a grown-up —
-              and `hitSlop` carries the target past 64.
-
-              **It skips the tour, and it cannot skip the setup.** `commitTourSkip` writes the two
-              tour latches and then asks `resolveDestination` where this captain belongs; with no
-              band chosen the answer is this very screen, so the skip lands where it started and
-              says so. That is the resolver refusing to let a skip outrun the band, not a dead
-              control — the ship cards are still the way on, and after the skip they lead to the
-              name screen and then straight to the chart.
-            */}
-            {tourSkipped ? (
-              <Text
-                style={[s.grownups, { fontSize: tx(12), lineHeight: tx(18), marginTop: px(8) }]}
-              >
-                {TOUR_SKIP.armed}
-              </Text>
-            ) : (
-              <Pressable
-                onPress={() => router.replace(`/${commitTourSkip(captainStore)}`)}
-                accessibilityRole="button"
-                accessibilityLabel={TOUR_SKIP.accessibilityLabel}
-                hitSlop={SKIP_SLOP}
-                style={({ pressed }) => [
-                  s.skip,
-                  { minHeight: SKIP_INK_HEIGHT, marginTop: px(8) },
-                  pressed && { opacity: 0.6 },
-                ]}
-              >
-                <Text style={[s.skipLabel, { fontSize: tx(12), lineHeight: tx(18) }]}>
-                  {TOUR_SKIP.label}
-                </Text>
-                <Text style={[s.grownups, { fontSize: tx(11), lineHeight: tx(15) }]}>
-                  {TOUR_SKIP.reason}
-                </Text>
-              </Pressable>
-            )}
           </View>
         </View>
 
@@ -331,7 +276,4 @@ const s = StyleSheet.create({
   /** Board: the caregiver note sits in a sunken parchment block, not loose on the page. */
   caregiver: { backgroundColor: '#F0E2C8' },
   grownups: { ...type.caption, color: color.inkDarkMuted, textAlign: 'center' },
-  skip: { alignItems: 'center', justifyContent: 'center' },
-  /** `inkDark` on the sunken block, not `goldDeep` — the board's own banned pair on parchment. */
-  skipLabel: { ...type.caption, color: color.inkDark, textAlign: 'center' },
 });

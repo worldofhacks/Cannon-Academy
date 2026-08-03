@@ -62,33 +62,6 @@ export const GRADE_COACH: CoachLine = say('Which ship looks like you?', 'A grown
 export const CAREGIVER_NOTE =
   'Grown-ups: this only picks where to start — pick the hardest one they can read.';
 
-/**
- * The grown-up's way out of the tour, and the only control in onboarding that is not addressed to
- * the child.
- *
- * The board puts it on the grade picker — *"from the grade picker only — a 10px 'skip the tour'
- * affordance on that one screen"* — and the intent is adopted while the 10px is not: a 10pt tap
- * target is below the 64pt floor this whole app is built on, so the INK stays small and quiet and
- * `hitSlop` carries the target out to 64, the same split `CoachBar`'s speaker and the chart's header
- * pills already use.
- *
- * It reads as *"I already know this"* rather than as *"cancel"*, which is the difference between an
- * adult opting out of guidance and a child believing they have broken something. `label` names the
- * audience out loud for the same reason the caregiver note does; `reason` is what makes it an
- * opt-out rather than a refusal.
- *
- * `armed` is the picker's acknowledgement, and it exists because the picker's skip cannot navigate:
- * a captain with no band is a captain `resolveDestination` sends straight back to the picker, so
- * the honest thing is to say the tour is skipped and name the one step that is still required.
- * Setup is never skippable — see `commitTourSkip`.
- */
-export const TOUR_SKIP = {
-  label: 'Grown-ups: skip the tour',
-  reason: 'We’ve played this before.',
-  armed: 'Tour skipped. Pick a ship to finish setting up.',
-  accessibilityLabel: 'Grown-ups: skip the tour. We have played this before.',
-} as const;
-
 // ── Beat 3 — the name chips ──────────────────────────────────────────────────────────────────
 
 /**

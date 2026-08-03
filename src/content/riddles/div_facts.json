@@ -2,7 +2,7 @@
   {
     "id": "riddle_div_facts_berries",
     "skill": "div_facts",
-    "text": "I split {t} berries into {b} equal piles. How many in each pile?",
+    "text": "I split {t} berries into {b} equal piles. How many berries are in each pile?",
     "params": {
       "t": [6, 24],
       "b": [2, 4]
@@ -16,7 +16,7 @@
   {
     "id": "riddle_div_facts_grapes",
     "skill": "div_facts",
-    "text": "{t} sea grapes are shared by {b} turtles. How many each?",
+    "text": "{t} sea grapes are shared by {b} turtles. How many grapes does each turtle get?",
     "params": {
       "t": [8, 30],
       "b": [2, 5]
@@ -30,7 +30,7 @@
   {
     "id": "riddle_div_facts_bags",
     "skill": "div_facts",
-    "text": "My {t} shells fit in bags of {b}. How many bags?",
+    "text": "My {t} shells fit in bags of {b}. How many bags do I fill?",
     "params": {
       "t": [6, 20],
       "b": [2, 5]

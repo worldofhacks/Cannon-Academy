@@ -952,14 +952,14 @@ describe('A-015 replay continues into the chart tour', () => {
     expect(leave?.[1], 'the abandon path arms a replay').not.toMatch(/beginTourReplay/);
   });
 
-  it('spec(A-015:AC-5) the grown-up skip goes through the resolver, never to a route of its own', async () => {
+  it('spec(A-015:AC-5) re-baselined under D-13: the guided duel carries no grown-up skip', async () => {
     const source = await readFile(new URL('../../app/guided-duel.tsx', import.meta.url), 'utf8');
 
-    // Skipping writes `hasFoughtGuidedDuel`, but writes nothing about the band, the name or the
-    // flag — so where it lands has to be the resolver's answer. A hardcoded `/chart` would strand a
-    // captain who reached this screen without a name: `resolveDestination` would send them back to
-    // the name screen on the next launch, and the skip would look like it had done nothing.
-    expect(source).toMatch(/const skipTour = \(\) => router\.replace\(`\/\$\{commitTourSkip\(captainStore\)\}`\)/);
+    // Owner ruling D-13 (tickets/app/OWNER-RULINGS.md, 2026-08-02): every voyage plays in full.
+    // This spec used to pin the skip chip's resolver wiring; it now pins the ABSENCE — no skip
+    // handler, no TOUR_SKIP copy, no chip chrome over the sea.
+    expect(source).not.toMatch(/skipTour|commitTourSkip|TOUR_SKIP|SKIP_CHIP/);
+    // The protective sibling stays: whatever exits this screen has, none may unlatch the tutorial.
     expect(source, 'the screen writes hasFoughtGuidedDuel = false').not.toMatch(
       /hasFoughtGuidedDuel\s*[:=]\s*false/,
     );

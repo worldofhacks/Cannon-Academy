@@ -124,9 +124,9 @@ export interface EncounterOutcome {
  * Ends an island's encounter on the captain: sets the shown-once latch, and pays the +8 exactly
  * when this is the island's FIRST completion and the riddle was answered right.
  *
- * Both outcomes land here — right, wrong, the grown-up skip, and the ask-nothing fallback are
- * all one call with `correct` true or false — because "no wrong outcome" is a store property as
- * much as a screen one: every path sets the same latch and differs only in the payout.
+ * Both outcomes land here — right, wrong, and the ask-nothing fallback are all one call with
+ * `correct` true or false — because "no wrong outcome" is a store property as much as a screen
+ * one: every path sets the same latch and differs only in the payout.
  *
  * One `replaceCaptain`, always: the coin union and the latch are a single commit, so the
  * idempotency guard above them covers both or neither. Nothing else is touched — no receipts

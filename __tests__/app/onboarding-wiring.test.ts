@@ -627,18 +627,13 @@ describe('A-005 the chart walkthrough reserves its coach band', () => {
       expect(coachBandHeight({ art: L.a, type: L.t, hasSub, build: 'standard' })).toBe(92);
     }
 
-    // The grown-up skip is reserved above it, and it is a TAP TARGET rather than ink: the row is
-    // the 64pt floor and the pill drawn inside it is 24. Slop would not do — spent upward it steals
-    // advancing taps from the dock, and spent downward it is dead under the coach bar's speaker.
-    const { chartTourBandHeight, TOUR_SKIP_ROW } = await import(
-      '../../src/components/onboarding/coachBand'
-    );
-    expect(TOUR_SKIP_ROW).toBe(64);
+    // Re-baselined under owner ruling D-13 (2026-08-02): the grown-up skip row this band once
+    // reserved is gone — every voyage plays in full — so the tour band is the bar plus the home
+    // indicator and nothing else.
+    const { chartTourBandHeight } = await import('../../src/components/onboarding/coachBand');
     const band = { art: L.a, type: L.t, hasSub: true, build: 'standard' } as const;
-    expect(chartTourBandHeight({ ...band, insetBottom: 0, hasSkip: true })).toBe(92 + 64);
-    expect(chartTourBandHeight({ ...band, insetBottom: 34, hasSkip: true })).toBe(92 + 64 + 34);
-    // Beat 20 is a full-bleed takeover: no bar, no skip, nothing reserved.
-    expect(chartTourBandHeight({ ...band, insetBottom: 0, hasSkip: false })).toBe(92);
+    expect(chartTourBandHeight({ ...band, insetBottom: 0 })).toBe(92);
+    expect(chartTourBandHeight({ ...band, insetBottom: 34 })).toBe(92 + 34);
   });
 
   it('spec(A-005:AC-3) no chart element sits under the coach band, at four viewports', async () => {
@@ -649,16 +644,15 @@ describe('A-005 the chart walkthrough reserves its coach band', () => {
 
     for (const shape of shapes) {
       const L = computeLayout(shape.w, shape.h);
-      // The number the chart actually reserves — coach bar, grown-up skip row and the home
-      // indicator — from the very function `useChartTourBand` calls, so this sweep cannot drift
-      // away from the screen it describes.
+      // The number the chart actually reserves — coach bar and the home indicator (the skip row is
+      // gone under D-13) — from the very function `useChartTourBand` calls, so this sweep cannot
+      // drift away from the screen it describes.
       const reserved = chartTourBandHeight({
         art: L.a,
         type: L.t,
         hasSub: true,
         build: 'standard',
         insetBottom: shape.bottom,
-        hasSkip: true,
       });
 
       const bands = await chartBands({
@@ -735,16 +729,15 @@ describe('A-005 the chart walkthrough reserves its coach band', () => {
 
     for (const shape of shapes) {
       const L = computeLayout(shape.w, shape.h);
-      // The live reservation, skip row included — the rings are derived from the height the hub
-      // model is handed, so a band that grew and a sweep that did not would put every dock ring
-      // one skip row low.
+      // The live reservation (bar + inset only, per D-13) — the rings are derived from the height
+      // the hub model is handed, so a band and a sweep that disagreed would put every dock ring
+      // off by the difference.
       const reserved = chartTourBandHeight({
         art: L.a,
         type: L.t,
         hasSub: true,
         build: 'standard',
         insetBottom: shape.bottom,
-        hasSkip: true,
       });
       const controls = chartHubControlLayout({ width: shape.w, height: shape.h - reserved }).controls;
 
@@ -962,7 +955,8 @@ describe('A-005 the tour replays whole', () => {
 
     call('beginTourReplay', () => state().beginTourReplay());
     call('setOnboardingBeat', () => state().setOnboardingBeat(2));
-    call('skipTour', () => state().skipTour());
+    // `skipTour` was swept here until owner ruling D-13 removed the action outright — the sweep's
+    // completeness check below is what proves it is gone rather than merely unswept.
     call('completeOnboarding', () => state().completeOnboarding());
     call('markGuidedDuelFought', () => state().markGuidedDuelFought());
     call('addCoins', () => state().addCoins(5));
@@ -1061,7 +1055,7 @@ describe('A-005 the tour replays whole', () => {
     expect(chartTourShowing(resumed)).toBe(true);
   });
 
-  it('spec(A-005:AC-3) the overlay gates on the shared predicate, and its skip is forward-only', async () => {
+  it('spec(A-005:AC-3) the overlay gates on the shared predicate, and carries no skip', async () => {
     const overlay = await readOnboardingSource('../../src/components/onboarding/ChartWalkthrough.tsx');
 
     // Both gates — the reserved band and the render — or the coach bar paints over a chart with no
@@ -1071,13 +1065,10 @@ describe('A-005 the tour replays whole', () => {
     );
     expect(overlay).not.toMatch(/if \(captain\.hasCompletedOnboarding\) return/);
 
-    // The chart tour carries NO skip, by owner ruling on 2026-07-30, and its absence is asserted
-    // rather than merely unmentioned.
-    //
-    // It was unreachable by construction. Rule NEVER BLOCK puts a frame-wide tap catcher over this
-    // overlay so every tap advances a beat — so a skip control inside it advanced one beat, which
-    // is indistinguishable from a dead button, and the owner reported it as exactly that. The grade
-    // picker and the guided duel keep working skips; this screen is four taps from done.
+    // The chart tour carries NO skip — first by owner ruling on 2026-07-30 (a skip under the
+    // frame-wide tap catcher advanced one beat, indistinguishable from a dead button), and now by
+    // owner ruling D-13 (2026-08-02), which removed every grown-up skip in the app. The absence is
+    // asserted rather than merely unmentioned.
     expect(overlay, 'the chart tour grew a skip again').not.toMatch(/FINAL_BEAT/);
     expect(overlay, 'the chart tour grew a skip again').not.toMatch(/TourSkip/);
     const { CHART_BEATS } = await import('../../src/components/onboarding/script');
@@ -1086,134 +1077,81 @@ describe('A-005 the tour replays whole', () => {
 });
 
 /**
- * A-005 — the grown-up's skip, and the setup it cannot skip.
+ * A-005 — the grown-up's skip, removed whole.
  *
- * The board asks for it on the grade picker and the owner asked for it on the tour as well. The
- * rule that makes it safe is one sentence: **it skips the TOUR, never the SETUP.** A skip that
- * jumped the band, the name or the flag would not even work — `resolveDestination` refuses a
- * captain without them, so the "skipped" captain would be handed straight back to the screen they
- * pressed it on, forever. Routing every skip through the resolver is what makes that structural
- * rather than remembered.
+ * Re-baselined under owner ruling D-13 (tickets/app/OWNER-RULINGS.md, 2026-08-02): every voyage
+ * plays in full. All three "Grown-ups: skip" affordances — the grade picker's, the guided duel's,
+ * and the encounter card's — are gone, and so is their infrastructure (`TOUR_SKIP`,
+ * `commitTourSkip`, `skipTour`, `TOUR_SKIP_ROW`). These specs used to pin the skips' behaviour;
+ * they now pin the ABSENCE, plus the two protective intents that outlive the ruling: the caregiver
+ * note stays, and setup was never skippable — which now holds trivially, because nothing can jump
+ * the tour at all.
  */
-describe('A-005 the grown-up skip', () => {
-  it('spec(A-005:AC-3) a skip from the grade picker lands on the name screen, never past it', async () => {
-    const { chartTourShowing, commitTourSkip } = await import('../../src/services/onboarding');
+describe('A-005 the grown-up skip is gone (D-13)', () => {
+  it('spec(A-005:AC-3) re-baselined under D-13: no tour-skip path exists in the services, the store, or the script', async () => {
+    // The dead paths leave the codebase rather than lingering unreferenced (D-13's own words).
+    const services = await import('../../src/services/onboarding');
+    expect('commitTourSkip' in services, 'commitTourSkip still exported').toBe(false);
 
-    // Pressed with no band chosen, the resolver's own answer is this very screen. That is the
-    // resolver declining to let a skip outrun the setup, and it is why the picker acknowledges the
-    // skip in place instead of pretending to navigate.
     const store = createCaptainStore();
-    expect(commitTourSkip(store)).toBe('onboarding');
-    const skipped = store.getState().captain;
-    expect(skipped.hasFoughtGuidedDuel).toBe(true);
-    expect(skipped.hasCompletedOnboarding).toBe(true);
-    expect(skipped.gradeBand, 'the skip chose a band for a child').toBeNull();
-    expect(skipped.name, 'the skip named the captain').toBe('');
-    expect(skipped.flag, 'the skip chose a flag').toBeNull();
+    const state = store.getState() as unknown as Record<string, unknown>;
+    expect('skipTour' in state, 'the store still carries a skipTour action').toBe(false);
 
-    // Every band, because a skip that only works at K-1 is a skip that only a five-year-old's
-    // grown-up can use.
-    for (const band of GRADE_BANDS) {
-      const fresh = createCaptainStore();
-      commitTourSkip(fresh);
-      expect(commitGradeBand(fresh, band), `${band} skipped past the name screen`).toBe('name-flag');
-      expect(resolveDestination(fresh.getState().captain)).not.toBe('guided-duel');
-      expect(resolveDestination(fresh.getState().captain)).not.toBe('chart');
+    const script = await import('../../src/components/onboarding/script');
+    expect('TOUR_SKIP' in script, 'the script still carries the TOUR_SKIP copy').toBe(false);
 
-      // And only once the name and flag are committed does the skip take effect: no guided duel,
-      // and no chart tour waiting on the other side of it.
-      fresh.getState().setNameAndFlag('Wren', 'flag-1');
-      expect(resolveDestination(fresh.getState().captain)).toBe('chart');
-      expect(chartTourShowing(fresh.getState().captain)).toBe(false);
-    }
+    const coachBand = await import('../../src/components/onboarding/coachBand');
+    expect('TOUR_SKIP_ROW' in coachBand, 'the coach band still reserves a skip row').toBe(false);
   });
 
-  it('spec(A-005:AC-3) a skip from the tour lands on the chart, or on the repair the resolver asks for', async () => {
-    const { commitTourSkip } = await import('../../src/services/onboarding');
-
-    // Mid-tutorial: band, name and flag are done, the duel is not. This is the adult reviewing a
-    // fresh install, four beats into twenty.
-    const store = createCaptainStore();
-    commitGradeBand(store, 'k_1');
-    store.getState().setNameAndFlag('Wren', 'flag-3');
-    expect(resolveDestination(store.getState().captain)).toBe('guided-duel');
-    expect(commitTourSkip(store)).toBe('chart');
-
-    // A captain with nothing equipped is a repair the resolver insists on, and the skip must not
-    // talk its way past it — an empty tray is a duel screen with no gun.
-    const stripped = createCaptainStore();
-    commitGradeBand(stripped, 'k_1');
-    stripped.getState().setNameAndFlag('Bo', 'flag-1');
-    stripped.getState().equipCannons([]);
-    expect(commitTourSkip(stripped)).toBe('gun-deck');
-  });
-
-  it('spec(A-005:AC-3) the skip forfeits nothing it did not earn, and latches nothing false', async () => {
-    const { commitTourSkip } = await import('../../src/services/onboarding');
-    const store = createCaptainStore();
-    commitGradeBand(store, 'k_1');
-    store.getState().setNameAndFlag('Wren', 'flag-3');
-    const before = structuredClone(store.getState().captain);
-
-    commitTourSkip(store);
-    const after = store.getState().captain;
-
-    // Two latches, and nothing else. The tutorial's coins and chest are NOT granted — settling a
-    // duel that was never fought would fabricate a reward — and nothing already earned is taken.
-    expect({ ...after, hasFoughtGuidedDuel: false, hasCompletedOnboarding: false }).toEqual({
-      ...before,
-      hasFoughtGuidedDuel: false,
-      hasCompletedOnboarding: false,
-    });
-    expect(after.coins).toBe(before.coins);
-    expect(after.hasFoughtGuidedDuel).toBe(true);
-    expect(after.hasCompletedOnboarding).toBe(true);
-  });
-
-  it('spec(A-005:AC-3) both remaining skips are adult-facing, and every one clears the 64pt floor', async () => {
-    const { TOUR_SKIP } = await import('../../src/components/onboarding/script');
+  it('spec(A-005:AC-3) re-baselined under D-13: the picker keeps the caregiver note and carries no skip', async () => {
     const picker = await readSource('../../app/onboarding.tsx');
     const duel = await readSource('../../app/guided-duel.tsx');
     const overlay = await readOnboardingSource('../../src/components/onboarding/ChartWalkthrough.tsx');
 
-    // "I already know this", never "cancel" — the register that tells a grown-up this control is
-    // for them and tells a child it is not.
-    expect(TOUR_SKIP.label.toLowerCase()).toContain('grown-ups');
-    expect(TOUR_SKIP.reason.toLowerCase()).toContain('played');
-    expect(TOUR_SKIP.accessibilityLabel.toLowerCase()).toContain('played');
-    for (const copy of Object.values(TOUR_SKIP)) {
-      expect(copy.toLowerCase(), 'the skip reads as a refusal').not.toMatch(/cancel|quit|exit/);
+    // The caregiver advisory survives the ruling — D-13 removes the ESCAPE, not the note to the
+    // adult. This is the protective sibling the old skip spec carried.
+    expect(picker).toContain('CAREGIVER_NOTE');
+    const { CAREGIVER_NOTE } = await import('../../src/components/onboarding/script');
+    expect(CAREGIVER_NOTE.toLowerCase()).toContain('where to start');
+
+    // No skip Pressable, no TOUR_SKIP, no commitTourSkip — at all three former sites.
+    for (const [label, source] of [
+      ['the grade picker', picker],
+      ['the guided duel', duel],
+      ['the chart walkthrough', overlay],
+    ] as const) {
+      expect(source, `${label} still references TOUR_SKIP`).not.toMatch(/TOUR_SKIP/);
+      expect(source, `${label} still references commitTourSkip`).not.toMatch(/commitTourSkip/);
+      expect(source, `${label} still references skipTour`).not.toMatch(/skipTour/);
+      expect(source, `${label} still draws skip chrome`).not.toMatch(/SKIP_SLOP|SKIP_INK|SKIP_CHIP/);
     }
+  });
 
-    // The picker's skip goes through the resolver and says so when the resolver keeps it put.
-    expect(picker).toMatch(/router\.replace\(`\/\$\{commitTourSkip\(captainStore\)\}`\)/);
-    expect(picker).toContain('TOUR_SKIP.armed');
-    // Small INK inside a floor-sized TARGET, at every one of the three sites. The board's literal
-    // "10px affordance" is the thing being refused here.
-    //
-    // The slop is asserted as an EXPRESSION rather than a number, because the number is the part
-    // that can be got right by accident: a literal `hitSlop={4}` beside a 40pt row still reads as
-    // "we thought about it" and is 16pt short. Deriving it from `MIN_TAP_TARGET` is what makes the
-    // floor hold when someone later changes the ink.
-    expect(picker, 'the picker’s skip does not derive its slop from the tap floor').toMatch(
-      /const SKIP_SLOP = Math\.round\(\(MIN_TAP_TARGET - SKIP_INK_HEIGHT\) \/ 2\)/,
-    );
-    expect(picker, 'the slop is not actually applied').toMatch(/hitSlop=\{SKIP_SLOP\}/);
-    const ink = Number(picker.match(/const SKIP_INK_HEIGHT = (\d+)/)?.[1]);
-    // Ink small enough to stay quiet, and big enough to hold the two lines it actually draws:
-    // `TOUR_SKIP.label` at 12/18 over `TOUR_SKIP.reason` at 11/15 is 33pt of text. Ink under that
-    // is a clipped row, and ink over the floor is not a quiet affordance any more.
-    expect(ink, 'the skip ink cannot hold its own two lines').toBeGreaterThanOrEqual(33);
-    expect(ink, 'the skip is no longer quiet').toBeLessThan(64);
-    expect(ink + Math.round((64 - ink) / 2) * 2).toBeGreaterThanOrEqual(64);
+  it('spec(A-005:AC-3) setup is never skippable — now trivially, because nothing can jump the tour', async () => {
+    const { chartTourShowing } = await import('../../src/services/onboarding');
 
-    // The duel's skip is a 22pt chip inside a `MIN_TAP_TARGET` box over the sky — `hitSlop` would
-    // have been dead there, because slop above the sea band never reaches this view's parent.
-    expect(duel).toMatch(/const SKIP_CHIP_HEIGHT = 22/);
-    expect(duel).toMatch(/skipTarget: \{[\s\S]{0,160}height: MIN_TAP_TARGET/);
-    // There is deliberately no third skip: the chart tour's was removed (see above), so this
-    // asserts the two that exist rather than a count that would quietly pass if one vanished.
-    expect(overlay, 'the chart tour must not reserve a skip row').not.toMatch(/TOUR_SKIP_ROW/);
+    // With the skip gone there is exactly one road: picker → name/flag → guided duel → chart tour.
+    // No store action can reach the chart without fighting the guided duel first.
+    for (const band of GRADE_BANDS) {
+      const fresh = createCaptainStore();
+      expect(resolveDestination(fresh.getState().captain)).toBe('onboarding');
+      expect(commitGradeBand(fresh, band), `${band} jumped the name screen`).toBe('name-flag');
+      expect(resolveDestination(fresh.getState().captain)).not.toBe('chart');
+
+      fresh.getState().setNameAndFlag('Wren', 'flag-1');
+      expect(resolveDestination(fresh.getState().captain), `${band} bypassed the guided duel`).toBe(
+        'guided-duel',
+      );
+      expect(chartTourShowing(fresh.getState().captain)).toBe(true);
+
+      // The one honest way through: fight the duel, then the chart tour, then Sail!.
+      fresh.getState().markGuidedDuelFought();
+      expect(resolveDestination(fresh.getState().captain)).toBe('chart');
+      expect(chartTourShowing(fresh.getState().captain)).toBe(true);
+      fresh.getState().completeOnboarding();
+      expect(chartTourShowing(fresh.getState().captain)).toBe(false);
+    }
   });
 });
 

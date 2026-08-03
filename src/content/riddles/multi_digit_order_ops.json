@@ -2,7 +2,7 @@
   {
     "id": "riddle_multi_digit_order_ops_fish",
     "skill": "multi_digit_order_ops",
-    "text": "I catch {a} fish on each of {b} trips, then eat {c}. How many left?",
+    "text": "I catch {a} fish on each of {b} trips, then eat {c}. How many fish do I have left?",
     "params": {
       "a": [3, 9],
       "b": [2, 5],
@@ -17,7 +17,7 @@
   {
     "id": "riddle_multi_digit_order_ops_flock",
     "skill": "multi_digit_order_ops",
-    "text": "My flock flies {a} gulls to a row, in {b} rows, plus {c} out front. How many gulls?",
+    "text": "My flock flies {a} gulls to a row, in {b} rows, plus {c} out front. How many gulls fly in my flock in all?",
     "params": {
       "a": [4, 9],
       "b": [3, 6],

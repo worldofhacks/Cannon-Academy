@@ -100,7 +100,6 @@ export function useChartTourBand(): number {
     hasSub: beat.coach.sub !== '',
     build: 'standard',
     insetBottom: insets.bottom,
-    hasSkip: false,
   });
 }
 
@@ -212,23 +211,6 @@ export function ChartWalkthrough() {
   );
 }
 
-/**
- * The grown-up's skip, drawn into the row the chart reserved for it.
- *
- * Quiet on purpose: an 11pt pill in the corner of a band a child has no reason to look at, worded
- * for the adult holding the phone. The ink stays small and the TARGET is the whole 64pt row — the
- * same ink-versus-target split the chart's own header pills document, and the only way to honour
- * the board's "10px affordance" without breaking the floor.
- *
- * `hitSlop` is deliberately not used here, and that is a measurement rather than a preference: slop
- * spent upward would steal advancing taps from the dock band, and slop spent downward is dead —
- * the coach bar is painted after this row, so its speaker owns those points whatever this view
- * claims. Every point of a target has to be somewhere nothing else is listening.
- *
- * It sits ABOVE the coach bar rather than beside it because the bar is measured to the point: its
- * height is what the chart reserved, and a control tucked inside it would either squeeze the line
- * or overhang the band.
- */
 /**
  * The dock buttons are cards and the header controls are pills, so a single radius would ring one
  * of them wrong. Matched to the surface rather than to the id, so a control that moves band keeps
@@ -617,12 +599,6 @@ function ReadyBadge({
 }
 
 const s = StyleSheet.create({
-  skipTarget: { justifyContent: 'center' },
-  /** The coach slab's own pair — `parchment` on `inkDark` — so the pill certifies itself rather
-      than depending on whatever the chart happens to paint behind the reserved band. */
-  skipPill: { backgroundColor: color.inkDark, alignItems: 'center', justifyContent: 'center' },
-  skipLabel: { fontFamily: type.body.fontFamily, color: color.parchment },
-
   /**
    * The sky, at `SeaStage`'s own token rather than the board's `seaFoam`.
    *

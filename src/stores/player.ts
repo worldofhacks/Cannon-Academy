@@ -139,12 +139,6 @@ export interface CaptainState {
    * and owes nothing (A-015).
    */
   beginTourReplay: () => void;
-  /**
-   * The grown-up's "we have played this before". Latches BOTH gates true and disarms any replay,
-   * which is the only shape a skip can take: `resolveDestination` reads `hasFoughtGuidedDuel`, so
-   * a skip that left it false would bounce the captain straight back into the guided duel.
-   */
-  skipTour: () => void;
   /** Records the chart-walkthrough beat so a relaunch resumes on it (board rule RESUME). */
   setOnboardingBeat: (beat: number) => void;
 
@@ -292,9 +286,8 @@ export function createCaptainStore(initial?: Captain): CaptainStore {
      *
      * A captain who opens the replay and leaves the duel halfway never armed anything, so there is
      * nothing to clear — the flag only exists between the duel's ending and the chart tour's. From
-     * there the only two ways out both clear it: `Sail!` (completion) and the grown-up skip, which
-     * lands on the same send-off. Anything else is a force-quit, and `persistence.ts` reads the
-     * flag back as `false` on the next launch.
+     * there the one way out clears it: `Sail!` (completion). Anything else is a force-quit, and
+     * `persistence.ts` reads the flag back as `false` on the next launch.
      *
      * The beat index goes back to the first chart beat because the walkthrough resumes from it
      * (board rule RESUME) and a finished captain's index is parked on `done` — without this, a
@@ -302,19 +295,6 @@ export function createCaptainStore(initial?: Captain): CaptainStore {
      */
     beginTourReplay: () =>
       set((s) => ({ captain: { ...s.captain, replayingTour: true, onboardingBeat: 0 } })),
-
-    // Monotonic by construction: both fields are assigned `true` and neither branch can produce
-    // `false`. A skip is "I have seen this", which is the same claim the first run makes when it
-    // finishes — so it makes the same two writes, and no others.
-    skipTour: () =>
-      set((s) => ({
-        captain: {
-          ...s.captain,
-          hasFoughtGuidedDuel: true,
-          hasCompletedOnboarding: true,
-          replayingTour: false,
-        },
-      })),
 
     // Clamped and floored here rather than at the screen, for the same reason `addCoins` clamps:
     // the store is the last place that can stop a bad index reaching a child's save. A negative or
