@@ -653,6 +653,7 @@ function Stage({ round, height, L }: { readonly round: RangeRound; readonly heig
           target={round.target}
           phase={round.phase}
           wasCorrect={round.wasCorrect}
+          carried={round.carried}
           art={art}
           stageHeight={height}
         />
@@ -671,7 +672,11 @@ function Stage({ round, height, L }: { readonly round: RangeRound; readonly heig
 function chipFor(round: RangeRound): { readonly text: string; readonly bg: string; readonly ink: string } | null {
   const noun = TARGET_NOUN[round.target.kind];
   if (round.phase === 'incoming') {
-    return { text: `PIM TOSSES ${noun}`, bg: color.parchment, ink: color.inkDark };
+    // A carried crate is already in the water — `PIM TOSSES` over it announces a throw that is
+    // not happening (A-061 AC-4). The continuation chip names what is left instead.
+    return round.carried
+      ? { text: CHIP_COPY.carry, bg: color.parchment, ink: color.inkDark }
+      : { text: `PIM TOSSES ${noun}`, bg: color.parchment, ink: color.inkDark };
   }
   if (round.phase === 'verdict') {
     return round.wasCorrect === true
@@ -1012,12 +1017,15 @@ function Target({
   target,
   phase,
   wasCorrect,
+  carried,
   art,
   stageHeight,
 }: {
   readonly target: StandingTarget;
   readonly phase: string;
   readonly wasCorrect: boolean | null;
+  /** The target is a carried survivor — already in the water, so it must NOT be tossed again. */
+  readonly carried: boolean;
   readonly art: number;
   readonly stageHeight: number;
 }) {
@@ -1026,15 +1034,18 @@ function Target({
   const kind = target.kind;
   const berth = TARGET_ART[kind];
 
-  const toss = useSharedValue(phase === 'incoming' ? 0 : 1);
+  const toss = useSharedValue(phase === 'incoming' && !carried ? 0 : 1);
   const float = useSharedValue(0);
   const exit = useSharedValue(0);
 
   useEffect(() => {
-    if (phase !== 'incoming') return;
+    // Keyed on the phase AND the carried flag, not the bare phase: the designed one-crate carry
+    // re-enters `incoming` with a target that never left the water, and animating Pim's throw
+    // under it re-throws an object the child just shot (A-061 AC-4).
+    if (phase !== 'incoming' || carried) return;
     toss.value = 0;
     toss.value = withTiming(1, { duration: TOSS.ms, easing: Easing.bezier(0.3, 0.8, 0.4, 1) });
-  }, [toss, phase]);
+  }, [toss, phase, carried]);
 
   useEffect(() => {
     if (kind === 'gull') {
@@ -1067,7 +1078,8 @@ function Target({
   const driftX = DRIFT_OFF.dx * art;
   const driftRot = DRIFT_OFF.rotateDeg;
   const driftOpacity = DRIFT_OFF.opacityTo;
-  const arriving = phase === 'incoming';
+  // A carried target is not arriving — it floats through the beat instead of flying in.
+  const arriving = phase === 'incoming' && !carried;
 
   const style = useAnimatedStyle(() => {
     if (arriving) {

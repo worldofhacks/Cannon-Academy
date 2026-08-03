@@ -630,6 +630,15 @@ export const CHIP_COPY = {
   moving: 'IT MOVES!',
   bell: 'THE GOLDEN BELL',
   miss: 'IT GOT AWAY',
+  /**
+   * Not on the board — the board's `incoming` chip is authored only for a fresh toss, and it
+   * never draws the carried beat. Announcing `PIM TOSSES` over a crate that is already in the
+   * water is the visible half of A-061, so a carried target gets continuation copy instead. The
+   * crate stack is the only target that ever carries (`rangeTargets.afterShot` — every other
+   * kind is `remaining: 1`), so the copy can name it. Same parchment/ink pair as the toss chip,
+   * measured 13.98.
+   */
+  carry: 'ONE CRATE LEFT!',
 } as const;
 
 /**

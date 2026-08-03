@@ -62,8 +62,23 @@ export interface RangeRound {
   readonly islandId: IslandId;
   readonly skillId: SkillId;
   readonly phase: RoundPhase;
-  /** What is floating out there right now. */
+  /** What is floating out there right now. Across the verdict beat: what was SHOT AT. */
   readonly target: StandingTarget;
+  /**
+   * What is STILL STANDING after the shot — `afterShot`'s raw verdict, `null` allowed.
+   *
+   * Kept apart from `target`, which holds the shot-at object so the verdict has something to
+   * shatter. Coalescing the two (`afterShot(...) ?? target`) was the A-061 bug: it resurrected a
+   * destroyed crate, `advanceRound` re-derived "standing" from the corpse, and the same crate
+   * was re-thrown after every later hit — and a stack could survive a miss, contradicting
+   * `afterShot`'s own "never survives a miss" contract.
+   */
+  readonly survivor: StandingTarget | null;
+  /**
+   * Whether `target` is a carried survivor rather than a fresh toss (A-061 AC-4). The screen
+   * skips the toss animation and the `PIM TOSSES` chip for a target already in the water.
+   */
+  readonly carried: boolean;
   /** The target rng, threaded separately from the drill's so a retune cannot move a question. */
   readonly rng: Rng;
   /**
@@ -151,6 +166,8 @@ export function openRound(input: {
     skillId: input.skillId,
     phase: 'incoming',
     target,
+    survivor: null,
+    carried: false,
     rng,
     asked: session.current,
     picked: null,
@@ -191,8 +208,11 @@ export function answerRound(round: RangeRound, choiceIndex: number, elapsedMs: n
     ...round,
     session,
     phase: 'verdict',
-    // The stack survives a hit with a crate left, and never survives a miss.
-    target: afterShot(round.target, correct) ?? round.target,
+    // `target` keeps what was SHOT AT, so the verdict has something to shatter or drift off.
+    // What is left standing is recorded raw — null on a miss, null on the final crate,
+    // `{crate, 1}` on the first hit. No coalesce: resurrecting the dead object here is the
+    // A-061 bug, and `advanceRound` reads THIS field, never the display.
+    survivor: afterShot(round.target, correct),
     asked,
     picked: asked.choices[choiceIndex]?.value ?? null,
     wasCorrect: correct,
@@ -217,8 +237,9 @@ export function advanceRound(round: RangeRound): RangeRound {
     return { ...round, phase: 'end', picked: null, sparkedSlot: -1 };
   }
 
-  // A crate stack with a crate left stands; everything else is re-rolled.
-  const standing = round.target.remaining > 0 && round.target.kind === 'crate' ? round.target : null;
+  // What is standing is the FACT the shot recorded, never re-derived from the verdict display —
+  // re-deriving it from `target` is how a smashed crate came back (A-061).
+  const standing = round.survivor;
   const [target, rng] = nextTarget({
     cleared: round.session.correct,
     rackSize: round.session.length,
@@ -231,6 +252,10 @@ export function advanceRound(round: RangeRound): RangeRound {
     ...round,
     phase: 'incoming',
     target,
+    // A non-null survivor IS the next target (`nextTarget`'s no-re-roll short-circuit), so the
+    // screen must not animate a fresh throw of an object already in the water.
+    carried: standing !== null,
+    survivor: null,
     rng,
     asked: round.session.current,
     picked: null,

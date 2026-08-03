@@ -48,6 +48,7 @@ import {
   type StandingTarget,
 } from '../../src/services/rangeTargets';
 import { emptyCaptain, type Captain } from '../../src/stores/player';
+import { CHIP_COPY } from '../../src/theme/rangeBoard';
 
 const ISLAND = 'port_sumwich' as const;
 const SKILL: SkillId = 'add_within_10';
@@ -460,5 +461,148 @@ describe('A-059 the round refuses what the band refuses', () => {
     });
     expect(reused.session).toBe(round.session);
     expect(reused.phase).toBe('incoming');
+  });
+});
+
+describe('A-061 the range never re-throws a target that is already dead or already carried', () => {
+  /**
+   * Seed-hunted, never hand-built: the crate stack is the only target that spans questions, so
+   * every spec here needs a REAL round that reaches one. The hunt plays perfect racks until a
+   * fresh two-crate stack is the incoming target early enough (`shotsTaken ≤ 7`) that the whole
+   * stack — and the shot after its death — still fits inside the round. Everything up to that
+   * beat is identical before and after the A-061 fix (the state conflation only diverges once a
+   * stack dies or is missed), so the hunt cannot mask the bug it exists to expose.
+   */
+  function huntFreshCrate(): { readonly seed: number; readonly round: RangeRound } {
+    for (let seed = 1; seed <= 500; seed += 1) {
+      let live = open(seed);
+      for (let shot = 0; shot < RACK_SIZE && live.phase === 'incoming'; shot += 1) {
+        if (live.target.kind === 'crate' && live.target.remaining === 2 && shotsTaken(live) <= 7) {
+          return { seed, round: live };
+        }
+        live = beat(live, true);
+      }
+    }
+    throw new Error('range-round: no seed under 500 reached a fresh crate stack by shot 8');
+  }
+
+  /**
+   * Lazy and memoised, deliberately: a broken engine (the mutation check restores the coalesce,
+   * under which the FIRST target of every round sticks forever and no crate is ever drawn) must
+   * redden the named specs below, not the file's collection step.
+   */
+  let hunted: { readonly seed: number; readonly round: RangeRound } | null = null;
+  function freshCrate(): { readonly seed: number; readonly round: RangeRound } {
+    hunted = hunted ?? huntFreshCrate();
+    return hunted;
+  }
+
+  it('spec(A-061:AC-1) clearing the LAST crate of a stack draws a fresh target — never the corpse', () => {
+    const { round: atCrate } = freshCrate();
+    // The designed first half: one hit leaves one crate standing. (The carry itself is frozen
+    // spec(A-059:AC-11) behaviour, held at round level by spec(A-061:AC-3).)
+    const carriedBeat = beat(atCrate, true);
+    expect(carriedBeat.phase).toBe('incoming');
+    expect(carriedBeat.target).toEqual({ kind: 'crate', remaining: 1 });
+
+    // The kill. `answerRound`'s old `?? round.target` coalesce resurrected the smashed crate so
+    // the verdict had something to shatter, `advanceRound` re-derived the corpse as "standing",
+    // and Pim visibly re-threw the identical object after every later hit. A fresh stack is
+    // ALWAYS `{remaining: 2}`, so a `{crate, remaining: 1}` here can only be the corpse coming
+    // back.
+    const killVerdict = shoot(landTarget(carriedBeat), true);
+    expect(killVerdict.wasCorrect).toBe(true);
+    const after = advanceRound(killVerdict);
+    expect(after.phase).toBe('incoming');
+    expect(after.target).not.toEqual({ kind: 'crate', remaining: 1 });
+    // ...and the toss was a REAL draw: a carried stack costs no rng, a fresh target always does.
+    expect(after.rng).not.toEqual(killVerdict.rng);
+  });
+
+  it('spec(A-061:AC-2) a crate stack never survives a miss — the round holds the module contract', () => {
+    // `afterShot` states it outright: "never survives a miss" (`rangeTargets.ts`). The old
+    // coalesce contradicted it at round level — `null ?? round.target` handed the missed stack
+    // back to `advanceRound`, which re-derived it as standing and threw it again.
+    const { round: atCrate } = freshCrate();
+    const missVerdict = shoot(landTarget(atCrate), false);
+    expect(missVerdict.wasCorrect).toBe(false);
+    // The verdict display still shows the stack that floated away...
+    expect(missVerdict.target).toEqual({ kind: 'crate', remaining: 2 });
+
+    const after = advanceRound(missVerdict);
+    expect(after.phase).toBe('incoming');
+    // ...but what follows is a FRESH draw: rng was consumed (a carried stack costs none), and
+    // the incoming target is a new object, never the stack the miss just cleared.
+    expect(after.rng).not.toEqual(missVerdict.rng);
+    expect(after.target).not.toBe(atCrate.target);
+    expect(after.carried).toBe(false);
+  });
+
+  it('spec(A-061:AC-3) the designed one-crate carry is preserved — {crate,1} stands and costs no draw', () => {
+    const { round: atCrate } = freshCrate();
+    const hitVerdict = shoot(landTarget(atCrate), true);
+    // The verdict shows what was SHOT AT — the screen needs the full stack to shatter.
+    expect(hitVerdict.target).toEqual({ kind: 'crate', remaining: 2 });
+    // What actually survived is recorded raw beside it.
+    expect(hitVerdict.survivor).toEqual({ kind: 'crate', remaining: 1 });
+
+    const after = advanceRound(hitVerdict);
+    // The board's promise: "answer twice and both crates go". The half-cleared stack stands...
+    expect(after.target).toEqual({ kind: 'crate', remaining: 1 });
+    // ...and `nextTarget`'s no-re-roll short-circuit held at round level: the continuation cost
+    // not one rng draw, exactly as frozen spec(A-059:AC-11) pins for the module.
+    expect(after.rng).toEqual(hitVerdict.rng);
+  });
+
+  it('spec(A-061:AC-4) `carried` marks exactly the continuation beat, and the screen has copy for it', () => {
+    // A freshly opened round is a real toss, and so is a freshly drawn stack.
+    const { round: atCrate } = freshCrate();
+    expect(open().carried).toBe(false);
+    expect(atCrate.carried).toBe(false);
+
+    // The half-cleared stack is the ONLY continuation: `carried` is what the screen keys the
+    // skipped toss animation and the continuation chip on, instead of the bare `incoming` phase
+    // that re-animated a throw of an object already in the water.
+    const carriedBeat = beat(atCrate, true);
+    expect(carriedBeat.phase).toBe('incoming');
+    expect(carriedBeat.carried).toBe(true);
+
+    // Once the stack dies, the next beat is a genuine toss again.
+    const afterKill = beat(carriedBeat, true);
+    expect(afterKill.carried).toBe(false);
+
+    // The continuation copy the chip prints in place of `PIM TOSSES …` when `carried` is true.
+    expect(CHIP_COPY.carry).toBe('ONE CRATE LEFT!');
+  });
+
+  it('spec(A-061:AC-5) replay is untouched — {seed, answers} reproduce every target, through the stack and past its death', () => {
+    // The fix moved a fact into state; it must not have moved a draw. Two identical perfect
+    // racks at the crate seed cross the stack, kill it, and keep drawing — and see the same
+    // water shot for shot.
+    const { seed: crateSeed } = freshCrate();
+    const plan = Array.from({ length: RACK_SIZE }, () => true);
+    const trail = (round: RangeRound): readonly (readonly [StandingTarget, boolean])[] => {
+      const seen: (readonly [StandingTarget, boolean])[] = [];
+      let live = round;
+      for (const correct of plan) {
+        if (live.phase === 'end') break;
+        seen.push([live.target, live.carried] as const);
+        live = beat(live, correct);
+      }
+      return seen;
+    };
+
+    const a = trail(open(crateSeed));
+    const b = trail(open(crateSeed));
+    expect(a).toEqual(b);
+    // Non-vacuity: the sweep really crossed a stack and really carried it once.
+    expect(a.some(([target]) => target.kind === 'crate')).toBe(true);
+    expect(a.some(([, carried]) => carried)).toBe(true);
+
+    const endA = play(open(crateSeed), plan);
+    const endB = play(open(crateSeed), plan);
+    expect(endA.phase).toBe('end');
+    expect(endA.target).toEqual(endB.target);
+    expect(endA.rng).toEqual(endB.rng);
   });
 });
