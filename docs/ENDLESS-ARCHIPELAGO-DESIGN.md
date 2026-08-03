@@ -49,7 +49,17 @@ things — the skill catalog, the grade-band ceiling, and the duel engine's coin
     z.enum(HostSpecies), name: 1-16, bobMs: enum-of-existing-periods}`, species per
     `encounterBoard.ts:294`), `rivals` (array of D-12 fleet docs per `generatedFleet.ts:63-78`,
     quarantined pool — **never appended to `generatedFleet.json`**, whose 20 docs and preview
-    are byte-pinned, `__tests__/app/generated-fleet.test.ts:239,366-376`), optional `packRefs`.
+    are byte-pinned, `__tests__/app/generated-fleet.test.ts:239,366-376`), optional `packRefs`,
+    and `design` (below).
+  - `design` — the island's LOOK, as a document (amended D-17: the LLM designs islands too,
+    under D-12's discipline extended from ships to land): `{silhouette: z.enum(boardVariants),
+    features: bounded array of {piece: z.enum(featurePieces), slot: z.enum(namedSlots)},
+    palette: z.enum(namedMoodSwatches)}` — every value an enum over material the commissioned
+    Uncharted Sea board publishes, exactly as the fleet schema draws on the duel board's
+    primitives (`generatedFleet.ts:63-78`). No raw coordinates, no free hex, no rasters; a
+    degenerate island is unrepresentable. Until the board lands, the pre-board frontier
+    (A-082) renders the existing `VoyageIsle` recipe (`Isle.tsx:34-101`) and ignores `design`;
+    the schema ships with the field from day one so docs never migrate.
   - Glyph is **not a field**: it is `SKILL_GLYPH[skills[0]]` — total over `SkillId`
     (`src/theme/rankPresentation.ts:113`), so it is free and lint-proof.
 
@@ -161,11 +171,15 @@ islands (its completion-death is pinned, `win-advance.test.ts:342-356`).
 **S7 — Island generation.** Two sources, one schema: (a) **local deterministic generator** —
 pure function of `(seed, index, band)`: skills rotated from the band's own atlas cells
 (catalog skills → ceiling-safe by construction), rival dealt kind-filtered from the *shipped*
-20-ship fleet pool (offline-present), name from closed word lists, host species cycled, hull
-a clamped ramp above `ENEMY_HULL_BY_ISLAND.grandline`; (b) **LLM enrichment** via the G11
-relay — names, D-12 fleet-schema rival docs, adaptive packs — every doc through
-`genIslandSchema` + the 7-stage gauntlet (plan `:102-117`), with gauntlet stage 2's cell
-check re-pointed at `doc.skills` instead of `islandCurriculumFor`. LLM riddle/pack templates
+20-ship fleet pool (offline-present), name from closed word lists, design dealt from the same
+closed silhouette/feature/palette vocabulary, host species cycled, hull a clamped ramp above
+`ENEMY_HULL_BY_ISLAND.grandline`; (b) **LLM enrichment** via the G11 relay — names, island
+`design` docs (the amended-D-17 "fully AI native" surface: the LLM composes the look from
+the board's vocabulary; it can never draw outside it), D-12 fleet-schema rival docs, adaptive
+packs — every doc through `genIslandSchema` + the 7-stage gauntlet (plan `:102-117`), with
+gauntlet stage 2's cell check re-pointed at `doc.skills` instead of `islandCurriculumFor`,
+plus a child-tone name lint (length ≤24, closed profanity/scare screen) since generated
+names render on the HUD and banner. LLM riddle/pack templates
 inject only at the `generateQuestion` call (`src/services/encounter.ts:117`;
 `armAdaptivePacks` seam, plan `:133-137`) — never into `RIDDLE_POOLS`/`TEMPLATE_POOLS`,
 whose key sets are pinned (`__tests__/app/encounter.test.ts:327-338`).
@@ -273,12 +287,15 @@ pre-amendment G13 (enum reopening) is superseded; the numbers are reassigned:
   route params. *Deps: A-081. Verify the `:953` source-scan slice stays contained.*
 
 **G14 — the frontier is generated (LLM + board):**
-- **A-083** Uncharted Sea screen proper: windowed single-frontier composition. **Board-gated**
-  on the commissioned Uncharted Sea design artifact; everything else in G14 does not wait on
-  it. *Deps: A-082 + artifact.*
-- **A-084** LLM island enrichment: relay leg emits gen-island docs (names, fleet-schema
-  rivals, pack refs) under `cannon-academy/uncharted/v1`; hydrate re-gauntlet; name tone
-  lint. *Deps: G11+G12, A-078.*
+- **A-083** Uncharted Sea screen proper: windowed single-frontier composition, and the
+  transcription of the board's **island-design vocabulary** (silhouette variants, feature
+  pieces + named slots, palette moods) into the enums the `design` field and its renderer
+  consume. **Board-gated** on the commissioned Uncharted Sea design artifact; everything else
+  in G14 does not wait on it. *Deps: A-082 + artifact.*
+- **A-084** LLM island enrichment: relay leg emits gen-island docs (names, `design` docs
+  composed from the board vocabulary, fleet-schema rivals, pack refs) under
+  `cannon-academy/uncharted/v1`; hydrate re-gauntlet; child-tone name lint. *Deps: G11+G12,
+  A-078; design rendering lights up with A-083.*
 - **A-085** generated rivals rendered: pool-parameterized variant dealer over the quarantined
   fleet pool (byte-pinned shipped pool untouched), crew derivation, HUD identity. *Deps:
   A-080, A-084.*

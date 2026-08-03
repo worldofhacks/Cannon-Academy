@@ -429,8 +429,22 @@ generation recombines).
 `IslandId` enum and every total Record built on it; generated islands live in their own
 namespace behind their own strict schema and never enter that enum. The authored game must
 remain provably untouched — same reference, same bytes — for any captain who has not sailed
-past the Grandline. The design that satisfies this law is being audited against the codebase
-and lands in the plan doc before wave G13 is cut.
+past the Grandline. The design that satisfies this law is `docs/ENDLESS-ARCHIPELAGO-DESIGN.md`.
+
+### Amended again, same session — the LLM also names and designs the islands
+
+> "we also should generate island names and some island designs using the llm so that we
+> have a fully ai native generative endless game that is adaptive to the users"
+
+Names were already in the enrichment leg. This amendment adds **island visual design** to
+what the LLM authors — under D-12's provenance discipline, extended from ships to islands:
+the LLM writes a *design document*, never art. Every field of an island-design doc is an
+enum or count over board-published isle primitives — silhouette recipe, feature pieces in
+named slots, palette moods drawn from the theme's named tokens. No raw coordinates, no free
+hex, no rasters — a document that could describe a degenerate island is unrepresentable, and
+the commissioned Uncharted Sea board is what publishes the vocabulary the LLM composes from.
+The local deterministic generator deals designs from the same closed vocabulary, so the
+frontier remains fully offline-capable; the LLM makes it *distinctive*, never *possible*.
 
 ### What it costs, deliberately
 
