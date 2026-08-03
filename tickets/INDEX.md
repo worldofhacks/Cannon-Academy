@@ -81,6 +81,12 @@ README, HANDOFF, or STATE — those documents link here.
 | A-069 | app | The curriculum atlas — per-band islands, four new skills, the catalog speaks Common Core | review-passed | G10 | A-062 | main | [A-069](app/A-069.md) |
 | A-070 | app | Every consumer sails the band's own sea — the atlas migration | review-passed | G10 | A-069 | main | [A-070](app/A-070.md) |
 | A-071 | app | The atlas speaks — band names on the chart, riddles for the new rungs | review-passed | G10 | A-069, A-066 | main | [A-071](app/A-071.md) |
+| A-078 | app | The gen-island namespace — schema, board vocabulary, local generator | in-progress | G13 | none | main | [A-078](app/A-078.md) |
+| A-079 | app | The uncharted captain state — tolerated-as-absent, bus law enforced on hydrate | in-progress | G13 | A-078 | main | [A-079](app/A-079.md) |
+| A-080 | app | The gen duel boots through the anchor — the engine never learns gen ids | in-progress | G13 | A-078, A-079 | main | [A-080](app/A-080.md) |
+| A-081 | app | Gen settlement pays honestly, and the frontier advances by explicit action | in-progress | G13 | A-079, A-080 | main | [A-081](app/A-081.md) |
+| A-082 | app | The Uncharted Sea screen and the dock doorway — pixel-true to the board | in-progress | G13 | A-078, A-079, A-080, A-081 | main | [A-082](app/A-082.md) |
+| A-086 | app | Lumen the lanternfish — the frontier's host, with a riddle that grows | in-progress | G13 | A-082 | main | [A-086](app/A-086.md) |
 | T-001 | engine | Seeded mulberry32 PRNG with pure, state-threaded draw helpers | review-passed | 1 | none | ticket/T-001-seeded-prng | [T-001](T-001.md) |
 | T-002 | engine | Safe arithmetic expression and constraint predicate evaluator (no eval) | review-passed | 1 | none | ticket/T-002-safe-expr-eval | [T-002](T-002.md) |
 | T-003 | engine | Content zod schemas, id unions, and engine question types | review-passed | 1 | none | ticket/T-003-schemas-and-types | [T-003](T-003.md) |
