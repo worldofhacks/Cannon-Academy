@@ -6,7 +6,7 @@
  * `damage` only to print it on a chip, and why the arc SHAPE comes from the cannon's look table
  * rather than from its damage band.
  */
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 import Animated, {
   Easing,
@@ -18,13 +18,16 @@ import Animated, {
 } from 'react-native-reanimated';
 
 import { ARC_PEAK, type CannonLook } from '../../theme/cannonPresentation';
+import { rivalCrewFor } from '../../theme/crewPresentation';
 import { REFERENCE } from '../../theme/responsive';
 import { sprite } from '../../theme/sprites';
 import { color, motion, radius, type } from '../../theme/tokens';
 import type { DuelPhase } from '../../stores/duel';
+import { useCaptain } from '../../stores/useCaptain';
 import type { CaptainPose } from './Captain';
+import { GeneratedPirate } from './GeneratedPirate';
 import { Ship, type ShipCosmetics } from './Ship';
-import type { RivalPresentation } from '../../theme/enemyPresentation';
+import { GHOST_HULL_OPACITY, type RivalPresentation } from '../../theme/enemyPresentation';
 
 /** RN 0.86 removed `StyleSheet.absoluteFillObject` from its types; this is the same thing. */
 const FILL = { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 } as const;
@@ -55,6 +58,21 @@ const BOARD = {
   rivalArrowRight: 12,
 } as const;
 
+/**
+ * The rival hull's design width, and the ship grid both hulls are drawn on — `Ship.tsx`'s own
+ * `GRID_WIDTH`, COPIED rather than imported (the D-12 lift-by-copying idiom; `Ship.tsx` stays
+ * byte-identical). The deck sailor scales by exactly the factor the rival ship itself does.
+ */
+const RIVAL_SHIP_WIDTH = 126;
+const SHIP_GRID_WIDTH = 150;
+
+/**
+ * Where the sailor stands, in the rival ship's own 150-grid: the player captain's amidships spot
+ * (`Ship.tsx` mounts him at left 40, bottom 44 of a 34-wide figure), mirrored for a hull that
+ * renders `facing="left"` — 150 − 40 − 34 = 76 — with his boots on the same deck-rail line.
+ */
+const CREW_ANCHOR = { left: 76, bottom: 44 } as const;
+
 interface SeaStageProps {
   readonly phase: DuelPhase;
   readonly captainPose: CaptainPose;
@@ -70,6 +88,14 @@ interface SeaStageProps {
   readonly rivalPresentation: RivalPresentation;
   readonly damageToRival: number | null;
   readonly damageToPlayer: number | null;
+  /**
+   * The duel's own id, for the rival deck's sailor — the same seed `rivalVariantFor` deals the
+   * duel's fleet variant (and settlement's `metRivals` entry) from. The duel screen does not
+   * thread it yet, so it is optional: absent, the stage keys the deal off the island id itself —
+   * `rivalVariantFor` hashes any stable string — which keeps a sailor on every rival deck, stable
+   * across rematches, until a screen passes the real id through this seam.
+   */
+  readonly duelId?: string;
 }
 
 export function SeaStage({
@@ -84,10 +110,24 @@ export function SeaStage({
   rivalPresentation,
   damageToRival,
   damageToPlayer,
+  duelId,
 }: SeaStageProps) {
   const rivalTurn = phase === 'watch' || phase === 'rivalFly' || phase === 'rivalImpact';
   const seaHeight = Math.round(height * SEA_BAND_RATIO);
   const [stageWidth, setStageWidth] = useState<number>(REFERENCE.width);
+  /*
+   * The rival deck's one sailor (A-068). Derived from the duel's fleet variant —
+   * `rivalVariantFor(islandId, duelId)`, A-067's service, via `rivalCrewFor` — never from the
+   * raw duel id, so every duel that deals the same catalog ship shows the same sailor. The
+   * island is the captain's `currentIsland`: the only island a real duel can be fought at
+   * (`resolveDuelContext` reads nothing else, and settlement marks `metRivals` off the same
+   * field). `null` means no sailor: no island yet, or the kraken — no cosmetics, no deck.
+   */
+  const islandId = useCaptain((state) => state.captain.currentIsland);
+  const rivalCrew = useMemo(
+    () => (islandId === null ? null : rivalCrewFor(islandId, duelId ?? islandId)),
+    [islandId, duelId],
+  );
   const onStageLayout = (e: LayoutChangeEvent) => {
     const next = e.nativeEvent.layout.width;
     setStageWidth((prev) => (prev === next ? prev : next));
@@ -127,9 +167,30 @@ export function SeaStage({
             : {})}
           {...(rivalPresentation.ghostGlow !== undefined ? { ghostGlow: rivalPresentation.ghostGlow } : {})}
           facing="left"
-          width={126 * art}
+          width={RIVAL_SHIP_WIDTH * art}
           burning={rivalHullPct > 0 && rivalHullPct <= 0.3}
         />
+        {rivalCrew !== null ? (
+          /* Exactly one sailor, standing on the rival deck. Mounted HERE, in the stage's own
+             composition layer — `Ship.tsx` stays byte-identical — and drawn after the hull so he
+             reads as standing on the deck. A ghost's sailor takes the ghost's own opacity
+             treatment, since the hull's wash is applied inside `Ship` where a sibling cannot
+             inherit it. */
+          <View
+            pointerEvents="none"
+            style={{
+              position: 'absolute',
+              left: CREW_ANCHOR.left * ((RIVAL_SHIP_WIDTH * art) / SHIP_GRID_WIDTH),
+              bottom: CREW_ANCHOR.bottom * ((RIVAL_SHIP_WIDTH * art) / SHIP_GRID_WIDTH),
+              opacity:
+                rivalPresentation.kind === 'ghost'
+                  ? (rivalPresentation.ghostOpacity ?? GHOST_HULL_OPACITY)
+                  : 1,
+            }}
+          >
+            <GeneratedPirate crew={rivalCrew} scale={(RIVAL_SHIP_WIDTH * art) / SHIP_GRID_WIDTH} />
+          </View>
+        ) : null}
       </View>
 
       {phase === 'fly' ? <Projectile look={look} travelX={travelX} originLeft={x(BOARD.shotLeft)} /> : null}
