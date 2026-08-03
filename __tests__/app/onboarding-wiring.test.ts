@@ -46,6 +46,7 @@ import { hydrate, persist, type KeyValueStore } from '../../src/services/persist
 import { applyCaptainTally, createCaptainStore, emptyCaptain, type CaptainStore } from '../../src/stores/player';
 import { inBandLoadout } from '../../src/services/loadout';
 import { MASTERY_THRESHOLD_CORRECT } from '../../src/engine/tuning';
+import { generateIsland } from '../../src/services/uncharted/generator';
 
 /** An in-memory stand-in for AsyncStorage, exactly as `persistence.test.ts` builds it. */
 function fakeStorage(seed: Record<string, string> = {}) {
@@ -969,6 +970,14 @@ describe('A-005 the tour replays whole', () => {
     call('setCurrentIsland', () => state().setCurrentIsland('port_sumwich'));
     call('setNameAndFlag', () => state().setNameAndFlag('Bo', 'flag-1'));
     call('setGradeBand', () => state().setGradeBand('g2_3'));
+    // A-079 (amended D-17): the four frontier actions join the sweep — none touches a latch.
+    // Docs come from the local deterministic generator, the only lawful GenIslandDoc source.
+    const genCurrent = generateIsland(4242, 6, 'g2_3');
+    const genNext = generateIsland(4242, 7, 'g2_3');
+    call('beginUncharted', () => state().beginUncharted());
+    call('setUnchartedIslands', () => state().setUnchartedIslands(genCurrent, genNext));
+    call('advanceUnchartedState', () => state().advanceUnchartedState(generateIsland(4242, 8, 'g2_3')));
+    call('markLumenMet', () => state().markLumenMet());
     unsubscribe();
 
     expect(seen.length, 'nothing was recorded, so this proves nothing').toBeGreaterThan(10);

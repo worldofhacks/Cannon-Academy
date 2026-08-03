@@ -14,10 +14,20 @@
  * one of those must resolve to a playable app: a child locked out of the game by a bad write is a
  * worse outcome than a child who lost their coins.
  */
+import { genIslandSchema, type GenIslandDoc } from '@content/genIsland';
+import { getSkill } from '@content/index';
+import { GRADE_BANDS, ISLAND_IDS, type IslandId } from '@content/schemas';
+import type { MercyState } from '@engine/opponents/mercy';
+import { maxGradeForBand } from '@engine/placement';
+
 import { normalizeRewardReceipts } from '../contracts/rewards';
 import { DEFAULT_SKIN_ID } from '../theme/shipSkins';
-import { emptyCaptain, type Captain } from '../stores/player';
-import type { MercyState } from '@engine/opponents/mercy';
+import {
+  emptyCaptain,
+  freshUnchartedState,
+  type Captain,
+  type UnchartedState,
+} from '../stores/player';
 
 /** The two AsyncStorage methods this needs. Narrow on purpose — it is the whole test seam. */
 export interface KeyValueStore {
@@ -164,6 +174,78 @@ function normalizeSkins(raw: Record<string, unknown>): Pick<Captain, 'ownedSkins
   return { ownedSkins: owned, equippedSkin: equipped };
 }
 
+/**
+ * The bus law, enforced at the door (A-079, amended D-17; design §1).
+ *
+ * `currentIsland` and `unlockedIslands` carry AUTHORED ids or null, forever. `isBaseCaptain`
+ * checks only that these fields are string-shaped (`:143,140`), which is deliberate — but it
+ * means a hostile or bugged save could put a `gen_isle_*` string (or any garbage) on the bus,
+ * where `settleDuelRewards`, `chartNodes` and every total Record would meet it. Each authored
+ * gate already fails closed on foreign strings; this scrub is the defense-in-depth that keeps
+ * them from ever being asked. A scrubbed `currentIsland` resolves to null (the same "no island"
+ * state a fresh captain holds), never to a guess.
+ */
+const AUTHORED_ISLAND_IDS: ReadonlySet<string> = new Set(ISLAND_IDS);
+
+function isAuthoredIslandId(value: unknown): value is IslandId {
+  return typeof value === 'string' && AUTHORED_ISLAND_IDS.has(value);
+}
+
+function scrubIslandBus(
+  raw: Record<string, unknown>,
+): Pick<Captain, 'currentIsland' | 'unlockedIslands'> {
+  return {
+    currentIsland: isAuthoredIslandId(raw.currentIsland) ? raw.currentIsland : null,
+    unlockedIslands: Array.isArray(raw.unlockedIslands)
+      ? raw.unlockedIslands.filter(isAuthoredIslandId)
+      : [],
+  };
+}
+
+/**
+ * One Uncharted slot: a full `genIslandSchema` gauntlet, then the band law on top.
+ *
+ * The schema has no band (a document cannot know who holds it), so the ceiling is re-proven here
+ * against the captain the save claims to be: every skill's `minGrade` must sit within
+ * `maxGradeForBand` — the same clamp every other band gate uses (`range.ts:164`). A doc that
+ * fails either check resolves to null rather than fresh-or-crash because slots are REGENERABLE:
+ * the local generator re-deals `(seed, index, band)` deterministically, so nulling a corrupt
+ * slot costs nothing and keeps a poisoned doc out of a duel boot. A captain with no valid band
+ * cannot prove any doc in-band, so their slots reset too.
+ */
+function normalizeUnchartedSlot(raw: unknown, band: unknown): GenIslandDoc | null {
+  if (raw === null || raw === undefined) return null;
+  const parsed = genIslandSchema.safeParse(raw);
+  if (!parsed.success) return null;
+  if (!(GRADE_BANDS as readonly unknown[]).includes(band)) return null;
+  const ceiling = maxGradeForBand(band);
+  const withinBand = parsed.data.skills.every((skillId) => getSkill(skillId).minGrade <= ceiling);
+  return withinBand ? parsed.data : null;
+}
+
+/**
+ * The `uncharted` envelope (A-079) — the `normalizeMercyState` precedent, member by member: a
+ * non-object envelope resolves to fresh, and each member resolves to ITS default when corrupt
+ * (count clamped to a non-negative integer, slots to null, the latch to false) so one bad member
+ * never costs the others. Like `onboardingBeat`, this is tolerated-as-absent, NOT in
+ * `isBaseCaptain`, and NOT a `SCHEMA_VERSION` bump — a bump without a migration arm deletes
+ * every live save (`hydrate`'s unsupported-version branch below).
+ */
+function normalizeUncharted(raw: unknown, band: unknown): UnchartedState {
+  if (typeof raw !== 'object' || raw === null || Array.isArray(raw)) return freshUnchartedState();
+  const u = raw as Record<string, unknown>;
+  const clearedCount =
+    typeof u.clearedCount === 'number' && Number.isFinite(u.clearedCount)
+      ? Math.max(0, Math.floor(u.clearedCount))
+      : 0;
+  return {
+    clearedCount,
+    current: normalizeUnchartedSlot(u.current, band),
+    next: normalizeUnchartedSlot(u.next, band),
+    metLumen: u.metLumen === true,
+  };
+}
+
 function normalizeCaptain(raw: Record<string, unknown>): Captain {
   const base = raw as Omit<Captain, 'mercyState' | 'rewardReceipts' | 'nextPurchaseSequence'>;
   return {
@@ -172,11 +254,13 @@ function normalizeCaptain(raw: Record<string, unknown>): Captain {
     seenEncounters: Array.isArray(base.seenEncounters) ? base.seenEncounters : [],
     metRivals: Array.isArray(base.metRivals) ? base.metRivals : [],
     ...normalizeSkins(raw),
+    ...scrubIslandBus(raw),
     onboardingBeat: normalizeOnboardingBeat(raw.onboardingBeat),
     replayingTour: normalizeReplayingTour(),
     mercyState: normalizeMercyState(raw.mercyState),
     rewardReceipts: normalizeRewardReceipts(raw.rewardReceipts),
     nextPurchaseSequence: normalizeNextPurchaseSequence(raw.nextPurchaseSequence),
+    uncharted: normalizeUncharted(raw.uncharted, raw.gradeBand),
   };
 }
 
@@ -189,11 +273,16 @@ function migrateLegacyCaptain(raw: Record<string, unknown>): Captain {
       : [],
     metRivals: Array.isArray(raw.metRivals) ? (raw.metRivals as Captain['metRivals']) : [],
     ...normalizeSkins(raw),
+    // The bus law and the `uncharted` arm both mirror `normalizeCaptain` (A-079). A real v1 save
+    // predates both fields, but "version 1" is a claim the payload makes, not a fact — a hostile
+    // envelope must not reach the bus through the migrate door either.
+    ...scrubIslandBus(raw),
     onboardingBeat: normalizeOnboardingBeat(raw.onboardingBeat),
     replayingTour: normalizeReplayingTour(),
     mercyState: freshMercyState(),
     rewardReceipts: {},
     nextPurchaseSequence: 0,
+    uncharted: normalizeUncharted(raw.uncharted, raw.gradeBand),
   };
 }
 

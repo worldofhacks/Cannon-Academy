@@ -402,3 +402,85 @@ describe('A-002 onboarding beat is tolerated as absent', () => {
     expect(result.captain.coins).toBe(42);
   });
 });
+
+/**
+ * A-079 — the bus law, enforced on hydrate (amended D-17, design §1).
+ *
+ * `currentIsland` and `unlockedIslands` carry authored ids or null, forever — every total Record
+ * and settlement gate downstream is built on that. `isBaseCaptain` deliberately checks only that
+ * these fields are string-shaped, so the scrub in both normalize arms is what keeps a hostile or
+ * bugged save from ever putting a `gen_isle_*` (or any foreign) string on the authored bus.
+ */
+describe('A-079 hydrate scrubs the authored island bus', () => {
+  it('spec(A-079:AC-3) gen ids in currentIsland and unlockedIslands are scrubbed on hydrate', async () => {
+    io.data.set(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: SCHEMA_VERSION,
+        captain: preTicketCaptain({
+          currentIsland: 'gen_isle_7',
+          unlockedIslands: ['port_sumwich', 'gen_isle_9', 'isla_products'],
+        }),
+      }),
+    );
+
+    const result = await hydrate(io.store);
+
+    // Scrubbed, never discarded: the captain keeps everything else.
+    expect(result.recovered).toBe(false);
+    expect(result.captain.coins).toBe(42);
+    expect(result.captain.currentIsland).toBeNull();
+    expect(result.captain.unlockedIslands).toEqual(['port_sumwich', 'isla_products']);
+  });
+
+  it('spec(A-079:AC-3) any non-catalog value is scrubbed — the law is catalog membership', async () => {
+    io.data.set(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: SCHEMA_VERSION,
+        captain: preTicketCaptain({
+          currentIsland: 'atlantis',
+          unlockedIslands: ['port_sumwich', 42, null, 'atlantis', 'PORT_SUMWICH'],
+        }),
+      }),
+    );
+
+    const result = await hydrate(io.store);
+    expect(result.captain.currentIsland).toBeNull();
+    expect(result.captain.unlockedIslands).toEqual(['port_sumwich']);
+  });
+
+  it('spec(A-079:AC-3) a hostile v1 payload cannot smuggle a gen id through the migrate arm', async () => {
+    io.data.set(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        captain: preTicketCaptain({
+          currentIsland: 'gen_isle_6',
+          unlockedIslands: ['gen_isle_6', 'port_sumwich'],
+        }),
+      }),
+    );
+
+    const result = await hydrate(io.store);
+    expect(result.migrated).toBe(true);
+    expect(result.captain.currentIsland).toBeNull();
+    expect(result.captain.unlockedIslands).toEqual(['port_sumwich']);
+  });
+
+  it('spec(A-079:AC-3) authored ids pass the scrub intact — the whole chain, in stored order', async () => {
+    const all = ['port_sumwich', 'isla_products', 'quotient_cove', 'fraction_reef', 'grandline'];
+    io.data.set(
+      STORAGE_KEY,
+      JSON.stringify({
+        version: SCHEMA_VERSION,
+        captain: preTicketCaptain({ currentIsland: 'grandline', unlockedIslands: all }),
+      }),
+    );
+
+    const result = await hydrate(io.store);
+    expect(result.recovered).toBe(false);
+    expect(result.captain.currentIsland).toBe('grandline');
+    expect(result.captain.unlockedIslands).toEqual(all);
+  });
+});
