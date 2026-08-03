@@ -36,6 +36,7 @@ import { MASTERY_THRESHOLD_CORRECT } from '@engine/tuning';
 import { chartNodes, chartProgress } from '../../src/services/chart';
 import { commitGradeBand } from '../../src/services/onboarding';
 import { settleDuelRewards } from '../../src/services/rewardSettlement';
+import { rivalVariantFor } from '../../src/services/rivalVariant';
 import { createCaptainStore, type CaptainStore } from '../../src/stores/player';
 
 const BANDS: readonly GradeBand[] = ['k_1', 'g2_3', 'g4_5'];
@@ -397,5 +398,70 @@ describe('A-062 a win advances the voyage (re-baselined to D-14 by A-070)', () =
       'utf8',
     );
     expect(source).toMatch(/settleDuelRewards\(\s*store,\s*core,\s*\{\s*voyage:\s*'hold'\s*\}\s*\)/);
+  });
+});
+
+// ── A-081 — the `fleet` option is ADDITIVE: authored settlements mark exactly as before ────────
+//
+// Amended D-17 (design §2 S3): `fleet:'hold'` exists so a gen settlement, with the bus parked at
+// an authored island, cannot mark the anchor's authored ship met. These specs pin the other half
+// of that ruling — the DEFAULT path. No authored caller passes the option, so passing nothing and
+// passing `fleet:'mark'` must be byte-identical, and `'hold'` must withhold ONLY the shelf.
+
+describe('A-081 the fleet gate holds only the shelf (additive to the frozen A-062 suite)', () => {
+  function winAt(
+    store: CaptainStore,
+    at: IslandId,
+    duelId: string,
+    options?: { readonly voyage?: 'advance' | 'hold'; readonly fleet?: 'mark' | 'hold' },
+  ) {
+    store.getState().setCurrentIsland(at);
+    return settleDuelRewards(
+      store,
+      {
+        duelId,
+        seed: parseInt(duelId.slice('duel-'.length), 36) >>> 0,
+        won: true,
+        purseCoins: 7,
+        skillTally: { add_within_10: { correct: 3, asked: 4 } },
+      },
+      options,
+    );
+  }
+
+  it("spec(A-081:AC-4) the default marks the fought ship met, and an explicit fleet:'mark' is byte-identical to passing nothing", () => {
+    const duelId = 'duel-a81ac4a';
+    const defaulted = onboarded('k_1');
+    winAt(defaulted, 'port_sumwich', duelId);
+    const marked = onboarded('k_1');
+    winAt(marked, 'port_sumwich', duelId, { fleet: 'mark' });
+
+    const ship = rivalVariantFor('port_sumwich', duelId).shipId;
+    expect(defaulted.getState().captain.metRivals).toEqual([ship]);
+    expect(JSON.stringify(marked.getState().captain)).toBe(
+      JSON.stringify(defaulted.getState().captain),
+    );
+  });
+
+  it("spec(A-081:AC-4) fleet:'hold' withholds ONLY the shelf — coins, receipt, mastery and voyage land exactly as the default's", () => {
+    const duelId = 'duel-a81ac4b';
+    const defaulted = onboarded('g2_3');
+    winAt(defaulted, 'port_sumwich', duelId);
+    const held = onboarded('g2_3');
+    winAt(held, 'port_sumwich', duelId, { fleet: 'hold' });
+
+    expect(held.getState().captain.metRivals).toEqual([]);
+    expect(defaulted.getState().captain.metRivals).toHaveLength(1);
+
+    const stripShelf = (store: CaptainStore) =>
+      JSON.stringify({ ...store.getState().captain, metRivals: null });
+    expect(stripShelf(held)).toBe(stripShelf(defaulted));
+
+    // The held shelf still advanced the voyage — `fleet` gates the shelf, never the map.
+    expect(held.getState().captain.unlockedIslands).toContain('isla_products');
+    expect(
+      held.getState().captain.rewardReceipts[`duel:${duelId}`],
+      'the receipt lands regardless of the shelf gate',
+    ).toBeDefined();
   });
 });

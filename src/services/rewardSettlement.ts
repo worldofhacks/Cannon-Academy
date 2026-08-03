@@ -223,6 +223,14 @@ export function auditCannonAcquisitionPaths(): AcquisitionAudit {
 
 /** Canonical config seed encoded in `duel-<base36>` ids (A-032). */
 export function canonicalDuelSeed(duelId: string): number {
+  /*
+   * A-081 (amended D-17, design §2 S3): the Uncharted Sea settles through this same spine, and
+   * its `gduel_<index>_<seed36>` grammar carries its seed in the id's own tail, masked with the
+   * same `>>> 0` the authored grammar uses. The authored `duel-` arm below is byte-unchanged,
+   * and everything that is neither grammar still throws.
+   */
+  const gen = /^gduel_[1-9]\d*_([0-9a-z]+)$/.exec(duelId);
+  if (gen !== null) return parseInt(gen[1] as string, 36) >>> 0;
   if (!duelId.startsWith('duel-')) {
     throw new RangeError(`canonicalDuelSeed: expected duel:<id> key, received ${duelId}`);
   }
@@ -241,9 +249,20 @@ export function settleDuelRewards(
      * never fire for the youngest band.
      */
     readonly voyage?: 'advance' | 'hold';
+    /**
+     * A-081 (amended D-17, design §2 S3): the fleet-shelf gate. During Uncharted play the
+     * authored bus stays PARKED at the last authored island (the bus law), so an ungated gen
+     * settlement would run the `metRivals` block off the parked island and mark the ANCHOR's
+     * authored ship met — a shelf lie. `'hold'` gates ONLY that block; the gen settlement
+     * wrapper (`src/services/uncharted/settlement.ts`) marks the actually-fought rival —
+     * `doc.rivalDocId` — itself. No authored caller passes this, so the default `'mark'` path
+     * behaves exactly as before.
+     */
+    readonly fleet?: 'mark' | 'hold';
   },
 ): DuelSettlementOutcome {
   const voyage = options?.voyage ?? 'advance';
+  const fleet = options?.fleet ?? 'mark';
   const resolved = resolveSettlementInput(input);
   const before = store.getState().captain;
   const key = duelReceiptKey(resolved.duelId);
@@ -271,7 +290,7 @@ export function settleDuelRewards(
    * reads nothing else), and `rivalVariantFor` is duelId-seeded, so the ship marked met here is
    * the ship the duel dealt.
    */
-  if (next.currentIsland !== null) {
+  if (fleet === 'mark' && next.currentIsland !== null) {
     const variant = rivalVariantFor(next.currentIsland, resolved.duelId);
     if (!next.metRivals.includes(variant.shipId)) {
       next = { ...next, metRivals: [...next.metRivals, variant.shipId] };
