@@ -33,6 +33,7 @@ import { retainFirstApplied, victoryRewards } from '../src/services/victoryRewar
 import { shipCosmeticsForCaptain } from '../src/theme/shipCosmetics';
 import { cannonLook } from '../src/theme/cannonPresentation';
 import { enemyPresentationFor } from '../src/theme/enemyPresentation';
+import { rivalVariantFor } from '../src/services/rivalVariant';
 import { seaStageHeight, worldArtScale, worldBoardWidth } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
 import { color, radius, space } from '../src/theme/tokens';
@@ -80,7 +81,21 @@ function DuelBody() {
   const [state, dispatch] = useReducer(duelReducer, duelContext, (ctx) =>
     ctx.ok ? initialDuelStateWithContext(ctx, freshSeed(), captain) : initialDuelState(0),
   );
-  const rival = useMemo(() => enemyPresentationFor(getEnemyForIsland(state.islandId)), [state.islandId]);
+  // The island's kind presentation, dressed as THIS duel's dealt fleet ship (A-067): the same
+  // `rivalVariantFor(islandId, duelId)` deal settlement records into `metRivals`, so the ship a
+  // child fights is byte-for-byte the ship their shelf marks met. The kraken keeps its kind form
+  // (variant cosmetics are null there by contract); every other kind wears the variant's paint
+  // and sails under the variant's name.
+  const rival = useMemo(() => {
+    const kind = enemyPresentationFor(getEnemyForIsland(state.islandId));
+    const variant = rivalVariantFor(state.islandId, state.duelId);
+    return {
+      ...kind,
+      displayName: variant.displayName,
+      textChannel: `${variant.displayName} · ${kind.textChannel.split('·')[1]?.trim() ?? kind.textChannel}`,
+      cosmetics: variant.cosmetics ?? kind.cosmetics,
+    };
+  }, [state.islandId, state.duelId]);
   const [appliedReward, setAppliedReward] = useState<DuelRewardOutcome | null>(null);
   const askedAt = useRef(0);
   const rivalCancel = useRef<(() => void) | null>(null);
@@ -255,6 +270,7 @@ function DuelBody() {
             playerHullPct={state.playerHull / state.playerMax}
             rivalHullPct={state.rivalHull / state.rivalMax}
             rivalPresentation={rival}
+            duelId={state.duelId}
             damageToRival={state.phase === 'impact' ? (state.outcome?.damageToEnemy ?? null) : null}
             damageToPlayer={state.phase === 'rivalImpact' ? state.rivalDamage : null}
           />
