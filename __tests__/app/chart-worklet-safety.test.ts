@@ -467,10 +467,17 @@ const WORKLETS = chartSourceFiles(CHART_ROOT).flatMap((path) =>
 /** Sorted by file path, then by source order within the file — see `chartSourceFiles`/`workletsIn`. */
 const CURRENT_SHIPPED_WORKLETS = [
   'src/components/chart/ChartShip.tsx::bobStyle',
+  // A-063: the sail — the ship animates berth-to-berth along the trail curve, pre-sampled into
+  // plain captured number arrays and interpolated on the UI runtime. The deliberate eighth entry.
+  'src/components/chart/ChartShip.tsx::sailStyle',
   'src/components/chart/Fog.tsx::driftStyle',
   'src/components/chart/Kraken.tsx::humpStyle',
   'src/components/chart/Sea.tsx::swellStyle',
-  'src/components/chart/Sea.tsx::dashStyle',
+  // A-063 amendment, correcting a stale name: the close chart's crawling route dash died with
+  // that screen, and the binding that lives at this position in Sea.tsx today is `TrailBead`'s
+  // pulse (`sc-pulse` on the dotted trails). Same call site count, same file — the list had
+  // simply never been renamed with it, and was red against main before this ticket touched it.
+  'src/components/chart/Sea.tsx::beadStyle',
   'src/components/chart/Station.tsx::ringStyle',
   'src/components/chart/Waypoint.tsx::bobStyle',
 ] as const;

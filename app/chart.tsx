@@ -1,11 +1,12 @@
-import { router } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { router, useIsFocused } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { StyleSheet, View, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { IslandId } from '@content/schemas';
 import { rankForWins, rankTierForWins } from '@engine/ranks';
 
+import { SAIL_MS } from '../src/components/chart/ChartShip';
 import { ChartDock } from '../src/components/chart/Dock';
 import { HeaderPill } from '../src/components/chart/HeaderPill';
 import { SeaWater } from '../src/components/chart/Sea';
@@ -64,7 +65,63 @@ import { useLayout } from '../src/theme/useLayout';
  *
  * All fog and ordering decisions come from `services/chart.ts`, which is exhaustively tested. This
  * file renders that decision, positions it, and owns nothing else.
+ *
+ * ── The sail, and when the next battle begins (A-063) ──────────────────────────────────────────
+ * The ship used to teleport: a changed island was a different berth constant on the next render.
+ * Now this file is the trigger. It diffs the captain against the snapshot it last accounted for —
+ * `currentIsland` moved is a TRAVEL (the tap above), `unlockedIslands` grew by one is an ARRIVAL
+ * (a win just lifted fog) — and hands `VoyageMap` one sail run per cause. The diff is consumed
+ * before it dispatches, which is the settlement effect's own double-fire discipline
+ * (`duel.tsx:139-151`): StrictMode's replay and a re-render mid-sail find nothing left to diff.
+ *
+ * Only an arrival continues into a fight: the sail completes (`SAIL_MS`), the earned island
+ * becomes current, and one beat later the duel opens through the same push edge every other fight
+ * on this screen uses. A travel tap, a loss, a band ceiling — no new island, no auto-battle, the
+ * chart behaves exactly as it did yesterday.
  */
+
+/** The pause between the arrival sail ending and the duel opening — one breath, not a cut. */
+const ARRIVAL_BEAT_MS = 600;
+
+export interface SailPlan {
+  readonly kind: 'travel' | 'arrival';
+  readonly fromId: IslandId;
+  readonly toId: IslandId;
+}
+
+/**
+ * What one captain-state change means for the ship, if anything.
+ *
+ * Pure and deliberately closure-free (parameters only): the chart cannot render headless, so
+ * `chart-sail.test.ts` lifts this declaration out of the file and drives it directly — every
+ * "when does the ship sail, when does the battle start" decision lives here, not in JSX.
+ *
+ * An ARRIVAL is one island earned mid-voyage: exactly one new id, on a captain who already held
+ * some sea and stands somewhere else. A placement or hydration flood — several islands at once,
+ * or anything from an empty save — is a hand of islands, not a voyage, and must not replay as
+ * one. A TRAVEL is the captain moving between berths they already hold; from nowhere there is no
+ * berth to sail from, so there is nothing to animate.
+ */
+export function sailPlan(
+  prev: { readonly currentIsland: IslandId | null; readonly unlockedIslands: readonly IslandId[] },
+  next: { readonly currentIsland: IslandId | null; readonly unlockedIslands: readonly IslandId[] },
+): SailPlan | null {
+  const fresh = next.unlockedIslands.filter((id) => !prev.unlockedIslands.includes(id));
+  const earned = fresh.length === 1 ? fresh[0] : undefined;
+  const from = next.currentIsland ?? prev.currentIsland;
+  if (earned !== undefined && prev.unlockedIslands.length > 0 && from !== null && from !== earned) {
+    return { kind: 'arrival', fromId: from, toId: earned };
+  }
+  if (
+    prev.currentIsland !== null &&
+    next.currentIsland !== null &&
+    prev.currentIsland !== next.currentIsland
+  ) {
+    return { kind: 'travel', fromId: prev.currentIsland, toId: next.currentIsland };
+  }
+  return null;
+}
+
 export default function Chart() {
   const insets = useSafeAreaInsets();
   const L = useLayout();
@@ -119,6 +176,61 @@ export default function Chart() {
     },
     [drill, sail],
   );
+
+  // ── The sail trigger (A-063) ─────────────────────────────────────────────────────────────────
+  // One state per voyage, one snapshot of what has been accounted for. The snapshot seeds from the
+  // LIVE captain, so a fresh mount — StrictMode's simulated remount included — has nothing to diff
+  // and replays no sail.
+  const isFocused = useIsFocused();
+  const [sailRun, setSailRun] = useState<{ key: string; from: number; to: number } | null>(null);
+  const seen = useRef({ currentIsland: captain.currentIsland, unlockedIslands: captain.unlockedIslands });
+  const arrivalTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(
+    () => () => {
+      if (arrivalTimer.current !== null) clearTimeout(arrivalTimer.current);
+    },
+    [],
+  );
+
+  const unlockedKey = captain.unlockedIslands.join(',');
+  useEffect(() => {
+    // Unfocused, the chart must neither animate nor navigate: a victory settles `unlockedIslands`
+    // while the duel screen is still on top of this mounted route, and acting on it here would
+    // sail behind the victory panel and then push a duel over it. The diff stays UNCONSUMED, so
+    // the arrival plays the moment the captain actually returns.
+    if (!isFocused) return;
+    const next = { currentIsland: captain.currentIsland, unlockedIslands: captain.unlockedIslands };
+    const plan = sailPlan(seen.current, next);
+    // Consumed BEFORE dispatching — the settlement effect's double-fire discipline (duel.tsx): a
+    // StrictMode replay or a re-render mid-sail diffs an already-advanced snapshot and gets null.
+    seen.current = next;
+    if (plan === null) return;
+    const from = nodes.findIndex((n) => n.island.id === plan.fromId);
+    const to = nodes.findIndex((n) => n.island.id === plan.toId);
+    if (from < 0 || to < 0) return;
+    // A new voyage supersedes any pending auto-battle: a captain who taps elsewhere during the
+    // beat has changed their mind, and the duel must not open under them.
+    if (arrivalTimer.current !== null) {
+      clearTimeout(arrivalTimer.current);
+      arrivalTimer.current = null;
+    }
+    const key = `${plan.kind}:${plan.fromId}>${plan.toId}`;
+    setSailRun((current) => (current !== null && current.key === key ? current : { key, from, to }));
+    if (plan.kind !== 'arrival') return;
+    // Then the battle begins: the sail completes, the earned island becomes current, and one beat
+    // later the duel opens — the same `chart→duel` push edge as every other fight on this screen.
+    arrivalTimer.current = setTimeout(() => {
+      // Advance the snapshot FIRST, so making the earned island current cannot read back into the
+      // differ as a travel tap and replay the sail (AC-3).
+      seen.current = { currentIsland: plan.toId, unlockedIslands: seen.current.unlockedIslands };
+      captainActions().setCurrentIsland(plan.toId);
+      arrivalTimer.current = setTimeout(() => {
+        arrivalTimer.current = null;
+        router.push('/duel');
+      }, ARRIVAL_BEAT_MS);
+    }, SAIL_MS);
+  }, [isFocused, captain.currentIsland, unlockedKey]);
 
   const live = focusIndex(nodes);
   const focusIslandId = nodes[live]?.island.id;
@@ -214,6 +326,7 @@ export default function Chart() {
                 nextIsland={progress.nextIndex}
                 nextCaption={progress.caption}
                 typeScale={L.type}
+                sail={sailRun}
                 onTravel={travel}
                 onWaypoint={openWaypoint}
               />

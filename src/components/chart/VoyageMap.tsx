@@ -167,6 +167,7 @@ export function VoyageMap({
   nextIsland,
   nextCaption,
   typeScale,
+  sail,
   onTravel,
   onWaypoint,
 }: {
@@ -181,6 +182,8 @@ export function VoyageMap({
   /** What that island's gold chip says — how far off it is, in whole duels. */
   nextCaption: string | null;
   typeScale: number;
+  /** The voyage under way (or last completed): one key naming one run, and its two isle indices. */
+  sail: { readonly key: string; readonly from: number; readonly to: number } | null;
   /** Sails the captain to an island. It does NOT start a fight — see `app/chart.tsx`. */
   onTravel: (id: IslandId) => void;
   onWaypoint: (kind: WaypointKind, island: IslandId) => void;
@@ -190,6 +193,17 @@ export function VoyageMap({
   const liveIsle = VOYAGE.isles[live] ?? VOYAGE.isles[0];
   const legs = legsFor(nodes);
   const last = nodes.length - 1;
+
+  // The ship's anchor is the DESTINATION berth whenever a sail names one — not the live island.
+  // During an arrival the captain's `currentIsland` is still the island they are leaving (it
+  // becomes current only when the sail completes — `app/chart.tsx`), so anchoring on `live` would
+  // aim the voyage at its own departure berth. The sail transform inside `ChartShip` carries the
+  // hull back to the berth it left and plays it forward from there — never a teleport.
+  const sailingFrom = sail === null ? undefined : VOYAGE.isles[sail.from];
+  const sailingTo = sail === null ? undefined : VOYAGE.isles[sail.to];
+  const sailing =
+    sail !== null && sail.from !== sail.to && sailingFrom !== undefined && sailingTo !== undefined;
+  const berthIsle = sailing ? sailingTo : liveIsle;
 
   return (
     <>
@@ -268,14 +282,26 @@ export function VoyageMap({
         );
       })}
 
-      {liveIsle === undefined ? null : (
+      {berthIsle === undefined ? null : (
         <ChartShip
           frame={frame}
-          left={shipLeft(frame, liveIsle)}
-          top={
-            mapY(frame, liveIsle.y + liveIsle.h / 2) - (art(frame, VOYAGE.ship.width) * SHIP.aspect) / 2
-          }
+          left={shipLeft(frame, berthIsle)}
+          top={shipTop(frame, berthIsle)}
           width={VOYAGE.ship.width}
+          sail={
+            !sailing || sail === null || sailingFrom === undefined
+              ? null
+              : {
+                  key: sail.key,
+                  fromLeft: shipLeft(frame, sailingFrom),
+                  fromTop: shipTop(frame, sailingFrom),
+                  // The printed trail's own naming: the leg between two isles is the LOWER catalog
+                  // index, and the bow's alternating sign belongs to that name whichever way the
+                  // ship crosses it — sailing back runs the same bow with `t` reversed.
+                  leg: Math.min(sail.from, sail.to),
+                  forward: sail.from < sail.to,
+                }
+          }
         />
       )}
 
@@ -341,6 +367,11 @@ function shipLeft(frame: MapFrame, isle: { x: number; w: number }): number {
   const seaward = centre < VOYAGE.map.width / 2 ? 1 : -1;
   const offset = isle.w / 2 + VOYAGE.ship.shallowBleedX + VOYAGE.ship.gap + VOYAGE.ship.width / 2;
   return mapX(frame, centre + seaward * offset) - art(frame, VOYAGE.ship.width) / 2;
+}
+
+/** The berth's other half: the hull box seated so its middle is the island's own middle. */
+function shipTop(frame: MapFrame, isle: { y: number; h: number }): number {
+  return mapY(frame, isle.y + isle.h / 2) - (art(frame, VOYAGE.ship.width) * SHIP.aspect) / 2;
 }
 
 /**
