@@ -1,0 +1,44 @@
+[
+  {
+    "id": "riddle_div_facts_berries",
+    "skill": "div_facts",
+    "text": "I split {t} berries into {b} equal piles. How many in each pile?",
+    "params": {
+      "t": [6, 24],
+      "b": [2, 4]
+    },
+    "constraints": ["t % b == 0", "t / b >= 2"],
+    "answerExpr": "t / b",
+    "distractors": ["(t / b) + 1", "(t / b) - 1", "(t / b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_div_facts_grapes",
+    "skill": "div_facts",
+    "text": "{t} sea grapes are shared by {b} turtles. How many each?",
+    "params": {
+      "t": [8, 30],
+      "b": [2, 5]
+    },
+    "constraints": ["t % b == 0", "t / b >= 2"],
+    "answerExpr": "t / b",
+    "distractors": ["(t / b) + 1", "(t / b) - 1", "(t / b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_div_facts_bags",
+    "skill": "div_facts",
+    "text": "My {t} shells fit in bags of {b}. How many bags?",
+    "params": {
+      "t": [6, 20],
+      "b": [2, 5]
+    },
+    "constraints": ["t % b == 0", "t / b >= 2"],
+    "answerExpr": "t / b",
+    "distractors": ["(t / b) + 1", "(t / b) - 1", "(t / b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  }
+]

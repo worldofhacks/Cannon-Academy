@@ -1,0 +1,44 @@
+[
+  {
+    "id": "riddle_add_within_10_shells",
+    "skill": "add_within_10",
+    "text": "I have {a} shells. I find {b} more. How many shells?",
+    "params": {
+      "a": [2, 6],
+      "b": [1, 4]
+    },
+    "constraints": ["a + b <= 10"],
+    "answerExpr": "a + b",
+    "distractors": ["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_add_within_10_crabs",
+    "skill": "add_within_10",
+    "text": "{a} crabs sit on the sand. {b} more scuttle over. How many crabs?",
+    "params": {
+      "a": [2, 5],
+      "b": [2, 5]
+    },
+    "constraints": ["a + b <= 10"],
+    "answerExpr": "a + b",
+    "distractors": ["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_add_within_10_fish",
+    "skill": "add_within_10",
+    "text": "I spy {a} little fish. {b} more swim past. How many fish?",
+    "params": {
+      "a": [1, 4],
+      "b": [2, 5]
+    },
+    "constraints": ["a + b <= 9"],
+    "answerExpr": "a + b",
+    "distractors": ["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  }
+]

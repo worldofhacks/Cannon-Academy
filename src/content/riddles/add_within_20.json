@@ -1,0 +1,30 @@
+[
+  {
+    "id": "riddle_add_within_20_shell_pile",
+    "skill": "add_within_20",
+    "text": "My pile has {a} shells. I add {b} more. How many shells?",
+    "params": {
+      "a": [6, 12],
+      "b": [3, 8]
+    },
+    "constraints": ["a + b <= 20"],
+    "answerExpr": "a + b",
+    "distractors": ["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_add_within_20_gulls",
+    "skill": "add_within_20",
+    "text": "{a} gulls rest on my beach. {b} more land. How many gulls?",
+    "params": {
+      "a": [5, 11],
+      "b": [4, 9]
+    },
+    "constraints": ["a + b <= 20"],
+    "answerExpr": "a + b",
+    "distractors": ["(a + b) + 1", "(a + b) - 1", "(a + b) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  }
+]

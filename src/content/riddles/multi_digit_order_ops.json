@@ -1,0 +1,31 @@
+[
+  {
+    "id": "riddle_multi_digit_order_ops_fish",
+    "skill": "multi_digit_order_ops",
+    "text": "I catch {a} fish on each of {b} trips, then eat {c}. How many left?",
+    "params": {
+      "a": [3, 9],
+      "b": [2, 5],
+      "c": [1, 5]
+    },
+    "constraints": ["a * b > c"],
+    "answerExpr": "a * b - c",
+    "distractors": ["(a * b - c) + 1", "(a * b - c) - 1", "(a * b - c) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_multi_digit_order_ops_flock",
+    "skill": "multi_digit_order_ops",
+    "text": "My flock flies {a} gulls to a row, in {b} rows, plus {c} out front. How many gulls?",
+    "params": {
+      "a": [4, 9],
+      "b": [3, 6],
+      "c": [2, 9]
+    },
+    "answerExpr": "a * b + c",
+    "distractors": ["(a * b + c) + 1", "(a * b + c) - 1", "a * b"],
+    "isWordProblem": true,
+    "readAloud": true
+  }
+]

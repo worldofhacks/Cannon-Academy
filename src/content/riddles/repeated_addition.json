@@ -1,0 +1,41 @@
+[
+  {
+    "id": "riddle_repeated_addition_hellos",
+    "skill": "repeated_addition",
+    "text": "I squawk {a} hellos, then {a} hellos more. How many hellos?",
+    "params": {
+      "a": [2, 8]
+    },
+    "constraints": ["a + a <= 16"],
+    "answerExpr": "a + a",
+    "distractors": ["(a + a) + 1", "(a + a) - 1", "(a + a) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_repeated_addition_seeds",
+    "skill": "repeated_addition",
+    "text": "I eat {a} seeds, then {a} seeds, then {a} more. How many seeds?",
+    "params": {
+      "a": [2, 6]
+    },
+    "constraints": ["a + a + a <= 18"],
+    "answerExpr": "a + a + a",
+    "distractors": ["(a + a + a) + 1", "(a + a + a) - 1", "(a + a + a) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_repeated_addition_branches",
+    "skill": "repeated_addition",
+    "text": "Two branches hold {a} parrots each. How many parrots?",
+    "params": {
+      "a": [2, 9]
+    },
+    "constraints": ["a + a <= 18"],
+    "answerExpr": "a + a",
+    "distractors": ["(a + a) + 1", "(a + a) - 1", "(a + a) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  }
+]

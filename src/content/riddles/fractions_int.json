@@ -1,0 +1,41 @@
+[
+  {
+    "id": "riddle_fractions_int_arms",
+    "skill": "fractions_int",
+    "text": "Half of my {a} arms are up. How many is that?",
+    "params": {
+      "a": [4, 8]
+    },
+    "constraints": ["a % 2 == 0"],
+    "answerExpr": "a / 2",
+    "distractors": ["(a / 2) + 1", "(a / 2) - 1", "(a / 2) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_fractions_int_stones",
+    "skill": "fractions_int",
+    "text": "I keep {t} shiny stones. A quarter of them are pink. How many pink stones?",
+    "params": {
+      "t": [8, 24]
+    },
+    "constraints": ["t % 4 == 0", "t / 4 >= 2"],
+    "answerExpr": "t / 4",
+    "distractors": ["(t / 4) + 1", "(t / 4) - 1", "(t / 4) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  },
+  {
+    "id": "riddle_fractions_int_bubbles",
+    "skill": "fractions_int",
+    "text": "A third of my {t} bubbles pop. How many pop?",
+    "params": {
+      "t": [6, 21]
+    },
+    "constraints": ["t % 3 == 0", "t / 3 >= 2"],
+    "answerExpr": "t / 3",
+    "distractors": ["(t / 3) + 1", "(t / 3) - 1", "(t / 3) + 2"],
+    "isWordProblem": true,
+    "readAloud": true
+  }
+]
