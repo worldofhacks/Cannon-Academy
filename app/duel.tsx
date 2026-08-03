@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Redirect, router } from 'expo-router';
 
@@ -36,7 +36,7 @@ import { enemyPresentationFor } from '../src/theme/enemyPresentation';
 import { rivalVariantFor } from '../src/services/rivalVariant';
 import { seaStageHeight, worldArtScale, worldBoardWidth } from '../src/theme/responsive';
 import { useLayout } from '../src/theme/useLayout';
-import { color, radius, space } from '../src/theme/tokens';
+import { color, radius, space, type, MIN_TAP_TARGET } from '../src/theme/tokens';
 import {
   duelReducer,
   initialDuelState,
@@ -45,6 +45,18 @@ import {
   PHASE_DURATION_MS,
   type DuelPhase,
 } from '../src/stores/duel';
+import { createGuidedScreenController } from '../src/services/guidedDuel';
+import {
+  armedUnchartedDoc,
+  disarmUnchartedDuel,
+  openUnchartedDuel,
+  projectUnchartedView,
+  unchartedConfig,
+  unchartedRivalPresentation,
+  type UnchartedScreenView,
+} from '../src/services/uncharted/duel';
+import { settleUnchartedDuel } from '../src/services/uncharted/settlement';
+import type { GenIslandDoc } from '../src/content/genIsland';
 
 /**
  * The duel screen.
@@ -60,9 +72,14 @@ import {
  * fine in `app/**` — the engine stays replayable because the time it consumes is an input.
  */
 export default function DuelScreen() {
+  // The uncharted boot flag (A-080, design §2 S2): armed by the entry action, NEVER a route
+  // param — this screen reads no params at all, so a URL cannot reach the gen branch. Captured
+  // once per mount; the gen body disarms it, so the flag is one boot's worth of truth and a
+  // captain without it can only ever land in the authored body below.
+  const genDoc = useRef(armedUnchartedDoc()).current;
   return (
     <ResponsiveFrame surface="world">
-      <DuelBody />
+      {genDoc === null ? <DuelBody /> : <UnchartedDuelBody doc={genDoc} />}
     </ResponsiveFrame>
   );
 }
@@ -345,6 +362,320 @@ function DuelBody() {
 }
 
 /**
+ * The gen duel body — the Uncharted Sea's branch of this screen (A-080, amended D-17).
+ *
+ * Runs on the SAME session machinery the guided duel runs on (`createDuelAdapter`, via
+ * `openUnchartedDuel`) because the pinned legacy store can only boot `legacyConfig`, and the
+ * engine underneath is the same frozen reducer either way — the anchor mapping happens entirely
+ * inside `unchartedConfig`. Everything a child can see comes from the DOC, never from the
+ * anchor: the HUD names `view.islandName` (always `doc.displayName`), the rival is the doc's
+ * dealt fleet ship (`unchartedRivalPresentation`, bypassing `getEnemyForIsland` /
+ * `rivalVariantFor`), and the rival's per-turn guns are the session's own doc-derived loadout —
+ * `deriveRivalLoadout` is never consulted here.
+ *
+ * No settlement fires from this body yet: `settleUnchartedDuel` and the `fleet:'hold'` gate are
+ * A-081's, and settling through the default path from here would mark an AUTHORED ship met off
+ * the parked bus island (design §2 S3 — the shelf lie). Until A-081 lands, victory renders an
+ * honest zero-spoils sheet and defeat keeps nothing. Only the mercy ledger moves — the same
+ * three writes the authored body makes, so the frontier stays exactly as forgiving as the chart.
+ */
+function UnchartedDuelBody({ doc }: { readonly doc: GenIslandDoc }) {
+  const insets = useSafeAreaInsets();
+  const L = useLayout();
+  const { contentWidth } = useResponsiveSurface();
+  const boardWidth = worldBoardWidth(contentWidth);
+  const stageArt = worldArtScale(boardWidth);
+  const captain = useCaptain((s) => s.captain);
+  const playerShip = shipCosmeticsForCaptain(captain);
+  // Lazily booted once per mount — never re-created on re-render, so a live duel cannot be
+  // rebooted by a captain-store write mid-turn.
+  const sessionRef = useRef<ReturnType<typeof openUnchartedDuel> | null>(null);
+  if (sessionRef.current === null) {
+    sessionRef.current = openUnchartedDuel(doc, captainStore.getState().captain);
+  }
+  const session = sessionRef.current;
+  const [view, setView] = useState(() => projectUnchartedView(session.getState(), doc));
+  const rival = useMemo(() => unchartedRivalPresentation(doc), [doc]);
+  const askedAt = useRef(0);
+  const rivalCancel = useRef<(() => void) | null>(null);
+  const mounted = useRef(true);
+  const viewRef = useRef(view);
+  viewRef.current = view;
+
+  // The captain's OWN loadout under the SAME ceiling rule as the authored tray (A-058): the two
+  // must agree with `unchartedConfig`'s `inBandLoadout`, or the screen offers a tile the engine
+  // silently refuses.
+  const tray = useMemo(
+    () => trayCannons(captain).filter((c) => asksInBand(c, captain.gradeBand)),
+    [captain],
+  );
+
+  // Consume the boot flag: one arm, one boot. Leaving and re-entering without the entry action
+  // re-arming lands in the authored body, which is the AC-4 door law.
+  useEffect(() => {
+    disarmUnchartedDuel();
+  }, []);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      rivalCancel.current?.();
+      rivalCancel.current = null;
+    };
+  }, []);
+
+  useEffect(() => {
+    return session.subscribe(() =>
+      setView((previous) => projectUnchartedView(session.getState(), doc, previous)),
+    );
+  }, [session, doc]);
+
+  // Beat timing and the question fuse — the guided duel's own controller, which is generic over
+  // any adapter session: it reads `PHASE_DURATION_MS` and the live cannon's `timerMs`.
+  useEffect(() => {
+    const controller = createGuidedScreenController(session);
+    return () => controller.dispose();
+  }, [session]);
+
+  // Where the frontier loop closes (integrator wiring, A-081/A-082 handoff): the terminal
+  // settles through `settleUnchartedDuel` — coins, mastery, receipt, chest, rank on the
+  // existing path with `{voyage:'hold', fleet:'hold'}`, plus the honest rival mark — and it is
+  // receipt-idempotent per duelId, so StrictMode double-invokes and re-observed terminals are
+  // no-ops. The mercy write mirrors the authored body exactly.
+  useEffect(() => {
+    if (view.phase !== 'victory' && view.phase !== 'defeat') return;
+    const core = session.getState().core;
+    if (core.phase === 'victory' || core.phase === 'defeat') {
+      settleUnchartedDuel(captainStore, core, doc);
+    }
+    const won = view.phase === 'victory';
+    const { captain: settled } = captainStore.getState();
+    captainStore.getState().replaceCaptain({
+      ...settled,
+      mercyState: recordDuelResult(settled.mercyState, won),
+    });
+  }, [view.phase, view.duelId]);
+
+  // The rival's turn. The loadout is the session core's own — `unchartedConfig` derived it from
+  // `doc.skills` — never the authored island-keyed deriver, which needs an island the frontier
+  // does not have (spec(A-080:AC-3) bans even the identifier from this body).
+  useEffect(() => {
+    if (view.phase !== 'watch') {
+      rivalCancel.current?.();
+      rivalCancel.current = null;
+      return;
+    }
+
+    const core = session.getState().core;
+    if (core.phase !== 'rivalTurn') return;
+    const cap = captainStore.getState().captain;
+    const opponent = createRivalBot({ captain: cap, loadout: core.rivalLoadout, rng: core.rng });
+    const turnToken = core.turnToken;
+
+    rivalCancel.current?.();
+    rivalCancel.current = driveRivalTurn({
+      turnToken,
+      expectedTurnToken: turnToken,
+      alive: () => mounted.current,
+      resolve: () => resolveRivalVolley({ opponent, core }),
+      onResult: ({ turnToken: token, volley }) => {
+        if (!mounted.current) return;
+        session.dispatch({ type: 'RIVAL_RESULT', turnToken: token, volley });
+        if (!volley.correct) {
+          const after = captainStore.getState().captain;
+          if (after.mercyState.forcedMisfiresRemaining > 0) {
+            captainStore.getState().replaceCaptain({
+              ...after,
+              mercyState: consumeForcedMisfire(after.mercyState),
+            });
+          }
+        }
+      },
+    });
+
+    return () => {
+      rivalCancel.current?.();
+      rivalCancel.current = null;
+    };
+  }, [view.phase, view.turnToken, view.duelId, session]);
+
+  useEffect(() => {
+    if (view.phase === 'question' && view.cannon !== null) {
+      askedAt.current = Date.now();
+    }
+  }, [view.phase, view.cannon, view.question]);
+
+  const onAnswer = useCallback(
+    (value: number) => {
+      const current = viewRef.current;
+      if (current.question === null) return;
+      const choiceIndex = current.question.choices.findIndex((choice) => choice === value);
+      if (choiceIndex < 0) return;
+      session.dispatch({
+        type: 'ANSWER_CHOSEN',
+        choiceIndex,
+        elapsedMs: Date.now() - askedAt.current,
+      });
+      const cap = captainStore.getState().captain;
+      captainStore.getState().replaceCaptain({
+        ...cap,
+        mercyState: recordPlayerAnswer(cap.mercyState, value === current.question.answer),
+      });
+    },
+    [session],
+  );
+
+  const pickCannon = useCallback(
+    (picked: (typeof tray)[number]) => {
+      session.dispatch({ type: 'CANNON_SELECTED', cannonId: picked.id });
+    },
+    [session],
+  );
+
+  const leave = useCallback(() => router.back(), []);
+
+  // "Sail again" re-boots the same document — same seed, same duelId (D-15: determinism is
+  // infrastructure; A-081's settlement receipts are what make replays pay once).
+  const sailAgain = useCallback(() => {
+    session.reset(unchartedConfig(doc, captainStore.getState().captain));
+  }, [session, doc]);
+
+  // ── Every hook has now run. Conditional returns are legal from here down. ──
+
+  const fallback = tray[0];
+  if (fallback === undefined) return <Redirect href={`/${resolveDestination(captain)}`} />;
+  const cannon = view.cannon ?? fallback;
+  const look = cannonLook[cannon.id];
+
+  return (
+    <View style={[s.screen, { paddingTop: insets.top }]}>
+      <View style={[s.hud, { paddingHorizontal: L.gutter }]}>
+        <TurnBar
+          label={turnLabel(view.phase, view.islandName)}
+          turn={view.turn}
+          playerActive={!isRivalTurn(view.phase)}
+          onLeave={leave}
+        />
+        <View style={s.hullRow}>
+          <HullCard name="You" flag={color.amber} hp={view.playerHull} max={view.playerMax} />
+          <HullCard name={rival.displayName} flag={rival.accent} hp={view.rivalHull} max={view.rivalMax} />
+        </View>
+      </View>
+
+      <View style={[s.seaBand, { backgroundColor: color.skyTop }]}>
+        <View style={{ width: boardWidth, maxWidth: '100%', alignSelf: 'center' }}>
+          <SeaStage
+            height={seaStageHeight(L)}
+            art={stageArt}
+            phase={view.phase}
+            playerShip={playerShip}
+            captainPose={captainPoseForPhase(view.phase, view.outcome?.perfectShot === true)}
+            look={look}
+            playerHullPct={view.playerHull / view.playerMax}
+            rivalHullPct={view.rivalHull / view.rivalMax}
+            rivalPresentation={rival}
+            duelId={view.duelId}
+            damageToRival={view.phase === 'impact' ? (view.outcome?.damageToEnemy ?? null) : null}
+            damageToPlayer={view.phase === 'rivalImpact' ? view.rivalDamage : null}
+          />
+        </View>
+      </View>
+
+      <View
+        style={[
+          s.sheet,
+          { paddingBottom: insets.bottom },
+          isRivalTurn(view.phase) ? { backgroundColor: '#EFE6F7' } : null,
+          view.phase === 'perfect' ? { backgroundColor: color.gold } : null,
+        ]}
+      >
+        {view.phase === 'select' ? (
+          <CannonTray cannons={tray} gradeBand={captain.gradeBand ?? 'k_1'} onPick={pickCannon} />
+        ) : null}
+
+        {view.phase === 'question' && view.question !== null ? (
+          <QuestionPanel
+            question={view.question}
+            look={look}
+            cannonName={cannon.displayName}
+            timerMs={cannon.timerMs}
+            picked={null}
+            onAnswer={onAnswer}
+          />
+        ) : null}
+
+        {view.phase === 'perfect' ? <PerfectShotPanel /> : null}
+        {view.phase === 'fly' ? <FlyingPanel glyph={look.glyph} spectacle={look.spectacle} /> : null}
+        {view.phase === 'watch' || view.phase === 'rivalFly' ? <WatchPanel /> : null}
+
+        {isResolve(view.phase) ? (
+          <ResolvePanel
+            copy={genResolveCopy(view, look.spectacle)}
+            correction={view.phase === 'miss' || view.phase === 'timeout' ? genCorrectionText(view) : null}
+          />
+        ) : null}
+
+        {view.phase === 'victory' ? (
+          <UnchartedVictoryPanel
+            right={view.right}
+            asked={view.asked}
+            perfects={view.perfects}
+            onLeave={leave}
+          />
+        ) : null}
+
+        {view.phase === 'defeat' ? (
+          <DefeatPanel
+            right={view.right}
+            asked={view.asked}
+            perfects={view.perfects}
+            coins={0}
+            onAgain={sailAgain}
+            onLeave={leave}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The gen victory sheet, pre-settlement: tally and the way home, no chest and no coin line,
+ * because nothing has been banked (A-081 owns `settleUnchartedDuel`; a chest that opens to
+ * nothing is the dead button A-015 banned). Every string here is the authored victory sheet's
+ * own copy — nothing new is said, less is promised.
+ */
+function UnchartedVictoryPanel({
+  right,
+  asked,
+  perfects,
+  onLeave,
+}: {
+  readonly right: number;
+  readonly asked: number;
+  readonly perfects: number;
+  readonly onLeave: () => void;
+}) {
+  return (
+    <View style={s.genEndWrap}>
+      <Text style={s.genEndTitle}>The sea is yours</Text>
+      <Text style={s.genEndSub}>
+        {right} of {Math.max(1, asked)} right · {perfects} perfect
+      </Text>
+      <Pressable
+        onPress={onLeave}
+        accessibilityRole="button"
+        accessibilityLabel="Back to the chart"
+        style={({ pressed }) => [s.genEndButton, pressed && { transform: [{ translateY: 3 }] }]}
+      >
+        <Text style={s.genEndButtonText}>Back to the chart</Text>
+      </Pressable>
+    </View>
+  );
+}
+
+/**
  * A fresh seed for each duel this screen starts — and therefore a fresh `duelId`.
  *
  * The reducer is pure, so a duel's identity is a function of its seed. This file used to hardcode
@@ -455,6 +786,70 @@ function resolveCopy(state: ReturnType<typeof initialDuelState>): ResolveCopy {
   }
 }
 
+// ── Gen-branch copy helpers — the guided screen's view-shaped variants, verbatim copy ─────────
+
+function genCorrectionText(view: UnchartedScreenView): string {
+  if (view.question === null) return '';
+  return view.question.text.replace('?', String(view.question.answer));
+}
+
+function genResolveCopy(view: UnchartedScreenView, spectacle: string | null | undefined): ResolveCopy {
+  const damage = view.outcome?.damageToEnemy ?? 0;
+  const recoil = view.outcome?.damageToSelf ?? 0;
+
+  switch (view.phase) {
+    case 'miss':
+      return recoil > 0
+        ? {
+            background: color.goldDeep,
+            icon: '!',
+            title: 'She kicked back!',
+            body: `−${recoil} to your own deck`,
+            hint: `Big guns bite. That is the price of the ${spectacle?.toLowerCase() ?? 'big'} shot — the crew will patch it.`,
+          }
+        : {
+            background: color.sea,
+            icon: '~',
+            title: 'Splash — short of the mark',
+            body: 'No harm done. Look at the answer.',
+            hint: 'A wrong tap never damages your own ship. The turn just passes.',
+          };
+    case 'timeout':
+      return {
+        background: color.goldDeep,
+        icon: '◌',
+        title: 'Damp powder',
+        body: 'The fuse burned out. Nothing lost.',
+        hint: 'Slow is fine. The fuse only decides how hard the shot lands.',
+      };
+    case 'rivalImpact':
+      return view.rivalDamage > 0
+        ? {
+            background: '#6C4BD6',
+            // U+FE0E — this icon renders white on purple in ResolvePanel; see Hud.tsx.
+            icon: '◀︎',
+            title: 'They landed one',
+            body: `−${view.rivalDamage} to your hull`,
+            hint: 'Planks, not lives. Your hull is always patched after a duel.',
+          }
+        : {
+            background: color.sea,
+            icon: '~',
+            title: 'Splash — they missed',
+            body: 'No harm done.',
+            hint: 'Even rivals misfire. Your deck stays whole.',
+          };
+    default:
+      return {
+        background: color.success,
+        icon: '✓',
+        title: view.outcome?.perfectShot === true ? 'Perfect hit!' : 'Direct hit!',
+        body: `−${damage} to their hull`,
+        hint: 'Answer while the fuse is still gold and the shot flies truer.',
+      };
+  }
+}
+
 const s = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#0C5E86' },
   hud: { paddingHorizontal: space[3], paddingTop: 4, paddingBottom: space[2], gap: space[2] },
@@ -467,4 +862,21 @@ const s = StyleSheet.create({
     borderTopRightRadius: radius.sheet,
     overflow: 'hidden',
   },
+
+  // ── The gen victory sheet (pre-A-081) ───────────────────────────────────────────────────────
+  genEndWrap: { flex: 1, padding: space[4], gap: 10, alignItems: 'center', justifyContent: 'center' },
+  genEndTitle: { ...type.display, fontSize: 26, lineHeight: 32, color: color.inkDark },
+  genEndSub: { ...type.title, color: color.inkDark },
+  genEndButton: {
+    alignSelf: 'stretch',
+    height: MIN_TAP_TARGET,
+    marginTop: space[2],
+    borderRadius: radius.card,
+    backgroundColor: color.amber,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 4,
+    borderBottomColor: color.goldDeep,
+  },
+  genEndButtonText: { ...type.display, fontSize: 20, lineHeight: 24, color: color.inkDark },
 });
